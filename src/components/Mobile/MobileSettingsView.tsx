@@ -5,7 +5,7 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import { accountClient } from '../../lib/sync/account';
 import { navigatePage } from '../../lib/navigation';
 import { acceptSharedVault } from '../../lib/sync/vaultSharing';
-import { Database } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { SettingsGroup, SettingsRow, SettingsDivider } from '../Settings/SettingsUI';
 import { ProfileCard } from '../Settings/ProfileCard';
@@ -93,7 +93,7 @@ export const MobileSettingsView: React.FC = () => {
 
         <SettingsGroup className="pt-5">
           <SettingsRow
-            icon={<Database className="w-4 h-4" />}
+            icon={<Icon name="entity.vault" size="md" tone="inherit" />}
             label={vault.name || 'SLAG Vault'}
             value={<span className="font-mono">{folders.length} • {items.length}</span>}
             testId="mobile-vault-row"
@@ -108,7 +108,7 @@ export const MobileSettingsView: React.FC = () => {
             {accountState.invitations.map((inv, index) => (
               <React.Fragment key={inv.vaultId}>
                 {index > 0 && <SettingsDivider />}
-                <SettingsRow icon={<Database className="w-4 h-4" />} label={inv.vaultName || inv.vaultId} description={inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'} right={
+                <SettingsRow icon={<Icon name="entity.vault" size="md" tone="inherit" />} label={inv.vaultName || inv.vaultId} description={inv.mode === 'receive-only' ? 'Только чтение' : 'Полный доступ'} right={
                   <span className="flex items-center gap-1.5">
                     <button type="button" onClick={() => void handleDeclineInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-muted cursor-pointer">Скрыть</button>
                     <button type="button" disabled={acceptingVaultId !== null} onClick={() => void handleAcceptInvitation(inv.vaultId)} className="px-2 py-1.5 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{acceptingVaultId === inv.vaultId ? 'подключаем…' : 'Принять'}</button>
@@ -121,7 +121,6 @@ export const MobileSettingsView: React.FC = () => {
 
         <SettingsGroup className="pt-5">
           {SETTINGS_TABS.filter((tab) => tab.id !== 'account').map((tab, index) => {
-            const TabIcon = tab.icon;
             const isUpdates = tab.id === 'updates';
             const updateValue = isUpdates
               ? appUpdate.offer?.version ?? appUpdate.platform?.currentVersion
@@ -130,10 +129,10 @@ export const MobileSettingsView: React.FC = () => {
               <React.Fragment key={tab.id}>
                 {index > 0 && <SettingsDivider inset />}
                 <SettingsRow
-                  icon={<TabIcon className="w-4 h-4" />}
+                  icon={<Icon name={tab.icon} size="md" />}
                   label={tab.label}
                   testId={`mobile-settings-${tab.id}`}
-                  value={updateValue ? <span className="font-mono text-[11px]">{updateValue}</span> : undefined}
+                  value={updateValue ? <span className="font-mono text-2xs">{updateValue}</span> : undefined}
                   onClick={() => openSettingsModal(tab.id)}
                   chevron
                 />

@@ -2,8 +2,7 @@
 import React, { useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CheckCircle2, Circle } from 'lucide-react';
-
+import { Icon } from './icons/Icon';
 interface MarkdownRendererProps {
   content: string;
   onWikiLinkClick?: (target: string) => void;
@@ -93,16 +92,16 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         );
       },
       h1: ({ children }) => (
-        <h1 className="text-sm font-bold text-zinc-100 my-1 first:mt-0 tracking-tight">{children}</h1>
+        <h1 className="text-sm font-bold text-fg-primary my-1 first:mt-0 tracking-tight">{children}</h1>
       ),
       h2: ({ children }) => (
-        <h2 className="text-xs font-bold text-zinc-100 my-1 first:mt-0 tracking-tight">{children}</h2>
+        <h2 className="text-xs font-bold text-fg-primary my-1 first:mt-0 tracking-tight">{children}</h2>
       ),
       h3: ({ children }) => (
-        <h3 className="text-xs font-semibold text-zinc-200 my-0.5 first:mt-0">{children}</h3>
+        <h3 className="text-xs font-semibold text-fg-soft my-0.5 first:mt-0">{children}</h3>
       ),
       h4: ({ children }) => (
-        <h4 className="text-xs font-medium text-zinc-300 my-0.5 first:mt-0">{children}</h4>
+        <h4 className="text-xs font-medium text-fg-tertiary my-0.5 first:mt-0">{children}</h4>
       ),
       p: ({ children }) =>
         inline ? (
@@ -110,8 +109,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         ) : (
           <p className="mb-1.5 last:mb-0 leading-relaxed whitespace-pre-line">{children}</p>
         ),
-      strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
-      em: ({ children }) => <em className="italic text-zinc-300">{children}</em>,
+      strong: ({ children }) => <strong className="font-semibold text-fg-primary">{children}</strong>,
+      em: ({ children }) => <em className="italic text-fg-tertiary">{children}</em>,
       ul: ({ children }) => <ul className="list-disc list-inside my-1 space-y-0.5 pl-1">{children}</ul>,
       ol: ({ children }) => <ol className="list-decimal list-inside my-1 space-y-0.5 pl-1">{children}</ol>,
       li: ({ children, className }) => {
@@ -123,9 +122,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       input: ({ type, checked }) => {
         if (type === 'checkbox') {
           return checked ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5 inline-block" />
+            <Icon name="status.done" size="sm" tone="success" className="shrink-0 mt-0.5 inline-block" />
           ) : (
-            <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0 mt-0.5 inline-block" />
+            <Icon name="status.todo" size="sm" tone="dim" className="shrink-0 mt-0.5 inline-block" />
           );
         }
         return null;
@@ -135,7 +134,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         if (isInline) {
           return (
             <code
-              className="px-1 py-0.5 rounded bg-white/[0.06] text-zinc-300 font-mono text-[11px]"
+              className="px-1 py-0.5 rounded bg-tint-6 text-fg-tertiary font-mono text-2xs"
               {...props}
             >
               {children}
@@ -149,31 +148,31 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         );
       },
       pre: ({ children }) => (
-        <pre className="p-2 my-1.5 rounded bg-black/40 border border-white/[0.06] font-mono text-[11px] text-zinc-300 overflow-x-auto leading-normal">
+        <pre className="p-2 my-1.5 rounded bg-scrim-40 border border-tint-6 font-mono text-2xs text-fg-tertiary overflow-x-auto leading-normal">
           {children}
         </pre>
       ),
       blockquote: ({ children }) => (
-        <blockquote className="border-l-2 border-zinc-700 pl-2.5 my-1.5 text-zinc-400 italic">
+        <blockquote className="border-l-2 border-tint-14 pl-2.5 my-1.5 text-fg-secondary italic">
           {children}
         </blockquote>
       ),
       table: ({ children }) => (
         <div className="overflow-x-auto my-1.5">
-          <table className="min-w-full border-collapse border border-white/[0.08] text-xs">
+          <table className="min-w-full border-collapse border border-tint-8 text-xs">
             {children}
           </table>
         </div>
       ),
       th: ({ children }) => (
-        <th className="border border-white/[0.08] bg-white/[0.04] px-2 py-1 text-left font-medium text-zinc-200">
+        <th className="border border-tint-8 bg-tint-4 px-2 py-1 text-left font-medium text-fg-soft">
           {children}
         </th>
       ),
       td: ({ children }) => (
-        <td className="border border-white/[0.08] px-2 py-1 text-zinc-300">{children}</td>
+        <td className="border border-tint-8 px-2 py-1 text-fg-tertiary">{children}</td>
       ),
-      hr: () => <hr className="my-2 border-white/[0.08]" />,
+      hr: () => <hr className="my-2 border-tint-8" />,
     }),
     [onWikiLinkClick, inline]
   );
@@ -193,7 +192,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   }
 
   return (
-    <div className={`slag-markdown text-xs text-zinc-300 font-normal ${className}`}>
+    <div className={`slag-markdown text-xs text-fg-tertiary font-normal ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={components}

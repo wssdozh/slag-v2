@@ -111,7 +111,7 @@ export function useSheetDrag({ isOpen, onDismiss }: SheetDragOptions) {
       panel.style.translate = `0 ${offset}px`;
     }
     // The scrim dims with the sheet, but never below half of its own strength:
-    // `bg-black/70` at full opacity, so opacity 1 - 0.5·progress lands on exactly
+    // `bg-scrim-70` at full opacity, so opacity 1 - 0.5·progress lands on exactly
     // the 0.7 → 0.35 alpha ramp the colour animation used to draw.
     const scrim = scrimRef.current;
     if (scrim && session.height > 0) {

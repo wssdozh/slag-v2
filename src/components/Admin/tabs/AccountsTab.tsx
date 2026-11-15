@@ -3,21 +3,7 @@ import React from 'react';
 import { SparklineChart, BarChart } from '../Charts';
 import type { AdminAccount, AnalyticsData } from '../useAdminData';
 import { shortId } from '../../../lib/text/shortId';
-import {
-  Check,
-  Clock,
-  Copy,
-  CreditCard,
-  FolderSync,
-  Laptop,
-  Lock,
-  Smartphone,
-  Trash2,
-  TrendingUp,
-  Unlock,
-  Zap,
-} from 'lucide-react';
-
+import { Icon } from '../../UI/icons/Icon';
 interface AccountsTabProps {
   period: '7d' | '30d';
   accounts: AdminAccount[];
@@ -93,10 +79,10 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
       {/* Charts: User Growth & App Launches */}
       {analytics && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
+          <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs font-medium text-white">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <Icon name="admin.trend" size="sm" tone="success" />
                 <span>рост пользователей (новых за {period})</span>
               </div>
             </div>
@@ -105,15 +91,15 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 label: g.date.slice(5),
                 value: g.total,
               }))}
-              color="#10b981"
+              color="var(--color-success)"
               unit="юзеров"
             />
           </div>
 
-          <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
+          <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs font-medium text-white">
               <div className="flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 text-sky-400" />
+                <Icon name="status.priority" size="sm" tone="info" />
                 <span>активность и заходы в приложение</span>
               </div>
             </div>
@@ -122,7 +108,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 label: l.date.slice(5),
                 value: l.total,
               }))}
-              color="#38bdf8"
+              color="var(--color-mention)"
               unit="заходов"
             />
           </div>
@@ -130,24 +116,24 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
       )}
 
       {/* Filter controls */}
-      <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
+      <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="поиск по id или имени устройства..."
-            className="w-full sm:max-w-xs rounded-lg border border-white/[0.08] bg-panel px-3 py-1.5 text-xs text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+            className="w-full sm:max-w-xs rounded-lg border border-tint-8 bg-panel px-3 py-1.5 text-xs text-fg-primary font-mono outline-none ring-0 focus:border-tint-20 transition-colors"
           />
-          <span className="text-xs font-mono text-zinc-500 shrink-0">
+          <span className="text-xs font-mono text-fg-muted shrink-0">
             найдено: {filteredAccounts.length} / {accounts.length}
           </span>
         </div>
 
         {/* Multi-facet filter buttons */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/[0.04] text-[11px] font-mono">
-          <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
-            <span className="text-zinc-500 mr-1">тариф:</span>
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-tint-4 text-2xs font-mono">
+          <div className="flex items-center gap-1 pr-2 border-r border-tint-6">
+            <span className="text-fg-muted mr-1">тариф:</span>
             {(['all', 'free', 'smile', 'angry'] as const).map((p) => (
               <button
                 key={p}
@@ -156,7 +142,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                   filterPlan === p
                     ? 'bg-white text-black font-semibold'
-                    : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                    : 'bg-tint-3 text-fg-secondary hover:text-white'
                 }`}
               >
                 {p === 'all' ? 'все' : p}
@@ -164,8 +150,8 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
-            <span className="text-zinc-500 mr-1">статус:</span>
+          <div className="flex items-center gap-1 pr-2 border-r border-tint-6">
+            <span className="text-fg-muted mr-1">статус:</span>
             {(['all', 'active', 'blocked'] as const).map((s) => (
               <button
                 key={s}
@@ -174,7 +160,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                   filterStatus === s
                     ? 'bg-white text-black font-semibold'
-                    : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                    : 'bg-tint-3 text-fg-secondary hover:text-white'
                 }`}
               >
                 {s === 'all' ? 'все' : s}
@@ -182,8 +168,8 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1 pr-2 border-r border-white/[0.06]">
-            <span className="text-zinc-500 mr-1">платформа:</span>
+          <div className="flex items-center gap-1 pr-2 border-r border-tint-6">
+            <span className="text-fg-muted mr-1">платформа:</span>
             {(['all', 'desktop', 'mobile'] as const).map((plt) => (
               <button
                 key={plt}
@@ -192,7 +178,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                   filterPlatform === plt
                     ? 'bg-white text-black font-semibold'
-                    : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                    : 'bg-tint-3 text-fg-secondary hover:text-white'
                 }`}
               >
                 {plt === 'all' ? 'все' : plt}
@@ -206,13 +192,13 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
             className={`px-2.5 py-0.5 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
               filterExpiringSoon
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                : 'bg-tint-3 text-fg-secondary hover:text-white'
             }`}
           >
-            <Clock className="w-3 h-3 text-amber-400" />
+            <Icon name="time.time" size="xs" tone="warning" />
             <span>истекают скоро (≤7д)</span>
             {expiringAccounts.length > 0 && (
-              <span className="px-1 rounded bg-amber-500/30 text-[10px] text-amber-200">
+              <span className="px-1 rounded bg-amber-500/30 text-3xs text-amber-200">
                 {expiringAccounts.length}
               </span>
             )}
@@ -227,7 +213,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
           const isInlineOpen = inlineGrantAccountId === acc.id;
 
           return (
-            <div key={acc.id} className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
+            <div key={acc.id} className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-mono font-medium text-white break-all" title={acc.id}>
@@ -236,14 +222,14 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                   <button
                     type="button"
                     onClick={() => void copyAccountId(acc.id)}
-                    className="text-zinc-500 hover:text-white transition-colors cursor-pointer shrink-0"
+                    className="text-fg-muted hover:text-white transition-colors cursor-pointer shrink-0"
                     title="скопировать id"
                   >
-                    {copiedId === acc.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedId === acc.id ? <Icon name="action.check" size="sm" tone="success" /> : <Icon name="action.copy" size="sm" tone="inherit" />}
                   </button>
                   <span
-                    className={`text-[11px] font-mono px-1.5 py-0.5 rounded ${
-                      acc.status === 'blocked' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-zinc-500'
+                    className={`text-2xs font-mono px-1.5 py-0.5 rounded ${
+                      acc.status === 'blocked' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-fg-muted'
                     }`}
                   >
                     {acc.status}
@@ -255,9 +241,9 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                   <button
                     type="button"
                     onClick={() => setInlineGrantAccountId((prev) => (prev === acc.id ? null : acc.id))}
-                    className="px-2.5 py-1 text-[11px] font-mono rounded bg-white/10 hover:bg-white/15 text-zinc-200 flex items-center gap-1 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 text-2xs font-mono rounded bg-tint-10 hover:bg-tint-15 text-fg-soft flex items-center gap-1 transition-colors cursor-pointer"
                   >
-                    <CreditCard className="w-3 h-3 text-emerald-400" />
+                    <Icon name="admin.billing" size="xs" tone="success" />
                     <span>{isInlineOpen ? 'скрыть' : '+ подписка'}</span>
                   </button>
 
@@ -270,10 +256,10 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                           type="button"
                           disabled={isUpdating || isActive}
                           onClick={() => void onPlanChange(acc.id, plan)}
-                          className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors cursor-pointer disabled:cursor-default ${
+                          className={`px-2.5 py-1 text-2xs font-mono rounded transition-colors cursor-pointer disabled:cursor-default ${
                             isActive
                               ? 'bg-white text-black font-medium'
-                              : 'bg-white/[0.04] text-zinc-400 hover:text-white hover:bg-white/[0.08]'
+                              : 'bg-tint-4 text-fg-secondary hover:text-white hover:bg-tint-8'
                           }`}
                         >
                           {plan}
@@ -288,11 +274,11 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                     className={`p-1.5 rounded transition-colors cursor-pointer ${
                       acc.status === 'blocked'
                         ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
-                        : 'bg-white/[0.04] text-zinc-400 hover:text-rose-400 hover:bg-white/[0.08]'
+                        : 'bg-tint-4 text-fg-secondary hover:text-rose-400 hover:bg-tint-8'
                     }`}
                     title={acc.status === 'blocked' ? 'разблокировать' : 'заблокировать'}
                   >
-                    {acc.status === 'blocked' ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                    {acc.status === 'blocked' ? <Icon name="status.unlocked" size="sm" tone="inherit" /> : <Icon name="action.lock" size="sm" tone="inherit" />}
                   </button>
                 </div>
               </div>
@@ -300,15 +286,15 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
               {/* Inline Quick Grant Drawer */}
               {isInlineOpen && (
                 <div className="p-3 rounded-lg bg-panel border border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-xs text-zinc-300">
-                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                  <div className="flex items-center gap-2 text-xs text-fg-tertiary">
+                    <Icon name="status.priority" size="sm" tone="success" />
                     <span>быстрое продление:</span>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] font-mono">
+                  <div className="flex items-center gap-2 text-2xs font-mono">
                     <select
                       value={inlinePlan}
                       onChange={(e) => setInlinePlan(e.target.value as 'smile' | 'angry')}
-                      className="rounded bg-surface border border-white/[0.08] px-2 py-1 text-white outline-none"
+                      className="rounded bg-surface border border-tint-8 px-2 py-1 text-white outline-none"
                     >
                       <option value="smile">Smile (190 ₽)</option>
                       <option value="angry">Angry (490 ₽)</option>
@@ -316,7 +302,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                     <select
                       value={inlineDays}
                       onChange={(e) => setInlineDays(e.target.value)}
-                      className="rounded bg-surface border border-white/[0.08] px-2 py-1 text-white outline-none"
+                      className="rounded bg-surface border border-tint-8 px-2 py-1 text-white outline-none"
                     >
                       <option value="30">30 дней</option>
                       <option value="90">90 дней</option>
@@ -334,66 +320,66 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-400">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-secondary">
                 <span>кеш {acc.usedCacheMb} / {acc.maxCacheMb} мб</span>
                 <span>устройств {acc.devices.length} / {acc.maxDevices}</span>
                 {acc.vaults && acc.vaults.length > 0 && <span>хранилищ: {acc.vaults.length}</span>}
                 {acc.createdAt && (
-                  <span className="text-zinc-500">
+                  <span className="text-fg-muted">
                     создан {new Date(acc.createdAt).toLocaleDateString('ru-RU')}
                   </span>
                 )}
                 {acc.expiresAt && (
-                  <span className="text-amber-400/90 font-mono text-[11px]">
+                  <span className="text-amber-400/90 font-mono text-2xs">
                     подписка до {new Date(acc.expiresAt).toLocaleDateString('ru-RU')}
                   </span>
                 )}
               </div>
 
               {acc.vaults && acc.vaults.length > 0 && (
-                <div className="border-t border-white/[0.04] pt-2 flex flex-wrap gap-2 text-[11px] text-zinc-400">
+                <div className="border-t border-tint-4 pt-2 flex flex-wrap gap-2 text-2xs text-fg-secondary">
                   {acc.vaults.map((v) => (
                     <span
                       key={v.id}
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/[0.03] border border-white/[0.04]"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-tint-3 border border-tint-4"
                     >
-                      <FolderSync className="w-3 h-3 text-zinc-500" />
-                      <span className="text-zinc-300">{v.name}</span>
-                      <span className="text-zinc-500 font-mono">({v.grantsCount} девайсов)</span>
+                      <Icon name="entity.folderSynced" size="xs" tone="muted" />
+                      <span className="text-fg-tertiary">{v.name}</span>
+                      <span className="text-fg-muted font-mono">({v.grantsCount} девайсов)</span>
                     </span>
                   ))}
                 </div>
               )}
 
               {acc.devices.length > 0 && (
-                <div className="border-t border-white/[0.04] pt-2.5 flex flex-col gap-1.5">
+                <div className="border-t border-tint-4 pt-2.5 flex flex-col gap-1.5">
                   {acc.devices.map((dev) => (
                     <div key={dev.id} className="flex items-center justify-between gap-2 text-xs">
                       <div className="flex items-center gap-2 min-w-0">
                         {dev.platform === 'mobile' ? (
-                          <Smartphone className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                          <Icon name="entity.phone" size="sm" tone="muted" className="shrink-0" />
                         ) : (
-                          <Laptop className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                          <Icon name="entity.desktop" size="sm" tone="muted" className="shrink-0" />
                         )}
-                        <span className="text-zinc-300 truncate">{dev.name}</span>
-                        <span className="text-[11px] font-mono text-zinc-600 truncate" title={dev.id}>
+                        <span className="text-fg-tertiary truncate">{dev.name}</span>
+                        <span className="text-2xs font-mono text-fg-dim truncate" title={dev.id}>
                           {shortId(dev.id)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-[11px] font-mono shrink-0">
+                      <div className="flex items-center gap-3 text-2xs font-mono shrink-0">
                         <span
                           className={
                             dev.status === 'active'
                               ? 'text-emerald-400'
                               : dev.status === 'pending'
                               ? 'text-amber-400'
-                              : 'text-zinc-500'
+                              : 'text-fg-muted'
                           }
                         >
                           {dev.status}
                         </span>
                         {dev.lastSeenAt && (
-                          <span className="text-zinc-500 hidden sm:inline">
+                          <span className="text-fg-muted hidden sm:inline">
                             {new Date(dev.lastSeenAt).toLocaleDateString('ru-RU')}
                           </span>
                         )}
@@ -402,10 +388,10 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                             type="button"
                             disabled={actionBusy}
                             onClick={() => void onRevokeDevice(acc.id, dev.id)}
-                            className="text-zinc-500 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-40"
+                            className="text-fg-muted hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-40"
                             title="отозвать доступ"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Icon name="action.delete" size="xs" tone="inherit" />
                           </button>
                         )}
                       </div>
@@ -418,7 +404,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
         })}
 
         {filteredAccounts.length === 0 && (
-          <div className="py-8 text-center text-xs text-zinc-500">
+          <div className="py-8 text-center text-xs text-fg-muted">
             {accounts.length === 0 ? 'нет зарегистрированных аккаунтов' : 'ничего не найдено под выбранные фильтры'}
           </div>
         )}

@@ -1,13 +1,6 @@
 // The thread: empty-state prompts, message bubbles, tool traces, and scroll to the newest.
 import React, { useEffect, useRef } from 'react';
-import {
-  Sparkles,
-  Loader2,
-  Search,
-  CheckSquare,
-  Calendar,
-  BarChart3,
-} from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { useApp } from '../../../context/AppContext';
 import { prefersReducedMotion } from '../../../lib/motion';
 import type { ChatMessage, SuggestedAction } from '../../../types';
@@ -73,56 +66,56 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
       <div className={`w-full flex-1 flex flex-col gap-3.5 ${isSidebar ? '' : 'max-w-2xl mx-auto'}`}>
         {messages.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
-            <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-zinc-300 mb-2.5">
-              <Sparkles className="w-4 h-4 text-zinc-300" />
+            <div className="w-9 h-9 rounded-xl bg-tint-4 border border-tint-6 flex items-center justify-center text-fg-tertiary mb-2.5">
+              <Icon name="system.ai" size="md" tone="tertiary" />
             </div>
-            <h3 className="text-sm font-semibold text-zinc-200 mb-1">
+            <h3 className="text-sm font-semibold text-fg-soft mb-1">
               {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderLabel}»`}
             </h3>
-            <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+            <p className="text-xs text-fg-secondary mb-4 leading-relaxed">
               Задайте вопрос, найдите записи или попросите создать таску.
             </p>
 
             <div className="flex flex-col gap-1.5 w-full">
               <button
                 onClick={() => onQuickPrompt('Покажи план на сегодня и календарную повестку')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <Icon name="time.date" size="sm" className="shrink-0" />
                   <span>План на сегодня</span>
                 </span>
-                <span className="text-2xs text-zinc-500 font-mono">agenda</span>
+                <span className="text-2xs text-fg-muted font-mono">agenda</span>
               </button>
               <button
                 onClick={() => onQuickPrompt('Найди ключевые заметки')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <Icon name="action.search" size="sm" className="shrink-0" />
                   <span>Поиск заметок</span>
                 </span>
-                <span className="text-2xs text-zinc-500 font-mono">search</span>
+                <span className="text-2xs text-fg-muted font-mono">search</span>
               </button>
               <button
                 onClick={() => onQuickPrompt('Создай новую таску: Проверить синхронизацию заметок')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <CheckSquare className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <Icon name="entity.task" size="sm" className="shrink-0" />
                   <span>Создать таску</span>
                 </span>
-                <span className="text-2xs text-zinc-500 font-mono">task</span>
+                <span className="text-2xs text-fg-muted font-mono">task</span>
               </button>
               <button
                 onClick={() => onQuickPrompt('Сколько заметок и задач в хранилище?')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.04] text-xs text-zinc-300 transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
-                  <BarChart3 className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <Icon name="admin.chart" size="sm" className="shrink-0" />
                   <span>Сводка хранилища</span>
                 </span>
-                <span className="text-2xs text-zinc-500 font-mono">stats</span>
+                <span className="text-2xs text-fg-muted font-mono">stats</span>
               </button>
             </div>
           </div>
@@ -145,10 +138,10 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
               className={`flex flex-col gap-1.5 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               {/* Message Header */}
-              <div className="flex items-center gap-1.5 text-2xs text-zinc-500 font-mono px-1">
+              <div className="flex items-center gap-1.5 text-2xs text-fg-muted font-mono px-1">
                 {msg.role === 'assistant' ? (
                   <>
-                    <Sparkles className="w-3 h-3 text-zinc-400" />
+                    <Icon name="system.ai" size="xs" />
                     <span>SLAG</span>
                   </>
                 ) : (
@@ -213,8 +206,8 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
       )}
 
       {isLoading && (
-        <div className="flex items-center gap-2 text-zinc-500 text-xs px-2 py-1">
-          <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+        <div className="flex items-center gap-2 text-fg-muted text-xs px-2 py-1">
+          <Icon name="status.loading" size="sm" className="animate-spin" />
           <span>Ассистент думает...</span>
         </div>
       )}

@@ -9,7 +9,7 @@ const MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'и�
 
 /** Five steps, chosen relative to the busiest day so a quiet vault still reads as a graph. */
 const LEVEL_CLASS = [
-  'bg-white/[0.05]',
+  'bg-tint-5',
   'bg-accent/25',
   'bg-accent/45',
   'bg-accent/70',
@@ -64,7 +64,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
         ].map((stat) => (
           <div key={stat.label} className="flex flex-col gap-0.5">
             <span className="font-mono text-sm text-fg-primary">{stat.value.toLocaleString('ru-RU')}</span>
-            <span className="text-[10px] leading-tight text-fg-muted">{stat.label}</span>
+            <span className="text-3xs leading-tight text-fg-muted">{stat.label}</span>
           </div>
         ))}
       </div>
@@ -72,7 +72,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
       <div className="overflow-x-auto">
         <div className="flex gap-1.5 pt-1">
           <div
-            className="grid pt-[15px] text-[9px] leading-[7px] text-fg-dim"
+            className="grid pt-[15px] text-4xs leading-[7px] text-fg-dim"
             style={{ gridTemplateRows: `repeat(7, ${CELL}px)`, rowGap: `${GAP}px` }}
           >
             {['пн', '', 'ср', '', 'пт', '', ''].map((label, index) => (
@@ -80,7 +80,7 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
             ))}
           </div>
           <div className="flex flex-col" style={{ gap: `${GAP}px` }}>
-            <div className="grid text-[9px] leading-[7px] text-fg-dim" style={{ gridTemplateColumns: template, columnGap: `${GAP}px` }}>
+            <div className="grid text-4xs leading-[7px] text-fg-dim" style={{ gridTemplateColumns: template, columnGap: `${GAP}px` }}>
               {monthLabels.map((label, index) => (
                 <span key={index} className="whitespace-nowrap">
                   {label}
@@ -104,17 +104,17 @@ export const ActivityHeatmap: React.FC<ActivityHeatmapProps> = ({ summary }) => 
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] text-fg-dim">
+        <span className="text-3xs text-fg-dim">
           {summary.bestDay === 0
             ? 'пока ни одной записи'
             : `${summary.activeDays} ${pluralRu(summary.activeDays, ['активный день', 'активных дня', 'активных дней'])} за год · ${humanDate(summary.firstDate, true)} — ${humanDate(summary.lastDate)}`}
         </span>
         <span className="flex items-center gap-1">
-          <span className="text-[10px] text-fg-dim">меньше</span>
+          <span className="text-3xs text-fg-dim">меньше</span>
           {LEVEL_CLASS.map((tone, index) => (
             <span key={index} className={`rounded-[2px] ${tone}`} style={{ width: CELL, height: CELL }} />
           ))}
-          <span className="text-[10px] text-fg-dim">больше</span>
+          <span className="text-3xs text-fg-dim">больше</span>
         </span>
       </div>
     </div>

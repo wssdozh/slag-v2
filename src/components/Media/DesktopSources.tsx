@@ -1,7 +1,6 @@
 // Desktop's attach shortcuts: images, files and voice, each behind a system dialog.
 import React, { useRef } from 'react';
-import { FileUp, Images, Mic } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 interface SourceTileProps {
   icon: React.ReactNode;
   label: string;
@@ -13,11 +12,11 @@ const SourceTile: React.FC<SourceTileProps> = ({ icon, label, hint, onClick }) =
   <button
     type="button"
     onClick={onClick}
-    className="flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-white/[0.06] bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-hover active:bg-surface-hover"
+    className="flex cursor-pointer flex-col items-start gap-1 rounded-xl border border-tint-6 bg-surface px-3 py-2.5 text-left transition-colors hover:bg-surface-hover active:bg-surface-hover"
   >
     <span className="text-fg-secondary">{icon}</span>
     <span className="text-xs font-medium leading-tight text-fg-primary">{label}</span>
-    <span className="text-[10px] leading-tight text-fg-muted">{hint}</span>
+    <span className="text-3xs leading-tight text-fg-muted">{hint}</span>
   </button>
 );
 
@@ -37,19 +36,19 @@ export const DesktopSources: React.FC<DesktopSourcesProps> = ({ onPickFiles, onR
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       <SourceTile
-        icon={<Images className="h-4 w-4" />}
+        icon={<Icon name="entity.images" size="md" tone="inherit" />}
         label="Фото и видео"
         hint="из галереи"
         onClick={() => mediaInputRef.current?.click()}
       />
       <SourceTile
-        icon={<FileUp className="h-4 w-4" />}
+        icon={<Icon name="action.uploadFile" size="md" tone="inherit" />}
         label="Файл"
         hint="любой документ"
         onClick={() => filesInputRef.current?.click()}
       />
       <SourceTile
-        icon={<Mic className="h-4 w-4" />}
+        icon={<Icon name="media.microphone" size="md" tone="inherit" />}
         label="Голос"
         hint="записать сейчас"
         onClick={onRecordVoice}

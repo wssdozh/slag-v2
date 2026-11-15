@@ -1,6 +1,6 @@
 // The task-only composer controls: due date, duration, recurrence and priority.
 import React, { useState } from 'react';
-import { Calendar, Clock, Repeat } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import type { RecurrenceRule, SlagItemPriority } from '../../types';
 import { ToolbarButton } from '../UI/ToolbarButton';
 import { MenuDropdown } from '../UI/MenuDropdown';
@@ -61,7 +61,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
               : 'Установить срок таски'
           }
           aria-label={effectiveDueDate ? `Срок: ${effectiveDateLabel}` : 'Установить срок таски'}
-          icon={<Calendar className="w-4 h-4" />}
+          icon={<Icon name="time.date" size="md" tone="inherit" />}
         />
 
         <DatePickerPopover
@@ -109,7 +109,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 : 'Установить длительность таски'
             }
             aria-label="Установить длительность таски"
-            icon={<Clock className="w-4 h-4" />}
+            icon={<Icon name="time.time" size="md" tone="inherit" />}
           />
         }
       >
@@ -121,7 +121,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 onDurationChange(undefined);
                 setIsDurationOpen(false);
               }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-tint-6 mb-0.5"
             >
               <span>Без длительности</span>
             </button>
@@ -136,8 +136,8 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
               }}
               className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
                 effectiveDuration === mins
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-300 hover:bg-white/[0.06]'
+                  ? 'bg-tint-10 text-white font-medium'
+                  : 'text-fg-tertiary hover:bg-tint-6'
               }`}
             >
               <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
@@ -171,7 +171,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 : 'повторение: настроить повтор'
             }
             aria-label="Повторяющаяся таска"
-            icon={<Repeat className="w-4 h-4" />}
+            icon={<Icon name="time.repeat" size="md" tone="inherit" />}
           />
         }
       >
@@ -183,7 +183,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 onRecurrenceChange(undefined);
                 setIsRecurrenceOpen(false);
               }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-white/[0.06] mb-0.5"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer border-b border-tint-6 mb-0.5"
             >
               <span>Без повторения</span>
             </button>
@@ -196,7 +196,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
                 onRecurrenceChange(opt.rule);
                 setIsRecurrenceOpen(false);
               }}
-              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-fg-tertiary hover:bg-tint-6 transition-colors cursor-pointer"
             >
               <span>{opt.label}</span>
             </button>
@@ -224,13 +224,13 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
               value: 'none',
               label: 'Обычный',
               icon: <LinearSignalBars size="md" priority="none" />,
-              color: 'text-zinc-400',
+              color: 'text-fg-secondary',
             },
             {
               value: 'low',
               label: PRIORITY_LABELS.low,
               icon: <LinearSignalBars size="md" priority="low" />,
-              color: 'text-zinc-300',
+              color: 'text-fg-tertiary',
             },
             {
               value: 'medium',

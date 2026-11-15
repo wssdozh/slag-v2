@@ -1,6 +1,6 @@
 // Round Telegram-style video bubble: tap to play, mute toggle, progress ring.
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import { bindMediaEvents } from '../../lib/media/mediaEvents';
 
 interface VideoCirclePlayerProps {
@@ -65,7 +65,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
   return (
     <div
       onClick={togglePlay}
-      className={`relative ${sizeClass} rounded-full overflow-hidden bg-black border border-white/10 shadow-2xl cursor-pointer group select-none shrink-0`}
+      className={`relative ${sizeClass} rounded-full overflow-hidden bg-black border border-tint-10 shadow-2xl cursor-pointer group select-none shrink-0`}
       title="Нажмите для воспроизведения/паузы"
     >
       <video
@@ -86,7 +86,7 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
           cy={compact ? 48 : 112}
           r={radius}
           fill="none"
-          stroke="rgba(255, 255, 255, 0.15)"
+          className="stroke-tint-15"
           strokeWidth={compact ? 2.5 : 3.5}
         />
         {/* Active progress arc */}
@@ -95,26 +95,25 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
           cy={compact ? 48 : 112}
           r={radius}
           fill="none"
-          stroke="#ffffff"
+          className="stroke-fg-primary transition-[stroke-dashoffset] duration-75"
           strokeWidth={compact ? 2.5 : 3.5}
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
-          className="transition-[stroke-dashoffset] duration-75"
         />
       </svg>
 
       {/* Play/Pause Center Button on hover or when paused */}
       <div
-        className={`absolute inset-0 flex items-center justify-center bg-black/35 transition-opacity ${
+        className={`absolute inset-0 flex items-center justify-center bg-scrim-35 transition-opacity ${
           isPlaying ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
         }`}
       >
-        <div className="w-12 h-12 rounded-full bg-canvas/80 flex items-center justify-center text-white border border-white/20 shadow-lg motion-press">
+        <div className="w-12 h-12 rounded-full bg-canvas/80 flex items-center justify-center text-white border border-tint-20 shadow-lg motion-press">
           {isPlaying ? (
-            <Pause className="w-5 h-5 fill-current" />
+            <Icon name="media.pause" size="lg" tone="inherit" className="fill-current" />
           ) : (
-            <Play className="w-5 h-5 fill-current ml-0.5" />
+            <Icon name="media.play" size="lg" tone="inherit" className="fill-current ml-0.5" />
           )}
         </div>
       </div>
@@ -124,16 +123,16 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
         <button
           type="button"
           onClick={toggleMute}
-          className="absolute bottom-3 right-5 p-1.5 rounded-full bg-canvas/90 text-white/90 hover:text-white border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          className="absolute bottom-3 right-5 p-1.5 rounded-full bg-canvas/90 text-tint-90 hover:text-white border border-tint-10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
           title={isMuted ? 'Включить звук' : 'Выключить звук'}
         >
-          {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          {isMuted ? <Icon name="media.volumeOff" size="sm" tone="inherit" /> : <Icon name="media.volumeOn" size="sm" tone="inherit" />}
         </button>
       )}
 
       {/* Duration badge at the top if paused and non-compact */}
       {!compact && !isPlaying && duration > 0 && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-canvas/90 text-[10px] font-mono text-white/90 border border-white/10 pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-canvas/90 text-3xs font-mono text-tint-90 border border-tint-10 pointer-events-none">
           {Math.floor(duration / 60)}:{(Math.floor(duration % 60) < 10 ? '0' : '') + Math.floor(duration % 60)}
         </div>
       )}

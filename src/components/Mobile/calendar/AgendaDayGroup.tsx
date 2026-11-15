@@ -2,7 +2,7 @@
 import React from 'react';
 import type { SlagItem } from '../../../types';
 import { pluralRu, RUSSIAN_MONTHS } from '../../../lib/time/dateUtils';
-import { Plus, X } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { CalendarTaskRow } from './CalendarTaskRow';
 import type { AgendaDayLayout } from './calendarPositions';
 
@@ -29,13 +29,13 @@ interface NowLineProps {
 const NowLine: React.FC<NowLineProps> = ({ label, divider = false }) => (
   <div
     className={`w-full flex items-center gap-2 p-2.5 sm:p-3 select-none${
-      divider ? ' border-b border-white/[0.04]' : ''
+      divider ? ' border-b border-tint-4' : ''
     }`}
   >
     <div className="w-6 flex items-center justify-center shrink-0">
       <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/80" />
     </div>
-    <span className="text-[11px] font-mono font-semibold text-rose-400 shrink-0">
+    <span className="text-2xs font-mono font-semibold text-rose-400 shrink-0">
       {label}
     </span>
     <div className="h-px flex-1 bg-rose-500/40" />
@@ -69,19 +69,19 @@ export const AgendaDayGroup: React.FC<AgendaDayGroupProps> = ({
       className="flex flex-col gap-1.5 scroll-mt-2"
     >
       <div className="flex items-center justify-between px-1">
-        <span className={`text-xs font-semibold tracking-tight ${isToday ? 'text-white' : 'text-zinc-400'}`}>
+        <span className={`text-xs font-semibold tracking-tight ${isToday ? 'text-white' : 'text-fg-secondary'}`}>
           {heading}
         </span>
         {sortedTasks.length > 0 && (
-          <span className="text-[10px] font-mono text-zinc-500">
+          <span className="text-3xs font-mono text-fg-muted">
             {sortedTasks.length} {pluralRu(sortedTasks.length, ['таска', 'таски', 'тасок'])}
           </span>
         )}
       </div>
 
-      <div className="rounded-2xl bg-surface/70 border border-white/[0.05] overflow-hidden">
+      <div className="rounded-2xl bg-surface/70 border border-tint-5 overflow-hidden">
         {sortedTasks.length > 0 ? (
-          <div className="divide-y divide-white/[0.04]">
+          <div className="divide-y divide-tint-4">
             {sortedTasks.map((task, index) => (
               <React.Fragment key={task.id}>
                 {hasNowLine && nowLineIndex === index && <NowLine label={nowLabel} />}
@@ -98,14 +98,14 @@ export const AgendaDayGroup: React.FC<AgendaDayGroupProps> = ({
         ) : (
           <div className="flex flex-col">
             {isToday && <NowLine label={nowLabel} divider />}
-            <div className="p-3 text-xs text-zinc-500 flex items-center justify-between">
+            <div className="p-3 text-xs text-fg-muted flex items-center justify-between">
               <span>— нет тасок</span>
               <button
                 type="button"
                 onClick={onStartAdding}
-                className="text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer text-xs"
+                className="text-fg-secondary hover:text-white flex items-center gap-1 cursor-pointer text-xs"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Icon name="action.add" size="sm" tone="inherit" />
                 <span>Добавить</span>
               </button>
             </div>
@@ -115,7 +115,7 @@ export const AgendaDayGroup: React.FC<AgendaDayGroupProps> = ({
         {isAdding ? (
           <form
             onSubmit={onSubmitAdd}
-            className="p-2.5 bg-black/40 border-t border-white/[0.06] flex items-center gap-2 motion-fade"
+            className="p-2.5 bg-scrim-40 border-t border-tint-6 flex items-center gap-2 motion-fade"
           >
             <input
               type="text"
@@ -123,7 +123,7 @@ export const AgendaDayGroup: React.FC<AgendaDayGroupProps> = ({
               onChange={e => onChangeAddTitle(e.target.value)}
               placeholder={`Новая задача на ${day.dayNum} ${RUSSIAN_MONTHS[day.date.getMonth()].slice(0, 3)}...`}
               autoFocus
-              className="flex-1 bg-black/50 border border-white/[0.08] rounded-xl px-3 py-1.5 text-xs text-white placeholder-zinc-500 outline-none"
+              className="flex-1 bg-scrim-50 border border-tint-8 rounded-xl px-3 py-1.5 text-xs text-white placeholder-fg-muted outline-none"
             />
             <button
               type="submit"
@@ -134,18 +134,18 @@ export const AgendaDayGroup: React.FC<AgendaDayGroupProps> = ({
             <button
               type="button"
               onClick={onCancelAdding}
-              className="p-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer"
+              className="p-1 rounded-lg text-fg-secondary hover:text-white cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           </form>
         ) : sortedTasks.length > 0 ? (
           <button
             type="button"
             onClick={onStartAdding}
-            className="w-full py-2 px-3 flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02] border-t border-white/[0.04] transition-colors cursor-pointer"
+            className="w-full py-2 px-3 flex items-center gap-1.5 text-xs text-fg-muted hover:text-fg-tertiary hover:bg-tint-2 border-t border-tint-4 transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Icon name="action.add" size="sm" tone="inherit" />
             <span>Добавить таску</span>
           </button>
         ) : null}

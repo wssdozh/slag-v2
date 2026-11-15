@@ -22,33 +22,33 @@ export interface SegmentedStripClasses {
 export const SEGMENTED_STRIP_CLASSES: Record<Exclude<SegmentedVariant, 'default'>, SegmentedStripClasses> = {
   /** Компактный переключатель в шапке календаря: иконка + подпись 10px. */
   xs: {
-    container: 'flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0',
+    container: 'flex items-center bg-surface p-0.5 rounded-lg border border-tint-8 shrink-0',
     button:
-      'px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1',
-    activeButton: () => 'bg-white/10 text-white shadow-xs font-semibold',
-    idleButton: 'text-zinc-400 hover:text-zinc-200',
+      'px-1.5 py-0.5 rounded-md text-3xs font-medium transition-colors cursor-pointer flex items-center gap-1',
+    activeButton: () => 'bg-tint-10 text-white shadow-xs font-semibold',
+    idleButton: 'text-fg-secondary hover:text-fg-soft',
     indicator: null,
   },
   /** Плоская полоса без плашки: подписи 12px, как в переключателе экрана тасок. */
   plain: {
-    container: 'flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.08] shrink-0',
+    container: 'flex items-center bg-surface p-0.5 rounded-lg border border-tint-8 shrink-0',
     button: 'px-2 py-0.5 rounded-md text-xs font-medium transition-colors cursor-pointer',
-    activeButton: () => 'bg-white/10 text-white shadow-sm',
-    idleButton: 'text-zinc-400 hover:text-zinc-200',
+    activeButton: () => 'bg-tint-10 text-white shadow-sm',
+    idleButton: 'text-fg-secondary hover:text-fg-soft',
     indicator: null,
   },
   /** Таб-бар статусов: крупные сегменты со счётчиком и белой плашкой. */
   tabs: {
     container:
-      'relative flex items-center justify-between gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none',
+      'relative flex items-center justify-between gap-1 bg-surface/90 p-1 rounded-2xl border border-tint-6 overflow-x-auto scrollbar-none',
     button:
       'relative z-10 shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap',
     activeButton: (isIndicatorReady: boolean) =>
-      `${isIndicatorReady ? '' : 'bg-white/10 shadow-sm '}text-white font-semibold`,
-    idleButton: 'text-zinc-400 hover:text-white hover:bg-white/[0.04]',
+      `${isIndicatorReady ? '' : 'bg-tint-10 shadow-sm '}text-white font-semibold`,
+    idleButton: 'text-fg-secondary hover:text-white hover:bg-tint-4',
     indicator: {
       className:
-        'absolute top-1 bottom-1 left-0 rounded-xl bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200',
+        'absolute top-1 bottom-1 left-0 rounded-xl bg-tint-10 shadow-sm pointer-events-none transition-[transform,width] duration-200',
       testId: 'status-tab-pill',
     },
   },

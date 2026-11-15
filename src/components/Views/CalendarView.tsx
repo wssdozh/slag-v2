@@ -15,13 +15,7 @@ import {
   RUSSIAN_MONTHS,
   RUSSIAN_WEEKDAYS,
 } from '../../lib/time/dateUtils';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Calendar as CalendarIcon,
-  Clock,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import {
   DEFAULT_HOUR_HEIGHT,
   useCalendarInteractions,
@@ -346,38 +340,38 @@ export const CalendarView: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-canvas text-fg-primary select-none overflow-hidden relative">
-      <div className="h-12 px-4 border-b border-white/[0.06] bg-panel flex items-center justify-between gap-3 shrink-0">
+      <div className="h-12 px-4 border-b border-tint-6 bg-panel flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <CalendarIcon className="w-4 h-4 text-zinc-300" />
-            <h2 className="text-xs font-semibold text-zinc-100 tracking-tight">
+            <Icon name="time.date" size="md" tone="tertiary" />
+            <h2 className="text-xs font-semibold text-fg-primary tracking-tight">
               {headerTitle}
             </h2>
           </div>
 
-          <div className="flex items-center gap-1 bg-white/[0.03] p-0.5 rounded-md border border-white/[0.04]">
-            <button onClick={handlePrev} className="p-1 rounded hover:bg-white/[0.06] text-zinc-400 hover:text-white transition-colors cursor-pointer" title="Предыдущий период"><ChevronLeft className="w-3.5 h-3.5" /></button>
-            <button onClick={handleToday} className="px-2 py-0.5 rounded text-[11px] font-medium text-zinc-300 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer" title="Перейти к сегодняшнему дню">Сегодня</button>
-            <button onClick={handleNext} className="p-1 rounded hover:bg-white/[0.06] text-zinc-400 hover:text-white transition-colors cursor-pointer" title="Следующий период"><ChevronRight className="w-3.5 h-3.5" /></button>
+          <div className="flex items-center gap-1 bg-tint-3 p-0.5 rounded-md border border-tint-4">
+            <button onClick={handlePrev} className="p-1 rounded hover:bg-tint-6 text-fg-secondary hover:text-white transition-colors cursor-pointer" title="Предыдущий период"><Icon name="nav.prev" size="sm" tone="inherit" /></button>
+            <button onClick={handleToday} className="px-2 py-0.5 rounded text-2xs font-medium text-fg-tertiary hover:text-white hover:bg-tint-6 transition-colors cursor-pointer" title="Перейти к сегодняшнему дню">Сегодня</button>
+            <button onClick={handleNext} className="p-1 rounded hover:bg-tint-6 text-fg-secondary hover:text-white transition-colors cursor-pointer" title="Следующий период"><Icon name="nav.next" size="sm" tone="inherit" /></button>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div aria-label="Режим календаря" className="flex items-center h-8 bg-surface p-0.5 rounded-lg border border-white/[0.08] shadow-inner shrink-0">
-            <button onClick={() => setViewMode('week')} className={`h-7 px-3 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${viewMode === 'week' ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'}`}>Неделя</button>
-            <button onClick={() => setViewMode('month')} className={`h-7 px-3 rounded-md text-[12px] font-medium transition-colors cursor-pointer ${viewMode === 'month' ? 'bg-white/10 text-white font-medium shadow-sm border border-white/[0.08]' : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04] border border-transparent'}`}>Месяц</button>
+          <div aria-label="Режим календаря" className="flex items-center h-8 bg-surface p-0.5 rounded-lg border border-tint-8 shadow-inner shrink-0">
+            <button onClick={() => setViewMode('week')} className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${viewMode === 'week' ? 'bg-tint-10 text-white font-medium shadow-sm border border-tint-8' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4 border border-transparent'}`}>Неделя</button>
+            <button onClick={() => setViewMode('month')} className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${viewMode === 'month' ? 'bg-tint-10 text-white font-medium shadow-sm border border-tint-8' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4 border border-transparent'}`}>Месяц</button>
           </div>
 
           <button
             onClick={() => setIsDrawerOpen(prev => !prev)}
             onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!isDrawerOpen) setIsDrawerOpen(true); }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer ${isDrawerOpen ? 'bg-white/10 border-white/[0.12] text-white' : 'bg-white/[0.03] border-white/[0.05] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'}`}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer ${isDrawerOpen ? 'bg-tint-10 border-tint-12 text-white' : 'bg-tint-3 border-tint-5 text-fg-secondary hover:text-fg-soft hover:bg-tint-6'}`}
             title="Открыть список просроченных и незапланированных задач"
           >
             {overdueTasks.length > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />}
-            <Clock className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="time.time" size="sm" />
             <span className="hidden sm:inline">Сроки</span>
-            <span className="text-[10px] font-mono text-zinc-500">({overdueTasks.length + unscheduledTasks.length})</span>
+            <span className="text-3xs font-mono text-fg-muted">({overdueTasks.length + unscheduledTasks.length})</span>
           </button>
         </div>
       </div>
@@ -387,16 +381,16 @@ export const CalendarView: React.FC = () => {
           {viewMode === 'week' ? (
             <div ref={weekHorizontalScrollRef} data-testid="calendar-week-scroll-container" className="flex-1 flex flex-col overflow-x-auto overflow-y-hidden min-h-0 min-w-0 scrollbar-thin select-none cursor-grab">
               <div className="flex-1 flex flex-col min-w-[896px] h-full">
-                <div className="flex border-b border-white/[0.06] bg-panel/90 shrink-0 cursor-grab">
-                  <div data-resize-handle="timeline" title="Масштаб времени (двойной клик — сброс к 52px)" onDoubleClick={handleTimelineDoubleClick} className="w-14 shrink-0 border-r border-white/[0.04] flex items-center justify-center text-[10px] font-mono text-zinc-600 sticky left-0 z-20 bg-panel select-none hover:text-zinc-400 transition-colors cursor-pointer">{hourHeight !== DEFAULT_HOUR_HEIGHT ? `${hourHeight}px` : 'UTC'}</div>
+                <div className="flex border-b border-tint-6 bg-panel/90 shrink-0 cursor-grab">
+                  <div data-resize-handle="timeline" title="Масштаб времени (двойной клик — сброс к 52px)" onDoubleClick={handleTimelineDoubleClick} className="w-14 shrink-0 border-r border-tint-4 flex items-center justify-center text-3xs font-mono text-fg-dim sticky left-0 z-20 bg-panel select-none hover:text-fg-secondary transition-colors cursor-pointer">{hourHeight !== DEFAULT_HOUR_HEIGHT ? `${hourHeight}px` : 'UTC'}</div>
                   <div className="flex-1 grid grid-cols-7">
                   {weekDays.map((date, idx) => {
                     const dateStr = getISODateString(date);
                     const isToday = dateStr === todayStr;
                     return (
-                      <div key={dateStr} className="px-2 py-2 text-center border-r border-white/[0.04] last:border-r-0 flex flex-col items-center justify-center gap-1">
-                        <span className="text-[10px] font-mono text-zinc-500 tracking-wider">{RUSSIAN_WEEKDAYS[idx]}</span>
-                        {isToday ? <span className="w-6 h-6 rounded-full bg-white text-canvas text-xs font-bold flex items-center justify-center shadow-sm">{date.getDate()}</span> : <span className="text-xs font-medium text-zinc-300">{date.getDate()}</span>}
+                      <div key={dateStr} className="px-2 py-2 text-center border-r border-tint-4 last:border-r-0 flex flex-col items-center justify-center gap-1">
+                        <span className="text-3xs font-mono text-fg-muted tracking-wider">{RUSSIAN_WEEKDAYS[idx]}</span>
+                        {isToday ? <span className="w-6 h-6 rounded-full bg-white text-canvas text-xs font-bold flex items-center justify-center shadow-sm">{date.getDate()}</span> : <span className="text-xs font-medium text-fg-tertiary">{date.getDate()}</span>}
                       </div>
                     );
                   })}
@@ -404,18 +398,18 @@ export const CalendarView: React.FC = () => {
                   {gridScrollbarWidth > 0 && <div style={{ width: gridScrollbarWidth }} className="shrink-0 bg-panel" />}
                 </div>
 
-                <div className="flex border-b border-white/[0.06] bg-canvas shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
-                  <div className="w-14 shrink-0 border-r border-white/[0.04] px-1.5 py-2 flex items-start justify-end text-[10px] font-mono text-zinc-500 select-none sticky left-0 z-20 bg-canvas">Весь день</div>
+                <div className="flex border-b border-tint-6 bg-canvas shrink-0 max-h-36 overflow-y-auto scrollbar-thin">
+                  <div className="w-14 shrink-0 border-r border-tint-4 px-1.5 py-2 flex items-start justify-end text-3xs font-mono text-fg-muted select-none sticky left-0 z-20 bg-canvas">Весь день</div>
                   <div className="flex-1 grid grid-cols-7 min-h-[44px]">
                     {weekDays.map(date => {
                       const dateStr = getISODateString(date);
                       const allDayTasks = (tasksByDueDate.get(dateStr) || []).filter(t => getTaskTimeSlot(t).isAllDay);
                       const isOver = isDragging && activeZoneData?.dropZone === 'calendar-allday' && activeZoneData.dropDate === dateStr;
                       return (
-                        <div key={dateStr} data-drop-zone="calendar-allday" data-drop-date={dateStr} className={`p-1 border-r border-white/[0.04] last:border-r-0 space-y-1 transition-colors min-h-[44px] ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 rounded-sm' : ''}`}>
+                        <div key={dateStr} data-drop-zone="calendar-allday" data-drop-date={dateStr} className={`p-1 border-r border-tint-4 last:border-r-0 space-y-1 transition-colors min-h-[44px] ${isOver ? 'bg-blue-500/15 ring-1 ring-blue-500/40 rounded-sm' : ''}`}>
                           {allDayTasks.map(task => <AllDayTaskPill key={task.id} task={task} items={items} draggingTaskId={draggingTaskId} handlePointerDown={handlePointerDown} setSelectedItem={setSelectedItem} setIsFullscreenEditorOpen={setIsFullscreenEditorOpen} openContextMenu={openContextMenu} toggleTaskComplete={toggleTaskComplete} />)}
-                          {isOver && allDayTasks.length === 0 && <div className="text-[10px] font-mono text-blue-300 py-1 text-center border border-dashed border-blue-500/40 rounded bg-blue-500/10 pointer-events-none">Весь день</div>}
-                          <button onClick={() => openComposerModal({ type: 'task', dueDate: dateStr, folder: currentFolder })} className="w-full opacity-0 hover:opacity-100 focus:opacity-100 py-0.5 text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.04] rounded flex items-center justify-center transition-opacity text-[10px] cursor-pointer" title="Добавить таску на весь день"><Plus className="w-3 h-3" /></button>
+                          {isOver && allDayTasks.length === 0 && <div className="text-3xs font-mono text-blue-300 py-1 text-center border border-dashed border-blue-500/40 rounded bg-blue-500/10 pointer-events-none">Весь день</div>}
+                          <button onClick={() => openComposerModal({ type: 'task', dueDate: dateStr, folder: currentFolder })} className="w-full opacity-0 hover:opacity-100 focus:opacity-100 py-0.5 text-fg-muted hover:text-fg-tertiary hover:bg-tint-4 rounded flex items-center justify-center transition-opacity text-3xs cursor-pointer" title="Добавить таску на весь день"><Icon name="action.add" size="xs" tone="inherit" /></button>
                         </div>
                       );
                     })}
@@ -424,13 +418,13 @@ export const CalendarView: React.FC = () => {
                 </div>
 
                 <div ref={timeGridRef} data-testid="calendar-time-grid" className="flex-1 overflow-y-auto scrollbar-thin relative bg-canvas flex">
-                  <div data-resize-handle="timeline" data-testid="timeline-hour-ruler" onMouseDown={handleTimelineRulerMouseDown} onDoubleClick={handleTimelineDoubleClick} onWheel={handleTimelineRulerWheel} title={`Шкала времени: зажмите и тяните для приближения делений (сейчас шаг ${slotStepMinutes}м). Двойной клик — сброс.`} className="w-14 shrink-0 border-r border-white/[0.04] bg-panel select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-surface-hover transition-colors">
+                  <div data-resize-handle="timeline" data-testid="timeline-hour-ruler" onMouseDown={handleTimelineRulerMouseDown} onDoubleClick={handleTimelineDoubleClick} onWheel={handleTimelineRulerWheel} title={`Шкала времени: зажмите и тяните для приближения делений (сейчас шаг ${slotStepMinutes}м). Двойной клик — сброс.`} className="w-14 shrink-0 border-r border-tint-4 bg-panel select-none sticky left-0 z-30 shadow-[1px_0_0_0_rgba(255,255,255,0.04)] cursor-ns-resize hover:bg-surface-hover transition-colors">
                     {HOURS.map(hour => (
                       <div key={hour} data-hour={hour} style={{ height: `${hourHeight}px` }} className="flex flex-col cursor-ns-resize">
                         {subMinutes.map((minute, mIdx) => {
                           const isTop = minute === 0;
                           return (
-                            <div key={minute} data-minute={minute} style={{ height: `${subSlotHeight}px` }} className={`border-b ${mIdx === subMinutes.length - 1 ? 'border-white/[0.04]' : 'border-white/[0.025] border-dashed'} pr-2 text-right font-mono pt-0.5 select-none flex items-start justify-end ${isTop ? 'text-2xs text-zinc-400' : 'text-2xs text-zinc-600'}`}>
+                            <div key={minute} data-minute={minute} style={{ height: `${subSlotHeight}px` }} className={`border-b ${mIdx === subMinutes.length - 1 ? 'border-tint-4' : 'border-tint-3 border-dashed'} pr-2 text-right font-mono pt-0.5 select-none flex items-start justify-end ${isTop ? 'text-2xs text-fg-secondary' : 'text-2xs text-fg-dim'}`}>
                               <span className="hover:text-blue-300 pointer-events-none">{isTop ? `${String(hour).padStart(2, '0')}:00` : `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}</span>
                             </div>
                           );
@@ -444,11 +438,11 @@ export const CalendarView: React.FC = () => {
                       const dateStr = getISODateString(date);
                       const timedTasks = (tasksByDueDate.get(dateStr) || []).filter(t => !getTaskTimeSlot(t).isAllDay);
                       return (
-                        <div key={dateStr} className="relative border-r border-white/[0.04] last:border-r-0 h-full">
+                        <div key={dateStr} className="relative border-r border-tint-4 last:border-r-0 h-full">
                           {HOURS.map(hour => (
                             <div key={hour} data-hour={hour} style={{ height: `${hourHeight}px` }} className="flex flex-col">
                               {subMinutes.map((minute) => (
-                                <div key={minute} data-drop-zone="calendar-hour" data-drop-date={dateStr} data-drop-hour={hour} data-drop-minute={minute} style={{ height: `${subSlotHeight}px` }} onClick={() => openComposerModal({ type: 'task', dueDate: dateStr, reminder: `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`, folder: currentFolder })} className="h-[52px] border-b border-white/[0.025] border-dashed hover:bg-white/[0.025] transition-colors relative group cursor-pointer" />
+                                <div key={minute} data-drop-zone="calendar-hour" data-drop-date={dateStr} data-drop-hour={hour} data-drop-minute={minute} style={{ height: `${subSlotHeight}px` }} onClick={() => openComposerModal({ type: 'task', dueDate: dateStr, reminder: `${dateStr}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`, folder: currentFolder })} className="h-[52px] border-b border-tint-3 border-dashed hover:bg-tint-3 transition-colors relative group cursor-pointer" />
                               ))}
                             </div>
                           ))}
@@ -491,10 +485,10 @@ export const CalendarView: React.FC = () => {
         </div>
 
         {timelineResizing && (
-          <div data-testid="timeline-resize-tooltip" className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-surface-elevated/95 border text-xs font-mono text-zinc-100 shadow-2xl backdrop-blur-md flex items-center gap-2.5 ${timelineResizing.isSnapped ? 'border-blue-400' : 'border-white/15'}`} style={{ left: 72, top: Math.max(70, Math.min(window.innerHeight - 60, timelineResizing.startY)) }}>
+          <div data-testid="timeline-resize-tooltip" className={`fixed z-50 pointer-events-none px-3.5 py-2 rounded-xl bg-surface-elevated/95 border text-xs font-mono text-fg-primary shadow-2xl backdrop-blur-md flex items-center gap-2.5 ${timelineResizing.isSnapped ? 'border-blue-400' : 'border-tint-15'}`} style={{ left: 72, top: Math.max(70, Math.min(window.innerHeight - 60, timelineResizing.startY)) }}>
             <div className={`w-2 h-2 rounded-full ${timelineResizing.isSnapped ? 'bg-blue-400' : 'bg-blue-500'}`} />
-            <span className="font-semibold text-zinc-100">{timelineResizing.currentHeight}px</span>
-            <span className="text-zinc-500">•</span>
+            <span className="font-semibold text-fg-primary">{timelineResizing.currentHeight}px</span>
+            <span className="text-fg-muted">•</span>
             <span className="text-blue-400 font-medium">Деления: {timelineResizing.slotStep} мин</span>
           </div>
         )}
@@ -538,7 +532,7 @@ export const CalendarView: React.FC = () => {
       />
       {isDragging && dragPos && draggingPayload && (
         <div className="fixed pointer-events-none z-50 px-3 py-1.5 rounded-lg bg-surface-elevated border border-blue-500/40 text-xs font-medium text-white shadow-2xl flex items-center gap-2 transform -translate-x-1/2 -translate-y-1/2 opacity-90 scale-105" style={{ left: `${dragPos.x}px`, top: `${dragPos.y}px` }}>
-          <CalendarIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+          <Icon name="time.date" size="sm" tone="accent" className="shrink-0" />
           <span className="truncate max-w-[200px]">{draggingPayload.title || 'Задача'}</span>
         </div>
       )}

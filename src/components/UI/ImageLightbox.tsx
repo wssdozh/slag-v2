@@ -1,6 +1,6 @@
 // The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side panel.
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight, CornerUpLeft, FileText, MoreVertical, RotateCcw, X, ZoomIn } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import type { LightboxImage } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
@@ -139,7 +139,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       aria-hidden={!isOpen || undefined}
       onClick={isMobile ? undefined : onClose}
       data-testid="image-lightbox"
-      className={`fixed inset-0 z-[130] select-none outline-none motion-fade ${isMobile ? 'bg-black' : 'bg-black/95'}`}
+      className={`fixed inset-0 z-[130] select-none outline-none motion-fade ${isMobile ? 'bg-black' : 'bg-scrim-95'}`}
       style={{ touchAction: 'none' }}
       {...handlers}
     >
@@ -148,20 +148,20 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         // The root closes the viewer on any click on desktop, so the chrome has to stop it:
         // without this every button up here opened its own panel and closed the viewer at once.
         onClick={(event) => event.stopPropagation()}
-        className={`absolute inset-x-0 top-0 z-30 flex items-center gap-1 bg-gradient-to-b from-black/80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
+        className={`absolute inset-x-0 top-0 z-30 flex items-center gap-1 bg-gradient-to-b from-scrim-80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Закрыть"
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-zinc-300 transition-colors hover:bg-white/10 hover:text-white"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-fg-tertiary transition-colors hover:bg-tint-10 hover:text-white"
         >
-          {isMobile ? <ArrowLeft className="h-5 w-5" /> : <X className="h-4 w-4" />}
+          {isMobile ? <Icon name="nav.back" size="lg" tone="inherit" /> : <Icon name="action.close" size="md" tone="inherit" />}
         </button>
 
         <div className="min-w-0 flex-1 text-center">
-          <p className="truncate text-[13px] font-medium leading-tight text-zinc-100">{currentImage.name}</p>
-          <p className="font-mono text-[10px] leading-tight text-zinc-500">
+          <p className="truncate text-ui font-medium leading-tight text-fg-primary">{currentImage.name}</p>
+          <p className="font-mono text-3xs leading-tight text-fg-muted">
             {activeIndex + 1} из {activeImages.length}
           </p>
         </div>
@@ -174,10 +174,10 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               title={isTextPanelOpen ? 'Скрыть текст (T)' : 'Распознанный текст и описание (T)'}
               aria-label="Распознанный текст"
               className={`flex h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium outline-none transition-colors motion-press ${
-                isTextPanelOpen ? 'bg-white/15 text-white' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-white'
+                isTextPanelOpen ? 'bg-tint-15 text-white' : 'text-fg-secondary hover:bg-tint-6 hover:text-white'
               }`}
             >
-              <FileText className="h-4 w-4 shrink-0" />
+              <Icon name="entity.article" size="md" tone="inherit" className="shrink-0" />
               <span className="hidden sm:inline">Текст</span>
             </button>
           )}
@@ -189,14 +189,14 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               disabled={zoom >= 4}
               title="Увеличить"
               aria-label="Увеличить"
-              className="cursor-pointer rounded-lg p-2 text-zinc-400 outline-none transition-colors hover:bg-white/[0.06] hover:text-white disabled:pointer-events-none disabled:opacity-25 motion-press"
+              className="cursor-pointer rounded-lg p-2 text-fg-secondary outline-none transition-colors hover:bg-tint-6 hover:text-white disabled:pointer-events-none disabled:opacity-25 motion-press"
             >
-              <ZoomIn className="h-4 w-4" />
+              <Icon name="media.zoomIn" size="md" tone="inherit" />
             </button>
             <span
               onClick={() => commitZoom(1)}
               title="Сбросить масштаб"
-              className="w-10 cursor-pointer py-1 text-center font-mono text-[11px] text-zinc-400 transition-colors hover:text-zinc-200"
+              className="w-10 cursor-pointer py-1 text-center font-mono text-2xs text-fg-secondary transition-colors hover:text-fg-soft"
             >
               {Math.round(zoom * 100)}%
             </span>
@@ -205,9 +205,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               onClick={() => commitZoom(1)}
               title="Сбросить"
               aria-label="Сбросить"
-              className="cursor-pointer rounded-lg p-2 text-zinc-400 outline-none transition-colors hover:bg-white/[0.06] hover:text-white motion-press"
+              className="cursor-pointer rounded-lg p-2 text-fg-secondary outline-none transition-colors hover:bg-tint-6 hover:text-white motion-press"
             >
-              <RotateCcw className="h-4 w-4" />
+              <Icon name="action.retry" size="md" tone="inherit" />
             </button>
           </div>
 
@@ -218,10 +218,10 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               aria-label="Действия"
               aria-expanded={isMenuOpen}
               className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-full outline-none transition-colors motion-press ${
-                isMenuOpen ? 'bg-white/15 text-white' : 'text-zinc-300 hover:bg-white/10 hover:text-white'
+                isMenuOpen ? 'bg-tint-15 text-white' : 'text-fg-tertiary hover:bg-tint-10 hover:text-white'
               }`}
             >
-              <MoreVertical className="h-5 w-5" />
+              <Icon name="action.more" size="lg" tone="inherit" />
             </button>
           )}
         </div>
@@ -232,7 +232,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
           <div className="absolute inset-0 z-30" onClick={() => setIsMenuOpen(false)} />
           <div
             data-testid="viewer-menu"
-            className="absolute right-2 z-40 flex w-56 flex-col gap-0.5 rounded-xl border border-white/[0.08] bg-surface-elevated/95 p-1 text-xs text-zinc-300 shadow-2xl backdrop-blur-xl motion-popover"
+            className="absolute right-2 z-40 flex w-56 flex-col gap-0.5 rounded-xl border border-tint-8 bg-surface-elevated/95 p-1 text-xs text-fg-tertiary shadow-2xl backdrop-blur-xl motion-popover"
             style={{ top: 'calc(var(--sat) + 58px)' }}
           >
             <button
@@ -243,7 +243,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-hover hover:text-white"
             >
-              <FileText className="h-4 w-4 shrink-0 text-fg-muted" />
+              <Icon name="entity.article" size="md" tone="muted" className="shrink-0" />
               <span>Открыть заметку</span>
             </button>
             <button
@@ -254,7 +254,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-hover hover:text-white"
             >
-              <CornerUpLeft className="h-4 w-4 shrink-0 text-fg-muted" />
+              <Icon name="action.reply" size="md" tone="muted" className="shrink-0" />
               <span>Ответить</span>
             </button>
           </div>
@@ -314,9 +314,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Предыдущее (←)"
               aria-label="Предыдущее изображение"
-              className="absolute left-6 z-20 hidden cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-black/40 p-2.5 text-zinc-400 shadow-xl backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white motion-press sm:flex"
+              className="absolute left-6 z-20 hidden cursor-pointer items-center justify-center rounded-full border border-tint-8 bg-scrim-40 p-2.5 text-fg-secondary shadow-xl backdrop-blur-md transition-colors hover:bg-tint-10 hover:text-white motion-press sm:flex"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <Icon name="nav.prev" size="lg" tone="inherit" />
             </button>
           )}
           {hasNeighbours && (
@@ -328,9 +328,9 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
               }}
               title="Следующее (→)"
               aria-label="Следующее изображение"
-              className="absolute right-6 z-20 hidden cursor-pointer items-center justify-center rounded-full border border-white/[0.08] bg-black/40 p-2.5 text-zinc-400 shadow-xl backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white motion-press sm:flex"
+              className="absolute right-6 z-20 hidden cursor-pointer items-center justify-center rounded-full border border-tint-8 bg-scrim-40 p-2.5 text-fg-secondary shadow-xl backdrop-blur-md transition-colors hover:bg-tint-10 hover:text-white motion-press sm:flex"
             >
-              <ChevronRight className="h-5 w-5" />
+              <Icon name="nav.next" size="lg" tone="inherit" />
             </button>
           )}
         </div>
@@ -347,8 +347,8 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
         )}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 z-10 hidden h-12 items-center justify-center border-t border-white/[0.06] bg-black/40 backdrop-blur-md sm:flex">
-        <span className="select-none text-xs font-medium tracking-wide text-zinc-500">
+      <div className="absolute inset-x-0 bottom-0 z-10 hidden h-12 items-center justify-center border-t border-tint-6 bg-scrim-40 backdrop-blur-md sm:flex">
+        <span className="select-none text-xs font-medium tracking-wide text-fg-muted">
           ← / → для перелистывания • Колесико для зума • T для текста • Esc для закрытия
         </span>
       </div>

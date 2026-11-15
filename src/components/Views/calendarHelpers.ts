@@ -41,11 +41,11 @@ export function getPriorityBadge(priority?: SlagItemPriority): {
     default:
       return {
         bg: 'bg-surface-elevated hover:bg-surface-hover',
-        border: 'border-white/[0.08]',
-        text: 'text-zinc-200',
-        dot: 'bg-zinc-500',
-        checkboxBorder: 'border-zinc-400',
-        checkboxHover: 'hover:border-zinc-200 hover:bg-white/[0.12] text-zinc-200',
+        border: 'border-tint-8',
+        text: 'text-fg-soft',
+        dot: 'bg-fg-muted',
+        checkboxBorder: 'border-fg-secondary',
+        checkboxHover: 'hover:border-fg-soft hover:bg-tint-12 text-fg-soft',
       };
   }
 }

@@ -1,6 +1,6 @@
 // Video circle notes on a card: plays in place, the corner opens the full viewer.
 import React, { memo } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { VideoCirclePlayer } from '../../UI/VideoCirclePlayer';
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';
 import type { SlagAttachment } from '../../../types';
@@ -31,7 +31,7 @@ const ItemVideoNotesComponent: React.FC<ItemVideoNotesProps> = ({
           title="Открыть видео"
           className="cursor-pointer rounded-md p-1.5 text-fg-dim transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
-          <Maximize2 className="h-3.5 w-3.5" />
+          <Icon name="action.expand" size="sm" tone="inherit" />
         </button>
       </div>
     ))}

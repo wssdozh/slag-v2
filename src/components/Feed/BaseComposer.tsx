@@ -1,6 +1,6 @@
 // The shared composer shell: growing textarea, slot layout, and the send plate.
 import React, { useRef, useLayoutEffect, useMemo } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { SendButton } from '../UI/SendButton';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { segmentText, type ComposerHighlight } from './composer/composerHighlights';
@@ -165,14 +165,14 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             : `rounded-2xl bg-surface-elevated ${
                 isDraggingOver
                   ? 'ring-2 ring-blue-500/60 bg-blue-500/[0.06] shadow-blue-500/10'
-                  : 'focus-within:ring-1 focus-within:ring-white/10'
-              } p-2 flex flex-col gap-2 md:shadow-2xl md:shadow-black/50 transition-shadow w-full relative ${className}`
+                  : 'focus-within:ring-1 focus-within:ring-tint-10'
+              } p-2 flex flex-col gap-2 md:shadow-2xl md:shadow-scrim-50 transition-shadow w-full relative ${className}`
         }
       >
         {/* Drag & Drop Visual Dropzone Overlay */}
         {isDraggingOver && (
-          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-zinc-300 motion-fade">
-            <UploadCloud className="w-4 h-4 text-blue-400 animate-bounce" />
+          <div className="absolute inset-0.5 z-30 rounded-xl bg-surface border-2 border-dashed border-blue-500/50 flex items-center justify-center gap-2 pointer-events-none select-none text-xs font-mono text-fg-tertiary motion-fade">
+            <Icon name="action.upload" size="md" tone="accent" className="animate-bounce" />
             <span>Отпустите файлы для прикрепления</span>
           </div>
         )}
@@ -223,7 +223,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               rows={1}
               placeholder={placeholder}
               disabled={disabled}
-              className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-zinc-500 placeholder:truncate resize-none  ${
+              className={`min-w-0 flex-1 w-full bg-transparent text-base md:text-sm text-fg-primary placeholder-fg-muted placeholder:truncate resize-none  ${
                 value.trim() ? 'overflow-y-auto' : 'overflow-y-hidden'
               } relative z-10 leading-normal py-0 outline-none border-none`}
               style={{

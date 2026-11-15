@@ -1,6 +1,6 @@
 // The month sheet: a month grid with a dot on days that have tasks, and a today shortcut.
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { usePresence } from '../../../hooks/ui/usePresence';
 import { getMonthCalendarDays, RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS } from '../../../lib/time/dateUtils';
 
@@ -52,22 +52,22 @@ export const MonthPickerSheet: React.FC<MonthPickerSheetProps> = ({
       onTransitionEnd={onTransitionEnd}
       onClick={onClose}
       data-testid="month-picker-sheet"
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/80 motion-fade motion-scrim-hold select-none"
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-scrim-80 motion-fade motion-scrim-hold select-none"
     >
       <div
         onClick={e => e.stopPropagation()}
         data-motion-state={phase}
-        className="w-full max-h-[85vh] bg-surface border-t border-white/[0.1] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl motion-sheet"
+        className="w-full max-h-[85vh] bg-surface border-t border-tint-10 rounded-t-3xl flex flex-col overflow-hidden shadow-2xl motion-sheet"
         style={{ paddingBottom: 'max(var(--sab), 1rem)' }}
       >
         {/* Handle & Header */}
-        <div className="flex flex-col items-center pt-2 px-4 border-b border-white/[0.06] shrink-0">
-          <div className="w-10 h-1 rounded-full bg-white/20 mb-3" />
+        <div className="flex flex-col items-center pt-2 px-4 border-b border-tint-6 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-tint-20 mb-3" />
           <div className="w-full flex items-center justify-between pb-3">
             <button
               type="button"
               onClick={onClose}
-              className="text-xs text-zinc-400 hover:text-white cursor-pointer"
+              className="text-xs text-fg-secondary hover:text-white cursor-pointer"
             >
               Отмена
             </button>
@@ -75,9 +75,9 @@ export const MonthPickerSheet: React.FC<MonthPickerSheetProps> = ({
               <button
                 type="button"
                 onClick={() => onShiftMonth(-1)}
-                className="p-1 rounded text-zinc-400 hover:text-white cursor-pointer"
+                className="p-1 rounded text-fg-secondary hover:text-white cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <Icon name="nav.prev" size="md" tone="inherit" />
               </button>
               <span className="text-sm font-semibold text-white">
                 {RUSSIAN_MONTHS[pickerMonth]} {pickerYear}
@@ -85,9 +85,9 @@ export const MonthPickerSheet: React.FC<MonthPickerSheetProps> = ({
               <button
                 type="button"
                 onClick={() => onShiftMonth(1)}
-                className="p-1 rounded text-zinc-400 hover:text-white cursor-pointer"
+                className="p-1 rounded text-fg-secondary hover:text-white cursor-pointer"
               >
-                <ChevronRight className="w-4 h-4" />
+                <Icon name="nav.next" size="md" tone="inherit" />
               </button>
             </div>
             <button
@@ -102,7 +102,7 @@ export const MonthPickerSheet: React.FC<MonthPickerSheetProps> = ({
 
         {/* Month Calendar Grid */}
         <div className="p-4 flex flex-col gap-2">
-          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-mono text-zinc-500 uppercase">
+          <div className="grid grid-cols-7 gap-1 text-center text-3xs font-mono text-fg-muted uppercase">
             {RUSSIAN_WEEKDAYS.map(w => (
               <div key={w} className="py-1">{w}</div>
             ))}
@@ -123,16 +123,16 @@ export const MonthPickerSheet: React.FC<MonthPickerSheetProps> = ({
                     isSelected
                       ? 'bg-white text-black font-bold shadow-sm'
                       : isToday
-                      ? 'border border-white/30 text-white font-semibold'
+                      ? 'border border-tint-30 text-white font-semibold'
                       : cell.isCurrentMonth
-                      ? 'text-zinc-200 hover:bg-white/[0.04]'
-                      : 'text-zinc-600 hover:bg-white/[0.02]'
+                      ? 'text-fg-soft hover:bg-tint-4'
+                      : 'text-fg-dim hover:bg-tint-2'
                   }`}
                 >
                   <span className="text-xs">{cell.date.getDate()}</span>
                   <div className="h-1 flex items-center justify-center">
                     {hasTasks && (
-                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-400'}`} />
+                      <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-fg-secondary'}`} />
                     )}
                   </div>
                 </button>

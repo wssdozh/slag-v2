@@ -19,8 +19,8 @@ export const AssistantTextBubble: React.FC<AssistantTextBubbleProps> = ({
     <div
       className={`max-w-[92%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed ${
         role === 'user'
-          ? 'bg-white/10 text-zinc-100 border border-white/[0.08]'
-          : 'bg-surface text-zinc-200 border border-white/[0.06] shadow-sm'
+          ? 'bg-tint-10 text-fg-primary border border-tint-8'
+          : 'bg-surface text-fg-soft border border-tint-6 shadow-sm'
       }`}
     >
       <div className="font-sans text-sm flex flex-col gap-1.5 break-words">

@@ -4,13 +4,7 @@ import type { SlagItem } from '../../types';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
 import { getPriorityBadge } from './calendarHelpers';
 import { baseTaskId } from '../../lib/tasks/taskUtils';
-import {
-  Calendar as CalendarIcon,
-  Check,
-  X,
-  Plus,
-  Repeat,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { pluralRu } from '../../lib/time/dateUtils';
 
 export interface CalendarExpandedDayModalProps {
@@ -61,21 +55,21 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
       onTransitionEnd={onExpandedDayTransitionEnd}
       inert={!isExpandedDayOpen}
       onClick={() => setExpandedDayDateStr(null)}
-      className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 motion-fade"
+      className="fixed inset-0 z-50 bg-scrim-70 flex items-center justify-center p-4 motion-fade"
     >
       <div
         onClick={e => e.stopPropagation()}
         data-motion-state={expandedDayPhase}
-        className="w-full max-w-md rounded-2xl bg-surface border border-white/[0.1] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden motion-dialog"
+        className="w-full max-w-md rounded-2xl bg-surface border border-tint-10 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden motion-dialog"
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between bg-surface-elevated">
+        <div className="px-4 py-3 border-b border-tint-6 flex items-center justify-between bg-surface-elevated">
           <div className="flex items-center gap-2">
-            <CalendarIcon className="w-4 h-4 text-zinc-300" />
-            <h3 className="text-sm font-semibold text-zinc-100">
+            <Icon name="time.date" size="md" tone="tertiary" />
+            <h3 className="text-sm font-semibold text-fg-primary">
               {effectiveDayDateStr}
             </h3>
-            <span className="text-[11px] font-mono text-zinc-500">
+            <span className="text-2xs font-mono text-fg-muted">
               ({dayTasks.length} {pluralRu(dayTasks.length, ['таска', 'таски', 'тасок'])})
             </span>
           </div>
@@ -83,16 +77,16 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
             data-testid="close-expanded-day-modal"
             title="Закрыть (Esc)"
             onClick={() => setExpandedDayDateStr(null)}
-            className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+            className="p-1 rounded-md text-fg-secondary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <Icon name="action.close" size="md" tone="inherit" />
           </button>
         </div>
 
         {/* Tasks list */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
           {dayTasks.length === 0 ? (
-            <div className="py-12 text-center text-xs text-zinc-500 font-mono">
+            <div className="py-12 text-center text-xs text-fg-muted font-mono">
               На этот день пока нет тасок
             </div>
           ) : (
@@ -137,23 +131,23 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
                           : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
                       }`}
                     >
-                      <Check className={`w-2.5 h-2.5 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+                      <Icon name="action.check" size="none" tone="inherit" className={`w-2.5 h-2.5 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
                     </button>
                     <span
                       className={`text-xs font-medium leading-snug truncate ${
-                        isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
+                        isDone ? 'line-through text-fg-muted' : 'text-fg-soft'
                       }`}
                     >
                       {task.title}
                     </span>
                     {task.recurrence && (
                       <span title="Повторяющаяся таска" className="shrink-0 flex items-center">
-                        <Repeat className="w-3 h-3 text-amber-400" />
+                        <Icon name="time.repeat" size="xs" tone="warning" />
                       </span>
                     )}
                   </div>
 
-                  <span className="text-[10px] font-mono text-zinc-400 shrink-0">
+                  <span className="text-3xs font-mono text-fg-secondary shrink-0">
                     {slot.isAllDay ? 'Весь день' : slot.timeLabel}
                   </span>
                 </div>
@@ -163,7 +157,7 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
         </div>
 
         {/* Quick Add at bottom */}
-        <div className="p-3 border-t border-white/[0.06] bg-surface-elevated">
+        <div className="p-3 border-t border-tint-6 bg-surface-elevated">
           <button
             onClick={() => {
               openComposerModal({
@@ -172,9 +166,9 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
                 folder: currentFolder,
               });
             }}
-            className="w-full flex items-center justify-center gap-2 bg-canvas hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.16] rounded-xl px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 bg-canvas hover:bg-tint-4 border border-tint-8 hover:border-tint-16 rounded-xl px-3 py-2 text-xs text-fg-secondary hover:text-fg-soft transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="action.add" size="sm" />
             <span>Добавить таску...</span>
           </button>
         </div>

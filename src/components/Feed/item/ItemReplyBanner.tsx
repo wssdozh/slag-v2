@@ -1,6 +1,6 @@
 // The quoted line above a reply: jump to what it answers, or say it is gone.
 import React, { memo } from 'react';
-import { CornerUpLeft } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { SlagItem } from '../../../types';
 
 export interface ItemReplyBannerProps {
@@ -25,20 +25,20 @@ const ItemReplyBannerComponent: React.FC<ItemReplyBannerProps> = ({
   return (
     <div
       onClick={() => replyParent && onScrollToParent(replyParent.id)}
-      className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer transition-colors select-none group/quote pt-0.5"
+      className="flex items-center gap-1.5 text-xs text-fg-muted hover:text-fg-tertiary cursor-pointer transition-colors select-none group/quote pt-0.5"
     >
-      <CornerUpLeft className="w-3.5 h-3.5 text-zinc-500 group-hover/quote:text-zinc-300 shrink-0" />
+      <Icon name="action.reply" size="sm" tone="muted" className="group-hover/quote:text-fg-tertiary shrink-0" />
       {replyParent ? (
         <div className="flex items-center gap-1.5 truncate">
-          <span className="font-mono text-2xs text-zinc-500 shrink-0">
+          <span className="font-mono text-2xs text-fg-muted shrink-0">
             {replyParentKind(replyParent)}:
           </span>
-          <span className="text-zinc-400 group-hover/quote:text-zinc-200 truncate font-medium text-xs">
+          <span className="text-fg-secondary group-hover/quote:text-fg-soft truncate font-medium text-xs">
             {replyParent.title || replyParent.content.slice(0, 45)}
           </span>
         </div>
       ) : (
-        <span className="text-2xs text-zinc-600 italic">Исходная запись удалена</span>
+        <span className="text-2xs text-fg-dim italic">Исходная запись удалена</span>
       )}
     </div>
   );

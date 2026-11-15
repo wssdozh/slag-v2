@@ -3,13 +3,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMe
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagAttachment } from '../../types';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
-import {
-  Calendar,
-  FileText,
-  CornerUpLeft,
-  Pin,
-  Flame,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
 import { extractFocalContext } from '../../lib/media/enrichment/text';
@@ -332,7 +326,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           e.stopPropagation();
           navigateToFolder(item.folder, item.id);
         }}
-        className="text-2xs text-zinc-500 hover:text-zinc-200 font-mono transition-colors cursor-pointer hover:underline underline-offset-2 truncate max-w-[96px] text-left leading-none inline-flex items-center shrink-0"
+        className="text-2xs text-fg-muted hover:text-fg-soft font-mono transition-colors cursor-pointer hover:underline underline-offset-2 truncate max-w-[96px] text-left leading-none inline-flex items-center shrink-0"
         title={`Перейти в папку «${item.folder}» и перейти к этой записи`}
       >
         {folderDisplayName}
@@ -357,7 +351,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             item,
           });
         }}
-        className="text-2xs font-mono text-zinc-500 hover:text-zinc-200 cursor-pointer transition-colors hover:underline underline-offset-2 shrink-0"
+        className="text-2xs font-mono text-fg-muted hover:text-fg-soft cursor-pointer transition-colors hover:underline underline-offset-2 shrink-0"
         title="Сменить тип записи (клик или ПКМ)"
       >
         Статья
@@ -384,10 +378,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="due"
-        className="flex items-center gap-1 text-2xs text-zinc-500 font-mono shrink-0"
+        className="flex items-center gap-1 text-2xs text-fg-muted font-mono shrink-0"
         title={`Срок: ${dueLabel}`}
       >
-        <Calendar className="w-3 h-3 text-zinc-600" />
+        <Icon name="time.date" size="xs" tone="dim" />
         <span>{dueLabel}</span>
       </span>
     );
@@ -402,12 +396,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         className="flex items-center gap-1 text-2xs font-mono select-none shrink-0"
         title={isZero ? 'Серия прервана (0)' : `Серия: ${streak}`}
       >
-        <Flame
-          className={`w-3 h-3 shrink-0 ${
-            isZero ? 'text-rose-400/80' : 'text-amber-400/90'
-          }`}
-        />
-        <span className={isZero ? 'text-rose-400/80 font-medium' : 'text-zinc-500 font-medium'}>
+        <Icon name="status.urgent" size="xs" tone="inherit" className={`shrink-0 ${isZero ? 'text-rose-400/80' : 'text-amber-400/90'}`} />
+        <span className={isZero ? 'text-rose-400/80 font-medium' : 'text-fg-muted font-medium'}>
           {streak}
         </span>
       </span>
@@ -421,7 +411,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         className="flex items-center gap-1 text-2xs font-mono text-amber-400/90 shrink-0"
         title="Закрепленная запись"
       >
-        <Pin className="w-2.5 h-2.5 rotate-45 shrink-0" />
+        <Icon name="action.pin" size="none" tone="inherit" className="w-2.5 h-2.5 rotate-45 shrink-0" />
         <span>Закреп</span>
       </span>
     );
@@ -498,7 +488,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {swipeOffset < 0 && (
         <div className="absolute inset-y-0 right-0 w-16 flex items-center justify-center text-blue-400">
           <div className="w-8 h-8 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center">
-            <CornerUpLeft className="w-4 h-4" />
+            <Icon name="action.reply" size="md" tone="inherit" />
           </div>
         </div>
       )}
@@ -557,7 +547,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               onClick={() => toggleTaskComplete(item.id)}
               title={item.status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
               aria-label="Изменить статус таски"
-              className="mt-0.5 text-zinc-400 hover:text-white transition-colors shrink-0"
+              className="mt-0.5 text-fg-secondary hover:text-white transition-colors shrink-0"
             >
               <TaskStatusMark done={item.status === 'done'} className="w-4 h-4" />
             </button>
@@ -566,20 +556,20 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               <h3
                 className={`text-base font-medium leading-snug tracking-tight ${
                   item.status === 'done'
-                    ? 'line-through text-zinc-500'
-                    : 'text-zinc-100'
+                    ? 'line-through text-fg-muted'
+                    : 'text-fg-primary'
                 }`}
               >
                 <CardMarkdown
                   content={item.title}
                   inline
                   onWikiLinkClick={scrollToItem}
-                  className={item.status === 'done' ? 'line-through text-zinc-500' : 'text-zinc-100'}
+                  className={item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}
                 />
               </h3>
 
               {taskBodyContent && (
-                <div className="mt-1 text-sm text-zinc-300 leading-relaxed font-normal">
+                <div className="mt-1 text-sm text-fg-tertiary leading-relaxed font-normal">
                   <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} />
                 </div>
               )}
@@ -598,15 +588,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-base font-medium text-zinc-100 tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
+            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
           >
-            <FileText className="w-4 h-4 text-zinc-400 shrink-0" />
+            <Icon name="entity.article" size="md" className="shrink-0" />
             <span>{item.title}</span>
           </h3>
 
           <p
             onClick={handleOpenArticle}
-            className="text-sm text-zinc-300 line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-zinc-100 transition-colors"
+            className="text-sm text-fg-tertiary line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-fg-primary transition-colors"
           >
             {item.summary || item.content.slice(0, 200)}
           </p>
@@ -624,7 +614,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
           return (
             <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              <div className="text-sm text-zinc-200 leading-relaxed font-normal">
+              <div className="text-sm text-fg-soft leading-relaxed font-normal">
                 <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} />
               </div>
             </div>
@@ -678,14 +668,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
               {metaElements.map((el, idx) => (
                 <React.Fragment key={idx}>
-                  {idx > 0 && <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />}
+                  {idx > 0 && <span className="w-1 h-1 rounded-full bg-fg-dim/80 inline-block shrink-0" />}
                   {el}
                 </React.Fragment>
               ))}
 
               {/* Separator between metadata and tags */}
               {metaElements.length > 0 && item.tags && item.tags.length > 0 && (
-                <span className="w-1 h-1 rounded-full bg-zinc-600/80 inline-block shrink-0" />
+                <span className="w-1 h-1 rounded-full bg-fg-dim/80 inline-block shrink-0" />
               )}
 
               {/* Tags with overflow folding */}
@@ -714,7 +704,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                       {hidden > 0 && (
                         <span
                           data-tag-overflow="1"
-                          className="shrink-0 text-2xs font-mono text-zinc-500"
+                          className="shrink-0 text-2xs font-mono text-fg-muted"
                         >
                           +{hidden}
                         </span>
@@ -750,7 +740,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                           e.stopPropagation();
                           setIsTagsExpanded(prev => !prev);
                         }}
-                        className="text-2xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer select-none leading-none shrink-0"
+                        className="text-2xs font-mono text-fg-muted hover:text-fg-tertiary transition-colors cursor-pointer select-none leading-none shrink-0"
                         title={isTagsExpanded ? 'Свернуть теги' : `Показать ещё ${hiddenCount} тегов`}
                       >
                         {isTagsExpanded ? 'свернуть' : `+${hiddenCount}`}
@@ -765,7 +755,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           )}
 
           {!isVoiceBubble && (
-            <span className="text-2xs font-mono text-zinc-500 select-none ml-auto shrink-0 leading-none">
+            <span className="text-2xs font-mono text-fg-muted select-none ml-auto shrink-0 leading-none">
               {formattedTime}
             </span>
           )}
@@ -778,9 +768,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           onClick={() => {
             if (firstReplyId) scrollToItem(firstReplyId);
           }}
-          className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 hover:text-blue-400 transition-colors pt-1 select-none w-fit"
+          className="flex items-center gap-1.5 text-2xs font-mono text-fg-muted hover:text-blue-400 transition-colors pt-1 select-none w-fit"
         >
-          <CornerUpLeft className="w-3 h-3 rotate-180 text-zinc-500" />
+          <Icon name="action.reply" size="xs" tone="muted" className="rotate-180" />
           <span>{repliesCount} {repliesCount === 1 ? 'ответ' : repliesCount < 5 ? 'ответа' : 'ответов'}</span>
         </button>
       )}

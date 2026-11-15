@@ -1,7 +1,7 @@
 // The dialog frame every modal wears: presence, backdrop, header, footer, Escape.
 import React, { useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { IconButton } from '../UI/IconButton';
 import { usePresence } from '../../hooks/ui/usePresence';
 
@@ -94,11 +94,11 @@ export const BaseModal: React.FC<BaseModalProps> = ({
       role={role}
       aria-modal="true"
       aria-label={ariaLabelString}
-      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 motion-fade select-none ${className}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-scrim-80 motion-fade select-none ${className}`}
     >
       <div
         data-motion-state={phase}
-        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-surface border border-white/[0.08] shadow-2xl flex flex-col overflow-hidden motion-dialog ${containerClassName}`}
+        className={`w-full ${maxWidth} ${maxHeight || 'max-h-[calc(100dvh-2rem)]'} rounded-2xl bg-surface border border-tint-8 shadow-2xl flex flex-col overflow-hidden motion-dialog ${containerClassName}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -106,12 +106,12 @@ export const BaseModal: React.FC<BaseModalProps> = ({
           <div className="rounded-t-[15px] overflow-hidden shrink-0">
             {customHeader || (
               <div
-                className="px-4 md:px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel rounded-t-[15px]"
+                className="px-4 md:px-5 py-3.5 border-b border-tint-6 flex items-center justify-between shrink-0 bg-panel rounded-t-[15px]"
                 style={{ paddingTop: 'max(var(--sat), 0.875rem)' }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   {icon && (
-                    <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-white shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-tint-10 flex items-center justify-center text-white shrink-0">
                       {icon}
                     </div>
                   )}
@@ -122,7 +122,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                       </h3>
                     )}
                     {subtitle && (
-                      <p className="text-[11px] text-zinc-400 truncate">
+                      <p className="text-2xs text-fg-secondary truncate">
                         {subtitle}
                       </p>
                     )}
@@ -139,7 +139,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
                       title="Закрыть (Esc)"
                       aria-label="Закрыть"
                     >
-                      <X className="w-4 h-4" />
+                      <Icon name="action.close" size="md" tone="inherit" />
                     </IconButton>
                   )}
                 </div>
@@ -155,7 +155,7 @@ export const BaseModal: React.FC<BaseModalProps> = ({
 
         {/* Optional Footer */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-white/[0.06] bg-panel shrink-0 rounded-b-[15px]">
+          <div className="px-4 md:px-5 py-3 border-t border-tint-6 bg-panel shrink-0 rounded-b-[15px]">
             {footer}
           </div>
         )}

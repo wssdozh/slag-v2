@@ -6,10 +6,7 @@ import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import { undo, redo } from '@codemirror/commands';
-import {
-  Check,
-  UploadCloud,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { SheetPanel } from '../UI/SheetPanel';
 import { TagChip } from '../UI/TagChip';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
@@ -367,11 +364,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
         <div className="fixed inset-4 z-[120] rounded-3xl bg-surface border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
-          <UploadCloud className="w-12 h-12 text-accent animate-bounce" />
+          <Icon name="action.upload" size="none" tone="accent" className="w-12 h-12 animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
           </span>
-          <span className="text-xs text-zinc-400 font-mono">
+          <span className="text-xs text-fg-secondary font-mono">
             Войсы, видео, изображения или документы прикрепятся к заметке
           </span>
         </div>
@@ -388,7 +385,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
         onDismiss={handleClose}
         onExited={onExited}
         testId={isMobile ? 'editor-sheet' : undefined}
-        scrimClassName="bg-black/60"
+        scrimClassName="bg-scrim-60"
         panelClassName={
           isMobile
             ? `bg-surface border-t border-subtle ${isSheetExpanded ? 'rounded-t-none' : 'rounded-t-2xl'}`
@@ -448,11 +445,11 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                   className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
                     status === 'done'
                       ? 'border border-emerald-500 bg-emerald-500/20 text-emerald-400'
-                      : 'border border-zinc-600 hover:border-blue-400 text-transparent hover:text-blue-400'
+                      : 'border border-fg-dim hover:border-blue-400 text-transparent hover:text-blue-400'
                   }`}
                   title={status === 'done' ? 'Отметить как невыполненную' : 'Отметить как выполненную'}
                 >
-                  <Check className="w-3 h-3 stroke-[3]" />
+                  <Icon name="action.check" size="xs" tone="inherit" className="stroke-[3]" />
                 </button>
               )}
               {/* textarea вместо input: заголовок переносится, а не обрезается на узком экране.
@@ -463,8 +460,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
                 onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
                 placeholder={type === 'task' ? 'Название таски...' : 'Заголовок...'}
-                className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-zinc-600 border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
-                  type === 'task' && status === 'done' ? 'text-zinc-500 line-through' : 'text-white'
+                className={`w-full bg-transparent text-xl md:text-2xl font-semibold tracking-tight placeholder-fg-dim border-none px-0 outline-none resize-none overflow-hidden [field-sizing:content] ${
+                  type === 'task' && status === 'done' ? 'text-fg-muted line-through' : 'text-white'
                 }`}
               />
             </div>
@@ -499,7 +496,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
               {/* Subtle Divider between Task Controls and Tags */}
               {type === 'task' && (
-                <div className="h-px bg-white/[0.06] w-full" />
+                <div className="h-px bg-tint-6 w-full" />
               )}
 
               {/* Tags Ribbon Row - Seamless Flat Textarea-Like Area */}
@@ -523,12 +520,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                   onKeyDown={handleTagKeyDown}
                   onBlur={handleTagBlur}
                   placeholder={tags.length === 0 ? 'добавьте теги...' : ''}
-                  className="bg-transparent text-xs font-mono text-zinc-300 placeholder-zinc-600 outline-none min-w-[70px] flex-1 py-0.5"
+                  className="bg-transparent text-xs font-mono text-fg-tertiary placeholder-fg-dim outline-none min-w-[70px] flex-1 py-0.5"
                 />
               </div>
 
               {/* Subtle Divider between Properties/Tags and Content */}
-              <div className="h-px bg-white/[0.06] w-full mt-1" />
+              <div className="h-px bg-tint-6 w-full mt-1" />
             </div>
 
             {/* Media Attachments Section in Fullscreen Editor - Collapsible */}

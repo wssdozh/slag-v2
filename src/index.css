@@ -7,6 +7,8 @@
   --font-sans: var(--slag-font-sans);
   --font-mono: var(--slag-font-mono);
 
+  --text-4xs: calc(0.5625rem * var(--slag-font-scale, 1)); /* 9px  - P4 (подписи внутри картинок, счётчики галереи) */
+  --text-3xs: calc(0.625rem * var(--slag-font-scale, 1));  /* 10px - P4 (метрики, служебные подписи) */
   --text-2xs: calc(0.6875rem * var(--slag-font-scale, 1));  /* 11px - P4 (Метаданные, бейджи, хоткеи) */
   --text-xs:  calc(0.75rem * var(--slag-font-scale, 1));    /* 12px - P3 (Контекст, папки, теги) */
   --text-ui:  calc(0.8125rem * var(--slag-font-scale, 1));  /* 13px - P2 (Чекбоксы подзадач, сайдбар, кнопки) */
@@ -28,6 +30,8 @@
     --border-subtle: var(--color-border-subtle);
     --border-hover: var(--color-border-hover);
     --text-primary: var(--color-fg-primary);
+    --text-soft: var(--color-fg-soft);
+    --text-tertiary: var(--color-fg-tertiary);
     --text-secondary: var(--color-fg-secondary);
     --text-muted: var(--color-fg-muted);
     --text-dim: var(--color-fg-dim);
@@ -46,10 +50,6 @@
     --slag-ctrl-sm: 28px;
     --slag-ctrl-md: 32px;
     --slag-ctrl-lg: 40px;
-
-    --slag-icon-xs: 12px;
-    --slag-icon-sm: 14px;
-    --slag-icon-md: 16px;
 
     --slag-radius-sm: 6px;
     --slag-radius-md: 8px;

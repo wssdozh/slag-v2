@@ -2,7 +2,7 @@
 // its own repository, so this route is a signpost: old links and the admin header must not
 // dead-end, and nothing here may pretend to download a file.
 import React from 'react';
-import { ArrowUpRight, UserRound } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { openExternalUrl } from '../../lib/platform/openExternal';
 import { SITE_URL } from '../../config/site';
 
@@ -28,7 +28,7 @@ export const SiteRedirect: React.FC<SiteRedirectProps> = ({ onNavigateToAccount 
           className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-fg-primary text-canvas text-xs font-semibold rounded-lg hover:bg-fg-secondary motion-press cursor-pointer"
         >
           <span>Открыть slag.app</span>
-          <ArrowUpRight className="w-3.5 h-3.5" />
+          <Icon name="nav.open" size="sm" tone="inherit" />
         </button>
         {onNavigateToAccount && (
           <button
@@ -36,13 +36,13 @@ export const SiteRedirect: React.FC<SiteRedirectProps> = ({ onNavigateToAccount 
             onClick={onNavigateToAccount}
             className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-surface text-fg-secondary hover:text-fg-primary border border-border-subtle text-xs font-medium rounded-lg motion-press cursor-pointer"
           >
-            <UserRound className="w-3.5 h-3.5" />
+            <Icon name="entity.user" size="sm" tone="inherit" />
             <span>Личный кабинет</span>
           </button>
         )}
       </div>
 
-      <span className="font-mono text-[10px] text-fg-muted">{SITE_URL}</span>
+      <span className="font-mono text-3xs text-fg-muted">{SITE_URL}</span>
     </div>
   </div>
 );

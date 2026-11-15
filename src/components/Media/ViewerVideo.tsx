@@ -1,7 +1,6 @@
 // A clip in the viewer: custom transport that hides with the chrome, and play may be refused.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pause, Play } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export interface ViewerVideoProps {
   src: string;
   /** Only the slide on screen loads bytes; its neighbours stay empty frames. */
@@ -98,15 +97,15 @@ export const ViewerVideo: React.FC<ViewerVideoProps> = ({ src, isActive, chromeV
         type="button"
         onClick={toggle}
         aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}
-        className={`absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-surface/85 text-white ring-1 ring-white/10 backdrop-blur-sm transition-opacity duration-150 ${
+        className={`absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-surface/85 text-white ring-1 ring-tint-10 backdrop-blur-sm transition-opacity duration-150 ${
           isPlaying && !chromeVisible ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
       >
-        {isPlaying ? <Pause className="h-7 w-7 fill-current" /> : <Play className="ml-0.5 h-7 w-7 fill-current" />}
+        {isPlaying ? <Icon name="media.pause" size="none" tone="inherit" className="h-7 w-7 fill-current" /> : <Icon name="media.play" size="none" tone="inherit" className="ml-0.5 h-7 w-7 fill-current" />}
       </button>
 
       <div
-        className={`absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent px-4 pt-6 pb-3 transition-opacity duration-150 ${chrome}`}
+        className={`absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-scrim-70 to-transparent px-4 pt-6 pb-3 transition-opacity duration-150 ${chrome}`}
       >
         <input
           type="range"
@@ -118,7 +117,7 @@ export const ViewerVideo: React.FC<ViewerVideoProps> = ({ src, isActive, chromeV
           aria-label="Позиция в видео"
           className="h-1 min-w-0 flex-1 cursor-pointer accent-accent-strong"
         />
-        <span className="shrink-0 font-mono text-[11px] tabular-nums text-white/80">
+        <span className="shrink-0 font-mono text-2xs tabular-nums text-tint-80">
           {clock(time)} / {clock(duration)}
         </span>
       </div>

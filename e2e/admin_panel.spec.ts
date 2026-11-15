@@ -409,7 +409,7 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
     await page.locator('button[type="submit"]', { hasText: 'войти' }).click();
 
     // 1. Accounts tab
-    await expect(page.locator('[data-testid="tab-accounts"]')).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('[data-testid="tab-accounts"]')).toHaveClass(/bg-tint-10/);
     await expect(page.locator('span', { hasText: 'acc_7a8b9c0d1e2f34567890abcd' })).toBeVisible();
     await expect(page.locator('text=рост пользователей')).toBeVisible();
     await expect(page.locator('text=активность и заходы')).toBeVisible();
@@ -427,7 +427,7 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
 
     // 2. Billing Tab
     await page.locator('[data-testid="tab-billing"]').click();
-    await expect(page.locator('[data-testid="tab-billing"]')).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('[data-testid="tab-billing"]')).toHaveClass(/bg-tint-10/);
     await expect(page.locator('text=MRR (выручка/мес)')).toBeVisible();
     await expect(page.locator('text=680 ₽')).toBeVisible();
     await expect(page.locator('text=33.3%')).toBeVisible();
@@ -448,7 +448,7 @@ test.describe('SLAG Relay Commercial Admin Panel (?page=admin)', () => {
 
     // 3. AI Gateway Tab
     await page.locator('[data-testid="tab-ai"]').click();
-    await expect(page.locator('[data-testid="tab-ai"]')).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('[data-testid="tab-ai"]')).toHaveClass(/bg-tint-10/);
     await expect(page.locator('text=operational')).toBeVisible();
     await expect(page.locator('text=357 000')).toBeVisible();
     await expect(page.locator('text=распределение расхода токенов на юзера')).toBeVisible();

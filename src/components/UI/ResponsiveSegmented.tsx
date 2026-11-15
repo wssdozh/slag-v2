@@ -1,7 +1,7 @@
 // Segmented control that collapses into a dropdown once the row no longer fits.
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
 import { MenuDropdown } from './MenuDropdown';
-import { ChevronDown, Check } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import type { SegmentedVariant } from './segmentedVariants';
 import { SEGMENTED_STRIP_CLASSES } from './segmentedVariants';
 
@@ -105,8 +105,8 @@ export function ResponsiveSegmented<T extends string = string>({
           aria-expanded={isOpen}
           aria-label={ariaLabel || selectedOption?.ariaLabel || selectedOption?.label}
           title={selectedOption?.title || selectedOption?.label}
-          className={`${heightClass} px-2 rounded-md hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 ${
-            isOpen ? 'bg-white/[0.06] text-white' : ''
+          className={`${heightClass} px-2 rounded-md hover:bg-tint-6 text-fg-secondary hover:text-fg-soft ${
+            isOpen ? 'bg-tint-6 text-white' : ''
           } flex items-center gap-1.5 text-xs transition-colors cursor-pointer shrink-0 ${triggerClassName}`}
         >
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
@@ -115,11 +115,7 @@ export function ResponsiveSegmented<T extends string = string>({
               {selectedOption.label}
             </span>
           )}
-          <ChevronDown
-            className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 shrink-0 ${
-              isOpen ? 'rotate-180 text-zinc-300' : ''
-            }`}
-          />
+          <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
         </button>
         }
       >
@@ -135,15 +131,15 @@ export function ResponsiveSegmented<T extends string = string>({
               }}
               className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
                 isSelected
-                  ? 'bg-white/10 text-white font-medium'
-                  : 'text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+                  ? 'bg-tint-10 text-white font-medium'
+                  : 'text-fg-tertiary hover:bg-tint-6 hover:text-white'
               }`}
             >
               <div className="flex items-center gap-2 truncate">
                 {opt.icon && <span className="shrink-0">{opt.icon}</span>}
                 <span className="truncate">{opt.label}</span>
               </div>
-              {isSelected && <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />}
+              {isSelected && <Icon name="action.check" size="sm" tone="primary" className="shrink-0 stroke-[2.5]" />}
             </button>
           );
         })}
@@ -210,7 +206,7 @@ export function ResponsiveSegmented<T extends string = string>({
       {indicatorStyle.ready && (
         <div
           data-testid="segmented-pill"
-          className="absolute top-0 bottom-0 left-0 rounded-md bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+          className="absolute top-0 bottom-0 left-0 rounded-md bg-tint-10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
           style={{
             transform: `translateX(${indicatorStyle.left}px)`,
             width: `${indicatorStyle.width}px`,
@@ -234,8 +230,8 @@ export function ResponsiveSegmented<T extends string = string>({
               opt.icon && !showExpandedLabel ? 'px-1.5' : 'px-2'
             } rounded-md text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 ${
               isSelected
-                ? `${indicatorStyle.ready ? '' : 'bg-white/10'} text-white font-medium`
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                ? `${indicatorStyle.ready ? '' : 'bg-tint-10'} text-white font-medium`
+                : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
             }`}
           >
             {opt.icon && <span className="shrink-0">{opt.icon}</span>}

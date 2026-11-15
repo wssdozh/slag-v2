@@ -1,7 +1,6 @@
 // The phone screen's top bar: back, title slots, and the status-bar inset.
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export interface MobileScreenHeaderProps {
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
@@ -31,7 +30,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
     /* Высота = 56px контента + системный inset: раньше inset вычитался из h-14,
        и двухстрочный центр (заголовок + подпись) вылезал на разделитель. */
     <header
-      className={`border-b border-white/[0.06] bg-panel px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
+      className={`border-b border-tint-6 bg-panel px-3 md:px-4 flex items-center justify-between shrink-0 z-10 ${className}`}
       style={{ height: 'calc(3.5rem + max(var(--sat), 0px))', paddingTop: 'max(var(--sat), 0px)' }}
     >
       {/* Left Slot: custom, back button, or icon + title */}
@@ -44,15 +43,15 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
             onClick={onBack}
             aria-label={backLabel}
             title={backTitle || backLabel}
-            className="h-10 px-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer flex items-center gap-1.5"
+            className="h-10 px-2 rounded-lg text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer flex items-center gap-1.5"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <Icon name="nav.back" size="md" tone="inherit" />
             <span className="text-xs font-medium">{backLabel}</span>
           </button>
         ) : (
           <>
             {icon && (
-              <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center font-mono font-bold text-xs text-white shrink-0">
+              <div className="w-6 h-6 rounded-md bg-tint-10 flex items-center justify-center font-mono font-bold text-xs text-white shrink-0">
                 {icon}
               </div>
             )}
@@ -73,7 +72,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
       ) : subtitle ? (
         <div className="flex flex-col items-center min-w-0 px-2">
           {title && <h1 className="text-sm font-bold text-white truncate max-w-[160px]">{title}</h1>}
-          <span className="text-[10px] font-mono text-zinc-500 truncate">{subtitle}</span>
+          <span className="text-3xs font-mono text-fg-muted truncate">{subtitle}</span>
         </div>
       ) : null}
 

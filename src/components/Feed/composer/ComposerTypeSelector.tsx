@@ -1,6 +1,6 @@
 // The note / task / article switch at the bottom of the composer.
 import React from 'react';
-import { CheckSquare, FileText, StickyNote } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { ResponsiveSegmented, type SegmentedOption } from '../../UI/ResponsiveSegmented';
 import type { SlagItemType } from '../../../types';
 
@@ -10,7 +10,7 @@ const TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
     value: 'note',
     label: 'Заметка',
     showLabelInTrigger: true,
-    icon: <StickyNote className="w-4 h-4" />,
+    icon: <Icon name="entity.note" size="md" tone="inherit" />,
     title: 'Заметка',
     ariaLabel: 'Заметка',
   },
@@ -18,7 +18,7 @@ const TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
     value: 'task',
     label: 'Таска',
     showLabelInTrigger: true,
-    icon: <CheckSquare className="w-4 h-4" />,
+    icon: <Icon name="entity.task" size="md" tone="inherit" />,
     title: 'Таска',
     ariaLabel: 'Таска',
   },
@@ -26,7 +26,7 @@ const TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
     value: 'article',
     label: 'Статья',
     showLabelInTrigger: true,
-    icon: <FileText className="w-4 h-4" />,
+    icon: <Icon name="entity.article" size="md" tone="inherit" />,
     title: 'Статья',
     ariaLabel: 'Статья',
   },

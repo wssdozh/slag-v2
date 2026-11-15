@@ -40,8 +40,9 @@ test.describe('Folder Badge Navigation & Card Anchoring', () => {
       fullPage: false,
     });
 
-    // 7. Verify unified color: tag chip and folder button both use text-zinc-500
-    const cardWithTags = page.locator('[id^="item-"]').filter({ has: page.locator('span[class*="text-zinc-500"]') }).first();
+    // 7. Verify unified color: the tag chip and the folder button share one muted tone.
+    // Assert the token class, not the palette name: a class rename must not look like a regression.
+    const cardWithTags = page.locator('[id^="item-"]').filter({ has: page.locator('span[class*="text-fg-muted"]') }).first();
     await cardWithTags.screenshot({
       path: 'test-results/screenshots/card_folder_and_tags_unified_color.png',
     });

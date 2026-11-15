@@ -1,6 +1,6 @@
 // The `/` command list: filtered by the typed query, grouped by category.
 import React from 'react';
-import { Command } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { SLASH_COMMANDS, CATEGORY_LABELS, type SlashCommand } from '../../types/slashCommands';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
@@ -39,18 +39,17 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
       placement={placement}
       isModal={isModal}
       isEmpty={filteredCommands.length === 0}
-      emptyContent={<><Command className="w-3.5 h-3.5 text-zinc-500 shrink-0" /><span>Команда «/{query}» не найдена</span></>}
-      header={<SuggestionMenuHeader icon={<Command className="w-3 h-3 text-zinc-400" />} title="Команды композера" />}
+      emptyContent={<><Icon name="system.command" size="sm" tone="muted" className="shrink-0" /><span>Команда «/{query}» не найдена</span></>}
+      header={<SuggestionMenuHeader icon={<Icon name="system.command" size="xs" />} title="Команды композера" />}
     >
       {filteredCommands.map((cmd, idx) => {
         const isSelected = idx === selectedIndex;
         const isNewCategory = idx === 0 || filteredCommands[idx - 1].category !== cmd.category;
-        const IconComponent = cmd.icon;
 
         return (
           <React.Fragment key={cmd.id}>
             {isNewCategory && !cleanQuery && (
-              <div className="px-2.5 pt-1.5 pb-0.5 text-2xs font-mono uppercase tracking-wider text-zinc-500">
+              <div className="px-2.5 pt-1.5 pb-0.5 text-2xs font-mono uppercase tracking-wider text-fg-muted">
                 {CATEGORY_LABELS[cmd.category]}
               </div>
             )}
@@ -63,32 +62,35 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
               onClick={() => onSelect(cmd)}
               className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
                 isSelected
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-300 hover:bg-white/[0.04]'
+                  ? 'bg-tint-10 text-white font-medium shadow-sm'
+                  : 'text-fg-tertiary hover:bg-tint-4'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <IconComponent
+                <Icon
+                  name={cmd.icon}
+                  size="none"
+                  tone="inherit"
                   className={`w-4 h-4 shrink-0 transition-colors ${
-                    isSelected ? 'text-zinc-100' : 'text-zinc-400'
+                    isSelected ? 'text-fg-primary' : 'text-fg-secondary'
                   }`}
                 />
 
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-xs font-mono font-medium text-zinc-100 shrink-0">
+                  <span className="text-xs font-mono font-medium text-fg-primary shrink-0">
                     {cmd.command}
                   </span>
-                  <span className="text-xs text-zinc-300 font-medium truncate">
+                  <span className="text-xs text-fg-tertiary font-medium truncate">
                     {cmd.title}
                   </span>
-                  <span className="text-[11px] text-zinc-500 truncate hidden sm:inline">
+                  <span className="text-2xs text-fg-muted truncate hidden sm:inline">
                     — {cmd.description}
                   </span>
                 </div>
               </div>
 
               {cmd.badge && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.04] text-zinc-400 border border-white/[0.06] shrink-0">
+                <span className="px-1.5 py-0.5 rounded text-3xs font-mono bg-tint-4 text-fg-secondary border border-tint-6 shrink-0">
                   {cmd.badge}
                 </span>
               )}

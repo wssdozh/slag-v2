@@ -11,8 +11,7 @@ import {
   syncAllGroupConstraints,
   wsLog,
 } from './dockPanelUtils';
-import { Plus } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export const GroupHeaderActions: React.FC<IDockviewHeaderActionsProps> = (props) => {
   const [isOpen, setIsOpen] = useState(false);
   const { ref: menuRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
@@ -73,10 +72,10 @@ export const GroupHeaderActions: React.FC<IDockviewHeaderActionsProps> = (props)
     <div className="relative flex items-center h-full px-0.5 gap-0.5">
       <button
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-6 h-6 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+        className="w-6 h-6 rounded-md text-fg-muted hover:text-fg-soft hover:bg-tint-6 flex items-center justify-center transition-colors cursor-pointer"
         title="Добавить вкладку в эту группу"
       >
-        <Plus className="w-3.5 h-3.5" />
+        <Icon name="action.add" size="sm" tone="inherit" />
       </button>
 
       {isPresent && (
@@ -85,20 +84,19 @@ export const GroupHeaderActions: React.FC<IDockviewHeaderActionsProps> = (props)
           data-motion-state={phase}
           onTransitionEnd={onTransitionEnd}
           inert={!isOpen}
-          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-2xl py-1 z-50 motion-popover"
+          className="absolute left-0 top-full mt-1 w-44 rounded-lg bg-surface-elevated border border-tint-12 shadow-2xl py-1 z-50 motion-popover"
         >
-          <div className="px-2.5 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider border-b border-white/[0.04]">
+          <div className="px-2.5 py-1 text-3xs font-mono text-fg-muted uppercase tracking-wider border-b border-tint-4">
             Добавить вкладку
           </div>
           {PANELS_TO_ADD.map(item => {
-            const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 onClick={() => addPanel(item.id, item.title)}
-                className="w-full px-2.5 py-1.5 text-left text-xs flex items-center gap-2 text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                className="w-full px-2.5 py-1.5 text-left text-xs flex items-center gap-2 text-fg-tertiary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
               >
-                <Icon className="w-3.5 h-3.5 text-zinc-400" />
+                <Icon name={item.icon} size="sm" />
                 <span>{item.title}</span>
               </button>
             );

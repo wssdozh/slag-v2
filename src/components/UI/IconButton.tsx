@@ -29,8 +29,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
 
     const variantClasses = {
       ghost: 'text-fg-muted hover:text-fg-primary',
-      danger: 'text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06]',
-      secondary: 'text-zinc-300 bg-white/[0.06] hover:bg-white/10',
+      danger: 'text-fg-muted hover:text-rose-400 hover:bg-tint-6',
+      secondary: 'text-fg-tertiary bg-tint-6 hover:bg-tint-10',
     }[variant];
 
     return (

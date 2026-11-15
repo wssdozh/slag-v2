@@ -1,6 +1,6 @@
 // Integrations: the master switch, the list of channels, and one detail screen behind a gear.
 import React, { useState } from 'react';
-import { ArrowLeft, Cog } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import type { NotifyInvite } from '../../lib/sync/account';
@@ -162,12 +162,12 @@ export const IntegrationsSettingsTab: React.FC = () => {
           onClick={() => setIsTelegramOpen(false)}
           className="self-start flex items-center gap-1.5 px-1 py-0.5 text-2xs text-fg-muted hover:text-fg-primary cursor-pointer motion-press"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> все интеграции
+          <Icon name="nav.back" size="sm" tone="inherit" /> все интеграции
         </button>
 
         <div className="px-1 flex flex-col gap-1">
           <span className="text-sm font-semibold text-fg-primary">telegram</span>
-          <p className="text-xs leading-relaxed text-zinc-500">
+          <p className="text-xs leading-relaxed text-fg-muted">
             канал доставки: напоминания приходят в чат, а вопросы уходят на это устройство.
             вход защищён только телеграм-аккаунтом — кто войдёт в него, тот прочитает то, что
             бот видит в хранилище.
@@ -254,7 +254,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
                 onClick={() => setIsTelegramOpen(true)}
                 className="p-1.5 rounded-md text-fg-muted hover:text-fg-primary hover:bg-surface-hover cursor-pointer motion-press"
               >
-                <Cog className="w-4 h-4" />
+                <Icon name="system.integrationConfig" size="md" tone="inherit" />
               </button>
               <SettingsSwitch
                 label="канал telegram"

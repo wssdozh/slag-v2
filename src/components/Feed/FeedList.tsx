@@ -11,7 +11,7 @@ import React, {
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
 import type { SlagAttachment, LightboxImage } from '../../types';
-import { Inbox, Sparkles, Pin } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
@@ -455,11 +455,11 @@ export const FeedList: React.FC = () => {
           <EmptyState
             icon={
               isPinnedOnlyFilter ? (
-                <Pin className="w-5 h-5 text-amber-400 rotate-45" />
+                <Icon name="action.pin" size="lg" tone="warning" className="rotate-45" />
               ) : items.length === 0 ? (
-                <Sparkles className="w-5 h-5 text-amber-400" />
+                <Icon name="system.ai" size="lg" tone="warning" />
               ) : (
-                <Inbox className="w-5 h-5" />
+                <Icon name="entity.inbox" size="lg" tone="inherit" />
               )
             }
             title={
@@ -483,7 +483,7 @@ export const FeedList: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   onClick={togglePinnedOnlyFilter}
-                  className="gap-1.5 text-xs text-zinc-200 hover:text-white"
+                  className="gap-1.5 text-xs text-fg-soft hover:text-white"
                 >
                   Показать все сообщения
                 </Button>
@@ -493,9 +493,9 @@ export const FeedList: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   onClick={seedDemoData}
-                  className="gap-1.5 text-xs text-zinc-200 hover:text-white"
+                  className="gap-1.5 text-xs text-fg-soft hover:text-white"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <Icon name="system.ai" size="sm" tone="warning" />
                   Сгенерировать демо-заметки и папки
                 </Button>
               ) : undefined
@@ -513,7 +513,7 @@ export const FeedList: React.FC = () => {
                 <button
                   type="button"
                   onClick={loadMoreOlder}
-                  className="text-xs font-mono text-zinc-500 hover:text-zinc-300 transition-colors px-3 py-1 rounded-full bg-surface border border-white/[0.04] cursor-pointer"
+                  className="text-xs font-mono text-fg-muted hover:text-fg-tertiary transition-colors px-3 py-1 rounded-full bg-surface border border-tint-4 cursor-pointer"
                 >
                   Показать более ранние записи...
                 </button>

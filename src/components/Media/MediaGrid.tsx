@@ -1,6 +1,6 @@
 // The device gallery grid: paged cells whose thumbnails decode only as they scroll in.
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, Lock, Pause, Play, RefreshCw } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { UI_DELAYS } from '../../config';
 import { formatBytes } from '../../lib/text/formatBytes';
 import { entryStreamSrc, readEntryThumbnail } from '../../lib/media/folderBrowser';
@@ -110,7 +110,7 @@ const AudioRows: React.FC<AudioRowsProps> = ({ items, selected, onToggle }) => {
               aria-pressed={isPlaying}
               className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-fg-muted transition-colors hover:text-fg-primary disabled:cursor-default disabled:opacity-40"
             >
-              {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {isPlaying ? <Icon name="media.pause" size="sm" tone="inherit" /> : <Icon name="media.play" size="sm" tone="inherit" />}
             </button>
             <button
               type="button"
@@ -120,10 +120,10 @@ const AudioRows: React.FC<AudioRowsProps> = ({ items, selected, onToggle }) => {
               className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 py-1.5 text-left"
             >
               <span className="min-w-0 flex-1 truncate text-xs text-fg-primary">{item.name}</span>
-              <span className="shrink-0 font-mono text-[10px] text-fg-muted">{formatBytes(item.size)}</span>
+              <span className="shrink-0 font-mono text-3xs text-fg-muted">{formatBytes(item.size)}</span>
               <span
-                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] ${
-                  order > 0 ? 'bg-accent-strong text-white' : 'border border-white/25 text-transparent'
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-4xs ${
+                  order > 0 ? 'bg-accent-strong text-white' : 'border border-tint-25 text-transparent'
                 }`}
               >
                 {order > 0 ? order : ''}
@@ -183,9 +183,9 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
   if (access !== 'granted') {
     return (
       <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-        <Lock className="h-5 w-5 text-fg-muted" />
+        <Icon name="action.lock" size="lg" tone="muted" />
         <p className="text-xs text-fg-primary">{GRANT_LABEL[kind]}</p>
-        <p className="text-[10px] leading-relaxed text-fg-muted">
+        <p className="text-3xs leading-relaxed text-fg-muted">
           Приложение читает только имена, даты и размеры файлов. Сами файлы остаются в телефоне,
           пока ты их не прикрепишь.
         </p>
@@ -253,10 +253,10 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
             type="button"
             onClick={onCamera}
             aria-label="Снять фото"
-            className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-white/15 bg-surface text-fg-muted transition-colors hover:text-fg-primary"
+            className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border border-dashed border-tint-15 bg-surface text-fg-muted transition-colors hover:text-fg-primary"
           >
-            <Camera className="h-4 w-4" />
-            <span className="text-[9px]">снять</span>
+            <Icon name="media.camera" size="md" tone="inherit" />
+            <span className="text-4xs">снять</span>
           </button>
         )}
 
@@ -284,17 +284,17 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
                 }}
                 aria-label={item.name}
                 aria-pressed={order >= 0}
-                className="relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-md bg-black/40"
+                className="relative aspect-square min-w-0 cursor-pointer overflow-hidden rounded-md bg-scrim-40"
               >
                 <Thumb uri={item.uri} />
                 <span
-                  className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full font-mono text-[9px] ${
+                  className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full font-mono text-4xs ${
                     order >= 0
                       ? 'bg-accent-strong text-white'
-                      : 'border border-white/40 bg-black/50 text-transparent'
+                      : 'border border-tint-40 bg-scrim-50 text-transparent'
                   }`}
                 >
-                  {order >= 0 ? order + 1 : <Check className="h-2.5 w-2.5 opacity-0" />}
+                  {order >= 0 ? order + 1 : <Icon name="action.check" size="none" tone="inherit" className="h-2.5 w-2.5 opacity-0" />}
                 </span>
               </button>
             );
@@ -302,12 +302,12 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
         )}
 
         {isLoading && items.length === 0 && (
-          <span className="col-span-3 flex items-center justify-center gap-2 py-6 text-[10px] text-fg-muted">
-            <RefreshCw className="w-3 h-3 motion-safe:animate-spin" /> читаю галерею
+          <span className="col-span-3 flex items-center justify-center gap-2 py-6 text-3xs text-fg-muted">
+            <Icon name="action.refresh" size="xs" tone="inherit" className="motion-safe:animate-spin" /> читаю галерею
           </span>
         )}
         {!isLoading && items.length === 0 && (
-          <span className="col-span-3 py-6 text-center text-[10px] text-fg-muted">{EMPTY_LABEL[kind]}</span>
+          <span className="col-span-3 py-6 text-center text-3xs text-fg-muted">{EMPTY_LABEL[kind]}</span>
         )}
       </div>
 

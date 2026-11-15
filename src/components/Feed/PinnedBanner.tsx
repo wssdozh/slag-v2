@@ -1,7 +1,7 @@
 // The pinned strip over the feed: cycles this folder's pinned notes and jumps to them.
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Pin, CheckSquare, FileText, StickyNote } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useAttachmentSrc } from '../../hooks/media/useAttachmentSrc';
@@ -111,7 +111,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
           onClick={handleBannerClick}
           onContextMenu={handleContextMenu}
           data-testid="pinned-banner"
-          className="h-11 px-3 sm:px-4 bg-surface hover:bg-surface-hover border-b border-white/[0.06] flex items-center justify-between gap-3 transition-colors cursor-pointer select-none shrink-0 z-20"
+          className="h-11 px-3 sm:px-4 bg-surface hover:bg-surface-hover border-b border-tint-6 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none shrink-0 z-20"
           title="Нажмите, чтобы перейти к закрепленному сообщению (ПКМ — контекстное меню)"
         >
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -139,7 +139,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
                       className={`w-0.5 rounded-full transition-colors duration-200 ${
                         isActive
                           ? 'h-2.5 bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.6)]'
-                          : 'h-1 bg-white/20'
+                          : 'h-1 bg-tint-20'
                       }`}
                     />
                   );
@@ -152,16 +152,16 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
               <img
                 src={firstImageSrc}
                 alt="Превью"
-                className="w-7 h-7 rounded-md object-cover shrink-0 border border-white/[0.08]"
+                className="w-7 h-7 rounded-md object-cover shrink-0 border border-tint-8"
               />
             ) : (
-              <div className="w-7 h-7 rounded-md bg-white/[0.04] border border-white/[0.06] flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-md bg-tint-4 border border-tint-6 flex items-center justify-center shrink-0">
                 {currentPinnedItem.type === 'task' ? (
-                  <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+                  <Icon name="entity.task" size="sm" tone="warning" />
                 ) : currentPinnedItem.type === 'article' ? (
-                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <Icon name="entity.article" size="sm" tone="accent" />
                 ) : (
-                  <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
+                  <Icon name="entity.note" size="sm" />
                 )}
               </div>
             )}
@@ -173,12 +173,12 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
                   Закреплённое сообщение
                 </span>
                 {effectivePinnedItems.length > 1 && (
-                  <span className="text-[10px] font-mono text-zinc-500 shrink-0">
+                  <span className="text-3xs font-mono text-fg-muted shrink-0">
                     {safeIndex + 1} / {effectivePinnedItems.length}
                   </span>
                 )}
               </div>
-              <span className="text-[11px] text-zinc-300 truncate leading-tight mt-0.5 font-normal">
+              <span className="text-2xs text-fg-tertiary truncate leading-tight mt-0.5 font-normal">
                 {previewText}
               </span>
             </div>
@@ -194,7 +194,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
             className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
               isPinnedOnlyFilter
                 ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.08]'
+                : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-8'
             }`}
             title={
               isPinnedOnlyFilter
@@ -203,7 +203,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
             }
             aria-label="Фильтр закрепленных записей"
           >
-            <Pin className="w-3.5 h-3.5 rotate-45 shrink-0" />
+            <Icon name="action.pin" size="sm" tone="inherit" className="rotate-45 shrink-0" />
             <div className="flex flex-col gap-0.5 shrink-0">
               <span className="w-2 h-0.5 bg-current rounded-full block" />
               <span className="w-1.5 h-0.5 bg-current rounded-full block" />

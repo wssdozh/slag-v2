@@ -1,6 +1,6 @@
 // First settings tab: who you are, how much you have done, plan limits and where to go next.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Laptop, UserRound } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { navigatePage } from '../../lib/navigation';
 import { summarizeActivity } from '../../lib/activityStats';
@@ -73,11 +73,11 @@ export const AccountSettingsTab: React.FC = () => {
       <SettingsGroup>
         {hosted && !locked && (
           <>
-            <SettingsRow icon={<UserRound className="w-4 h-4" />} label="Личный кабинет" description="Подписка, устройства и доступ к хранилищам" onClick={() => navigatePage('account')} external />
+            <SettingsRow icon={<Icon name="entity.user" size="md" tone="inherit" />} label="Личный кабинет" description="Подписка, устройства и доступ к хранилищам" onClick={() => navigatePage('account')} external />
             <SettingsDivider inset />
           </>
         )}
-        <SettingsRow icon={<Laptop className="w-4 h-4" />} label="Подключённые устройства" value={<span className="font-mono">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices}</span>} testId="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} chevron />
+        <SettingsRow icon={<Icon name="entity.desktop" size="md" tone="inherit" />} label="Подключённые устройства" value={<span className="font-mono">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices}</span>} testId="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} chevron />
       </SettingsGroup>
     </div>
   );

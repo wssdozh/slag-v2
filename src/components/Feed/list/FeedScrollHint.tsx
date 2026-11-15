@@ -1,6 +1,6 @@
 // Two floating tips at the feed edges: pull-to-search, and a jump to the newest note.
 import React, { memo } from 'react';
-import { ChevronDown, Search } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { UI_GESTURES } from '../../../config';
 
 export interface FeedScrollHintProps {
@@ -37,10 +37,10 @@ const FeedScrollHintComponent: React.FC<FeedScrollHintProps> = ({
         }
       >
         <span
-          className="flex items-center gap-1.5 rounded-full border border-subtle bg-surface-elevated px-3 py-1.5 text-[11px] font-medium text-fg-secondary shadow-xl"
+          className="flex items-center gap-1.5 rounded-full border border-subtle bg-surface-elevated px-3 py-1.5 text-2xs font-medium text-fg-secondary shadow-xl"
           style={{ opacity: Math.min(1, pull / UI_GESTURES.SEARCH_PULL_PX) }}
         >
-          <Search className="h-3.5 w-3.5" /> поиск
+          <Icon name="action.search" size="sm" tone="inherit" /> поиск
         </span>
       </div>
     )}
@@ -59,11 +59,11 @@ const FeedScrollHintComponent: React.FC<FeedScrollHintProps> = ({
         type="button"
         onClick={onScrollToBottom}
         tabIndex={isBottomButtonVisible ? 0 : -1}
-        className={`${isBottomButtonVisible ? 'pointer-events-auto' : 'pointer-events-none'} w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-white/[0.08] text-zinc-300 hover:text-white border border-white/[0.14] shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group`}
+        className={`${isBottomButtonVisible ? 'pointer-events-auto' : 'pointer-events-none'} w-10 h-10 rounded-full aspect-square shrink-0 bg-surface-elevated/95 hover:bg-surface-hover active:bg-tint-8 text-fg-tertiary hover:text-white border border-tint-14 shadow-2xl backdrop-blur-md flex items-center justify-center cursor-pointer motion-press group`}
         title="К последним заметкам"
         aria-label="Прокрутить к последним заметкам"
       >
-        <ChevronDown className="w-5 h-5 text-zinc-300 group-hover:text-white transition-transform group-hover:translate-y-0.5" />
+        <Icon name="nav.down" size="lg" tone="tertiary" className="group-hover:text-white transition-transform group-hover:translate-y-0.5" />
       </button>
     </div>
   </>

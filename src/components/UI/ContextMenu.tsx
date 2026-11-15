@@ -247,7 +247,7 @@ export const ContextMenu: React.FC = () => {
       {/* Main Menu Container */}
       <div
         data-motion-state={phase}
-        className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+        className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
       >
         {type === 'item' && item && (
           <ItemMenuSections

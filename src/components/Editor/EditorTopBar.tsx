@@ -1,6 +1,6 @@
 // Editor top row: back, folder selector, item type.
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { Select } from '../UI/Select';
 import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
 import type { SlagItemType } from '../../types';
@@ -20,16 +20,16 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       {/* Back Button: pure icon */}
       <button
         onClick={onClose}
-        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer"
+        className="p-1.5 rounded-lg text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer"
         title="Назад к ленте (Escape)"
         aria-label="Назад к ленте"
       >
-        <ArrowLeft className="w-4 h-4" />
+        <Icon name="nav.back" size="md" tone="inherit" />
         <span className="sr-only">Назад</span>
       </button>
 
       {/* Vertical Divider */}
-      <div className="h-4 w-px bg-white/[0.08] shrink-0" />
+      <div className="h-4 w-px bg-tint-8 shrink-0" />
 
       {/* Folder Selector: ghost droplist without podlozhka, showing full hierarchical path */}
       <Select
@@ -42,7 +42,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       />
 
       {/* Vertical Divider */}
-      <div className="h-4 w-px bg-white/[0.08] shrink-0 hidden sm:block" />
+      <div className="h-4 w-px bg-tint-8 shrink-0 hidden sm:block" />
 
       {/* Item Type: droplist, the same control the composer uses */}
       <div className="hidden shrink-0 sm:block">

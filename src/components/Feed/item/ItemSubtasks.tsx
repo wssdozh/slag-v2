@@ -1,6 +1,6 @@
 // A task's subtasks: one counter, one toggleable line each, collapsible.
 import React, { memo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { MarkdownRenderer } from '../../UI/MarkdownRenderer';
 import { TaskStatusMark } from '../../UI/TaskStatusMark';
 import type { SlagSubtask } from '../../../types';
@@ -32,12 +32,12 @@ const ItemSubtasksComponent: React.FC<ItemSubtasksProps> = ({
         onClick={() => setIsExpanded(!isExpanded)}
         aria-expanded={isExpanded}
         aria-label={`Подзадачи: ${completedCount} из ${totalCount}`}
-        className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 cursor-pointer hover:text-zinc-300 select-none py-0.5 w-fit"
+        className="flex items-center gap-1.5 text-2xs font-mono text-fg-muted cursor-pointer hover:text-fg-tertiary select-none py-0.5 w-fit"
       >
         <span>
           Подзадачи: {completedCount} из {totalCount}
         </span>
-        <ChevronDown className={`w-3 h-3 text-zinc-500 transition-transform duration-200 ease-out ${isExpanded ? 'rotate-180' : ''}`} />
+        <Icon name="nav.down" size="xs" tone="muted" className={`transition-transform duration-200 ease-out ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 
       <div
@@ -55,20 +55,20 @@ const ItemSubtasksComponent: React.FC<ItemSubtasksProps> = ({
               <button
                 type="button"
                 aria-label={`Отметить подзадачу ${subtask.title}`}
-                className="text-zinc-500 group-hover/sub:text-zinc-300 transition-colors shrink-0"
+                className="text-fg-muted group-hover/sub:text-fg-tertiary transition-colors shrink-0"
               >
                 <TaskStatusMark done={subtask.completed} className="w-3.5 h-3.5" />
               </button>
               <span
                 className={`text-xs sm:text-ui flex-1 min-w-0 ${
-                  subtask.completed ? 'line-through text-zinc-500' : 'text-zinc-300'
+                  subtask.completed ? 'line-through text-fg-muted' : 'text-fg-tertiary'
                 }`}
               >
                 <MarkdownRenderer
                   content={subtask.title}
                   inline
                   onWikiLinkClick={onWikiLinkClick}
-                  className={subtask.completed ? 'line-through text-zinc-500' : 'text-zinc-300'}
+                  className={subtask.completed ? 'line-through text-fg-muted' : 'text-fg-tertiary'}
                 />
               </span>
             </div>

@@ -4,14 +4,7 @@ import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { triageInboxItems } from '../../lib/ai/aiService';
 import type { TriageSuggestion } from '../../lib/ai/aiService';
-import {
-  Sparkles,
-  ArrowRight,
-  Loader2,
-  X,
-  Plus,
-  ArrowLeft,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { BaseModal } from './BaseModal';
 import { Checkbox } from '../UI/Checkbox';
 import { Select } from '../UI/Select';
@@ -182,8 +175,8 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
   };
 
   const modalSubtitle = isAnalyzing ? (
-    <span className="flex items-center gap-1.5 text-zinc-400">
-      <Loader2 className="w-3 h-3 animate-spin text-amber-400 shrink-0" />
+    <span className="flex items-center gap-1.5 text-fg-secondary">
+      <Icon name="status.loading" size="xs" tone="warning" className="animate-spin shrink-0" />
       <span>
         Пакетный анализ: {progress.processed} из {progress.total}...
       </span>
@@ -194,7 +187,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
 
   const footer = (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-zinc-500">
+      <span className="text-xs text-fg-muted">
         Выбрано: {selectedIds.size} из {suggestions.length}
       </span>
 
@@ -202,7 +195,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
         <button
           type="button"
           onClick={() => setIsTriageModalOpen(false)}
-          className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-lg text-xs text-fg-secondary hover:text-white transition-colors cursor-pointer"
         >
           Отмена
         </button>
@@ -210,7 +203,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
           type="button"
           onClick={handleApply}
           disabled={selectedIds.size === 0}
-          className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+          className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-fg-soft transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           Применить перемещение
         </button>
@@ -221,19 +214,19 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
   const triageContent = (
     <>
       {isAnalyzing && suggestions.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 gap-3 text-zinc-400">
-          <Loader2 className="w-6 h-6 animate-spin text-white" />
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-fg-secondary">
+          <Icon name="status.loading" size="none" tone="primary" className="w-6 h-6 animate-spin" />
           <p className="text-xs">
             ИИ анализирует первую партию заметок из «Входящих»...
           </p>
         </div>
       ) : suggestions.length === 0 ? (
-        <div className="text-center py-10 text-xs text-zinc-500">
+        <div className="text-center py-10 text-xs text-fg-muted">
           Нет заметок во «Входящих» для распределения.
         </div>
       ) : (
         <div className="flex flex-col flex-1 min-h-0">
-          <div className="flex justify-between items-center text-[11px] text-zinc-500 px-3 py-1.5 border-b border-white/[0.04] mb-1 shrink-0">
+          <div className="flex justify-between items-center text-2xs text-fg-muted px-3 py-1.5 border-b border-tint-4 mb-1 shrink-0">
             <span>Предложенные перемещения:</span>
             <button
               type="button"
@@ -256,8 +249,8 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                   onClick={() => toggleSelect(s.itemId)}
                   className={`group flex items-start gap-3 p-3 rounded-xl border motion-surface cursor-pointer ${
                     isChecked
-                      ? 'bg-white/[0.03] border-white/[0.08] text-zinc-200'
-                      : 'bg-transparent border-transparent text-zinc-500 opacity-40 hover:opacity-75'
+                      ? 'bg-tint-3 border-tint-8 text-fg-soft'
+                      : 'bg-transparent border-transparent text-fg-muted opacity-40 hover:opacity-75'
                   }`}
                 >
                   <Checkbox
@@ -270,12 +263,12 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                     {/* Top line: Title & Folder Selector */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs font-semibold text-zinc-200 truncate">
+                        <span className="text-xs font-semibold text-fg-soft truncate">
                           {s.suggestedTitle || s.itemTitle}
                         </span>
                         {s.suggestedTitle && s.suggestedTitle !== s.itemTitle && (
                           <span
-                            className="text-[10px] text-zinc-500 line-through truncate max-w-[140px] hidden sm:inline"
+                            className="text-3xs text-fg-muted line-through truncate max-w-[140px] hidden sm:inline"
                             title={`Исходный заголовок: ${s.itemTitle}`}
                           >
                             {s.itemTitle}
@@ -285,13 +278,13 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
 
                       {/* Interactive Folder Selector */}
                       <div
-                        className="flex items-center gap-1.5 text-[11px] shrink-0 font-mono"
+                        className="flex items-center gap-1.5 text-2xs shrink-0 font-mono"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <span className="text-zinc-500 hidden sm:inline">
+                        <span className="text-fg-muted hidden sm:inline">
                           Входящие
                         </span>
-                        <ArrowRight className="w-3 h-3 text-zinc-600 hidden sm:inline" />
+                        <Icon name="nav.forward" size="xs" tone="dim" className="hidden sm:inline" />
                         <Select
                           value={s.targetFolder}
                           onChange={(val) => updateSuggestionFolder(s.itemId, val)}
@@ -312,24 +305,24 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                       {s.tags.map(t => (
                         <span
                           key={t}
-                          className="group/tag inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors shrink-0"
+                          className="group/tag inline-flex items-center gap-1 text-2xs font-mono text-fg-secondary hover:text-fg-soft transition-colors shrink-0"
                         >
                           <span>#{t}</span>
                           <button
                             type="button"
                             onClick={() => removeSuggestionTag(s.itemId, t)}
-                            className="text-zinc-600 hover:text-rose-400 opacity-60 group-hover/tag:opacity-100 motion-surface cursor-pointer p-0.5"
+                            className="text-fg-dim hover:text-rose-400 opacity-60 group-hover/tag:opacity-100 motion-surface cursor-pointer p-0.5"
                             title={`Удалить тег #${t}`}
                             aria-label={`Удалить тег #${t}`}
                           >
-                            <X className="w-2.5 h-2.5" />
+                            <Icon name="action.close" size="none" tone="inherit" className="w-2.5 h-2.5" />
                           </button>
                         </span>
                       ))}
 
                       {/* Inline Tag Adder */}
                       {activeTagInputId === s.itemId ? (
-                        <div className="inline-flex items-center text-[11px] font-mono text-zinc-400 shrink-0">
+                        <div className="inline-flex items-center text-2xs font-mono text-fg-secondary shrink-0">
                           <span>#</span>
                           <input
                             ref={tagInputRef}
@@ -353,7 +346,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                               }
                             }}
                             placeholder="тег..."
-                            className="w-16 px-0.5 py-0 bg-transparent border-b border-zinc-600 focus:border-zinc-300 text-[11px] font-mono text-zinc-200 outline-none"
+                            className="w-16 px-0.5 py-0 bg-transparent border-b border-fg-dim focus:border-fg-tertiary text-2xs font-mono text-fg-soft outline-none"
                           />
                         </div>
                       ) : (
@@ -363,10 +356,10 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                             setActiveTagInputId(s.itemId);
                             setTagInputText('');
                           }}
-                          className="inline-flex items-center gap-0.5 text-[11px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer py-0.5 shrink-0"
+                          className="inline-flex items-center gap-0.5 text-2xs font-mono text-fg-dim hover:text-fg-tertiary transition-colors cursor-pointer py-0.5 shrink-0"
                           title="Добавить тег к этой заметке"
                         >
-                          <Plus className="w-2.5 h-2.5" />
+                          <Icon name="action.add" size="none" tone="inherit" className="w-2.5 h-2.5" />
                           <span>тег</span>
                         </button>
                       )}
@@ -394,23 +387,23 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
       >
         {/* Mobile Header */}
         <div
-          className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between shrink-0 bg-panel"
+          className="px-4 py-3 border-b border-tint-6 flex items-center justify-between shrink-0 bg-panel"
           style={{ paddingTop: 'max(var(--sat), 0.75rem)' }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <button
               onClick={() => setIsTriageModalOpen(false)}
-              className="p-1.5 -ml-1 text-zinc-400 hover:text-white cursor-pointer motion-press"
+              className="p-1.5 -ml-1 text-fg-secondary hover:text-white cursor-pointer motion-press"
               title="Закрыть"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <Icon name="nav.back" size="lg" tone="inherit" />
             </button>
             <div className="flex flex-col min-w-0">
               <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 truncate">
-                <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                <Icon name="system.ai" size="sm" tone="accent" className="shrink-0" />
                 <span className="truncate">AI Triage — Сортировка</span>
               </h3>
-              <span className="text-[10px] text-zinc-500 font-mono truncate max-w-[240px]">
+              <span className="text-3xs text-fg-muted font-mono truncate max-w-[240px]">
                 {modalSubtitle}
               </span>
             </div>
@@ -424,17 +417,17 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
 
         {/* Fixed Mobile Footer */}
         <div
-          className="px-4 py-3 border-t border-white/[0.08] bg-panel shrink-0 flex items-center justify-between"
+          className="px-4 py-3 border-t border-tint-8 bg-panel shrink-0 flex items-center justify-between"
           style={{ paddingBottom: 'max(var(--sab), 0.75rem)' }}
         >
-          <span className="text-xs text-zinc-500 font-mono">
+          <span className="text-xs text-fg-muted font-mono">
             Выбрано: {selectedIds.size} из {suggestions.length}
           </span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setIsTriageModalOpen(false)}
-              className="px-3 py-1.5 rounded-xl text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl text-xs text-fg-secondary hover:text-white transition-colors cursor-pointer"
             >
               Отмена
             </button>
@@ -442,7 +435,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
               type="button"
               onClick={handleApply}
               disabled={selectedIds.size === 0}
-              className="px-4 py-1.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm motion-press"
+              className="px-4 py-1.5 rounded-xl bg-white text-black font-semibold text-xs hover:bg-fg-soft transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-sm motion-press"
             >
               Применить перемещение
             </button>
@@ -459,7 +452,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
       onClose={() => setIsTriageModalOpen(false)}
       title="AI Triage — Сортировка Входящих"
       subtitle={modalSubtitle}
-      icon={<Sparkles className="w-4 h-4" />}
+      icon={<Icon name="system.ai" size="md" tone="inherit" />}
       maxWidth="max-w-xl"
       footer={footer}
     >

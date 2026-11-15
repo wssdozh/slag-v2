@@ -1,6 +1,6 @@
 // Per-device vault access dialog: grant mode and a toggle for each vault.
 import React from 'react';
-import { Database } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { AccountDevice, AccountVault } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile, DeviceSyncMode } from '../../../lib/sync/types';
 import type { VaultMeta } from '../../../types';
@@ -48,7 +48,7 @@ export const DevicePermissions: React.FC<DevicePermissionsProps> = ({
           return (
             <React.Fragment key={vault.id}>
               {index > 0 && <SettingsDivider />}
-              <SettingsRow icon={<Database className="w-3.5 h-3.5" />} label={getVaultDisplayName(vault, vaults)} description={grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : undefined} right={<SettingsSwitch checked={allowed} onChange={() => onToggleVaultAccess(vault.id)} label={`Доступ к ${getVaultDisplayName(vault, vaults)}`} />} />
+              <SettingsRow icon={<Icon name="entity.vault" size="sm" tone="inherit" />} label={getVaultDisplayName(vault, vaults)} description={grant?.status === 'pending' ? 'Ожидает' : grant?.status === 'accepted' ? (grant.mode === 'receive-only' ? 'Только чтение' : 'Подключено') : undefined} right={<SettingsSwitch checked={allowed} onChange={() => onToggleVaultAccess(vault.id)} label={`Доступ к ${getVaultDisplayName(vault, vaults)}`} />} />
             </React.Fragment>
           );
         })}

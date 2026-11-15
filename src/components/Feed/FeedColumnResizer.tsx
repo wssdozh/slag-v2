@@ -82,7 +82,7 @@ export const FeedColumnResizer: React.FC = () => {
           style={{ [side === 1 ? 'right' : 'left']: 'calc(50% - var(--feed-content-width, 42rem) / 2 - 6px)' }}
           className="group absolute inset-y-0 z-10 hidden w-3 cursor-col-resize touch-none outline-none md:block"
         >
-          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full bg-white/25 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:bg-accent-strong group-active:opacity-100" />
+          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 rounded-full bg-tint-25 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100 group-active:bg-accent-strong group-active:opacity-100" />
         </div>
       ))}
     </>

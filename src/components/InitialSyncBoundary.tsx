@@ -37,16 +37,16 @@ export function InitialSyncBoundary({ children }: { children: ReactNode }) {
     <main className="flex h-full w-full flex-col items-center justify-center gap-4 bg-canvas-subtle px-6 text-center text-fg-primary" aria-busy={initial.state === 'loading'}>
       <div role="status" aria-live="polite">
         <h1 className="text-lg font-medium">{initial.state === 'loading' ? 'загружаем хранилище…' : 'не удалось загрузить хранилище'}</h1>
-        <p className="mt-2 text-sm text-zinc-400">обработано пакетов: {initial.processed}</p>
+        <p className="mt-2 text-sm text-fg-secondary">обработано пакетов: {initial.processed}</p>
       </div>
       {warning}
       <div className="flex flex-wrap justify-center gap-3">
         {initial.state === 'error' && (
-          <button onClick={() => void retry()} disabled={retrying} className="min-h-11 rounded-lg bg-white/10 px-4 text-sm outline-none ring-0 hover:bg-white/15 disabled:opacity-50">
+          <button onClick={() => void retry()} disabled={retrying} className="min-h-11 rounded-lg bg-tint-10 px-4 text-sm outline-none ring-0 hover:bg-tint-15 disabled:opacity-50">
             {retrying ? 'повторяем…' : 'повторить загрузку'}
           </button>
         )}
-        <button onClick={openVaultModal} className="min-h-11 rounded-lg px-4 text-sm text-zinc-400 outline-none ring-0 hover:bg-white/5 hover:text-zinc-100">
+        <button onClick={openVaultModal} className="min-h-11 rounded-lg px-4 text-sm text-fg-secondary outline-none ring-0 hover:bg-tint-5 hover:text-fg-primary">
           сменить хранилище
         </button>
       </div>

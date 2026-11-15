@@ -2,7 +2,7 @@
 import React from 'react';
 import { useApp } from '../../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../../types';
-import { Calendar as CalendarIcon, CheckSquare, Paperclip } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { LinearSignalBars } from '../../UI/PriorityBadge';
 import { TagChip } from '../../UI/TagChip';
 import type { DragItemPayload } from '../../../hooks/gestures/usePointerDnd';
@@ -80,7 +80,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
         });
       }}
       data-testid="kanban-card"
-      className={`group relative p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-white/[0.06] hover:border-white/[0.14] transition-colors text-left space-y-2 shadow-sm select-none touch-none ${
+      className={`group relative p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-tint-6 hover:border-tint-14 transition-colors text-left space-y-2 shadow-sm select-none touch-none ${
         isDragging
           ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
           : 'cursor-grab active:cursor-grabbing'
@@ -96,7 +96,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
                 e.stopPropagation();
                 onStatusMenuChange(isMenuOpen ? null : task.id);
               }}
-              className="p-0.5 rounded hover:bg-white/[0.1] transition-colors"
+              className="p-0.5 rounded hover:bg-tint-10 transition-colors"
               title="Сменить статус задачи"
             >
               <KanbanStatusIcon iconType={column.iconType} iconColor={column.iconColor} />
@@ -106,14 +106,14 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
             {isMenuOpen && (
               <div
                 onClick={e => e.stopPropagation()}
-                className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-white/[0.12] shadow-xl py-1 z-30 space-y-0.5 motion-popover"
+                className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-tint-12 shadow-xl py-1 z-30 space-y-0.5 motion-popover"
               >
                 {KANBAN_COLUMNS.map(col => (
                   <button
                     key={col.id}
                     onClick={() => handleStatusChange(col.id)}
-                    className={`w-full px-2.5 py-1 text-left text-xs flex items-center gap-2 hover:bg-white/[0.08] transition-colors ${
-                      task.status === col.id ? 'text-white font-medium bg-white/[0.04]' : 'text-zinc-400'
+                    className={`w-full px-2.5 py-1 text-left text-xs flex items-center gap-2 hover:bg-tint-8 transition-colors ${
+                      task.status === col.id ? 'text-white font-medium bg-tint-4' : 'text-fg-secondary'
                     }`}
                   >
                     <KanbanStatusIcon iconType={col.iconType} iconColor={col.iconColor} />
@@ -125,7 +125,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
           </div>
 
           {/* Linear Task Key (e.g. TSK-12) */}
-          <span className="text-2xs font-mono text-zinc-500 font-medium">
+          <span className="text-2xs font-mono text-fg-muted font-medium">
             {taskKey}
           </span>
         </div>
@@ -140,7 +140,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
       <div
         className={`text-sm font-medium leading-snug line-clamp-2 ${
           task.status === 'done'
-            ? 'line-through text-zinc-500'
+            ? 'line-through text-fg-muted'
             : 'text-fg-primary'
         }`}
       >
@@ -162,7 +162,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
       )}
 
       {/* Card Footer: Subtasks, Due Date, Attachments */}
-      <div className="flex items-center justify-between text-2xs font-mono text-zinc-500 pt-1 border-t border-white/[0.04]">
+      <div className="flex items-center justify-between text-2xs font-mono text-fg-muted pt-1 border-t border-tint-4">
         <div className="flex items-center gap-2">
           {/* Subtasks Progress Badge */}
           {totalSubtasks > 0 && (
@@ -170,11 +170,11 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
               className={`flex items-center gap-1 text-2xs ${
                 completedSubtasks === totalSubtasks
                   ? 'text-emerald-400'
-                  : 'text-zinc-400'
+                  : 'text-fg-secondary'
               }`}
               title={`Подзадачи: ${completedSubtasks}/${totalSubtasks}`}
             >
-              <CheckSquare className="w-3 h-3" />
+              <Icon name="entity.task" size="xs" tone="inherit" />
               <span>
                 {completedSubtasks}/{totalSubtasks}
               </span>
@@ -184,10 +184,10 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
           {/* Attachments */}
           {task.attachments && task.attachments.length > 0 && (
             <span
-              className="flex items-center gap-1 text-2xs text-zinc-400"
+              className="flex items-center gap-1 text-2xs text-fg-secondary"
               title={`Файлы: ${task.attachments.length}`}
             >
-              <Paperclip className="w-3 h-3" />
+              <Icon name="action.attach" size="xs" tone="inherit" />
               <span>{task.attachments.length}</span>
             </span>
           )}
@@ -197,15 +197,15 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
         {task.dueDate ? (
           <span
             className={`flex items-center gap-1 text-2xs font-mono ${
-              overdue ? 'text-rose-400 font-semibold' : 'text-zinc-400'
+              overdue ? 'text-rose-400 font-semibold' : 'text-fg-secondary'
             }`}
             title={overdue ? 'Просрочено!' : 'Срок выполнения'}
           >
-            <CalendarIcon className="w-3 h-3 shrink-0" />
+            <Icon name="time.date" size="xs" tone="inherit" className="shrink-0" />
             <span>{task.dueDate}</span>
           </span>
         ) : (
-          <span className="text-2xs text-zinc-600 font-mono">
+          <span className="text-2xs text-fg-dim font-mono">
             {new Date(task.createdAt).toLocaleDateString([], {
               month: 'short',
               day: 'numeric',

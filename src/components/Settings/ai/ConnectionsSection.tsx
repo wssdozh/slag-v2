@@ -64,7 +64,7 @@ export const ConnectionsSection: React.FC<ConnectionsSectionProps> = ({
                 testId={`ai-connection-${connection.id}`}
                 icon={
                   <span
-                    className={`w-1.5 h-1.5 rounded-full ${ready ? 'bg-emerald-400' : 'bg-zinc-600'}`}
+                    className={`w-1.5 h-1.5 rounded-full ${ready ? 'bg-emerald-400' : 'bg-fg-dim'}`}
                   />
                 }
                 label={connection.label}

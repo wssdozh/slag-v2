@@ -28,7 +28,7 @@ export const WeekStrip: React.FC<WeekStripProps> = ({
     <div
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
-      className="px-3 py-2 border-b border-white/[0.06] bg-panel/80 shrink-0"
+      className="px-3 py-2 border-b border-tint-6 bg-panel/80 shrink-0"
     >
       <div className="grid grid-cols-7 gap-1">
         {days.map(day => {
@@ -45,11 +45,11 @@ export const WeekStrip: React.FC<WeekStripProps> = ({
                 isSelected
                   ? 'bg-white text-black font-bold shadow-sm'
                   : isToday
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                  ? 'bg-tint-8 text-white'
+                  : 'text-fg-secondary hover:text-white hover:bg-tint-3'
               }`}
             >
-              <span className={`text-[10px] font-mono uppercase ${isSelected ? 'text-black/70' : 'text-zinc-500'}`}>
+              <span className={`text-3xs font-mono uppercase ${isSelected ? 'text-scrim-70' : 'text-fg-muted'}`}>
                 {RUSSIAN_WEEKDAYS[day.weekdayIndex]}
               </span>
               <span className="text-xs font-semibold mt-0.5">
@@ -59,9 +59,9 @@ export const WeekStrip: React.FC<WeekStripProps> = ({
               {/* Event Dot Indicator */}
               <div className="h-1 flex items-center justify-center mt-0.5">
                 {hasTasks ? (
-                  <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-zinc-400'}`} />
+                  <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-black' : 'bg-fg-secondary'}`} />
                 ) : isToday && !isSelected ? (
-                  <span className="w-1 h-1 rounded-full bg-zinc-600" />
+                  <span className="w-1 h-1 rounded-full bg-fg-dim" />
                 ) : null}
               </div>
             </button>

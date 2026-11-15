@@ -12,7 +12,7 @@ export interface FeedDateBubbleProps {
  */
 const FeedDateBubbleComponent: React.FC<FeedDateBubbleProps> = ({ label }) => (
   <div className="flex justify-center py-1 select-none">
-    <span className="px-3 py-0.5 rounded-full bg-surface-elevated border border-white/[0.06] text-[11px] text-zinc-400 shadow-sm">
+    <span className="px-3 py-0.5 rounded-full bg-surface-elevated border border-tint-6 text-2xs text-fg-secondary shadow-sm">
       {label}
     </span>
   </div>

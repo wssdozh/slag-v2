@@ -1,6 +1,6 @@
 // Plays a note's audio: waveform scrub, speed, transcript and on-demand enrichment.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Play, Pause, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import { formatAudioDuration, audioTrackLabel } from '../../lib/media/audioHelper';
 import { bindMediaEvents } from '../../lib/media/mediaEvents';
 import { logger } from '../../lib/logger/logger';
@@ -211,9 +211,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           title={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
         >
           {isPlaying ? (
-            <Pause className="w-3 h-3 fill-current" />
+            <Icon name="media.pause" size="xs" tone="inherit" className="fill-current" />
           ) : (
-            <Play className="w-3 h-3 fill-current ml-0.5" />
+            <Icon name="media.play" size="xs" tone="inherit" className="fill-current ml-0.5" />
           )}
         </button>
 
@@ -231,14 +231,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
                 key={i}
                 style={{ height: `${height}px` }}
                 className={`w-[2px] rounded-full transition-colors ${
-                  isFilled ? 'bg-white' : 'bg-white/35'
+                  isFilled ? 'bg-white' : 'bg-tint-35'
                 }`}
               />
             );
           })}
         </div>
 
-        <span className="text-[11px] font-sans tabular-nums text-zinc-400 shrink-0">
+        <span className="text-2xs font-sans tabular-nums text-fg-secondary shrink-0">
           {src
             ? (isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur))
             : 'файла нет'}
@@ -257,9 +257,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       aria-label={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
     >
       {isPlaying ? (
-        <Pause className="w-4 h-4 fill-current" />
+        <Icon name="media.pause" size="md" tone="inherit" className="fill-current" />
       ) : (
-        <Play className="w-4 h-4 fill-current ml-0.5" />
+        <Icon name="media.play" size="md" tone="inherit" className="fill-current ml-0.5" />
       )}
     </button>
   );
@@ -269,17 +269,17 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       ref={waveTrackRef}
       onMouseDown={handleMouseDown}
       title="Перемотка"
-      className="relative h-2 w-full min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-white/[0.12]"
+      className="relative h-2 w-full min-w-0 flex-1 cursor-pointer overflow-hidden rounded-full bg-tint-12"
     >
       <div
         style={{ transform: `scaleX(${progressPercent / 100})`, transformOrigin: 'left center' }}
-        className="h-full w-full rounded-full bg-white/85 transition-transform duration-100 ease-linear"
+        className="h-full w-full rounded-full bg-tint-85 transition-transform duration-100 ease-linear"
       />
     </div>
   );
 
   const durationText = (
-    <span className="shrink-0 font-mono text-[10px] tabular-nums text-zinc-400">
+    <span className="shrink-0 font-mono text-3xs tabular-nums text-fg-secondary">
       {src
         ? (isPlaying ? formatAudioDuration(currentTime) : formatAudioDuration(currentDur))
         : 'файла нет'}
@@ -287,7 +287,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   );
 
   const timeContextText = timeContext ? (
-    <span className="shrink-0 font-mono text-[10px] leading-none text-zinc-500 select-none">
+    <span className="shrink-0 font-mono text-3xs leading-none text-fg-muted select-none">
       {timeContext}
     </span>
   ) : null;
@@ -297,7 +297,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       type="button"
       onClick={handleTranscriptToggle}
       disabled={enrichmentStatus === 'processing'}
-      className="h-5 w-5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] motion-press flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+      className="h-5 w-5 rounded-md text-fg-secondary hover:text-white hover:bg-tint-8 motion-press flex items-center justify-center shrink-0 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
       title={
         enrichmentStatus === 'processing'
           ? 'Идет расшифровка...'
@@ -310,13 +310,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       aria-label="Расшифровка"
     >
       {enrichmentStatus === 'processing' ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+        <Icon name="status.loading" size="sm" className="animate-spin" />
       ) : transcript && isExpanded ? (
-        <ChevronUp className="w-4 h-4 text-zinc-200" strokeWidth={2.25} />
+        <Icon name="nav.up" size="md" tone="soft" strokeWidth={2.25} />
       ) : transcript ? (
-        <ChevronDown className="w-4 h-4 text-zinc-400 hover:text-zinc-200" strokeWidth={2.25} />
+        <Icon name="nav.down" size="md" strokeWidth={2.25} className="hover:text-fg-soft" />
       ) : (
-        <TelegramTranscribeIcon className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-200" />
+        <TelegramTranscribeIcon className="w-3.5 h-3.5 text-fg-secondary hover:text-fg-soft" />
       )}
     </button>
   ) : null;
@@ -334,13 +334,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             className="flex h-9 min-w-0 flex-1 flex-col justify-center gap-1.5"
           >
             <div className="flex items-baseline gap-1.5">
-              <span className="min-w-0 truncate text-[12.5px] font-medium leading-tight text-fg-primary">
+              <span className="min-w-0 truncate text-xs font-medium leading-tight text-fg-primary">
                 {header.title}
               </span>
               {header.author && (
                 <>
                   <span className="shrink-0 text-fg-dim">·</span>
-                  <span className="min-w-0 truncate text-[11.5px] text-fg-secondary">{header.author}</span>
+                  <span className="min-w-0 truncate text-2xs text-fg-secondary">{header.author}</span>
                 </>
               )}
               <span className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -371,7 +371,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       >
         <div className="motion-accordion-inner">
           {transcript && (
-            <div className="mt-2 pt-2 border-t border-white/[0.08] text-xs sm:text-[13px] text-zinc-200 font-sans leading-relaxed select-text flex flex-col">
+            <div className="mt-2 pt-2 border-t border-tint-8 text-xs sm:text-ui text-fg-soft font-sans leading-relaxed select-text flex flex-col">
               <p className="whitespace-pre-wrap">{transcript}</p>
             </div>
           )}

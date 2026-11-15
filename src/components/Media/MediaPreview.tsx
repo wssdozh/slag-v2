@@ -1,7 +1,7 @@
 // Fullscreen photo and video viewer: paging, chrome that idles away, full bytes on demand.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { entryStreamSrc, readEntryObjectUrl, readEntryThumbnail } from '../../lib/media/folderBrowser';
 import { enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePhotoPager } from '../../hooks/gestures/usePhotoPager';
@@ -55,7 +55,7 @@ const PreviewImage: React.FC<PreviewImageProps> = ({ item, isActive }) => {
     if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
   }, []);
 
-  if (!src) return <span className="text-[10px] text-fg-muted">открываю</span>;
+  if (!src) return <span className="text-3xs text-fg-muted">открываю</span>;
   return <img src={src} alt="" draggable={false} className="h-full w-full select-none object-contain" />;
 };
 
@@ -149,19 +149,19 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
       {/* The bars are gradients over the frame: the slide area keeps clear of them so a photo is
           neither cropped by the title nor covered by the attach plate. */}
       <div
-        className={`absolute inset-x-0 top-0 z-10 flex items-center gap-1 bg-gradient-to-b from-black/80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
+        className={`absolute inset-x-0 top-0 z-10 flex items-center gap-1 bg-gradient-to-b from-scrim-80 to-transparent px-2 pb-8 pt-[max(var(--sat),0.5rem)] transition-opacity duration-150 ${chrome}`}
       >
         <button
           type="button"
           onClick={close}
           aria-label="Назад"
-          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/10 hover:text-white"
+          className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full text-tint-90 transition-colors hover:bg-tint-10 hover:text-white"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <Icon name="nav.back" size="lg" tone="inherit" />
         </button>
         <div className="min-w-0 flex-1 text-center">
-          <p className="truncate text-[13px] font-medium leading-tight text-white">{item.name}</p>
-          <p className="font-mono text-[10px] leading-tight text-white/50">{index + 1} из {items.length}</p>
+          <p className="truncate text-ui font-medium leading-tight text-white">{item.name}</p>
+          <p className="font-mono text-3xs leading-tight text-tint-50">{index + 1} из {items.length}</p>
         </div>
         <button
           type="button"
@@ -171,10 +171,10 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
           className={`flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors ${
             isSelected
               ? 'border-accent-strong bg-accent-strong text-white'
-              : 'border-white/40 text-white/80 hover:border-white/70 hover:text-white'
+              : 'border-tint-40 text-tint-80 hover:border-tint-70 hover:text-white'
           }`}
         >
-          <Check className="h-4 w-4" />
+          <Icon name="action.check" size="md" tone="inherit" />
         </button>
       </div>
 
@@ -215,9 +215,9 @@ export const MediaPreview: React.FC<MediaPreviewProps> = ({
       </div>
 
       <div
-        className={`absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pt-10 pb-[max(var(--sab),0.75rem)] transition-opacity duration-150 ${chrome}`}
+        className={`absolute inset-x-0 bottom-0 z-10 flex items-center gap-2 bg-gradient-to-t from-scrim-80 to-transparent px-3 pt-10 pb-[max(var(--sab),0.75rem)] transition-opacity duration-150 ${chrome}`}
       >
-        <span className="text-[11px] text-white/60">
+        <span className="text-2xs text-tint-60">
           {selected.length > 0 ? `${selected.length} выбрано` : 'ничего не выбрано'}
         </span>
         <SendButton

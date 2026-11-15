@@ -1,16 +1,6 @@
 // Admin console shell: server/token login and five tabs over the relay's API.
 import React, { useEffect, useState } from 'react';
-import {
-  CreditCard,
-  Loader2,
-  LogOut,
-  Radio,
-  RefreshCw,
-  Server,
-  Shield,
-  Sparkles,
-  Users,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { isDesktopApp } from '../../lib/platform/windowControls';
 import { openExternalUrl } from '../../lib/platform/openExternal';
 import { navigatePage } from '../../lib/navigation';
@@ -154,14 +144,14 @@ export const AdminPanel: React.FC = () => {
 
   if (isDesktopShell) {
     return (
-      <div className="min-h-screen bg-canvas-subtle text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
-        <Shield className="w-10 h-10 text-amber-400 mb-4" />
-        <p className="text-sm font-medium text-zinc-200">доступно только в веб-версии</p>
-        <p className="text-xs text-zinc-500 mt-1 mb-6">админ-панель релея работает только на сайте</p>
+      <div className="min-h-screen bg-canvas-subtle text-fg-primary flex flex-col items-center justify-center p-6 text-center">
+        <Icon name="system.security" size="none" tone="warning" className="w-10 h-10 mb-4" />
+        <p className="text-sm font-medium text-fg-soft">доступно только в веб-версии</p>
+        <p className="text-xs text-fg-muted mt-1 mb-6">админ-панель релея работает только на сайте</p>
         <button
           type="button"
           onClick={() => navigatePage(null, 'replace')}
-          className="px-4 py-2 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-zinc-100 transition-colors cursor-pointer"
+          className="px-4 py-2 bg-tint-10 hover:bg-tint-15 rounded-lg text-xs text-fg-primary transition-colors cursor-pointer"
         >
           вернуться в приложение
         </button>
@@ -170,11 +160,11 @@ export const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-canvas-subtle text-zinc-100 selection:bg-white/20 selection:text-white">
-      <header className="border-b border-white/[0.06] bg-panel px-6 h-14 flex items-center justify-between">
+    <div className="min-h-screen bg-canvas-subtle text-fg-primary selection:bg-tint-20 selection:text-white">
+      <header className="border-b border-tint-6 bg-panel px-6 h-14 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
-            <Server className="w-4 h-4 text-zinc-400" />
+            <Icon name="admin.server" size="md" />
             <span className="text-sm font-semibold tracking-tight text-white">SLAG Relay Admin</span>
           </div>
           {isAuthenticated && (
@@ -185,11 +175,11 @@ export const AdminPanel: React.FC = () => {
                 onClick={() => switchTab('accounts')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'accounts'
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-tint-10 text-white font-medium'
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <Users className="w-3.5 h-3.5" />
+                <Icon name="admin.users" size="sm" tone="inherit" />
                 <span>аккаунты</span>
               </button>
               <button
@@ -198,11 +188,11 @@ export const AdminPanel: React.FC = () => {
                 onClick={() => switchTab('billing')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'billing'
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-tint-10 text-white font-medium'
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <CreditCard className="w-3.5 h-3.5" />
+                <Icon name="admin.billing" size="sm" tone="inherit" />
                 <span>биллинг</span>
               </button>
               <button
@@ -211,11 +201,11 @@ export const AdminPanel: React.FC = () => {
                 onClick={() => switchTab('ai')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'ai'
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-tint-10 text-white font-medium'
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Icon name="system.ai" size="sm" tone="inherit" />
                 <span>ии-шлюз</span>
               </button>
               <button
@@ -224,11 +214,11 @@ export const AdminPanel: React.FC = () => {
                 onClick={() => switchTab('relay')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'relay'
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-tint-10 text-white font-medium'
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <Radio className="w-3.5 h-3.5" />
+                <Icon name="status.live" size="sm" tone="inherit" />
                 <span>релей</span>
               </button>
               <button
@@ -237,11 +227,11 @@ export const AdminPanel: React.FC = () => {
                 onClick={() => switchTab('security')}
                 className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded transition-colors cursor-pointer ${
                   activeTab === 'security'
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? 'bg-tint-10 text-white font-medium'
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <Shield className="w-3.5 h-3.5" />
+                <Icon name="system.security" size="sm" tone="inherit" />
                 <span>безопасность</span>
               </button>
             </nav>
@@ -251,12 +241,12 @@ export const AdminPanel: React.FC = () => {
           {isAuthenticated ? (
             <>
               {/* Period toggle */}
-              <div className="flex items-center bg-surface p-0.5 rounded-lg border border-white/[0.06] text-[11px] font-mono">
+              <div className="flex items-center bg-surface p-0.5 rounded-lg border border-tint-6 text-2xs font-mono">
                 <button
                   type="button"
                   onClick={() => setPeriod('7d')}
                   className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                    period === '7d' ? 'bg-white/10 text-white font-medium' : 'text-zinc-500 hover:text-zinc-300'
+                    period === '7d' ? 'bg-tint-10 text-white font-medium' : 'text-fg-muted hover:text-fg-tertiary'
                   }`}
                 >
                   7 дней
@@ -265,7 +255,7 @@ export const AdminPanel: React.FC = () => {
                   type="button"
                   onClick={() => setPeriod('30d')}
                   className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                    period === '30d' ? 'bg-white/10 text-white font-medium' : 'text-zinc-500 hover:text-zinc-300'
+                    period === '30d' ? 'bg-tint-10 text-white font-medium' : 'text-fg-muted hover:text-fg-tertiary'
                   }`}
                 >
                   30 дней
@@ -276,17 +266,17 @@ export const AdminPanel: React.FC = () => {
                 type="button"
                 disabled={loading || actionBusy}
                 onClick={() => void loadData(token, serverUrl, period)}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer disabled:opacity-40"
+                className="flex items-center gap-1.5 text-xs text-fg-secondary hover:text-white transition-colors cursor-pointer disabled:opacity-40"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <Icon name="action.refresh" size="sm" tone="inherit" className={`${loading ? 'animate-spin' : ''}`} />
                 <span>обновить</span>
               </button>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-xs text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer"
               >
-                <LogOut className="w-3.5 h-3.5" />
+                <Icon name="action.logout" size="sm" tone="inherit" />
                 <span>выйти</span>
               </button>
             </>
@@ -294,7 +284,7 @@ export const AdminPanel: React.FC = () => {
             <button
               type="button"
               onClick={() => void openExternalUrl(SITE_URL)}
-              className="text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="text-xs text-fg-secondary hover:text-white transition-colors cursor-pointer"
             >
               на сайт
             </button>
@@ -319,11 +309,11 @@ export const AdminPanel: React.FC = () => {
           <div className="max-w-md mx-auto w-full pt-12 flex flex-col gap-5">
             <div>
               <h1 className="text-lg font-semibold text-white">вход в админ-панель</h1>
-              <p className="text-xs text-zinc-500 mt-1">управление аккаунтами и тарифами relay</p>
+              <p className="text-xs text-fg-muted mt-1">управление аккаунтами и тарифами relay</p>
             </div>
             <form onSubmit={handleLogin} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="admin-server-url" className="text-xs text-zinc-400">
+                <label htmlFor="admin-server-url" className="text-xs text-fg-secondary">
                   адрес сервера
                 </label>
                 <input
@@ -332,11 +322,11 @@ export const AdminPanel: React.FC = () => {
                   value={inputServerUrl}
                   onChange={(e) => setInputServerUrl(e.target.value)}
                   required
-                  className="rounded-lg border border-white/[0.08] bg-panel px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                  className="rounded-lg border border-tint-8 bg-panel px-3 py-2 text-sm text-fg-primary font-mono outline-none ring-0 focus:border-tint-20 transition-colors"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="admin-token" className="text-xs text-zinc-400">
+                <label htmlFor="admin-token" className="text-xs text-fg-secondary">
                   секретный токен
                 </label>
                 <input
@@ -347,15 +337,15 @@ export const AdminPanel: React.FC = () => {
                   placeholder="токен из SLAG_ADMIN_TOKEN"
                   autoFocus
                   required
-                  className="rounded-lg border border-white/[0.08] bg-panel px-3 py-2 text-sm text-zinc-100 font-mono outline-none ring-0 focus:border-white/20 transition-colors"
+                  className="rounded-lg border border-tint-8 bg-panel px-3 py-2 text-sm text-fg-primary font-mono outline-none ring-0 focus:border-tint-20 transition-colors"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !inputToken.trim()}
-                className="mt-2 px-4 py-2 bg-white text-black font-medium text-xs rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                className="mt-2 px-4 py-2 bg-white text-black font-medium text-xs rounded-lg hover:bg-fg-soft transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
               >
-                {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {loading && <Icon name="status.loading" size="sm" tone="inherit" className="animate-spin" />}
                 <span>войти</span>
               </button>
             </form>

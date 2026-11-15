@@ -4,16 +4,7 @@ import type { LightboxImage, SlagAttachment } from '../../types';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import { VideoCirclePlayer } from '../UI/VideoCirclePlayer';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
-import {
-  ChevronRight,
-  ChevronDown,
-  Paperclip,
-  Link2,
-  ArrowUp,
-  ArrowDown,
-  Trash2,
-} from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export interface AttachmentStripProps {
   itemId: string;
   attachments: SlagAttachment[];
@@ -50,23 +41,23 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
   if (attachments.length === 0) return null;
 
   return (
-    <div className="flex flex-col rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+    <div className="flex flex-col rounded-xl bg-tint-2 border border-tint-6 overflow-hidden">
       <div
         onClick={onToggleCollapse}
-        className="flex items-center justify-between px-3 py-2 text-xs text-zinc-400 hover:bg-white/[0.03] cursor-pointer transition-colors select-none"
+        className="flex items-center justify-between px-3 py-2 text-xs text-fg-secondary hover:bg-tint-3 cursor-pointer transition-colors select-none"
       >
         <div className="flex items-center gap-2">
           {isCollapsed ? (
-            <ChevronRight className="w-3.5 h-3.5 text-zinc-500" />
+            <Icon name="nav.next" size="sm" tone="muted" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />
+            <Icon name="nav.down" size="sm" tone="muted" />
           )}
-          <Paperclip className="w-3.5 h-3.5 text-zinc-400" />
-          <span className="font-medium text-zinc-300">
+          <Icon name="action.attach" size="sm" />
+          <span className="font-medium text-fg-tertiary">
             Медиа и вложения ({attachments.length})
           </span>
           {isCollapsed && (
-            <span className="text-[11px] font-mono text-zinc-500">
+            <span className="text-2xs font-mono text-fg-muted">
               • {attachments.map(a => a.type === 'audio' ? '🎙' : a.type === 'video' ? '📹' : a.type === 'image' ? '🖼' : '📎').slice(0, 5).join(' ')}
             </span>
           )}
@@ -78,7 +69,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
               e.stopPropagation();
               onAddClick();
             }}
-            className="text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="text-2xs font-mono text-fg-secondary hover:text-white transition-colors cursor-pointer"
           >
             + Добавить
           </button>
@@ -86,7 +77,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
       </div>
 
       {!isCollapsed && (
-        <div className="flex flex-col gap-2.5 p-3 pt-1 border-t border-white/[0.04]">
+        <div className="flex flex-col gap-2.5 p-3 pt-1 border-t border-tint-4">
           {attachments.map((att, idx) => (
             <div
               key={att.id}
@@ -94,7 +85,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
               className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
                 selectedAttachmentId === att.id
                   ? 'bg-blue-500/10 border-blue-500/40 ring-1 ring-blue-500/40 shadow-sm'
-                  : 'bg-black/40 border-white/[0.06] hover:border-white/[0.12]'
+                  : 'bg-scrim-40 border-tint-6 hover:border-tint-12'
               }`}
             >
               {/* Media Rendering */}
@@ -102,10 +93,10 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                 {att.type === 'audio' ? (
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-mono text-zinc-400 font-medium">
+                      <span className="text-2xs font-mono text-fg-secondary font-medium">
                         🎙 Войс:
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[200px]">
+                      <span className="text-3xs font-mono text-fg-muted truncate max-w-[200px]">
                         {att.name}
                       </span>
                     </div>
@@ -121,10 +112,10 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   <div className="flex items-center gap-3">
                     <VideoCirclePlayer src={srcs[att.id] ?? att.dataUrl ?? ''} compact={true} />
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                      <span className="text-xs font-mono text-fg-tertiary font-medium truncate">
                         {att.name}
                       </span>
-                      <span className="text-[10px] text-zinc-500 font-mono">
+                      <span className="text-3xs text-fg-muted font-mono">
                         Видео-кружок {att.duration ? `• ${att.duration} сек` : ''}
                       </span>
                     </div>
@@ -147,7 +138,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                           }], 0);
                         }
                       }}
-                      className="relative w-14 h-14 rounded-lg overflow-hidden bg-black/60 border border-white/10 shrink-0 cursor-pointer hover:opacity-90"
+                      className="relative w-14 h-14 rounded-lg overflow-hidden bg-scrim-60 border border-tint-10 shrink-0 cursor-pointer hover:opacity-90"
                     >
                       {(srcs[att.id] ?? att.dataUrl) && (
                         <img
@@ -164,24 +155,24 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                         <span
                           data-testid="media-skeleton"
                           aria-hidden
-                          className="absolute inset-0 bg-white/[0.04] motion-safe:animate-pulse"
+                          className="absolute inset-0 bg-tint-4 motion-safe:animate-pulse"
                         />
                       )}
                     </div>
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-xs font-mono text-zinc-300 font-medium truncate">
+                      <span className="text-xs font-mono text-fg-tertiary font-medium truncate">
                         {att.name}
                       </span>
-                      <span className="text-[10px] text-zinc-500 font-mono">
+                      <span className="text-3xs text-fg-muted font-mono">
                         {Math.round(att.size / 1024)} KB
                       </span>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4 text-zinc-400 shrink-0" />
-                    <span className="text-xs font-mono text-zinc-300 truncate">{att.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-mono">
+                    <Icon name="action.attach" size="md" className="shrink-0" />
+                    <span className="text-xs font-mono text-fg-tertiary truncate">{att.name}</span>
+                    <span className="text-3xs text-fg-muted font-mono">
                       {Math.round(att.size / 1024)} KB
                     </span>
                   </div>
@@ -193,10 +184,10 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                 <button
                   type="button"
                   onClick={() => onInsertMarkdown(att.name)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-white/[0.05] hover:bg-white/[0.1] text-zinc-300 hover:text-white text-[11px] font-mono transition-colors cursor-pointer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded bg-tint-5 hover:bg-tint-10 text-fg-tertiary hover:text-white text-2xs font-mono transition-colors cursor-pointer"
                   title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
                 >
-                  <Link2 className="w-3 h-3 text-accent" />
+                  <Icon name="action.link" size="xs" tone="accent" />
                   <span>Вставить в текст</span>
                 </button>
 
@@ -205,10 +196,10 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   type="button"
                   disabled={idx === 0}
                   onClick={() => onMoveAttachment(idx, 'up')}
-                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  className="p-1 rounded text-fg-secondary hover:text-white hover:bg-tint-6 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   title="Переместить выше"
                 >
-                  <ArrowUp className="w-3.5 h-3.5" />
+                  <Icon name="action.send" size="sm" tone="inherit" />
                 </button>
 
                 {/* Reorder Down */}
@@ -216,20 +207,20 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   type="button"
                   disabled={idx === attachments.length - 1}
                   onClick={() => onMoveAttachment(idx, 'down')}
-                  className="p-1 rounded text-zinc-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  className="p-1 rounded text-fg-secondary hover:text-white hover:bg-tint-6 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   title="Переместить ниже"
                 >
-                  <ArrowDown className="w-3.5 h-3.5" />
+                  <Icon name="action.moveDown" size="sm" tone="inherit" />
                 </button>
 
                 {/* Remove */}
                 <button
                   type="button"
                   onClick={() => onRemoveAttachment(att.id)}
-                  className="p-1 rounded text-zinc-500 hover:text-rose-400 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  className="p-1 rounded text-fg-muted hover:text-rose-400 hover:bg-tint-6 transition-colors cursor-pointer"
                   title="Удалить"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Icon name="action.delete" size="sm" tone="inherit" />
                 </button>
               </div>
             </div>

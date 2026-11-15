@@ -2,18 +2,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { MobileTabId } from '../../types';
-import {
-  Folder,
-  CheckSquare,
-  Sparkles,
-  Settings as SettingsIcon,
-  Calendar,
-  Music,
-  GripVertical,
-  Check,
-  Plus,
-  RotateCcw,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
+import type { IconName } from '../UI/icons/icons';
 import { SettingsGroup } from './SettingsUI';
 
 /**
@@ -28,14 +18,14 @@ import { SettingsGroup } from './SettingsUI';
 const ALL_AVAILABLE_TABS: {
   id: MobileTabId;
   label: string;
-  icon: React.FC<{ className?: string }>;
+  icon: IconName;
 }[] = [
-  { id: 'folders', label: 'Папки', icon: Folder },
-  { id: 'tasks', label: 'Таски', icon: CheckSquare },
-  { id: 'assistant', label: 'ИИ', icon: Sparkles },
-  { id: 'settings', label: 'Настройки', icon: SettingsIcon },
-  { id: 'calendar', label: 'Календарь', icon: Calendar },
-  { id: 'audio', label: 'Плеер', icon: Music },
+  { id: 'folders', label: 'Папки', icon: 'entity.folder' },
+  { id: 'tasks', label: 'Таски', icon: 'entity.task' },
+  { id: 'assistant', label: 'ИИ', icon: 'system.ai' },
+  { id: 'settings', label: 'Настройки', icon: 'system.settings' },
+  { id: 'calendar', label: 'Календарь', icon: 'time.calendar' },
+  { id: 'audio', label: 'Плеер', icon: 'media.music' },
 ];
 
 const DEFAULT_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
@@ -137,16 +127,15 @@ export const MobileDockSettings: React.FC = () => {
         <button
           type="button"
           onClick={() => setMobileDockTabs(DEFAULT_DOCK_TABS)}
-          className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+          className="flex items-center gap-1 text-2xs font-mono text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
         >
-          <RotateCcw className="w-3 h-3" />
+          <Icon name="action.retry" size="xs" tone="inherit" />
           Сбросить
         </button>
       }
     >
       <div className="divide-y divide-border-subtle">
         {activeTabs.map((tab, index) => {
-          const Icon = tab.icon;
           const isDragging = draggedIndex === index;
 
           return (
@@ -170,32 +159,30 @@ export const MobileDockSettings: React.FC = () => {
                 onPointerMove={handlePointerMove}
                 onPointerUp={endPointerDrag}
                 onPointerCancel={endPointerDrag}
-                className="text-zinc-600 hover:text-zinc-400 cursor-grab active:cursor-grabbing shrink-0"
+                className="text-fg-dim hover:text-fg-secondary cursor-grab active:cursor-grabbing shrink-0"
               >
-                <GripVertical className="w-4 h-4" />
+                <Icon name="action.dragHandle" size="md" tone="inherit" />
               </span>
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center text-zinc-400">
-                <Icon className="w-4 h-4" />
+              <span className="w-5 h-5 shrink-0 flex items-center justify-center text-fg-secondary">
+                <Icon name={tab.icon} size="md" tone="inherit" />
               </span>
-              <span className="flex-1 min-w-0 text-sm font-medium text-zinc-200 truncate">
+              <span className="flex-1 min-w-0 text-sm font-medium text-fg-soft truncate">
                 {tab.label}
               </span>
               <button
                 type="button"
                 onClick={() => toggleDockTab(tab.id)}
-                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-md text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-md text-fg-soft hover:bg-tint-6 transition-colors cursor-pointer"
                 title="Отключить"
                 aria-label={`Отключить ${tab.label}`}
               >
-                <Check className="w-4 h-4" />
+                <Icon name="action.check" size="md" tone="inherit" />
               </button>
             </div>
           );
         })}
 
         {inactiveTabs.map((tab) => {
-          const Icon = tab.icon;
-
           return (
             <div
               key={tab.id}
@@ -212,14 +199,14 @@ export const MobileDockSettings: React.FC = () => {
               className="w-full flex items-center gap-3 p-3.5 opacity-50 hover:opacity-90 hover:bg-surface-hover transition-colors cursor-pointer select-none"
             >
               <span className="w-4 shrink-0" />
-              <span className="w-5 h-5 shrink-0 flex items-center justify-center text-zinc-400">
-                <Icon className="w-4 h-4" />
+              <span className="w-5 h-5 shrink-0 flex items-center justify-center text-fg-secondary">
+                <Icon name={tab.icon} size="md" tone="inherit" />
               </span>
-              <span className="flex-1 min-w-0 text-sm font-medium text-zinc-500 truncate">
+              <span className="flex-1 min-w-0 text-sm font-medium text-fg-muted truncate">
                 {tab.label}
               </span>
-              <span className="w-7 h-7 shrink-0 flex items-center justify-center text-zinc-500">
-                <Plus className="w-4 h-4" />
+              <span className="w-7 h-7 shrink-0 flex items-center justify-center text-fg-muted">
+                <Icon name="action.add" size="md" tone="inherit" />
               </span>
             </div>
           );

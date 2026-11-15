@@ -1,6 +1,6 @@
 // The assistant's memory in settings: what it thinks it knows, and the way to cut it.
 import React, { Fragment, useCallback, useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import type { MemoryItem } from '../../types';
 import { MEMORY_KIND_LABEL, memoryService } from '../../lib/memory';
 import { useApp } from '../../context/AppContext';
@@ -73,7 +73,7 @@ export const MemoryList: React.FC = () => {
                     onClick={() => forget(item)}
                     className="p-1.5 rounded-md text-fg-dim transition-colors hover:text-danger hover:bg-surface-hover outline-none"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Icon name="action.delete" size="sm" tone="inherit" />
                   </button>
                 }
               />

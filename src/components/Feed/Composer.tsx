@@ -17,15 +17,7 @@ import { SuggestionMenuShell } from './SuggestionMenuShell';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
-import {
-  CheckSquare,
-  X,
-  Maximize2,
-  FileText,
-  StickyNote,
-  Lock,
-  Paperclip,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useComposerDraft } from './composer/useComposerDraft';
 import { useComposerAutocomplete } from './composer/useComposerAutocomplete';
 import { ComposerReplyBanner } from './composer/ComposerReplyBanner';
@@ -511,7 +503,7 @@ export const Composer: React.FC<ComposerProps> = ({
         isModal={isModal}
         isEmpty={(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).length === 0}
         emptyContent={<span>Заметка не найдена</span>}
-        header={<SuggestionMenuHeader icon={<FileText className="w-3 h-3 text-zinc-400" />} title="Связать заметку [[...]]" />}
+        header={<SuggestionMenuHeader icon={<Icon name="entity.article" size="xs" />} title="Связать заметку [[...]]" />}
       >
         {(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).map((wikiItem, idx) => {
           const isSelected = idx === wikiSelectedIndex;
@@ -523,12 +515,12 @@ export const Composer: React.FC<ComposerProps> = ({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => insertWikiLink(wikiItem)}
               className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition-colors truncate cursor-pointer ${
-                isSelected ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.05]'
+                isSelected ? 'bg-tint-10 text-white font-medium' : 'text-fg-tertiary hover:bg-tint-5'
               }`}
             >
-              {wikiItem.type === 'task' && <CheckSquare className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-              {wikiItem.type === 'article' && <FileText className="w-3.5 h-3.5 text-blue-400 shrink-0" />}
-              {wikiItem.type === 'note' && <StickyNote className="w-3.5 h-3.5 text-zinc-400 shrink-0" />}
+              {wikiItem.type === 'task' && <Icon name="entity.task" size="sm" tone="warning" className="shrink-0" />}
+              {wikiItem.type === 'article' && <Icon name="entity.article" size="sm" tone="accent" className="shrink-0" />}
+              {wikiItem.type === 'note' && <Icon name="entity.note" size="sm" className="shrink-0" />}
               <span className="truncate">{wikiItem.title || wikiItem.id}</span>
             </button>
           );
@@ -568,8 +560,8 @@ export const Composer: React.FC<ComposerProps> = ({
     <div className="composer-toolbar-group relative">
       {/* Lock Hint Banner when holding mic/video button */}
       {lockHint && recordMode === 'holding' && (
-        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-white/10 shadow-2xl flex items-center gap-2 text-[11px] font-mono text-zinc-200 pointer-events-none motion-popover">
-          <Lock className="w-3.5 h-3.5 text-accent animate-bounce" />
+        <div className="absolute bottom-full mb-3 right-2 z-50 px-3 py-1.5 rounded-full bg-surface border border-tint-10 shadow-2xl flex items-center gap-2 text-2xs font-mono text-fg-soft pointer-events-none motion-popover">
+          <Icon name="action.lock" size="sm" tone="accent" className="animate-bounce" />
           <span>Потяните вверх для фиксации</span>
         </div>
       )}
@@ -620,7 +612,7 @@ export const Composer: React.FC<ComposerProps> = ({
       className="composer-toolbar-control composer-toolbar-icon"
       title="Прикрепить файл"
       aria-label="Прикрепить файл"
-      icon={<Paperclip className="w-4 h-4" />}
+      icon={<Icon name="action.attach" size="md" tone="inherit" />}
     />
   );
 
@@ -676,8 +668,8 @@ export const Composer: React.FC<ComposerProps> = ({
                 onClick={() => setReplyTarget(null)}
                 title="Отменить ответ"
                 aria-label="Отменить ответ"
-                className="text-zinc-400 hover:text-zinc-200"
-                icon={<X className="w-3.5 h-3.5" />}
+                className="text-fg-secondary hover:text-fg-soft"
+                icon={<Icon name="action.close" size="sm" tone="inherit" />}
               />
             )}
             {!isModal && (
@@ -686,8 +678,8 @@ export const Composer: React.FC<ComposerProps> = ({
                 onClick={handleExpandToFullscreen}
                 title="Раскрыть в полноэкранный редактор"
                 aria-label="Раскрыть в полноэкранный редактор"
-                className="flex text-zinc-400 hover:text-zinc-200"
-                icon={<Maximize2 className="w-3.5 h-3.5" />}
+                className="flex text-fg-secondary hover:text-fg-soft"
+                icon={<Icon name="action.expand" size="sm" tone="inherit" />}
               />
             )}
           </div>

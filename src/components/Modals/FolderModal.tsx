@@ -3,8 +3,8 @@ import React, { useMemo, useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
-import { FOLDER_ICONS } from '../Sidebar/folderIcons';
-import { Folder } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
+import { FOLDER_ICON_CHOICES, folderIconName } from '../UI/icons/icons';
 import { Select, type SelectOption } from '../UI/Select';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
@@ -59,7 +59,7 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
     saveFolder(folderMeta);
   };
 
-  const CurrentIconComp = FOLDER_ICONS[selectedIcon] || Folder;
+  const currentIcon = folderIconName(selectedIcon);
 
   const footer = (
     <div className="flex items-center justify-end gap-2">
@@ -78,7 +78,7 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
       isOpen={isFolderModalOpen}
       onClose={closeFolderModal}
       title={parentPath ? 'Новая подпапка' : 'Создать новую папку'}
-      icon={<CurrentIconComp className="w-4 h-4" />}
+      icon={<Icon name={currentIcon} size="md" tone="inherit" />}
       maxWidth="max-w-md"
       footer={footer}
     >
@@ -91,26 +91,27 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
             onChange={event => setName(event.target.value)}
             placeholder="Например: Проекты, Финансы, Идеи..."
             autoFocus
-            className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-fg-primary placeholder-fg-dim outline-none ring-0 focus:border-white/20"
+            className="w-full bg-scrim-40 border border-tint-8 rounded-lg px-3 py-2 text-xs text-fg-primary placeholder-fg-dim outline-none ring-0 focus:border-tint-20"
           />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-fg-secondary">Иконка папки</label>
-          <div className="grid grid-cols-8 gap-1.5 p-2 rounded-lg bg-black/30 border border-white/[0.06]">
-            {Object.entries(FOLDER_ICONS).map(([key, IconComponent]) => (
+          <div className="grid grid-cols-8 gap-1.5 p-2 rounded-lg bg-scrim-30 border border-tint-6">
+            {FOLDER_ICON_CHOICES.map(({ key, label }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setSelectedIcon(key)}
                 className={`p-1.5 rounded-md flex items-center justify-center motion-surface outline-none ring-0 cursor-pointer ${
-                  selectedIcon === key
+                  folderIconName(selectedIcon) === key
                     ? 'bg-white text-black'
-                    : 'text-fg-secondary hover:text-fg-primary hover:bg-white/[0.06]'
+                    : 'text-fg-secondary hover:text-fg-primary hover:bg-tint-6'
                 }`}
-                title={key}
+                title={label}
+                aria-label={`Иконка: ${label}`}
               >
-                <IconComponent className="w-4 h-4" />
+                <Icon name={key} size="md" tone="inherit" />
               </button>
             ))}
           </div>
@@ -133,7 +134,7 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
             onChange={event => setDescription(event.target.value)}
             placeholder="Опишите темы и содержание папки, чтобы ИИ сортировал сюда входящие заметки..."
             rows={2}
-            className="w-full bg-black/40 border border-white/[0.08] rounded-lg p-2.5 text-xs text-fg-primary placeholder-fg-dim resize-none leading-relaxed outline-none ring-0 focus:border-white/20"
+            className="w-full bg-scrim-40 border border-tint-8 rounded-lg p-2.5 text-xs text-fg-primary placeholder-fg-dim resize-none leading-relaxed outline-none ring-0 focus:border-tint-20"
           />
         </div>
       </form>

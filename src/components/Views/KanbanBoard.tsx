@@ -6,7 +6,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { useDragToScroll } from '../../hooks/gestures/useDragToScroll';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 import { usePointerDnd, type DragItemPayload } from '../../hooks/gestures/usePointerDnd';
-import { CheckSquare, StickyNote } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { KanbanMaterialsDock } from './kanban/KanbanMaterialsDock';
 import { KanbanColumn } from './kanban/KanbanColumn';
 import { KANBAN_COLUMNS } from './kanban/kanbanModel';
@@ -156,9 +156,9 @@ export const KanbanBoard: React.FC = () => {
           }}
         >
           {draggingPayload.type === 'material' ? (
-            <StickyNote className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <Icon name="entity.note" size="sm" tone="accent" className="shrink-0" />
           ) : (
-            <CheckSquare className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <Icon name="entity.task" size="sm" tone="accent" className="shrink-0" />
           )}
           <span className="truncate max-w-[180px]">{draggingPayload.title || 'Элемент'}</span>
         </div>

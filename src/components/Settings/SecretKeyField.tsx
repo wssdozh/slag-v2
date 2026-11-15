@@ -1,7 +1,6 @@
 // One-line secret input with a per-field reveal toggle and no autocorrect.
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 interface SecretKeyFieldProps {
   value: string;
   onChange: (value: string) => void;
@@ -42,7 +41,7 @@ export const SecretKeyField: React.FC<SecretKeyFieldProps> = ({ value, onChange,
         aria-pressed={visible}
         className="p-1 shrink-0 text-fg-dim hover:text-fg-muted cursor-pointer"
       >
-        {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        {visible ? <Icon name="action.hide" size="sm" tone="inherit" /> : <Icon name="action.preview" size="sm" tone="inherit" />}
       </button>
     </div>
   );

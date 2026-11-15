@@ -5,8 +5,7 @@ import type { LayoutPositionedTask } from '../../lib/time/calendarLayout';
 import { timedBlockBox } from '../../lib/time/calendarLayout';
 import { getPriorityBadge, formatDurationBadge } from './calendarHelpers';
 import { baseTaskId } from '../../lib/tasks/taskUtils';
-import { Check, ListTodo } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export interface AllDayTaskPillProps {
   task: SlagItem & { isVirtual?: boolean };
   items: SlagItem[];
@@ -81,19 +80,19 @@ export const AllDayTaskPill: React.FC<AllDayTaskPillProps> = ({
         }`}
         title={isDone ? 'Возобновить' : 'Выполнить'}
       >
-        <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+        <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
       </button>
 
       <span
         className={`truncate font-medium text-xs leading-tight select-none flex-1 min-w-[20px] ${
-          isDone ? 'line-through text-zinc-500' : 'text-zinc-200'
+          isDone ? 'line-through text-fg-muted' : 'text-fg-soft'
         }`}
       >
         {task.title || 'Безымянная задача'}
       </span>
 
       {task.tags && task.tags.length > 0 && (
-        <span className="hidden xl:inline text-2xs font-mono text-zinc-500 shrink-0">
+        <span className="hidden xl:inline text-2xs font-mono text-fg-muted shrink-0">
           #{task.tags[0]}
         </span>
       )}
@@ -207,7 +206,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
           ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]'
           : isResizing
           ? 'ring-2 ring-blue-500 shadow-xl z-30'
-          : 'cursor-grab active:cursor-grabbing hover:border-white/20 hover:z-20'
+          : 'cursor-grab active:cursor-grabbing hover:border-tint-20 hover:z-20'
       }`}
     >
       {isCompact ? (
@@ -228,12 +227,12 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               }`}
               title={isDone ? 'Возобновить' : 'Выполнить'}
             >
-              <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+              <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
             </button>
 
             <span
-              className={`font-medium text-[11px] leading-tight truncate min-w-0 ${
-                isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
+              className={`font-medium text-2xs leading-tight truncate min-w-0 ${
+                isDone ? 'line-through text-fg-muted' : 'text-fg-primary'
               }`}
             >
               {task.title || 'Безымянная задача'}
@@ -242,7 +241,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
 
           {/* Time label and optional subtask counter on right (shown when single column) */}
           {totalCols === 1 && (
-            <div className="flex items-center gap-1.5 text-[10px] font-mono opacity-70 shrink-0">
+            <div className="flex items-center gap-1.5 text-3xs font-mono opacity-70 shrink-0">
               <span className="truncate">
                 {slot.durationMinutes <= 15
                   ? `${String(slot.startHour).padStart(2, '0')}:${String(slot.startMinute).padStart(2, '0')}`
@@ -250,7 +249,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               </span>
               {totalSubtasks > 0 && (
                 <span className="flex items-center gap-0.5 text-2xs font-mono">
-                  <ListTodo className="w-2.5 h-2.5" />
+                  <Icon name="entity.taskList" size="none" tone="inherit" className="w-2.5 h-2.5" />
                   <span>{completedSubtasks}/{totalSubtasks}</span>
                 </span>
               )}
@@ -275,12 +274,12 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               }`}
               title={isDone ? 'Возобновить' : 'Выполнить'}
             >
-              <Check className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+              <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
             </button>
 
             <span
               className={`font-semibold text-xs leading-snug truncate flex-1 min-w-0 ${
-                isDone ? 'line-through text-zinc-500' : 'text-zinc-100'
+                isDone ? 'line-through text-fg-muted' : 'text-fg-primary'
               }`}
             >
               {task.title || 'Безымянная задача'}
@@ -288,11 +287,11 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
           </div>
 
           {totalCols === 1 && (
-            <div className="flex items-center justify-between w-full text-[10px] font-mono opacity-80 pt-0.5">
+            <div className="flex items-center justify-between w-full text-3xs font-mono opacity-80 pt-0.5">
               <span className="truncate">{slot.timeLabel}</span>
               {totalSubtasks > 0 && (
                 <span className="flex items-center gap-0.5 shrink-0">
-                  <ListTodo className="w-2.5 h-2.5" />
+                  <Icon name="entity.taskList" size="none" tone="inherit" className="w-2.5 h-2.5" />
                   <span>{completedSubtasks}/{totalSubtasks}</span>
                 </span>
               )}
@@ -305,7 +304,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
       {isResizing && (
         <div
           data-testid="resize-live-tooltip"
-          className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-50 px-2.5 py-1 rounded-md bg-zinc-950/95 border border-blue-500/80 text-[11px] font-mono text-zinc-100 shadow-2xl whitespace-nowrap pointer-events-none flex items-center gap-1.5 backdrop-blur-sm"
+          className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-50 px-2.5 py-1 rounded-md bg-canvas-subtle/95 border border-blue-500/80 text-2xs font-mono text-fg-primary shadow-2xl whitespace-nowrap pointer-events-none flex items-center gap-1.5 backdrop-blur-sm"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
           <span>{slot.timeLabel}</span>
@@ -329,7 +328,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
             className={`w-8 h-0.5 rounded-full transition-[background-color,opacity] duration-150 ${
               isResizing
                 ? 'bg-blue-400 opacity-100 shadow-sm'
-                : 'bg-white/40 opacity-0 group-hover/card:opacity-100 group-hover/handle:opacity-100'
+                : 'bg-tint-40 opacity-0 group-hover/card:opacity-100 group-hover/handle:opacity-100'
             }`}
           />
         </div>

@@ -1,6 +1,6 @@
 // Editor toolbar assembly: top row, markdown palette, save/zen actions.
 import React from 'react';
-import { ArrowUp, Eye, Maximize, Minimize, Maximize2, Minimize2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/platform/windowControls';
 import { EditorTopBar } from './EditorTopBar';
 import { MarkdownPalette } from './MarkdownPalette';
@@ -51,7 +51,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           toggleMaximizeWindow();
         }
       }}
-      className={`border-b border-white/[0.04] bg-surface shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
+      className={`border-b border-tint-4 bg-surface shrink-0 sticky top-0 z-30 transition-opacity duration-200 select-none ${
         isCompact ? 'min-h-11' : 'min-h-14'
       } ${isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
       style={{ paddingTop: isCompact ? 0 : 'max(var(--sat), 0px)' }}
@@ -96,15 +96,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         />
 
         {/* Stats & Actions */}
-        <div className="flex items-center gap-2 md:gap-2.5 text-xs text-zinc-400 ml-auto shrink-0 z-10">
+        <div className="flex items-center gap-2 md:gap-2.5 text-xs text-fg-secondary ml-auto shrink-0 z-10">
           {/* Live Autosave Status Indicator */}
           {saveStatus === 'saving' && (
-            <span className="text-[11px] font-mono text-zinc-500 transition-opacity">
+            <span className="text-2xs font-mono text-fg-muted transition-opacity">
               сохранение...
             </span>
           )}
           {saveStatus === 'saved' && (
-            <span className="text-[11px] font-mono text-emerald-500/80 transition-opacity">
+            <span className="text-2xs font-mono text-emerald-500/80 transition-opacity">
               сохранено
             </span>
           )}
@@ -116,12 +116,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               onClick={onToggleExpanded}
               className={`hidden md:flex p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 isExpanded
-                  ? 'text-white bg-white/10 border border-white/10'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  ? 'text-white bg-tint-10 border border-tint-10'
+                  : 'text-fg-secondary hover:text-white hover:bg-tint-6'
               }`}
               title={isExpanded ? 'Вернуть в панель (Esc)' : 'Развернуть на всё окно'}
             >
-              {isExpanded ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              {isExpanded ? <Icon name="action.collapsePane" size="md" tone="inherit" /> : <Icon name="action.expandPane" size="md" tone="inherit" />}
             </button>
           )}
 
@@ -132,12 +132,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
               onClick={onToggleFullWidth}
               className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
                 isFullWidth
-                  ? 'text-white bg-white/10 border border-white/10'
-                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                  ? 'text-white bg-tint-10 border border-tint-10'
+                  : 'text-fg-secondary hover:text-white hover:bg-tint-6'
               }`}
               title={isFullWidth ? 'Свернуть лист' : 'Развернуть лист'}
             >
-              {isFullWidth ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              {isFullWidth ? <Icon name="action.collapse" size="md" tone="inherit" /> : <Icon name="action.expand" size="md" tone="inherit" />}
             </button>
           )}
 
@@ -148,11 +148,11 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer ${
               isZenMode
                 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.06]'
+                : 'text-fg-secondary hover:text-white hover:bg-tint-6'
             }`}
             title={isZenMode ? 'Выйти из режима фокуса (Zen)' : 'Режим полного фокуса (Zen)'}
           >
-            <Eye className="w-4 h-4" />
+            <Icon name="action.preview" size="md" tone="inherit" />
           </button>
 
           {/* Send, the same plate the composer sends with: it is the one commit action here. */}
@@ -162,7 +162,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             title="Сохранить изменения (Ctrl+S / ⌘S)"
             aria-label={item.id.startsWith('draft_') ? 'Создать' : 'Готово'}
           >
-            <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
+            <Icon name="action.send" size="md" tone="inherit" strokeWidth={2.5} />
           </button>
         </div>
       </div>

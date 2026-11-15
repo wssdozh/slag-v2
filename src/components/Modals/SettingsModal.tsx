@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
-import { X, ArrowLeft } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { BaseModal } from './BaseModal';
 import { AccountSettingsTab } from '../Settings/AccountSettingsTab';
 import { SyncSettingsTab } from '../Settings/SyncSettingsTab';
@@ -54,7 +54,6 @@ export const SettingsModal: React.FC = () => {
       className="flex md:flex-col overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:w-48 shrink-0 bg-panel md:bg-surface p-2 gap-1 md:gap-0.5 border-b md:border-b-0 border-border-subtle select-none scrollbar-none"
     >
       {SETTINGS_TABS.map((tab) => {
-        const TabIcon = tab.icon;
         const isActive = activeTab === tab.id;
         return (
           <button
@@ -69,7 +68,7 @@ export const SettingsModal: React.FC = () => {
                 : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
             }`}
           >
-            <TabIcon className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
+            <Icon name={tab.icon} size="none" tone="inherit" className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
             <span>{tab.label}</span>
           </button>
         );
@@ -163,7 +162,7 @@ export const SettingsModal: React.FC = () => {
               className="p-1.5 -ml-1 text-fg-muted hover:text-fg-primary cursor-pointer motion-press"
               title="Назад"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <Icon name="nav.back" size="lg" tone="inherit" />
             </button>
             <h3 className="text-sm font-semibold text-fg-primary">
               Настройки
@@ -210,7 +209,7 @@ export const SettingsModal: React.FC = () => {
               onClick={() => setIsSettingsOpen(false)}
               className="p-1 rounded text-fg-dim hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <Icon name="action.close" size="md" tone="inherit" />
             </button>
           </div>
 

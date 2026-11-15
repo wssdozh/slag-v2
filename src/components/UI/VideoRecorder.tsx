@@ -1,7 +1,7 @@
 // Records a video memo with a live preview, then hands the clip to the composer.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger/logger';
 
@@ -165,13 +165,13 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
 
   return createPortal(
     <div className={`fixed inset-0 z-[200] flex flex-col px-2 pt-[max(var(--sat),1rem)] pb-[max(var(--sab),0.5rem)] record-overlay ${isClosing ? 'record-overlay-out pointer-events-none' : ''}`}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" />
+      <div className="absolute inset-0 bg-scrim-60 backdrop-blur-xl" />
 
       <div className="relative flex-1 min-h-0 flex items-center justify-center">
-        <div className={`relative aspect-square w-[min(82vw,340px)] rounded-2xl overflow-hidden bg-surface border border-white/10 shadow-2xl record-card ${isClosing ? 'record-card-out' : ''} flex flex-col`}>
+        <div className={`relative aspect-square w-[min(82vw,340px)] rounded-2xl overflow-hidden bg-surface border border-tint-10 shadow-2xl record-card ${isClosing ? 'record-card-out' : ''} flex flex-col`}>
           {error ? (
             <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
-              <p className="text-sm text-zinc-300">{error}</p>
+              <p className="text-sm text-fg-tertiary">{error}</p>
               <button onClick={() => { setError(null); setIsReady(false); void init(); }} className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium">Повторить</button>
             </div>
           ) : (
@@ -179,12 +179,12 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
               <video ref={videoRef} autoPlay playsInline muted className="flex-1 w-full min-h-0 object-cover scale-x-[-1]" />
 
               {!isReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                  <span className="text-xs font-mono text-zinc-300">включаю камеру…</span>
+                <div className="absolute inset-0 flex items-center justify-center bg-scrim-40">
+                  <span className="text-xs font-mono text-fg-tertiary">включаю камеру…</span>
                 </div>
               )}
 
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-white/15">
+              <div className="absolute bottom-0 left-0 w-full h-1 bg-tint-15">
                 <div className="h-full bg-white transition-all duration-100" style={{ width: `${Math.min(100, (elapsedMs / 60000) * 100)}%` }} />
               </div>
             </>
@@ -192,17 +192,17 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         </div>
       </div>
 
-      <div className={`relative w-full max-w-2xl mx-auto grid grid-cols-3 items-center gap-2 rounded-2xl bg-surface-elevated border border-white/[0.12] p-2 shadow-2xl shadow-black/50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
+      <div className={`relative w-full max-w-2xl mx-auto grid grid-cols-3 items-center gap-2 rounded-2xl bg-surface-elevated border border-tint-12 p-2 shadow-2xl shadow-scrim-50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
         <div className="flex items-center gap-2 pl-1">
-          <span className={`w-2 h-2 rounded-full ${error ? 'bg-zinc-500' : 'bg-rose-500 animate-pulse'}`} />
-          <span className="font-mono text-xs text-zinc-300">{(elapsedMs / 1000).toFixed(1)}s</span>
+          <span className={`w-2 h-2 rounded-full ${error ? 'bg-fg-muted' : 'bg-rose-500 animate-pulse'}`} />
+          <span className="font-mono text-xs text-fg-tertiary">{(elapsedMs / 1000).toFixed(1)}s</span>
         </div>
         <button type="button" onClick={cancelAndClose} className="justify-self-center h-ctrl-sm px-3 rounded-md text-xs font-medium text-accent hover:bg-accent-subtle transition-colors">отмена</button>
         {error ? (
           <span className="w-ctrl-sm h-ctrl-sm justify-self-end" />
         ) : (
           <button type="button" onClick={() => handleFinish(true)} disabled={!isReady} className="justify-self-end w-ctrl-sm h-ctrl-sm rounded-full bg-accent-strong disabled:opacity-50 text-white flex items-center justify-center motion-press" aria-label="Отправить видео">
-            <ArrowUp className="w-4 h-4" />
+            <Icon name="action.send" size="md" tone="inherit" />
           </button>
         )}
       </div>

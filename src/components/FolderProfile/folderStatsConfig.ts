@@ -1,6 +1,5 @@
 // The single list of folder counters, labels and the Russian record count.
-import type { ComponentType } from 'react';
-import { CheckSquare, FileText, Image as ImageIcon, Link as LinkIcon, Mic, StickyNote } from 'lucide-react';
+import type { IconName } from '../UI/icons/icons';
 import type { FolderMediaData } from '../RightPanel/useFolderMedia';
 
 export type FolderStatKey = 'notes' | 'tasks' | 'articles' | 'media' | 'audio' | 'links';
@@ -8,7 +7,7 @@ export type FolderStatKey = 'notes' | 'tasks' | 'articles' | 'media' | 'audio' |
 export interface FolderStatDefinition {
   key: FolderStatKey;
   label: string;
-  Icon: ComponentType<{ className?: string }>;
+  icon: IconName;
   count: (mediaData: FolderMediaData) => number;
 }
 
@@ -17,12 +16,12 @@ export interface FolderStatDefinition {
  * "Фото / Медиа" and "Голосовые" while the modal said "Медиа" and "Аудио".
  */
 export const FOLDER_STATS: FolderStatDefinition[] = [
-  { key: 'notes', label: 'Заметки', Icon: StickyNote, count: data => data.notesCount },
-  { key: 'tasks', label: 'Таски', Icon: CheckSquare, count: data => data.tasksCount },
-  { key: 'articles', label: 'Статьи', Icon: FileText, count: data => data.articlesCount },
-  { key: 'media', label: 'Медиа', Icon: ImageIcon, count: data => data.allImages.length },
-  { key: 'audio', label: 'Аудио', Icon: Mic, count: data => data.allAudio.length },
-  { key: 'links', label: 'Ссылки', Icon: LinkIcon, count: data => data.allLinks.length },
+  { key: 'notes', label: 'Заметки', icon: 'entity.note', count: data => data.notesCount },
+  { key: 'tasks', label: 'Таски', icon: 'entity.task', count: data => data.tasksCount },
+  { key: 'articles', label: 'Статьи', icon: 'entity.article', count: data => data.articlesCount },
+  { key: 'media', label: 'Медиа', icon: 'entity.image', count: data => data.allImages.length },
+  { key: 'audio', label: 'Аудио', icon: 'media.microphone', count: data => data.allAudio.length },
+  { key: 'links', label: 'Ссылки', icon: 'entity.link', count: data => data.allLinks.length },
 ];
 
 export function recordCountLabel(count: number): string {

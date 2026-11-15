@@ -2,7 +2,7 @@
 // Errors and permission questions are toasts/modals (see useAppUpdates), not rows inside the card:
 // a state that needs a decision belongs in a question, not in a paragraph under a button.
 import React from 'react';
-import { ArrowDownToLine, Check, ExternalLink, RefreshCw } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { SettingsDivider, SettingsGroup, SettingsRow } from './SettingsUI';
 import { Button } from '../UI/Button';
@@ -76,7 +76,7 @@ export const UpdatesSettingsTab: React.FC = () => {
           testId="update-channel-row"
           description="адрес манифеста, который опрашивается"
           value={
-            <span className="text-[11px] font-mono text-fg-dim max-w-[15rem] truncate" data-testid="update-endpoint">
+            <span className="text-2xs font-mono text-fg-dim max-w-[15rem] truncate" data-testid="update-endpoint">
               {platform?.endpoint ?? '—'}
             </span>
           }
@@ -86,7 +86,7 @@ export const UpdatesSettingsTab: React.FC = () => {
       <SettingsGroup title="обновление">
         {platform === null ? (
           <SettingsRow
-            icon={<ArrowDownToLine className="w-4 h-4" />}
+            icon={<Icon name="system.update" size="md" tone="inherit" />}
             label="встроенное обновление"
             description="работает только в приложении, не в браузере"
             testId="update-web-hint"
@@ -94,7 +94,7 @@ export const UpdatesSettingsTab: React.FC = () => {
         ) : (
           <>
             <SettingsRow
-              icon={<ArrowDownToLine className="w-4 h-4" />}
+              icon={<Icon name="system.update" size="md" tone="inherit" />}
               label={
                 offer
                   ? `доступна ${offer.version}`
@@ -118,7 +118,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  icon={<RefreshCw className={`w-3.5 h-3.5 ${status === 'checking' ? 'animate-spin' : ''}`} />}
+                  icon={<Icon name="action.refresh" size="sm" tone="inherit" className={`${status === 'checking' ? 'animate-spin' : ''}`} />}
                   onClick={() => void check()}
                   disabled={isBusy}
                   data-testid="update-check-btn"
@@ -133,7 +133,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                 <SettingsDivider />
                 <div className="px-3.5 py-3 flex flex-col gap-3" data-testid="update-offer">
                   <div className="flex items-center gap-2 text-xs text-fg-secondary">
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <Icon name="action.check" size="sm" tone="success" />
                     <span className="font-mono" data-testid="update-offer-version">
                       {offer.currentVersion} → {offer.version}
                     </span>
@@ -147,13 +147,13 @@ export const UpdatesSettingsTab: React.FC = () => {
 
                   {status === 'downloading' && (
                     <div className="flex flex-col gap-1.5" data-testid="update-progress">
-                      <div className="h-1 rounded-full bg-white/[0.08] overflow-hidden">
+                      <div className="h-1 rounded-full bg-tint-8 overflow-hidden">
                         <div
                           className="h-full bg-fg-secondary transition-[width] duration-150"
                           style={{ width: `${percent ?? 8}%` }}
                         />
                       </div>
-                      <span className="text-[11px] font-mono text-fg-dim">
+                      <span className="text-2xs font-mono text-fg-dim">
                         {percent === null
                           ? 'качаю…'
                           : `${percent}% · ${formatBytes(progress?.downloaded)} из ${formatBytes(progress?.total ?? undefined)}`}
@@ -173,7 +173,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                         <Button
                           variant="primary"
                           size="sm"
-                          icon={<ArrowDownToLine className="w-3.5 h-3.5" />}
+                          icon={<Icon name="system.update" size="sm" tone="inherit" />}
                           onClick={() => void install()}
                           data-testid="update-install-btn"
                         >
@@ -183,7 +183,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                         <Button
                           variant="primary"
                           size="sm"
-                          icon={<ExternalLink className="w-3.5 h-3.5" />}
+                          icon={<Icon name="nav.externalLink" size="sm" tone="inherit" />}
                           onClick={openReleasePage}
                           data-testid="update-release-btn"
                         >
@@ -197,13 +197,13 @@ export const UpdatesSettingsTab: React.FC = () => {
                   )}
 
                   {offer.kind === 'installer' && (
-                    <span className="text-[11px] text-fg-dim">
+                    <span className="text-2xs text-fg-dim">
                       приложение установлено в папку без прав записи, поэтому обновляет установщик — он
                       спросит uac и поставит поверх.
                     </span>
                   )}
                   {offer.kind === 'manual' && (
-                    <span className="text-[11px] text-fg-dim">
+                    <span className="text-2xs text-fg-dim">
                       linux: обнови из пакетного менеджера или скачай файл со страницы релиза.
                     </span>
                   )}
@@ -215,7 +215,7 @@ export const UpdatesSettingsTab: React.FC = () => {
         )}
       </SettingsGroup>
 
-      <p className="text-[11px] text-fg-dim px-1 leading-relaxed">
+      <p className="text-2xs text-fg-dim px-1 leading-relaxed">
         обновления берутся из публичного репозитория релизов и проверяются по sha256 и подписи до
         запуска. без подписи файл не запускается.
       </p>

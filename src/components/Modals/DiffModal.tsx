@@ -1,11 +1,6 @@
 // What an AI edit would change, before it is applied: the line diff and the accept/reject pair.
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  ArrowLeft,
-  Check,
-  FileCode2,
-  ArrowRight,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import type { SlagItem, ItemUpdates } from '../../types';
 import { applyItemUpdates } from '../../lib/vault/itemUpdates';
 import { computeSideBySideDiff, computeMetadataDiff } from '../../lib/text/diffUtils';
@@ -49,14 +44,14 @@ function renderInlineMarkdown(text: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
       return (
-        <strong key={i} className="text-zinc-100 font-semibold">
+        <strong key={i} className="text-fg-primary font-semibold">
           {part.slice(2, -2)}
         </strong>
       );
     }
     if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
       return (
-        <code key={i} className="text-amber-300 bg-amber-500/15 px-1 py-0.5 rounded font-mono text-[11px]">
+        <code key={i} className="text-amber-300 bg-amber-500/15 px-1 py-0.5 rounded font-mono text-2xs">
           {part.slice(1, -1)}
         </code>
       );
@@ -85,10 +80,10 @@ function renderSyntaxLine(text: string): React.ReactNode {
     const isDone = taskMatch[2].toLowerCase() === 'x';
     return (
       <span>
-        <span className={isDone ? 'text-emerald-400 font-mono select-none font-semibold' : 'text-zinc-500 font-mono select-none'}>
+        <span className={isDone ? 'text-emerald-400 font-mono select-none font-semibold' : 'text-fg-muted font-mono select-none'}>
           {taskMatch[1]}
         </span>
-        <span className={isDone ? 'text-zinc-400 line-through' : 'text-zinc-200'}>
+        <span className={isDone ? 'text-fg-secondary line-through' : 'text-fg-soft'}>
           {taskMatch[3]}
         </span>
       </span>
@@ -100,8 +95,8 @@ function renderSyntaxLine(text: string): React.ReactNode {
   if (listMatch) {
     return (
       <span>
-        <span className="text-zinc-500 font-bold select-none">{listMatch[1]}</span>
-        <span className="text-zinc-200">{renderInlineMarkdown(listMatch[2])}</span>
+        <span className="text-fg-muted font-bold select-none">{listMatch[1]}</span>
+        <span className="text-fg-soft">{renderInlineMarkdown(listMatch[2])}</span>
       </span>
     );
   }
@@ -183,7 +178,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
     >
       {/* Top Control Bar */}
       <header
-        className="min-h-14 border-b border-white/[0.06] bg-panel shrink-0 flex items-center"
+        className="min-h-14 border-b border-tint-6 bg-panel shrink-0 flex items-center"
         style={{ paddingTop: 'max(var(--sat), 0px)' }}
       >
         <div className="max-w-6xl mx-auto w-full flex items-center justify-between px-4 md:px-8 gap-4">
@@ -192,23 +187,23 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press cursor-pointer shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer shrink-0"
               title="Вернуться назад (Esc)"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <Icon name="nav.back" size="md" tone="inherit" />
               <span className="font-medium">Назад</span>
             </button>
 
-            <span className="text-zinc-600 shrink-0">/</span>
+            <span className="text-fg-dim shrink-0">/</span>
 
-            <span className="text-xs font-semibold text-zinc-200 truncate max-w-xs md:max-w-md">
+            <span className="text-xs font-semibold text-fg-soft truncate max-w-xs md:max-w-md">
               {items.length > 1
                 ? 'Сравнение изменений'
                 : `Сравнение: ${items[0]?.title || 'Запись'}`}
             </span>
 
             {items.length > 1 && (
-              <span className="text-[11px] font-mono text-zinc-500 shrink-0">
+              <span className="text-2xs font-mono text-fg-muted shrink-0">
                 ({selectedIndex + 1}/{items.length})
               </span>
             )}
@@ -229,7 +224,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                 </span>
               )}
               {diffResult.removedCount === 0 && diffResult.addedCount === 0 && (
-                <span className="text-zinc-500 text-[11px] hidden sm:inline">Без изменений</span>
+                <span className="text-fg-muted text-2xs hidden sm:inline">Без изменений</span>
               )}
             </div>
 
@@ -237,7 +232,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.06] text-xs font-medium motion-press cursor-pointer"
+              className="px-3 py-1.5 rounded-md text-fg-secondary hover:text-white hover:bg-tint-6 text-xs font-medium motion-press cursor-pointer"
             >
               Закрыть
             </button>
@@ -250,7 +245,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium motion-press cursor-pointer shadow-sm shadow-blue-500/20"
                 title="Применить изменения (Ctrl+Enter)"
               >
-                <Check className="w-3.5 h-3.5" />
+                <Icon name="action.check" size="sm" tone="inherit" />
                 <span>Применить изменения</span>
               </button>
             )}
@@ -260,7 +255,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
       {/* Sub-bar: Existing-style borderless rounded tabs & flat metadata */}
       {(items.length > 1 || metaDiff.length > 0) && (
-        <div className="border-b border-white/[0.06] bg-panel/70 shrink-0">
+        <div className="border-b border-tint-6 bg-panel/70 shrink-0">
           <div className="max-w-6xl mx-auto w-full px-4 md:px-8 py-2.5 flex flex-col gap-2.5">
             {/* Existing Tab Style: Borderless rounded tabs matching dockview-theme-slag.css & FolderMediaTabs */}
             {items.length > 1 && (
@@ -278,16 +273,16 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                       key={idx}
                       type="button"
                       onClick={() => setSelectedIndex(idx)}
-                      className={`h-[28px] px-3 text-[11px] font-medium rounded-md motion-press cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+                      className={`h-[28px] px-3 text-2xs font-medium rounded-md motion-press cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                         isSelected
-                          ? 'bg-white/10 text-white font-medium border border-white/[0.08] shadow-xs'
-                          : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                          ? 'bg-tint-10 text-white font-medium border border-tint-8 shadow-xs'
+                          : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
                       }`}
                     >
-                      <FileCode2 className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-400' : 'text-zinc-500'}`} />
+                      <Icon name="entity.fileCode" size="sm" tone="inherit" className={`${isSelected ? 'text-blue-400' : 'text-fg-muted'}`} />
                       <span className="max-w-[200px] truncate">{item.title}</span>
                       {(tabDiff.addedCount > 0 || tabDiff.removedCount > 0) && (
-                        <span className="flex items-center gap-1 text-[10px] font-mono ml-0.5">
+                        <span className="flex items-center gap-1 text-3xs font-mono ml-0.5">
                           {tabDiff.removedCount > 0 && (
                             <span className="text-rose-400">-{tabDiff.removedCount}</span>
                           )}
@@ -304,15 +299,15 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
             {/* Flat Metadata Differences (Anti-matryoshka: clean typography directly on surface) */}
             {metaDiff.length > 0 && (
-              <div className="flex items-center gap-4 text-xs font-mono text-zinc-400 flex-wrap">
-                <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">
+              <div className="flex items-center gap-4 text-xs font-mono text-fg-secondary flex-wrap">
+                <span className="text-2xs text-fg-muted uppercase tracking-wider font-semibold">
                   Свойства:
                 </span>
                 {metaDiff.map((md, idx) => (
                   <div key={idx} className="flex items-center gap-1.5 text-xs font-mono">
-                    <span className="text-zinc-400">{md.label}:</span>
+                    <span className="text-fg-secondary">{md.label}:</span>
                     <span className="text-rose-400/90 line-through">{md.oldValue}</span>
-                    <ArrowRight className="w-3 h-3 text-zinc-600 inline" />
+                    <Icon name="nav.forward" size="xs" tone="dim" className="inline" />
                     <span className="text-emerald-400 font-semibold">{md.newValue}</span>
                   </div>
                 ))}
@@ -323,17 +318,17 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       )}
 
       {/* Editor Subheaders: Flat single plane with hairline divider */}
-      <div className="border-b border-white/[0.06] bg-panel shrink-0 select-none">
+      <div className="border-b border-tint-6 bg-panel shrink-0 select-none">
         <div className="max-w-6xl mx-auto w-full px-4 md:px-8">
-          <div className="grid grid-cols-2 divide-x divide-white/[0.06] py-2">
+          <div className="grid grid-cols-2 divide-x divide-tint-6 py-2">
             {/* Left Column Header */}
             <div className="flex items-center justify-between pr-4 pl-1">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/50" />
-                <span className="text-xs font-semibold text-zinc-200">Было (Текущая версия)</span>
+                <span className="text-xs font-semibold text-fg-soft">Было (Текущая версия)</span>
               </div>
               {diffResult.removedCount > 0 && (
-                <span className="text-[11px] font-mono font-medium text-rose-400">
+                <span className="text-2xs font-mono font-medium text-rose-400">
                   -{diffResult.removedCount} {diffResult.removedCount === 1 ? 'строка' : 'строк'}
                 </span>
               )}
@@ -343,10 +338,10 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <div className="flex items-center justify-between pl-4 pr-1">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/50" />
-                <span className="text-xs font-semibold text-zinc-200">Стало (Предлагаемая версия)</span>
+                <span className="text-xs font-semibold text-fg-soft">Стало (Предлагаемая версия)</span>
               </div>
               {diffResult.addedCount > 0 && (
-                <span className="text-[11px] font-mono font-medium text-emerald-400">
+                <span className="text-2xs font-mono font-medium text-emerald-400">
                   +{diffResult.addedCount} {diffResult.addedCount === 1 ? 'строка' : 'строк'}
                 </span>
               )}
@@ -359,46 +354,46 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto bg-canvas">
         <div className="max-w-6xl mx-auto w-full min-h-full px-4 md:px-8 flex flex-col">
           {diffResult.rows.length === 0 ? (
-            <div className="grid grid-cols-2 divide-x divide-white/[0.06] flex-1 min-h-[300px]">
-              <div className="p-16 flex items-center justify-center text-zinc-500 text-xs font-mono">
+            <div className="grid grid-cols-2 divide-x divide-tint-6 flex-1 min-h-[300px]">
+              <div className="p-16 flex items-center justify-center text-fg-muted text-xs font-mono">
                 Текст заметки пустой
               </div>
-              <div className="p-16 flex items-center justify-center text-zinc-500 text-xs font-mono">
+              <div className="p-16 flex items-center justify-center text-fg-muted text-xs font-mono">
                 Изменения отсутствуют
               </div>
             </div>
           ) : (
-            <div className="flex flex-col flex-1 divide-y divide-white/[0.02]">
+            <div className="flex flex-col flex-1 divide-y divide-tint-2">
               {diffResult.rows.map((row, idx) => {
                 const isRemoved = row.oldType === 'removed';
                 const isAdded = row.newType === 'added';
 
                 return (
-                  <div key={idx} className="grid grid-cols-2 divide-x divide-white/[0.06]">
+                  <div key={idx} className="grid grid-cols-2 divide-x divide-tint-6">
                     {/* Left Pane (Old Version) */}
                     <div
                       className={`flex items-start min-w-0 transition-colors ${
                         isRemoved
                           ? 'bg-rose-500/[0.10] text-rose-100'
                           : row.oldType === 'empty'
-                          ? 'bg-black/25 select-none'
-                          : 'hover:bg-white/[0.02] text-zinc-200'
+                          ? 'bg-scrim-25 select-none'
+                          : 'hover:bg-tint-2 text-fg-soft'
                       }`}
                     >
                       {/* Darker contrast gutter */}
                       <span
-                        className={`w-11 shrink-0 text-right pr-3 select-none text-[11px] font-mono leading-6 border-r ${
+                        className={`w-11 shrink-0 text-right pr-3 select-none text-2xs font-mono leading-6 border-r ${
                           isRemoved
                             ? 'bg-rose-500/20 text-rose-300 font-semibold border-rose-500/25'
                             : row.oldType === 'empty'
-                            ? 'bg-black/40 text-transparent border-white/[0.04]'
-                            : 'bg-black/35 text-zinc-500 border-white/[0.05]'
+                            ? 'bg-scrim-40 text-transparent border-tint-4'
+                            : 'bg-scrim-35 text-fg-muted border-tint-5'
                         }`}
                       >
                         {row.oldLineNum ?? ''}
                       </span>
                       {/* Line content with syntax highlighting */}
-                      <div className="flex-1 min-w-0 pl-3 pr-4 text-[12px] md:text-[13px] font-mono leading-6 whitespace-pre-wrap break-words min-h-[24px]">
+                      <div className="flex-1 min-w-0 pl-3 pr-4 text-xs md:text-ui font-mono leading-6 whitespace-pre-wrap break-words min-h-[24px]">
                         {row.oldWords && row.oldWords.length > 0 ? (
                           row.oldWords.map((chunk, cIdx) => (
                             <span
@@ -426,24 +421,24 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                         isAdded
                           ? 'bg-emerald-500/[0.10] text-emerald-100'
                           : row.newType === 'empty'
-                          ? 'bg-black/25 select-none'
-                          : 'hover:bg-white/[0.02] text-zinc-200'
+                          ? 'bg-scrim-25 select-none'
+                          : 'hover:bg-tint-2 text-fg-soft'
                       }`}
                     >
                       {/* Darker contrast gutter */}
                       <span
-                        className={`w-11 shrink-0 text-right pr-3 select-none text-[11px] font-mono leading-6 border-r ${
+                        className={`w-11 shrink-0 text-right pr-3 select-none text-2xs font-mono leading-6 border-r ${
                           isAdded
                             ? 'bg-emerald-500/20 text-emerald-300 font-semibold border-emerald-500/25'
                             : row.newType === 'empty'
-                            ? 'bg-black/40 text-transparent border-white/[0.04]'
-                            : 'bg-black/35 text-zinc-500 border-white/[0.05]'
+                            ? 'bg-scrim-40 text-transparent border-tint-4'
+                            : 'bg-scrim-35 text-fg-muted border-tint-5'
                         }`}
                       >
                         {row.newLineNum ?? ''}
                       </span>
                       {/* Line content with syntax highlighting */}
-                      <div className="flex-1 min-w-0 pl-3 pr-4 text-[12px] md:text-[13px] font-mono leading-6 whitespace-pre-wrap break-words min-h-[24px]">
+                      <div className="flex-1 min-w-0 pl-3 pr-4 text-xs md:text-ui font-mono leading-6 whitespace-pre-wrap break-words min-h-[24px]">
                         {row.newWords && row.newWords.length > 0 ? (
                           row.newWords.map((chunk, cIdx) => (
                             <span
@@ -469,13 +464,13 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
               })}
 
               {/* Full-Height Bottom Extension (Continues the divider and gutters down) */}
-              <div className="grid grid-cols-2 divide-x divide-white/[0.06] flex-1 min-h-[48px]">
+              <div className="grid grid-cols-2 divide-x divide-tint-6 flex-1 min-h-[48px]">
                 <div className="flex items-stretch min-w-0">
-                  <div className="w-11 shrink-0 bg-black/35 border-r border-white/[0.05]" />
+                  <div className="w-11 shrink-0 bg-scrim-35 border-r border-tint-5" />
                   <div className="flex-1" />
                 </div>
                 <div className="flex items-stretch min-w-0">
-                  <div className="w-11 shrink-0 bg-black/35 border-r border-white/[0.05]" />
+                  <div className="w-11 shrink-0 bg-scrim-35 border-r border-tint-5" />
                   <div className="flex-1" />
                 </div>
               </div>

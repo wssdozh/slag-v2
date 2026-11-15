@@ -1,7 +1,7 @@
 // The transparent quick-capture window: hosts the composer and resets between invocations.
 import React, { useState, useEffect, useCallback } from 'react';
 import { Composer } from '../Feed/Composer';
-import { Sparkles, X } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { hideQuickComposer, listenQuickComposerFocus, notifyDataChanged } from '../../lib/platform/windowControls';
 
 export const QuickComposerWindow: React.FC = () => {
@@ -61,27 +61,27 @@ export const QuickComposerWindow: React.FC = () => {
       }}
       className="w-screen h-screen bg-transparent select-none overflow-visible flex flex-col items-center justify-center p-2 cursor-default"
     >
-      <div className="w-full bg-surface border border-white/[0.12] rounded-2xl flex flex-col overflow-visible shadow-2xl relative">
+      <div className="w-full bg-surface border border-tint-12 rounded-2xl flex flex-col overflow-visible shadow-2xl relative">
         {/* Island Header */}
         <div
           data-tauri-drag-region
-          className="px-3.5 pt-2.5 pb-2 flex items-center justify-between border-b border-white/[0.04] cursor-move select-none shrink-0"
+          className="px-3.5 pt-2.5 pb-2 flex items-center justify-between border-b border-tint-4 cursor-move select-none shrink-0"
         >
           <div className="flex items-center gap-2 pointer-events-none">
-            <Sparkles className="w-4 h-4 text-zinc-400 shrink-0" />
-            <span className="text-sm font-semibold text-zinc-100">Быстрая мысль</span>
+            <Icon name="system.ai" size="md" className="shrink-0" />
+            <span className="text-sm font-semibold text-fg-primary">Быстрая мысль</span>
           </div>
 
           <div className="flex items-center gap-2.5">
-            <span className="text-[11px] text-zinc-500 font-mono pointer-events-none">Esc — закрыть</span>
+            <span className="text-2xs text-fg-muted font-mono pointer-events-none">Esc — закрыть</span>
             <button
               type="button"
               onClick={handleClose}
-              className="p-1 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="p-1 rounded-lg text-fg-secondary hover:text-fg-soft hover:bg-tint-6 transition-colors cursor-pointer"
               title="Закрыть (Esc)"
               aria-label="Закрыть окно"
             >
-              <X className="w-3.5 h-3.5" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           </div>
         </div>

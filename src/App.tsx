@@ -9,7 +9,7 @@ import { useAssistantActions } from './hooks/ui/useAssistantActions';
 import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { ConfirmDialog } from './components/Modals/ConfirmDialog';
 import { ToastContainer } from './components/UI/Toast';
-import { Monitor } from 'lucide-react';
+import { Icon } from './components/UI/icons/Icon';
 import { enrichAttachment } from './lib/media/enrichment/dispatch';
 import { extractFocalContext } from './lib/media/enrichment/text';
 import { setupAudioCollisionGuard } from './lib/media/audioHelper';
@@ -283,14 +283,14 @@ const AppContent: React.FC = () => {
         <div className="absolute top-3 inset-x-0 flex items-center justify-center pointer-events-none z-50">
           <button
             onClick={toggleMobileMode}
-            className="pointer-events-auto px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/15 text-xs text-white backdrop-blur-md border border-white/[0.08] shadow-lg flex items-center gap-2 cursor-pointer motion-press"
+            className="pointer-events-auto px-3.5 py-1.5 rounded-full bg-tint-10 hover:bg-tint-15 text-xs text-white backdrop-blur-md border border-tint-8 shadow-lg flex items-center gap-2 cursor-pointer motion-press"
           >
-            <Monitor className="w-3.5 h-3.5" />
+            <Icon name="system.desktopMode" size="sm" tone="inherit" />
             <span>Вернуться в десктопный режим</span>
           </button>
         </div>
 
-        <div className="w-full max-w-[390px] h-[844px] max-h-[92vh] bg-canvas rounded-[40px] border-4 border-white/[0.12] shadow-2xl flex flex-col overflow-hidden relative">
+        <div className="w-full max-w-[390px] h-[844px] max-h-[92vh] bg-canvas rounded-[40px] border-4 border-tint-12 shadow-2xl flex flex-col overflow-hidden relative">
           <MobileShell />
         </div>
 
@@ -434,10 +434,10 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
     if (this.state.hasError) {
       return (
         <div className="w-screen h-screen flex flex-col items-center justify-center bg-canvas text-fg-primary gap-4 font-mono">
-          <p className="text-sm text-zinc-400">Произошла ошибка интерфейса</p>
+          <p className="text-sm text-fg-secondary">Произошла ошибка интерфейса</p>
           <button
             onClick={() => this.setState({ hasError: false })}
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-xs cursor-pointer transition-colors"
+            className="px-4 py-2 bg-tint-10 hover:bg-tint-20 rounded-lg text-xs cursor-pointer transition-colors"
           >
             Восстановить
           </button>

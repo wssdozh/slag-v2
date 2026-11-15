@@ -37,8 +37,8 @@ export const LinearSignalBars: React.FC<LinearSignalBarsProps> = ({
             : p === 'medium'
             ? 'fill-amber-400'
             : p === 'low'
-            ? 'fill-zinc-400'
-            : 'fill-zinc-700'
+            ? 'fill-fg-secondary'
+            : 'fill-tint-14'
         }
       />
       {/* Bar 2 (Medium) */}
@@ -53,7 +53,7 @@ export const LinearSignalBars: React.FC<LinearSignalBarsProps> = ({
             ? 'fill-rose-500'
             : p === 'medium'
             ? 'fill-amber-400'
-            : 'fill-zinc-700'
+            : 'fill-tint-14'
         }
       />
       {/* Bar 3 (Tall) */}
@@ -66,7 +66,7 @@ export const LinearSignalBars: React.FC<LinearSignalBarsProps> = ({
         className={
           p === 'high'
             ? 'fill-rose-500'
-            : 'fill-zinc-700'
+            : 'fill-tint-14'
         }
       />
     </svg>

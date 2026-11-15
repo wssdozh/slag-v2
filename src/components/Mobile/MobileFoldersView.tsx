@@ -6,18 +6,8 @@ import { Composer } from '../Feed/Composer';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { MobileCalendarView } from './MobileCalendarView';
 import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
-import {
-  Folder,
-  FolderPlus,
-  ChevronDown,
-  Search,
-  Inbox,
-  Plus,
-  BookOpen,
-  ArrowUpDown,
-  MoreVertical,
-} from 'lucide-react';
-import { FOLDER_ICONS } from '../Sidebar/folderIcons';
+import { Icon } from '../UI/icons/Icon';
+import { folderIconName } from '../UI/icons/icons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
 import { MobileScreenHeader } from './MobileScreenHeader';
@@ -136,14 +126,10 @@ export const MobileFoldersView: React.FC = () => {
               data-testid="mobile-vault-switcher-btn"
             >
               <span>Заметки</span>
-              <span className="text-zinc-500 font-normal text-xs font-mono truncate max-w-[120px]">
+              <span className="text-fg-muted font-normal text-xs font-mono truncate max-w-[120px]">
                 / {vault.name || 'main'}
               </span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-zinc-500 transition-transform duration-150 ${
-                  isVaultMenuOpen ? 'rotate-180 text-zinc-300' : ''
-                }`}
-              />
+              <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-150 ${isVaultMenuOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
             </button>
           }
           icon="S"
@@ -152,20 +138,20 @@ export const MobileFoldersView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsSearchOpen(true)}
-                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
+                className="w-10 h-10 rounded-full hover:bg-tint-6 text-fg-secondary hover:text-white flex items-center justify-center motion-press cursor-pointer"
                 title="Поиск"
                 aria-label="Поиск"
               >
-                <Search className="w-5 h-5" />
+                <Icon name="action.search" size="lg" tone="inherit" />
               </button>
               <button
                 type="button"
                 onClick={() => openCreateFolderModal()}
-                className="w-10 h-10 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
+                className="w-10 h-10 rounded-full hover:bg-tint-6 text-fg-secondary hover:text-white flex items-center justify-center motion-press cursor-pointer"
                 title="Новая папка"
                 aria-label="Новая папка"
               >
-                <FolderPlus className="w-5 h-5" />
+                <Icon name="action.folderAdd" size="lg" tone="inherit" />
               </button>
             </>
           }
@@ -174,22 +160,22 @@ export const MobileFoldersView: React.FC = () => {
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
           {/* Pinned Inbox Card */}
-          <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
+          <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden">
             <button
               onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
               onPointerDown={flashTap}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-white/[0.04] active:bg-white/[0.1] active:duration-0 data-[tapped=true]:bg-white/[0.1] data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
+              className="w-full flex items-center justify-between p-3.5 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-6 h-6 flex items-center justify-center text-zinc-200 shrink-0">
-                  <Inbox className="w-5 h-5" />
+                <div className="w-6 h-6 flex items-center justify-center text-fg-soft shrink-0">
+                  <Icon name="entity.inbox" size="lg" tone="inherit" />
                 </div>
                 <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
                 {unsortedCount > 0 && (
-                  <span className="text-xs font-mono text-zinc-500">
+                  <span className="text-xs font-mono text-fg-muted">
                     {unsortedCount} {unsortedLabel(unsortedCount)}
                   </span>
                 )}
@@ -199,28 +185,28 @@ export const MobileFoldersView: React.FC = () => {
 
           {/* User Folders Group */}
           <div className="flex flex-col gap-1.5 mt-1">
-            <div className="px-1 text-[11px] font-mono text-zinc-500 uppercase tracking-wider">
+            <div className="px-1 text-2xs font-mono text-fg-muted uppercase tracking-wider">
               Папки
             </div>
 
-            <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
+            <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden divide-y divide-tint-4">
               {directSubfolders
                 .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
                 .map(folder => {
-                  const Icon = FOLDER_ICONS[folder.icon || 'Folder'] || Folder;
+                  const iconName = folderIconName(folder.icon);
 
                   return (
                     <button
                       key={folder.path}
                       onClick={() => setMobileActiveFolder(folder.path)}
                       onPointerDown={flashTap}
-                      className="w-full flex items-center justify-between p-3 hover:bg-white/[0.04] active:bg-white/[0.1] active:duration-0 data-[tapped=true]:bg-white/[0.1] data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
+                      className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-6 h-6 flex items-center justify-center text-zinc-400 shrink-0">
-                          <Icon className="w-5 h-5" />
+                        <div className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
+                          <Icon name={iconName} size="lg" tone="inherit" />
                         </div>
-                        <div className="text-sm font-medium text-zinc-200 truncate">{folder.name}</div>
+                        <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
                       </div>
                     </button>
                   );
@@ -262,7 +248,7 @@ export const MobileFoldersView: React.FC = () => {
             <span className="text-sm font-bold text-white truncate max-w-full">
               {activeMeta?.name || mobileActiveFolder}
             </span>
-            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-full">
+            <span className="text-3xs font-mono text-fg-muted truncate max-w-full">
               {isInbox ? 'Лента входящих' : mobileActiveFolder}
             </span>
           </button>
@@ -276,8 +262,8 @@ export const MobileFoldersView: React.FC = () => {
                 onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
                 className={`w-9 h-9 rounded-full flex items-center justify-center motion-press cursor-pointer ${
                   isKanbanMaterialsOpen
-                    ? 'bg-white/10 text-white'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06]'
+                    ? 'bg-tint-10 text-white'
+                    : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-6'
                 }`}
                 title={
                   isKanbanMaterialsOpen
@@ -286,7 +272,7 @@ export const MobileFoldersView: React.FC = () => {
                 }
                 aria-label="Материалы папки"
               >
-                <BookOpen className="w-4 h-4 shrink-0" />
+                <Icon name="entity.materials" size="md" tone="inherit" className="shrink-0" />
               </button>
             )}
 
@@ -297,10 +283,10 @@ export const MobileFoldersView: React.FC = () => {
                 onClick={() => setIsTriageModalOpen(true)}
                 title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
                 aria-label="Запустить ИИ-Сортировку"
-                className="h-8 px-2 rounded-lg flex items-center gap-1 text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.06] motion-press cursor-pointer"
+                className="h-8 px-2 rounded-lg flex items-center gap-1 text-fg-secondary hover:text-fg-soft hover:bg-tint-6 motion-press cursor-pointer"
               >
-                <ArrowUpDown className="w-3.5 h-3.5 shrink-0" />
-                <span key={inboxUnsortedCount} className="font-mono text-[11px] motion-count">{inboxUnsortedCount}</span>
+                <Icon name="action.sort" size="sm" tone="inherit" className="shrink-0" />
+                <span key={inboxUnsortedCount} className="font-mono text-2xs motion-count">{inboxUnsortedCount}</span>
                 <span className="sr-only">Запустить ИИ-Сортировку</span>
               </button>
             )}
@@ -309,11 +295,11 @@ export const MobileFoldersView: React.FC = () => {
             <button
               type="button"
               onClick={openFolderViewModal}
-              className="relative w-9 h-9 rounded-full hover:bg-white/[0.06] text-zinc-400 hover:text-white flex items-center justify-center motion-press cursor-pointer"
+              className="relative w-9 h-9 rounded-full hover:bg-tint-6 text-fg-secondary hover:text-white flex items-center justify-center motion-press cursor-pointer"
               title="Вид и фильтры папки"
               aria-label="Вид и фильтры папки"
             >
-              <MoreVertical className="w-5 h-5" />
+              <Icon name="action.more" size="lg" tone="inherit" />
               {isCustomized && (
                 <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
               )}
@@ -323,31 +309,31 @@ export const MobileFoldersView: React.FC = () => {
       />
 
       {/* Active Filter Badges Strip (Visible only when filters/tags/ai are active) */}
-      <ActiveFilterBadges className="px-3 py-1 border-b border-white/[0.04] bg-panel/40 shrink-0 z-10" />
+      <ActiveFilterBadges className="px-3 py-1 border-b border-tint-4 bg-panel/40 shrink-0 z-10" />
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.04] bg-panel/60 overflow-x-auto scrollbar-none shrink-0 z-10">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-tint-4 bg-panel/60 overflow-x-auto scrollbar-none shrink-0 z-10">
           {directSubfolders.map(sub => {
             const subItemsCount = items.filter(i => i.folder === sub.path).length;
             return (
               <button
                 key={sub.path}
                 onClick={() => setMobileActiveFolder(sub.path)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] text-xs font-medium text-zinc-300 shrink-0 motion-press cursor-pointer whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tint-4 hover:bg-tint-8 border border-tint-6 text-xs font-medium text-fg-tertiary shrink-0 motion-press cursor-pointer whitespace-nowrap"
               >
-                <Folder className="w-3.5 h-3.5 text-zinc-400" />
+                <Icon name="entity.folder" size="sm" />
                 <span>{sub.name}</span>
-                <span key={subItemsCount} className="text-[10px] font-mono text-zinc-500 motion-count">({subItemsCount})</span>
+                <span key={subItemsCount} className="text-3xs font-mono text-fg-muted motion-count">({subItemsCount})</span>
               </button>
             );
           })}
           <button
             onClick={() => openCreateFolderModal(mobileActiveFolder)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-dashed border-white/[0.1] text-xs text-zinc-400 shrink-0 cursor-pointer whitespace-nowrap"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-tint-2 hover:bg-tint-6 border border-dashed border-tint-10 text-xs text-fg-secondary shrink-0 cursor-pointer whitespace-nowrap"
             title="Создать подпапку"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Icon name="action.add" size="sm" tone="inherit" />
             <span>Подпапка</span>
           </button>
         </div>

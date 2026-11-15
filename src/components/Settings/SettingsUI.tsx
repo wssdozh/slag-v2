@@ -1,6 +1,6 @@
 // Settings' shared building blocks: group cards, rows, dividers, switches, selects.
 import React from 'react';
-import { ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { Select, type SelectOption } from '../UI/Select';
 import { NumberInput } from '../UI/NumberInput';
 
@@ -40,14 +40,14 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
     {(title || action) && (
       <div className="flex items-center justify-between gap-2 px-1">
         {title && (
-          <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+          <span className="text-2xs font-mono uppercase tracking-wider text-fg-muted">
             {title}
           </span>
         )}
         {action}
       </div>
     )}
-    <div className="rounded-2xl bg-surface/80 border border-white/[0.06] overflow-hidden">
+    <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden">
       {children}
     </div>
   </section>
@@ -105,7 +105,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
         : {})}
       className={`w-full flex items-center gap-3 p-3.5 text-left ${
-        interactive ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-white/[0.1] active:duration-0' : ''
+        interactive ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-tint-10 active:duration-0' : ''
       } ${disabled ? 'opacity-40' : ''} ${className}`}
     >
       {leading ? (
@@ -114,7 +114,7 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         icon && (
           <span
             className={`w-5 h-5 shrink-0 flex items-center justify-center ${
-              danger ? 'text-danger' : 'text-zinc-400'
+              danger ? 'text-danger' : 'text-fg-secondary'
             }`}
           >
             {icon}
@@ -122,19 +122,19 @@ export const SettingsRow: React.FC<SettingsRowProps> = ({
         )
       )}
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-        <span className={`text-sm font-medium ${danger ? 'text-danger' : 'text-zinc-200'}`}>
+        <span className={`text-sm font-medium ${danger ? 'text-danger' : 'text-fg-soft'}`}>
           {label}
         </span>
         {description && (
-          <span className="text-xs leading-relaxed text-zinc-500 break-words">{description}</span>
+          <span className="text-xs leading-relaxed text-fg-muted break-words">{description}</span>
         )}
       </span>
       {value !== undefined && (
-        <span className="max-w-[50%] min-w-0 text-right text-xs text-zinc-500 break-words">{value}</span>
+        <span className="max-w-[50%] min-w-0 text-right text-xs text-fg-muted break-words">{value}</span>
       )}
       {right && <span className="shrink-0">{right}</span>}
-      {chevron && <ChevronRight className="w-4 h-4 shrink-0 text-zinc-600" />}
-      {external && <ArrowUpRight className="w-4 h-4 shrink-0 text-zinc-600" />}
+      {chevron && <Icon name="nav.next" size="md" tone="dim" className="shrink-0" />}
+      {external && <Icon name="nav.open" size="md" tone="dim" className="shrink-0" />}
     </Element>
   );
 };

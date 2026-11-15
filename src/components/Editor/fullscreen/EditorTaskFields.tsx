@@ -3,7 +3,7 @@ import React from 'react';
 import type { SlagItemStatus, RecurrenceRule } from '../../../types';
 import { LinearSignalBars } from '../../UI/PriorityBadge';
 import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../../lib/time/recurrenceHelper';
-import { CheckCircle2, Circle, Clock, X, Calendar, Repeat } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { Select } from '../../UI/Select';
 import { DatePickerPopover } from '../../UI/DatePickerPopover';
 import { formatDueDateLabel } from '../../../lib/time/dateUtils';
@@ -48,7 +48,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
   setIsRecurrenceDropdownOpen,
 }) => {
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+    <div className="flex flex-wrap items-center gap-2 text-xs text-fg-tertiary">
       {/* Status Selector */}
       <div className="flex items-center shrink-0">
         <Select
@@ -61,29 +61,29 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
             {
               value: 'backlog',
               label: 'Бэклог',
-              icon: <Circle className="w-3.5 h-3.5 text-zinc-500" />,
-              color: 'text-zinc-500',
+              icon: <Icon name="status.todo" size="sm" tone="muted" />,
+              color: 'text-fg-muted',
             },
             {
               value: 'todo',
               label: 'К выполнению',
-              icon: <Circle className="w-3.5 h-3.5 text-zinc-400" />,
-              color: 'text-zinc-400',
+              icon: <Icon name="status.todo" size="sm" />,
+              color: 'text-fg-secondary',
             },
             {
               value: 'in_progress',
               label: 'В работе',
-              icon: <Clock className="w-3.5 h-3.5 text-blue-400" />,
+              icon: <Icon name="time.time" size="sm" tone="accent" />,
               color: 'text-blue-400',
             },
             {
               value: 'done',
               label: 'Выполнено',
-              icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />,
+              icon: <Icon name="status.done" size="sm" tone="success" />,
               color: 'text-emerald-400',
             },
           ]}
-          className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
+          className="h-7 rounded-md bg-tint-3 hover:bg-tint-7 border border-tint-6 px-2 text-xs"
         />
       </div>
 
@@ -100,13 +100,13 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               value: 'none',
               label: 'Обычный',
               icon: <LinearSignalBars priority="none" className="w-3.5 h-3.5" />,
-              color: 'text-zinc-400',
+              color: 'text-fg-secondary',
             },
             {
               value: 'low',
               label: PRIORITY_LABELS.low,
               icon: <LinearSignalBars priority="low" className="w-3.5 h-3.5" />,
-              color: 'text-zinc-300',
+              color: 'text-fg-tertiary',
             },
             {
               value: 'medium',
@@ -121,7 +121,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               color: 'text-rose-400',
             },
           ]}
-          className="h-7 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] px-2 text-xs"
+          className="h-7 rounded-md bg-tint-3 hover:bg-tint-7 border border-tint-6 px-2 text-xs"
         />
       </div>
 
@@ -135,7 +135,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
               title="Изменить срок"
             >
-              <Calendar className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <Icon name="time.date" size="sm" tone="accent" className="shrink-0" />
               <span className="font-medium max-w-[85px] truncate">{formatDueDateLabel(dueDate)}</span>
             </button>
             <button
@@ -144,17 +144,17 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять срок"
             >
-              <X className="w-3 h-3" />
+              <Icon name="action.close" size="xs" tone="inherit" />
             </button>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setIsDatePickerOpen(prev => !prev)}
-            className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="h-7 px-2 rounded-md bg-tint-3 hover:bg-tint-7 border border-tint-6 text-fg-secondary hover:text-fg-soft text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
             title="Установить срок таски"
           >
-            <Calendar className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <Icon name="time.date" size="sm" className="shrink-0" />
             <span>Срок</span>
           </button>
         )}
@@ -178,14 +178,14 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
       {/* Duration Selector */}
       <div className="relative shrink-0">
         {duration !== undefined ? (
-          <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-white/[0.08] border border-white/[0.12] text-xs text-white transition-colors shrink-0">
+          <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-tint-8 border border-tint-12 text-xs text-white transition-colors shrink-0">
             <button
               type="button"
               onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-              className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-fg-tertiary hover:text-white transition-colors cursor-pointer"
               title="Изменить длительность"
             >
-              <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+              <Icon name="time.time" size="sm" className="shrink-0" />
               <span className="font-medium max-w-[70px] truncate">
                 {duration >= 60
                   ? `${Math.floor(duration / 60)}ч${duration % 60 ? ` ${duration % 60}м` : ''}`
@@ -195,26 +195,26 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
             <button
               type="button"
               onClick={() => setDuration(undefined)}
-              className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+              className="p-0.5 text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять длительность"
             >
-              <X className="w-3 h-3" />
+              <Icon name="action.close" size="xs" tone="inherit" />
             </button>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setIsDurationDropdownOpen(!isDurationDropdownOpen)}
-            className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="h-7 px-2 rounded-md bg-tint-3 hover:bg-tint-7 border border-tint-6 text-fg-secondary hover:text-fg-soft text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
             title="Установить длительность таски"
           >
-            <Clock className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <Icon name="time.time" size="sm" className="shrink-0" />
             <span>Длительность</span>
           </button>
         )}
 
         {isDurationDropdownOpen && (
-          <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
+          <div className="absolute left-0 top-full mt-1.5 w-32 rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
             {[15, 30, 45, 60, 90, 120].map(mins => (
               <button
                 key={mins}
@@ -224,7 +224,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
                   setIsDurationDropdownOpen(false);
                 }}
                 className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
-                  duration === mins ? 'bg-white/10 text-white font-medium' : 'text-zinc-300 hover:bg-white/[0.06]'
+                  duration === mins ? 'bg-tint-10 text-white font-medium' : 'text-fg-tertiary hover:bg-tint-6'
                 }`}
               >
                 <span>{mins >= 60 ? `${mins / 60} ч` : `${mins} мин`}</span>
@@ -244,7 +244,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="flex items-center gap-1.5 text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
               title="Изменить повторение"
             >
-              <Repeat className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <Icon name="time.repeat" size="sm" tone="warning" className="shrink-0" />
               <span className="font-medium max-w-[85px] truncate">
                 {formatRecurrenceLabel(recurrence)}
               </span>
@@ -252,26 +252,26 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
             <button
               type="button"
               onClick={() => setRecurrence(undefined)}
-              className="p-0.5 text-zinc-400 hover:text-rose-400 transition-colors cursor-pointer"
+              className="p-0.5 text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять повторение"
             >
-              <X className="w-3 h-3" />
+              <Icon name="action.close" size="xs" tone="inherit" />
             </button>
           </div>
         ) : (
           <button
             type="button"
             onClick={() => setIsRecurrenceDropdownOpen(!isRecurrenceDropdownOpen)}
-            className="h-7 px-2 rounded-md bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] text-zinc-400 hover:text-zinc-100 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="h-7 px-2 rounded-md bg-tint-3 hover:bg-tint-7 border border-tint-6 text-fg-secondary hover:text-fg-primary text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
             title="Повторяющаяся таска"
           >
-            <Repeat className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+            <Icon name="time.repeat" size="sm" className="shrink-0" />
             <span>Повтор</span>
           </button>
         )}
 
         {isRecurrenceDropdownOpen && (
-          <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
+          <div className="absolute left-0 top-full mt-1.5 w-44 rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl p-1 z-50 text-xs flex flex-col gap-0.5 motion-popover pointer-events-auto">
             {RECURRENCE_PRESETS.map(opt => (
               <button
                 key={opt.label}
@@ -280,7 +280,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
                   setRecurrence(opt.rule);
                   setIsRecurrenceDropdownOpen(false);
                 }}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-zinc-300 hover:bg-white/[0.06] transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-fg-tertiary hover:bg-tint-6 transition-colors cursor-pointer"
               >
                 <span>{opt.label}</span>
               </button>

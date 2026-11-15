@@ -6,8 +6,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
 import { FolderProfile } from '../FolderProfile/FolderProfile';
-import { ArrowUpDown, Plus } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 interface FolderInfoModalDialogProps {
   targetFolder: string;
   presence: ReturnType<typeof usePresence>;
@@ -33,7 +32,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
           variant="secondary"
           size="sm"
           className="flex-1"
-          icon={<ArrowUpDown className="w-3.5 h-3.5 text-blue-400" />}
+          icon={<Icon name="action.sort" size="sm" tone="accent" />}
           onClick={() => {
             closeFolderInfoModal();
             setIsTriageModalOpen(true);
@@ -46,7 +45,7 @@ const FolderInfoModalDialog: React.FC<FolderInfoModalDialogProps> = ({ targetFol
         variant="secondary"
         size="sm"
         className="flex-1"
-        icon={<Plus className="w-3.5 h-3.5 text-fg-muted" />}
+        icon={<Icon name="action.add" size="sm" tone="muted" />}
         onClick={() => {
           closeFolderInfoModal();
           openComposerModal({ folder: targetFolder });

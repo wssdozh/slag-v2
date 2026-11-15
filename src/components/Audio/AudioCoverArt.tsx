@@ -133,15 +133,15 @@ export const AudioCoverArt: React.FC<AudioCoverArtProps> = ({ track, isPlaying, 
   // If track has an associated cover image (e.g. music note with photo)
   if (track?.coverUrl) {
     return (
-      <div className="relative aspect-square w-52 h-52 sm:w-64 sm:h-64 rounded-3xl overflow-hidden border border-white/[0.08] shadow-2xl bg-surface flex items-center justify-center select-none">
+      <div className="relative aspect-square w-52 h-52 sm:w-64 sm:h-64 rounded-3xl overflow-hidden border border-tint-8 shadow-2xl bg-surface flex items-center justify-center select-none">
         <img
           src={track.coverUrl}
           alt={track.name}
-          className={`w-full h-full object-cover transition-transform duration-700 ease-out outline outline-1 -outline-offset-1 outline-white/10 ${
+          className={`w-full h-full object-cover transition-transform duration-700 ease-out outline outline-1 -outline-offset-1 outline-tint-10 ${
             isPlaying ? 'scale-105' : 'scale-100'
           }`}
         />
-        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-2xs font-mono tracking-wider text-zinc-300 uppercase">
+        <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-scrim-60 backdrop-blur-md border border-tint-10 text-2xs font-mono tracking-wider text-fg-tertiary uppercase">
           {track.format}
         </div>
       </div>

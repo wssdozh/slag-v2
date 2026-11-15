@@ -1,6 +1,6 @@
 // Devices tab: paired machines, per-device vault access, and the pairing flow.
 import React, { useEffect, useState } from 'react';
-import { Database } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import type { AccountDevice } from '../../lib/sync/accountTypes';
@@ -149,7 +149,7 @@ export const DevicesSettingsTab: React.FC = () => {
           {accountState.invitations.map((invitation, index) => (
             <React.Fragment key={invitation.vaultId}>
               {index > 0 && <SettingsDivider />}
-              <SettingsRow icon={<Database className="w-4 h-4" />} label={invitation.vaultName || invitation.vaultId} description={invitation.mode === 'receive-only' ? 'Только чтение' : 'Чтение и изменение'} right={
+              <SettingsRow icon={<Icon name="entity.vault" size="md" tone="inherit" />} label={invitation.vaultName || invitation.vaultId} description={invitation.mode === 'receive-only' ? 'Только чтение' : 'Чтение и изменение'} right={
                 <span className="flex gap-1.5">
                   <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleDeclineInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-fg-muted disabled:opacity-50 cursor-pointer">Скрыть</button>
                   <button type="button" disabled={busyVaultId === invitation.vaultId} onClick={() => void handleAcceptInvitation(invitation.vaultId)} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-50 cursor-pointer">{busyVaultId === invitation.vaultId ? 'Подключение…' : 'Подключить'}</button>

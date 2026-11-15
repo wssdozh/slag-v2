@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import { SparklineChart, FunnelChart } from '../Charts';
 import type { AdminAccount, AnalyticsData, BillingStats, BillingTransaction } from '../useAdminData';
 import { shortId } from '../../../lib/text/shortId';
-import { Clock, CreditCard } from 'lucide-react';
-
+import { Icon } from '../../UI/icons/Icon';
 interface BillingTabProps {
   period: '7d' | '30d';
   accounts: AdminAccount[];
@@ -67,20 +66,20 @@ export const BillingTab: React.FC<BillingTabProps> = ({
     <div className="flex flex-col gap-6">
       {billingStats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
-            <span className="text-[11px] font-mono text-zinc-500">MRR (выручка/мес)</span>
+          <div className="p-3.5 rounded-xl bg-surface border border-tint-6 flex flex-col gap-1">
+            <span className="text-2xs font-mono text-fg-muted">MRR (выручка/мес)</span>
             <span className="text-sm font-semibold text-emerald-400">{billingStats.mrr.toLocaleString('ru-RU')} ₽</span>
           </div>
-          <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
-            <span className="text-[11px] font-mono text-zinc-500">платных аккаунтов</span>
+          <div className="p-3.5 rounded-xl bg-surface border border-tint-6 flex flex-col gap-1">
+            <span className="text-2xs font-mono text-fg-muted">платных аккаунтов</span>
             <span className="text-sm font-semibold text-white">{billingStats.paidAccounts}</span>
           </div>
-          <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
-            <span className="text-[11px] font-mono text-zinc-500">бесплатных</span>
-            <span className="text-sm font-semibold text-zinc-400">{billingStats.freeAccounts}</span>
+          <div className="p-3.5 rounded-xl bg-surface border border-tint-6 flex flex-col gap-1">
+            <span className="text-2xs font-mono text-fg-muted">бесплатных</span>
+            <span className="text-sm font-semibold text-fg-secondary">{billingStats.freeAccounts}</span>
           </div>
-          <div className="p-3.5 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-1">
-            <span className="text-[11px] font-mono text-zinc-500">конверсия</span>
+          <div className="p-3.5 rounded-xl bg-surface border border-tint-6 flex flex-col gap-1">
+            <span className="text-2xs font-mono text-fg-muted">конверсия</span>
             <span className="text-sm font-semibold text-white">{billingStats.conversionRate}%</span>
           </div>
         </div>
@@ -91,38 +90,38 @@ export const BillingTab: React.FC<BillingTabProps> = ({
         <div className="p-4 rounded-xl bg-surface border border-amber-500/20 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
-              <Clock className="w-4 h-4 text-amber-400" />
+              <Icon name="time.time" size="md" tone="warning" />
               <span>истекающие подписки (ближайшие 7 дней) — {expiringAccounts.length}</span>
             </div>
-            <span className="text-[11px] font-mono text-zinc-500">требуют внимания или продления</span>
+            <span className="text-2xs font-mono text-fg-muted">требуют внимания или продления</span>
           </div>
 
           <div className="flex flex-col gap-2">
             {expiringAccounts.map((acc) => (
               <div
                 key={acc.id}
-                className="p-2.5 rounded-lg bg-panel border border-white/[0.04] flex items-center justify-between gap-3 text-xs"
+                className="p-2.5 rounded-lg bg-panel border border-tint-4 flex items-center justify-between gap-3 text-xs"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-mono text-white">{shortId(acc.id)}</span>
-                  <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] font-mono text-amber-400">
+                  <span className="px-1.5 py-0.5 rounded bg-tint-4 text-3xs font-mono text-amber-400">
                     {acc.plan}
                   </span>
                   {acc.devices.length > 0 && (
-                    <span className="text-[11px] text-zinc-500 truncate hidden sm:inline">
+                    <span className="text-2xs text-fg-muted truncate hidden sm:inline">
                       ({acc.devices.map((d) => d.name).join(', ')})
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-mono text-amber-400">
+                  <span className="text-2xs font-mono text-amber-400">
                     до {new Date(acc.expiresAt!).toLocaleDateString('ru-RU')}
                   </span>
                   <button
                     type="button"
                     disabled={actionBusy}
                     onClick={() => void onQuickGrant(acc.id, acc.plan === 'angry' ? 'angry' : 'smile', 30)}
-                    className="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white text-[11px] font-mono rounded transition-colors cursor-pointer"
+                    className="px-2.5 py-1 bg-tint-10 hover:bg-tint-15 text-white text-2xs font-mono rounded transition-colors cursor-pointer"
                   >
                     +30 дней
                   </button>
@@ -136,10 +135,10 @@ export const BillingTab: React.FC<BillingTabProps> = ({
       {/* Charts: Revenue Trend & Drop-off Funnel */}
       {analytics && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
+          <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-2">
             <div className="flex items-center justify-between text-xs font-medium text-white">
               <div className="flex items-center gap-2">
-                <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+                <Icon name="admin.billing" size="sm" tone="success" />
                 <span>динамика оплат и выручки ({period})</span>
               </div>
             </div>
@@ -148,12 +147,12 @@ export const BillingTab: React.FC<BillingTabProps> = ({
                 label: r.date.slice(5),
                 value: r.amount,
               }))}
-              color="#10b981"
+              color="var(--color-success)"
               unit="₽"
             />
           </div>
 
-          <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-2">
+          <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-2">
             <FunnelChart
               steps={analytics.funnel.steps}
               dropOffRate={analytics.funnel.dropOffRate}
@@ -163,15 +162,15 @@ export const BillingTab: React.FC<BillingTabProps> = ({
       )}
 
       {/* Manual Grant Form with Searchable Autocomplete */}
-      <div className="p-4 rounded-xl bg-surface border border-white/[0.06] flex flex-col gap-3">
+      <div className="p-4 rounded-xl bg-surface border border-tint-6 flex flex-col gap-3">
         <div className="flex items-center gap-2 text-xs font-medium text-white">
-          <CreditCard className="w-3.5 h-3.5 text-zinc-400" />
+          <Icon name="admin.billing" size="sm" />
           <span>ручное начисление / продление подписки</span>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 pt-1">
           {/* Searchable Autocomplete Input */}
           <div className="flex flex-col gap-1 min-w-[260px] relative">
-            <label htmlFor="grant-account-input" className="text-[11px] text-zinc-400">
+            <label htmlFor="grant-account-input" className="text-2xs text-fg-secondary">
               аккаунт (поиск по id/девайсу)
             </label>
             <input
@@ -184,7 +183,7 @@ export const BillingTab: React.FC<BillingTabProps> = ({
                 setIsAccountDropdownOpen(true);
               }}
               onFocus={() => setIsAccountDropdownOpen(true)}
-              className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+              className="rounded-lg border border-tint-8 bg-panel px-2.5 py-1.5 text-xs text-fg-primary font-mono outline-none"
             />
 
             {/* Hidden select for compatibility with tests and form submission */}
@@ -203,7 +202,7 @@ export const BillingTab: React.FC<BillingTabProps> = ({
 
             {/* Live dropdown list */}
             {isAccountDropdownOpen && (
-              <div className="absolute top-[58px] left-0 right-0 z-40 max-h-48 overflow-y-auto rounded-lg bg-surface border border-white/[0.12] shadow-2xl p-1 flex flex-col gap-0.5">
+              <div className="absolute top-[58px] left-0 right-0 z-40 max-h-48 overflow-y-auto rounded-lg bg-surface border border-tint-12 shadow-2xl p-1 flex flex-col gap-0.5">
                 {autocompleteAccounts.map((a) => (
                   <button
                     key={a.id}
@@ -214,31 +213,31 @@ export const BillingTab: React.FC<BillingTabProps> = ({
                       setIsAccountDropdownOpen(false);
                     }}
                     className={`px-2.5 py-1.5 text-left rounded text-xs flex items-center justify-between cursor-pointer ${
-                      grantAccountId === a.id ? 'bg-white/10 text-white font-medium' : 'hover:bg-white/[0.04] text-zinc-300'
+                      grantAccountId === a.id ? 'bg-tint-10 text-white font-medium' : 'hover:bg-tint-4 text-fg-tertiary'
                     }`}
                   >
                     <div className="flex flex-col min-w-0">
                       <span className="font-mono text-xs">{shortId(a.id)}</span>
                       {a.devices.length > 0 && (
-                        <span className="text-[10px] text-zinc-500 truncate">
+                        <span className="text-3xs text-fg-muted truncate">
                           {a.devices.map((d) => d.name).join(', ')}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-mono px-1 rounded bg-white/[0.04] text-zinc-400">
+                    <span className="text-3xs font-mono px-1 rounded bg-tint-4 text-fg-secondary">
                       {a.plan}
                     </span>
                   </button>
                 ))}
                 {autocompleteAccounts.length === 0 && (
-                  <div className="p-2 text-center text-xs text-zinc-500">аккаунты не найдены</div>
+                  <div className="p-2 text-center text-xs text-fg-muted">аккаунты не найдены</div>
                 )}
               </div>
             )}
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="grant-plan" className="text-[11px] text-zinc-400">тариф</label>
+            <label htmlFor="grant-plan" className="text-2xs text-fg-secondary">тариф</label>
             <select
               id="grant-plan"
               value={grantPlan}
@@ -247,7 +246,7 @@ export const BillingTab: React.FC<BillingTabProps> = ({
                 setGrantPlan(p);
                 setGrantAmount(p === 'smile' ? '190' : '490');
               }}
-              className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+              className="rounded-lg border border-tint-8 bg-panel px-2.5 py-1.5 text-xs text-fg-primary font-mono outline-none"
             >
               <option value="smile">Smile (190 ₽)</option>
               <option value="angry">Angry (490 ₽)</option>
@@ -255,12 +254,12 @@ export const BillingTab: React.FC<BillingTabProps> = ({
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="grant-days" className="text-[11px] text-zinc-400">дней</label>
+            <label htmlFor="grant-days" className="text-2xs text-fg-secondary">дней</label>
             <select
               id="grant-days"
               value={grantDays}
               onChange={(e) => setGrantDays(e.target.value)}
-              className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+              className="rounded-lg border border-tint-8 bg-panel px-2.5 py-1.5 text-xs text-fg-primary font-mono outline-none"
             >
               <option value="30">30 дней</option>
               <option value="90">90 дней</option>
@@ -269,21 +268,21 @@ export const BillingTab: React.FC<BillingTabProps> = ({
           </div>
 
           <div className="flex flex-col gap-1 w-24">
-            <label htmlFor="grant-amount" className="text-[11px] text-zinc-400">сумма (₽)</label>
+            <label htmlFor="grant-amount" className="text-2xs text-fg-secondary">сумма (₽)</label>
             <input
               id="grant-amount"
               type="number"
               value={grantAmount}
               onChange={(e) => setGrantAmount(e.target.value)}
               required
-              className="rounded-lg border border-white/[0.08] bg-panel px-2.5 py-1.5 text-xs text-zinc-100 font-mono outline-none"
+              className="rounded-lg border border-tint-8 bg-panel px-2.5 py-1.5 text-xs text-fg-primary font-mono outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={actionBusy || !grantAccountId}
-            className="px-3.5 py-2 bg-white text-black font-medium text-xs rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-40"
+            className="px-3.5 py-2 bg-white text-black font-medium text-xs rounded-lg hover:bg-fg-soft transition-colors cursor-pointer disabled:opacity-40"
           >
             начислить
           </button>
@@ -297,27 +296,27 @@ export const BillingTab: React.FC<BillingTabProps> = ({
           {transactions.map((tx) => (
             <div
               key={tx.id}
-              className="p-3 rounded-lg bg-surface border border-white/[0.04] flex flex-wrap items-center justify-between gap-3 text-xs"
+              className="p-3 rounded-lg bg-surface border border-tint-4 flex flex-wrap items-center justify-between gap-3 text-xs"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className="font-mono text-zinc-400">{tx.id}</span>
+                <span className="font-mono text-fg-secondary">{tx.id}</span>
                 <span className="font-mono text-white" title={tx.accountId}>
                   {shortId(tx.accountId)}
                 </span>
-                <span className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[11px] font-mono text-zinc-300">
+                <span className="px-1.5 py-0.5 rounded bg-tint-4 text-2xs font-mono text-fg-tertiary">
                   {tx.plan} ({tx.periodDays}д)
                 </span>
               </div>
-              <div className="flex items-center gap-4 text-[11px] font-mono text-zinc-400 shrink-0">
+              <div className="flex items-center gap-4 text-2xs font-mono text-fg-secondary shrink-0">
                 <span className="text-emerald-400 font-semibold">{tx.amount} {tx.currency}</span>
-                <span className="text-zinc-500">
+                <span className="text-fg-muted">
                   {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString('ru-RU') : '—'}
                 </span>
               </div>
             </div>
           ))}
           {transactions.length === 0 && (
-            <div className="py-6 text-center text-xs text-zinc-500">транзакций пока нет</div>
+            <div className="py-6 text-center text-xs text-fg-muted">транзакций пока нет</div>
           )}
         </div>
       </div>

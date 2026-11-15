@@ -3,7 +3,7 @@
 // also how a prompt synced from another device shows up without an effect.
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, Maximize2, Minimize2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { BaseModal } from '../Modals/BaseModal';
 import { IconButton } from '../UI/IconButton';
 import { SettingsSwitch } from './SettingsUI';
@@ -130,7 +130,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
             className="p-1.5 -ml-1 text-fg-muted hover:text-fg-primary cursor-pointer motion-press"
             title="Назад"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <Icon name="nav.back" size="lg" tone="inherit" />
           </button>
           <span className="text-sm font-semibold text-fg-primary">{TITLES[field]}</span>
         </div>
@@ -168,7 +168,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
           title={wide ? 'Свернуть' : 'Развернуть'}
           aria-label={wide ? 'Свернуть' : 'Развернуть'}
         >
-          {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          {wide ? <Icon name="action.collapse" size="md" tone="inherit" /> : <Icon name="action.expand" size="md" tone="inherit" />}
         </IconButton>
       )}
       footer={actions}

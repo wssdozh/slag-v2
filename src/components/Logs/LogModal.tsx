@@ -15,7 +15,7 @@ export const LogModal: React.FC = () => {
       maxWidth="max-w-4xl"
       maxHeight="h-[82vh] max-h-[800px]"
       contentClassName="h-full flex flex-col"
-      containerClassName="p-0 border border-white/[0.08]"
+      containerClassName="p-0 border border-tint-8"
     >
       <LogViewer variant="modal" onClose={() => setIsLogViewerOpen(false)} />
     </BaseModal>

@@ -1,6 +1,6 @@
 // The Linear-style status glyph shared by a column header and the card's quick switcher.
 import React from 'react';
-import { CircleDashed, Circle, CheckCircle2 } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { KanbanColumnIconType } from './kanbanModel';
 
 // Half-filled Circle for Linear "In Progress"
@@ -22,12 +22,12 @@ export const KanbanStatusIcon: React.FC<KanbanStatusIconProps> = ({ iconType, ic
 
   switch (iconType) {
     case 'dashed':
-      return <CircleDashed className={`${className} shrink-0`} />;
+      return <Icon name="status.backlog" size="none" tone="inherit" className={`${className} shrink-0`} />;
     case 'circle':
-      return <Circle className={`${className} shrink-0`} />;
+      return <Icon name="status.todo" size="none" tone="inherit" className={`${className} shrink-0`} />;
     case 'in_progress':
       return <InProgressIcon className={className} />;
     case 'done':
-      return <CheckCircle2 className={`${className} shrink-0`} />;
+      return <Icon name="status.done" size="none" tone="inherit" className={`${className} shrink-0`} />;
   }
 };

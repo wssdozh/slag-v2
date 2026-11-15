@@ -2,14 +2,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FolderMeta } from '../../types';
-import { FOLDER_ICONS } from './folderIcons';
+import { Icon } from '../UI/icons/Icon';
+import { folderIconName } from '../UI/icons/icons';
 import { logger } from '../../lib/logger/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import {
-  ChevronRight,
-  Folder,
-  MoreVertical
-} from 'lucide-react';
 
 const uiLog = logger.scope('UI');
 
@@ -144,8 +140,7 @@ export const FolderTree: React.FC = () => {
     ).length;
 
     // Resolve folder icon
-    const iconKey = node.meta?.icon || 'Folder';
-    const IconComponent = FOLDER_ICONS[iconKey] || Folder;
+    const iconName = folderIconName(node.meta?.icon);
 
     const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -177,8 +172,8 @@ export const FolderTree: React.FC = () => {
             isDragTarget
               ? 'bg-blue-500/20 text-white ring-1 ring-blue-500/40'
               : isSelected
-              ? 'bg-white/[0.08] text-white font-medium'
-              : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+              ? 'bg-tint-8 text-white font-medium'
+              : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
           }`}
           style={{ paddingLeft: `${8 + depth * 14}px` }}
         >
@@ -189,11 +184,14 @@ export const FolderTree: React.FC = () => {
                 onClick={(e) => toggleExpand(node.fullPath, e)}
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? `Свернуть папку ${node.name}` : `Развернуть папку ${node.name}`}
-                className="p-0.5 text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+                className="p-0.5 text-fg-muted hover:text-fg-tertiary transition-colors shrink-0"
               >
-                <ChevronRight
+                <Icon
+                  name="nav.next"
+                  size="none"
+                  tone="inherit"
                   className={`w-3.5 h-3.5 transition-transform duration-200 ease-out ${
-                    isExpanded ? 'rotate-90 text-zinc-300' : 'text-zinc-500'
+                    isExpanded ? 'rotate-90 text-fg-tertiary' : 'text-fg-muted'
                   }`}
                 />
               </button>
@@ -201,7 +199,7 @@ export const FolderTree: React.FC = () => {
               <span className="w-3.5 shrink-0" />
             )}
 
-            <IconComponent className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-zinc-200' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+            <Icon name={iconName} size="none" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-fg-soft' : 'text-fg-muted group-hover:text-fg-secondary'}`} />
             <span className="truncate">{node.name}</span>
           </div>
 
@@ -209,7 +207,7 @@ export const FolderTree: React.FC = () => {
             {itemCount > 0 && (
               <span
                 key={itemCount}
-                className="text-2xs font-mono text-zinc-500 group-hover:text-zinc-400 px-1 motion-count"
+                className="text-2xs font-mono text-fg-muted group-hover:text-fg-secondary px-1 motion-count"
               >
                 {itemCount}
               </span>
@@ -227,9 +225,9 @@ export const FolderTree: React.FC = () => {
                 });
               }}
               title="Действия с папкой"
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-zinc-500 hover:text-zinc-200 hover:bg-white/10 transition-opacity"
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-fg-muted hover:text-fg-soft hover:bg-tint-10 transition-opacity"
             >
-              <MoreVertical className="w-3.5 h-3.5" />
+              <Icon name="action.more" size="sm" tone="inherit" />
             </button>
           </div>
         </div>

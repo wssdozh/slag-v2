@@ -1,14 +1,14 @@
 // The files tab: folders already granted, their contents, and the system dialog escape.
 import React from 'react';
-import { ArrowLeft, ChevronRight, FileText, Folder, FolderPlus, Image as ImageIcon, Lock } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { formatBytes } from '../../lib/text/formatBytes';
 import { useFolderBrowser } from './useFolderBrowser';
 import type { DevicePick, FolderEntry } from '../../types';
 
 function iconFor(entry: FolderEntry): React.ReactNode {
-  if (entry.isDir) return <Folder className="h-4 w-4 shrink-0 text-fg-muted" />;
-  if (entry.mimeType.startsWith('image/')) return <ImageIcon className="h-4 w-4 shrink-0 text-fg-muted" />;
-  return <FileText className="h-4 w-4 shrink-0 text-fg-muted" />;
+  if (entry.isDir) return <Icon name="entity.folder" size="md" tone="muted" className="shrink-0" />;
+  if (entry.mimeType.startsWith('image/')) return <Icon name="entity.image" size="md" tone="muted" className="shrink-0" />;
+  return <Icon name="entity.article" size="md" tone="muted" className="shrink-0" />;
 }
 
 export interface FolderBrowserProps {
@@ -44,10 +44,10 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
             aria-label="Назад к папкам"
             className="cursor-pointer rounded-lg p-1 text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <Icon name="nav.back" size="md" tone="inherit" />
           </button>
           <span className="truncate text-xs font-medium text-fg-primary">{openFolder.name}</span>
-          <span className="ml-auto font-mono text-[10px] text-fg-muted">{entries.length}</span>
+          <span className="ml-auto font-mono text-3xs text-fg-muted">{entries.length}</span>
         </div>
 
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto" data-testid="folder-entries">
@@ -62,30 +62,30 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
               >
                 {iconFor(entry)}
                 <span className="min-w-0 flex-1 truncate text-xs text-fg-primary">{entry.name}</span>
-                <span className="shrink-0 font-mono text-[10px] text-fg-muted">
+                <span className="shrink-0 font-mono text-3xs text-fg-muted">
                   {entry.isDir ? '' : formatBytes(entry.size)}
                 </span>
                 {!entry.isDir && (
                   <span
-                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] ${
-                      isSelected ? 'bg-accent-strong text-white' : 'border border-white/25 text-transparent'
+                    className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-4xs ${
+                      isSelected ? 'bg-accent-strong text-white' : 'border border-tint-25 text-transparent'
                     }`}
                   >
                     {isSelected ? selected.findIndex((pick) => pick.uri.uri === entry.uri.uri) + 1 : ''}
                   </span>
                 )}
-                {entry.isDir && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-dim" />}
+                {entry.isDir && <Icon name="nav.next" size="sm" tone="dim" className="shrink-0" />}
               </button>
             );
           })}
 
-          {isLoading && <p className="py-6 text-center text-[10px] text-fg-muted">читаю папку</p>}
+          {isLoading && <p className="py-6 text-center text-3xs text-fg-muted">читаю папку</p>}
           {!isLoading && entries.length === 0 && (
-            <p className="py-6 text-center text-[10px] text-fg-muted">Пусто</p>
+            <p className="py-6 text-center text-3xs text-fg-muted">Пусто</p>
           )}
         </div>
 
-        {error && <p className="shrink-0 px-1 text-[10px] text-rose-400">{error}</p>}
+        {error && <p className="shrink-0 px-1 text-3xs text-rose-400">{error}</p>}
       </div>
     );
   }
@@ -100,20 +100,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
             onClick={() => void open(folder)}
             className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-surface-hover"
           >
-            <Folder className="h-4 w-4 shrink-0 text-fg-muted" />
+            <Icon name="entity.folder" size="md" tone="muted" className="shrink-0" />
             <span className="min-w-0 flex-1 truncate text-xs text-fg-primary">{folder.name}</span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-dim" />
+            <Icon name="nav.next" size="sm" tone="dim" className="shrink-0" />
           </button>
         ))}
 
         {isLoading && folders.length === 0 && (
-          <p className="py-6 text-center text-[10px] text-fg-muted">читаю папки</p>
+          <p className="py-6 text-center text-3xs text-fg-muted">читаю папки</p>
         )}
         {!isLoading && folders.length === 0 && (
           <div className="flex flex-col items-center gap-1 px-4 py-6 text-center">
-            <Lock className="h-4 w-4 text-fg-muted" />
+            <Icon name="action.lock" size="md" tone="muted" />
             <p className="text-xs text-fg-primary">Папок пока нет</p>
-            <p className="text-[10px] leading-relaxed text-fg-muted">
+            <p className="text-3xs leading-relaxed text-fg-muted">
               Выдай одну — и она открывается здесь, без системных экранов.
             </p>
           </div>
@@ -124,20 +124,20 @@ export const FolderBrowser: React.FC<FolderBrowserProps> = ({ selected, onToggle
         <button
           type="button"
           onClick={() => void addFolder()}
-          className="flex cursor-pointer items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-[11px] font-medium text-fg-primary transition-colors hover:bg-surface-hover"
+          className="flex cursor-pointer items-center gap-1.5 rounded-md bg-surface px-2.5 py-1.5 text-2xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
         >
-          <FolderPlus className="h-3.5 w-3.5" /> Выдать папку
+          <Icon name="action.folderAdd" size="sm" tone="inherit" /> Выдать папку
         </button>
         <button
           type="button"
           onClick={() => void handleSystem()}
-          className="cursor-pointer rounded-md px-2 py-1.5 text-[11px] text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
+          className="cursor-pointer rounded-md px-2 py-1.5 text-2xs text-fg-secondary transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
           Системный диалог
         </button>
       </div>
 
-      {error && <p className="shrink-0 px-1 text-[10px] text-rose-400">{error}</p>}
+      {error && <p className="shrink-0 px-1 text-3xs text-rose-400">{error}</p>}
     </div>
   );
 };

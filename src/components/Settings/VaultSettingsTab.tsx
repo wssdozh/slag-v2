@@ -1,6 +1,6 @@
 // The vault itself: backups, snapshots, export and import, and the folders on disk.
 import React, { useState } from 'react';
-import { Archive, Download, History, Plus, Trash2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { openAppFolder } from '../../lib/platform/folderOpener';
@@ -138,7 +138,7 @@ export const VaultSettingsTab: React.FC = () => {
         <SettingsRow
           label="Последний снимок"
           description={backupSettings.lastBackupAt ? <span className="font-mono">{new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</span> : 'Ещё не создан'}
-          right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Plus className={`w-4 h-4 ${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
+          right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Icon name="action.add" size="md" tone="inherit" className={`${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
         />
       </SettingsGroup>
 
@@ -161,7 +161,7 @@ export const VaultSettingsTab: React.FC = () => {
                 <SettingsRow
                   key={snap.id}
                   testId={`snapshot-item-${snap.id}`}
-                  icon={<Archive className="w-3.5 h-3.5" />}
+                  icon={<Icon name="action.archive" size="sm" tone="inherit" />}
                   label={
                     <span className="flex items-baseline gap-2">
                       <span className="truncate">{dateStr}</span>
@@ -182,14 +182,14 @@ export const VaultSettingsTab: React.FC = () => {
                         title="Восстановить хранилище из этого снимка"
                         aria-label={`Восстановить хранилище из снимка ${dateStr}`}
                       >
-                        <History className="w-4 h-4 sm:hidden" />
+                        <Icon name="entity.versions" size="md" tone="inherit" className="sm:hidden" />
                         <span className="hidden text-xs sm:inline">Восстановить</span>
                       </button>
                       <IconButton size="lg" aria-label="Скачать ZIP архива" title="Скачать ZIP архива" onClick={() => downloadSnapshot(snap.id)}>
-                        <Download className="w-4 h-4" />
+                        <Icon name="action.download" size="md" tone="inherit" />
                       </IconButton>
                       <IconButton size="lg" variant="danger" aria-label="Удалить снимок" title="Удалить снимок" onClick={() => deleteSnapshot(snap.id)}>
-                        <Trash2 className="w-4 h-4" />
+                        <Icon name="action.delete" size="md" tone="inherit" />
                       </IconButton>
                     </span>
                   }

@@ -1,7 +1,6 @@
 // The dashed frame over the feed while files hover: what dropping them will do.
 import React, { memo } from 'react';
-import { UploadCloud } from 'lucide-react';
-
+import { Icon } from '../../UI/icons/Icon';
 export interface FeedDropOverlayProps {
   /** Показывать ли рамку: файлы держат над лентой. */
   isVisible: boolean;
@@ -16,11 +15,11 @@ const FeedDropOverlayComponent: React.FC<FeedDropOverlayProps> = ({ isVisible })
 
   return (
     <div className="absolute inset-2 z-30 rounded-2xl bg-canvas border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
-      <UploadCloud className="w-8 h-8 text-blue-400 animate-bounce" />
-      <span className="text-sm font-medium text-zinc-200">
+      <Icon name="action.upload" size="none" tone="accent" className="w-8 h-8 animate-bounce" />
+      <span className="text-sm font-medium text-fg-soft">
         Перетащите файлы сюда для создания заметки
       </span>
-      <span className="text-xs text-zinc-500 font-mono">
+      <span className="text-xs text-fg-muted font-mono">
         Изображения, аудио, видео или документы сохранятся в локальное хранилище
       </span>
     </div>

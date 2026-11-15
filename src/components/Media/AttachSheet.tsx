@@ -130,8 +130,8 @@ export const AttachSheet: React.FC = () => {
         onExited={finishExit}
         rest={0.22}
         testId="attach-sheet-panel"
-        scrimClassName="bg-black/85"
-        panelClassName={`w-full bg-canvas-subtle border-t border-white/[0.08] rounded-t-2xl sm:mx-auto sm:max-w-[420px] sm:rounded-2xl sm:border ${
+        scrimClassName="bg-scrim-85"
+        panelClassName={`w-full bg-canvas-subtle border-t border-tint-8 rounded-t-2xl sm:mx-auto sm:max-w-[420px] sm:rounded-2xl sm:border ${
           // On a phone the spring owns the panel's transform; on desktop the sheet keeps sliding in.
           isMobile ? '' : 'motion-sheet'
         }`}
@@ -166,7 +166,7 @@ export const AttachSheet: React.FC = () => {
               className={
                 isMobile
                   // The bar rides the panel's counter-translate, so it stays on the screen edge.
-                  ? 'absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-white/[0.08] bg-canvas-subtle px-3 pb-[max(var(--sab),0.75rem)] pt-2'
+                  ? 'absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-tint-8 bg-canvas-subtle px-3 pb-[max(var(--sab),0.75rem)] pt-2'
                   : 'flex shrink-0 items-center gap-2 pt-1'
               }
             >
@@ -179,7 +179,7 @@ export const AttachSheet: React.FC = () => {
 
               {isMobile && (
                 <>
-                  <span className="ml-auto shrink-0 font-mono text-[10px] text-fg-muted">
+                  <span className="ml-auto shrink-0 font-mono text-3xs text-fg-muted">
                     {selected.length > 0 ? `${selected.length} · ${formatBytes(selectedBytes)}` : ''}
                   </span>
                   <SendButton

@@ -11,8 +11,8 @@ export interface KanbanColumnConfig {
 }
 
 export const KANBAN_COLUMNS: KanbanColumnConfig[] = [
-  { id: 'backlog', title: 'Бэклог', iconType: 'dashed', iconColor: 'text-zinc-500' },
-  { id: 'todo', title: 'К выполнению', iconType: 'circle', iconColor: 'text-zinc-400' },
+  { id: 'backlog', title: 'Бэклог', iconType: 'dashed', iconColor: 'text-fg-muted' },
+  { id: 'todo', title: 'К выполнению', iconType: 'circle', iconColor: 'text-fg-secondary' },
   { id: 'in_progress', title: 'В работе', iconType: 'in_progress', iconColor: 'text-amber-500' },
   { id: 'done', title: 'Выполнено', iconType: 'done', iconColor: 'text-blue-500' },
 ];

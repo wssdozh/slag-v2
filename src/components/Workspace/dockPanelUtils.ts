@@ -2,30 +2,21 @@
 import type { DockviewApi, IDockviewPanel } from 'dockview-react';
 import { logger } from '../../lib/logger/logger';
 import { isDesktopApp, openDetachedWindow } from '../../lib/platform/windowControls';
-import {
-  Layers,
-  Kanban,
-  Calendar,
-  Sparkles,
-  Folder,
-  Info,
-  Terminal,
-  Music,
-} from 'lucide-react';
+import type { IconName } from '../UI/icons/icons';
 
 export const WORKSPACE_LAYOUT_KEY = 'slag_workspace_layout_v2';
 
 export const wsLog = logger.scope('WORKSPACE');
 
-export const PANELS_TO_ADD = [
-  { id: 'feed', title: 'Лента', icon: Layers },
-  { id: 'kanban', title: 'Канбан', icon: Kanban },
-  { id: 'calendar', title: 'Календарь', icon: Calendar },
-  { id: 'assistant', title: 'Ассистент', icon: Sparkles },
-  { id: 'audio', title: 'Аудиоплеер', icon: Music },
-  { id: 'sidebar', title: 'Навигация', icon: Folder },
-  { id: 'folder-info', title: 'Инфо папки', icon: Info },
-  { id: 'logs', title: 'Логи & HUD', icon: Terminal },
+export const PANELS_TO_ADD: { id: string; title: string; icon: IconName }[] = [
+  { id: 'feed', title: 'Лента', icon: 'entity.layers' },
+  { id: 'kanban', title: 'Канбан', icon: 'entity.kanban' },
+  { id: 'calendar', title: 'Календарь', icon: 'time.calendar' },
+  { id: 'assistant', title: 'Ассистент', icon: 'system.ai' },
+  { id: 'audio', title: 'Аудиоплеер', icon: 'media.music' },
+  { id: 'sidebar', title: 'Навигация', icon: 'entity.folder' },
+  { id: 'folder-info', title: 'Инфо папки', icon: 'entity.folderInfo' },
+  { id: 'logs', title: 'Логи & HUD', icon: 'system.logs' },
 ];
 
 export const PANEL_CONSTRAINTS: Record<string, { minWidth: number; maxWidth?: number }> = {

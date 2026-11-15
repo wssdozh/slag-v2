@@ -28,16 +28,16 @@ export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonPr
     let activeGlowClass = '';
     if (active) {
       if (glow === 'blue') {
-        activeGlowClass = 'text-blue-400 hover:text-blue-300 hover:bg-white/[0.06]';
+        activeGlowClass = 'text-blue-400 hover:text-blue-300 hover:bg-tint-6';
       } else if (glow === 'amber') {
-        activeGlowClass = 'text-amber-400 hover:text-amber-300 hover:bg-white/[0.06]';
+        activeGlowClass = 'text-amber-400 hover:text-amber-300 hover:bg-tint-6';
       } else if (glow === 'rose') {
-        activeGlowClass = 'text-rose-400 hover:text-rose-300 hover:bg-white/[0.06]';
+        activeGlowClass = 'text-rose-400 hover:text-rose-300 hover:bg-tint-6';
       } else {
-        activeGlowClass = 'bg-white/10 text-white';
+        activeGlowClass = 'bg-tint-10 text-white';
       }
     } else {
-      activeGlowClass = 'text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]';
+      activeGlowClass = 'text-fg-secondary hover:text-fg-primary hover:bg-tint-6';
     }
 
     return (

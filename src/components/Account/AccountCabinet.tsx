@@ -1,6 +1,6 @@
 // Full-page account cabinet: sign in, seed phrase, devices and vault sharing.
 import React, { useEffect, useState } from 'react';
-import { Check, Copy, Database, KeyRound, Laptop, Loader2, LogOut, Shield, Smartphone } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { accountClient, generateMnemonic } from '../../lib/sync/account';
 import type { AccountDevice } from '../../lib/sync/accountTypes';
@@ -140,14 +140,14 @@ export const AccountCabinet: React.FC = () => {
   return (
     <div className="min-h-screen bg-canvas-subtle text-fg-primary">
       <header
-        className="border-b border-white/[0.06] px-5 pb-4 flex items-center justify-between gap-4"
+        className="border-b border-tint-6 px-5 pb-4 flex items-center justify-between gap-4"
         style={{ paddingTop: 'max(var(--sat), 1rem)' }}
       >
         <span className="text-sm font-semibold">Личный кабинет</span>
         <button
           type="button"
           onClick={openApp}
-          className="text-xs text-zinc-300 hover:text-white px-3 py-2 -mr-3 rounded-lg hover:bg-white/[0.06] transition-colors shrink-0"
+          className="text-xs text-fg-tertiary hover:text-white px-3 py-2 -mr-3 rounded-lg hover:bg-tint-6 transition-colors shrink-0"
         >
           Открыть приложение
         </button>
@@ -157,8 +157,8 @@ export const AccountCabinet: React.FC = () => {
         style={{ paddingBottom: 'calc(max(var(--sab), 0px) + 2.5rem)' }}
       >
         <div>
-          <div className="flex items-center gap-2"><Shield className="w-5 h-5 text-emerald-400" /><h1 className="text-xl font-semibold">SLAG ID</h1></div>
-          <p className="text-sm text-zinc-500 mt-2">Подписка, устройства и доступ к хранилищам — в одном месте.</p>
+          <div className="flex items-center gap-2"><Icon name="system.security" size="lg" tone="success" /><h1 className="text-xl font-semibold">SLAG ID</h1></div>
+          <p className="text-sm text-fg-muted mt-2">Подписка, устройства и доступ к хранилищам — в одном месте.</p>
         </div>
         {(message || state.error) && <p role="status" className="text-sm text-amber-300 border-l border-amber-400/30 pl-3">{message || state.error}</p>}
 
@@ -167,45 +167,45 @@ export const AccountCabinet: React.FC = () => {
         {!state.session && pending ? (
           <section aria-label="Ожидание подтверждения" className="flex flex-col gap-4 max-w-lg">
             <h2 className="text-base font-medium">Подтвердите вход на другом устройстве</h2>
-            <p className="text-sm text-zinc-300">Подключаем «{loginDeviceName}»</p>
-            <p className="text-sm text-zinc-400">Откройте личный кабинет на устройстве, где вы уже вошли, и нажмите «Разрешить». После подтверждения вход завершится автоматически.</p>
-            <p className="text-xs text-zinc-500 flex items-center gap-2"><Loader2 aria-hidden="true" className={`w-4 h-4 ${checkingApproval ? 'animate-spin' : ''}`} />Ожидаем подтверждения · запрос действует 10 минут</p>
-            <button type="button" onClick={() => { accountClient.cancelPendingLogin(); setPending(false); setMessage(null); }} className="text-sm text-zinc-400 self-start">Отменить вход</button>
+            <p className="text-sm text-fg-tertiary">Подключаем «{loginDeviceName}»</p>
+            <p className="text-sm text-fg-secondary">Откройте личный кабинет на устройстве, где вы уже вошли, и нажмите «Разрешить». После подтверждения вход завершится автоматически.</p>
+            <p className="text-xs text-fg-muted flex items-center gap-2"><Icon name="status.loading" size="md" tone="inherit" aria-hidden="true" className={`${checkingApproval ? 'animate-spin' : ''}`} />Ожидаем подтверждения · запрос действует 10 минут</p>
+            <button type="button" onClick={() => { accountClient.cancelPendingLogin(); setPending(false); setMessage(null); }} className="text-sm text-fg-secondary self-start">Отменить вход</button>
           </section>
         ) : !state.session ? (
           <section className="flex flex-col gap-5 max-w-lg">
-            <div className="flex gap-5 border-b border-white/[0.06]">
-              <button type="button" onClick={() => { setMode('login'); setSeed(''); setSavedSeed(false); setPending(false); }} className={`pb-3 text-sm ${mode === 'login' ? 'text-white border-b border-white' : 'text-zinc-500'}`}>Войти по seed</button>
-              <button type="button" onClick={() => { setMode('register'); setSeed(generateMnemonic()); setSavedSeed(false); setPending(false); }} className={`pb-3 text-sm ${mode === 'register' ? 'text-white border-b border-white' : 'text-zinc-500'}`}>Создать аккаунт</button>
+            <div className="flex gap-5 border-b border-tint-6">
+              <button type="button" onClick={() => { setMode('login'); setSeed(''); setSavedSeed(false); setPending(false); }} className={`pb-3 text-sm ${mode === 'login' ? 'text-white border-b border-white' : 'text-fg-muted'}`}>Войти по seed</button>
+              <button type="button" onClick={() => { setMode('register'); setSeed(generateMnemonic()); setSavedSeed(false); setPending(false); }} className={`pb-3 text-sm ${mode === 'register' ? 'text-white border-b border-white' : 'text-fg-muted'}`}>Создать аккаунт</button>
             </div>
-            <label htmlFor="login-device-name" className="text-sm text-zinc-300">Имя этого устройства</label>
-            <input id="login-device-name" value={loginDeviceName} onChange={(event) => setLoginDeviceName(event.target.value)} maxLength={64} className="rounded-lg border border-white/[0.08] bg-panel p-3 text-sm outline-none ring-0" />
+            <label htmlFor="login-device-name" className="text-sm text-fg-tertiary">Имя этого устройства</label>
+            <input id="login-device-name" value={loginDeviceName} onChange={(event) => setLoginDeviceName(event.target.value)} maxLength={64} className="rounded-lg border border-tint-8 bg-panel p-3 text-sm outline-none ring-0" />
             {mode === 'register' ? (
               <>
                 <h2 className="text-base font-medium">Сохраните фразу восстановления</h2>
-                <p className="text-sm text-zinc-400">Эти слова дают полный доступ к вашему аккаунту. Мы не получаем seed и не сможем восстановить его вместо вас.</p>
+                <p className="text-sm text-fg-secondary">Эти слова дают полный доступ к вашему аккаунту. Мы не получаем seed и не сможем восстановить его вместо вас.</p>
                 <div data-testid="account-generated-seed" className="grid grid-cols-3 gap-x-5 gap-y-3 py-4 font-mono text-sm">
-                  {seed.split(' ').map((word, index) => <span key={index}><span className="text-zinc-600 mr-2 text-xs">{index + 1}.</span>{word}</span>)}
+                  {seed.split(' ').map((word, index) => <span key={index}><span className="text-fg-dim mr-2 text-xs">{index + 1}.</span>{word}</span>)}
                 </div>
-                <button type="button" onClick={() => void perform(async () => { await navigator.clipboard.writeText(seed); setCopied(true); })} className="flex items-center gap-2 text-xs text-zinc-400 self-start">{copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}Скопировать фразу</button>
-                <label className="flex items-start gap-3 text-sm text-zinc-300"><input type="checkbox" checked={savedSeed} onChange={(event) => setSavedSeed(event.target.checked)} className="mt-1 accent-white" />Я сохранил seed-фразу в безопасном месте и понимаю, что её нельзя передавать другим.</label>
+                <button type="button" onClick={() => void perform(async () => { await navigator.clipboard.writeText(seed); setCopied(true); })} className="flex items-center gap-2 text-xs text-fg-secondary self-start">{copied ? <Icon name="action.check" size="md" tone="inherit" /> : <Icon name="action.copy" size="md" tone="inherit" />}Скопировать фразу</button>
+                <label className="flex items-start gap-3 text-sm text-fg-tertiary"><input type="checkbox" checked={savedSeed} onChange={(event) => setSavedSeed(event.target.checked)} className="mt-1 accent-white" />Я сохранил seed-фразу в безопасном месте и понимаю, что её нельзя передавать другим.</label>
               </>
             ) : (
               <>
-                <label htmlFor="account-seed" className="text-sm text-zinc-300">Seed-фраза аккаунта</label>
-                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoCorrect="off" autoCapitalize="none" autoComplete="off" className="w-full resize-none rounded-lg border border-white/[0.08] bg-panel p-3 text-sm font-mono outline-none focus:border-white/25" placeholder="12 или 24 слова" />
-                <p className="text-xs text-zinc-500">Фраза проверяется на вашем устройстве и не отправляется на сервер. На новом устройстве потребуется подтверждение с уже подключённого.</p>
+                <label htmlFor="account-seed" className="text-sm text-fg-tertiary">Seed-фраза аккаунта</label>
+                <textarea id="account-seed" data-testid="account-seed-input" value={seed} onChange={(event) => setSeed(event.target.value)} rows={4} spellCheck={false} autoCorrect="off" autoCapitalize="none" autoComplete="off" className="w-full resize-none rounded-lg border border-tint-8 bg-panel p-3 text-sm font-mono outline-none focus:border-tint-25" placeholder="12 или 24 слова" />
+                <p className="text-xs text-fg-muted">Фраза проверяется на вашем устройстве и не отправляется на сервер. На новом устройстве потребуется подтверждение с уже подключённого.</p>
               </>
             )}
-            <button type="button" disabled={busy || !seed.trim() || (mode === 'register' && !savedSeed)} onClick={() => void authenticate()} className="self-start px-5 py-2 rounded-lg bg-white text-black text-sm font-medium disabled:opacity-40 flex items-center gap-2">{busy && <Loader2 className="w-4 h-4 animate-spin" />}{mode === 'register' ? 'Создать аккаунт' : pending ? 'Повторить вход после подтверждения' : 'Войти'}</button>
+            <button type="button" disabled={busy || !seed.trim() || (mode === 'register' && !savedSeed)} onClick={() => void authenticate()} className="self-start px-5 py-2 rounded-lg bg-white text-black text-sm font-medium disabled:opacity-40 flex items-center gap-2">{busy && <Icon name="status.loading" size="md" tone="inherit" className="animate-spin" />}{mode === 'register' ? 'Создать аккаунт' : pending ? 'Повторить вход после подтверждения' : 'Войти'}</button>
 
-            <p className="text-xs text-zinc-600">Не нужен наш сервис? Локальные заметки и синхронизация через собственный сервер работают без SLAG ID.</p>
+            <p className="text-xs text-fg-dim">Не нужен наш сервис? Локальные заметки и синхронизация через собственный сервер работают без SLAG ID.</p>
           </section>
         ) : account && (
           <>
             <SettingsGroup
               title="Аккаунт"
-              action={<span className="text-2xs font-mono text-zinc-500" title={account.id}>{shortId(account.id)}</span>}
+              action={<span className="text-2xs font-mono text-fg-muted" title={account.id}>{shortId(account.id)}</span>}
             >
               <SettingsRow label="Тариф" value={`${account.planLabel} · ${account.expiresAt ? `до ${new Date(account.expiresAt).toLocaleDateString('ru-RU')}` : 'бессрочно'}`} />
               <SettingsDivider />
@@ -215,7 +215,7 @@ export const AccountCabinet: React.FC = () => {
             <SettingsGroup
               title="Устройства"
               action={<span className="flex items-center gap-2">
-                <span className="text-2xs font-mono text-zinc-500">{activeDevices.length} / {account.maxDevices}</span>
+                <span className="text-2xs font-mono text-fg-muted">{activeDevices.length} / {account.maxDevices}</span>
                 <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.refresh())} className="px-2 py-0.5 text-2xs text-fg-muted rounded-md hover:bg-surface-hover disabled:opacity-40">Обновить</button>
               </span>}
             >
@@ -224,7 +224,7 @@ export const AccountCabinet: React.FC = () => {
                   {index > 0 && <SettingsDivider inset />}
                   <SettingsRow
                     testId={`device-row-${device.id}`}
-                    icon={device.platform === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Laptop className="w-4 h-4" />}
+                    icon={device.platform === 'mobile' ? <Icon name="entity.phone" size="md" tone="inherit" /> : <Icon name="entity.desktop" size="md" tone="inherit" />}
                     label={editingDevice === device.id ? (
                       <input
                         autoFocus
@@ -238,7 +238,7 @@ export const AccountCabinet: React.FC = () => {
                           if (event.key === 'Enter') { event.preventDefault(); void saveDeviceName(device.id); }
                           if (event.key === 'Escape') { event.stopPropagation(); setEditingDevice(null); }
                         }}
-                        className="w-48 bg-transparent border border-white/[0.12] px-1.5 py-0.5 text-sm outline-none ring-0 rounded-md text-fg-primary"
+                        className="w-48 bg-transparent border border-tint-12 px-1.5 py-0.5 text-sm outline-none ring-0 rounded-md text-fg-primary"
                       />
                     ) : (
                       <span className="flex items-baseline gap-2 min-w-0">
@@ -250,12 +250,12 @@ export const AccountCabinet: React.FC = () => {
                         >
                           {device.name}
                         </button>
-                        <span className="font-mono text-[11px] text-zinc-500 shrink-0" title={device.id}>{shortId(device.id)}</span>
+                        <span className="font-mono text-2xs text-fg-muted shrink-0" title={device.id}>{shortId(device.id)}</span>
                       </span>
                     )}
                     description={`${deviceWord(device)} · ${deviceMoment(device)}`}
                     right={<span className="flex items-center gap-1">
-                      {device.id === currentId ? <span className="text-2xs text-zinc-400">вы сейчас здесь</span>
+                      {device.id === currentId ? <span className="text-2xs text-fg-secondary">вы сейчас здесь</span>
                         : device.status === 'pending' ? <>
                           <button type="button" disabled={busy} onClick={() => void perform(() => accountClient.approveDevice(device.id), 'Устройство разрешено. Доступ к хранилищам выдаётся отдельно.')} className="px-2 py-1 text-2xs text-fg-primary rounded-md hover:bg-surface-hover disabled:opacity-40">Разрешить</button>
                           <button type="button" disabled={busy} onClick={async () => { if (await confirmAction({ title: `Отклонить запрос устройства «${device.name}»?`, description: 'Устройство не получит доступ к аккаунту. Запросить снова можно с самого устройства.', confirmLabel: 'Отклонить', isDestructive: true })) void perform(() => accountClient.revokeDevice(device.id), 'Запрос отклонён'); }} className="px-2 py-1 text-2xs text-rose-400 rounded-md hover:bg-surface-hover disabled:opacity-40">Отклонить</button>
@@ -278,7 +278,7 @@ export const AccountCabinet: React.FC = () => {
                 return <React.Fragment key={invitation.vaultId}>
                   {index > 0 && <SettingsDivider inset />}
                   <SettingsRow
-                    icon={<Database className="w-4 h-4" />}
+                    icon={<Icon name="entity.vault" size="md" tone="inherit" />}
                     label={invitation.vaultName}
                     description={`${rights(invitation.mode)} · ${inviter ? `от ${inviter.name}` : 'отправитель неизвестен'} · ${localVault ? 'заменит локальное' : 'новое хранилище'}`}
                     right={<span className="flex items-center gap-1">
@@ -300,10 +300,10 @@ export const AccountCabinet: React.FC = () => {
                 return <React.Fragment key={vault.id}>
                   {vaultIndex > 0 && <SettingsDivider />}
                   <SettingsRow
-                    icon={<Database className="w-4 h-4" />}
+                    icon={<Icon name="entity.vault" size="md" tone="inherit" />}
                     label={<span className="flex items-baseline gap-2 min-w-0">
                       <span className="truncate">{vaultName}</span>
-                      <span className="font-mono text-[11px] text-zinc-500 shrink-0" title={vault.syncId || vault.id}>{shortId(vault.syncId || vault.id)}</span>
+                      <span className="font-mono text-2xs text-fg-muted shrink-0" title={vault.syncId || vault.id}>{shortId(vault.syncId || vault.id)}</span>
                     </span>}
                     description={visibleGrants.length > 0 ? `${visibleGrants.length} с доступом` : 'доступ только у этого устройства'}
                     right={<button type="button" disabled={busy} onClick={() => { setSharingVault(sharingVault === vault.id ? null : vault.id); setSelectedDevice(''); setReadOnly(false); }} aria-expanded={sharingVault === vault.id} className="px-2 py-1 text-2xs text-fg-secondary rounded-md hover:bg-surface-hover disabled:opacity-40">Выдать доступ</button>}
@@ -331,16 +331,16 @@ export const AccountCabinet: React.FC = () => {
                     await shareVaultWithDevice(vault, device, readOnly ? 'receive-only' : 'read-write');
                     setSharingVault(null);
                   }, 'Приглашение отправлено. Подключите хранилище на выбранном устройстве.'); }}>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Устройство<select aria-label={`Устройство для хранилища ${vaultName}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0 rounded-md"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
-                    <label className="flex flex-col gap-2 text-xs text-zinc-400">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-panel border border-white/[0.08] px-2 py-2 outline-none ring-0 rounded-md"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
+                    <label className="flex flex-col gap-2 text-xs text-fg-secondary">Устройство<select aria-label={`Устройство для хранилища ${vaultName}`} value={selectedDevice} onChange={(event) => setSelectedDevice(event.target.value)} required className="bg-panel border border-tint-8 px-2 py-2 outline-none ring-0 rounded-md"><option value="">Выберите устройство</option>{recipients.filter((device) => !grants.some((grant) => grant.deviceId === device.id && grant.status !== 'revoked')).map((device) => <option key={device.id} value={device.id}>{device.name} · {shortId(device.id)}</option>)}</select></label>
+                    <label className="flex flex-col gap-2 text-xs text-fg-secondary">Права<select aria-label="Права" value={readOnly ? 'receive-only' : 'read-write'} onChange={(event) => setReadOnly(event.target.value === 'receive-only')} className="bg-panel border border-tint-8 px-2 py-2 outline-none ring-0 rounded-md"><option value="read-write">Чтение и изменение</option><option value="receive-only">Только чтение</option></select></label>
                     <button type="submit" disabled={busy || !selectedDevice} className="px-2 py-2 text-2xs text-fg-primary disabled:opacity-40">Отправить приглашение</button><button type="button" disabled={busy} onClick={() => setSharingVault(null)} className="px-2 py-2 text-2xs text-fg-muted">Отмена</button>
-                    {recipients.length === 0 && <p className="w-full text-xs text-zinc-500">Сначала разрешите другое устройство.</p>}
+                    {recipients.length === 0 && <p className="w-full text-xs text-fg-muted">Сначала разрешите другое устройство.</p>}
                   </form>}
                 </React.Fragment>;
               })}
               {vaults.length === 0 && <SettingsRow label="Хранилищ пока нет" description="Создайте локальное хранилище в приложении" />}
             </SettingsGroup>
-            <section className="border-t border-white/[0.06] pt-5 flex items-center justify-between gap-4"><div className="flex gap-2 text-xs text-zinc-500"><KeyRound className="w-4 h-4 shrink-0" />Seed аккаунта не хранится в сессии. Выход не удаляет локальные заметки.</div><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.logout(), 'Вы вышли из аккаунта')} className="flex items-center gap-2 text-xs text-zinc-400"><LogOut className="w-4 h-4" />Выйти</button></section>
+            <section className="border-t border-tint-6 pt-5 flex items-center justify-between gap-4"><div className="flex gap-2 text-xs text-fg-muted"><Icon name="system.secretKey" size="md" tone="inherit" className="shrink-0" />Seed аккаунта не хранится в сессии. Выход не удаляет локальные заметки.</div><button type="button" disabled={busy} onClick={() => void perform(() => accountClient.logout(), 'Вы вышли из аккаунта')} className="flex items-center gap-2 text-xs text-fg-secondary"><Icon name="action.logout" size="md" tone="inherit" />Выйти</button></section>
           </>
         )}
       </main>

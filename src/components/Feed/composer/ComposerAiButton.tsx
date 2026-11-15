@@ -1,6 +1,6 @@
 // The +AI button: asks the model for folder and tags, spinning while the call runs.
 import React from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { ToolbarButton } from '../../UI/ToolbarButton';
 
 export interface ComposerAiButtonProps {
@@ -19,9 +19,9 @@ export const ComposerAiButton: React.FC<ComposerAiButtonProps> = ({ isGenerating
     aria-label="ИИ классификация: папка и теги (+AI)"
     icon={
       isGenerating ? (
-        <Loader2 className="w-4 h-4 animate-spin" />
+        <Icon name="status.loading" size="md" tone="inherit" className="animate-spin" />
       ) : (
-        <Sparkles className="w-4 h-4" />
+        <Icon name="system.ai" size="md" tone="inherit" />
       )
     }
   >

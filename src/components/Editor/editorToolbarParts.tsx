@@ -1,12 +1,11 @@
 // Shared props, options and dropdown state for the editor toolbar halves.
 import type { SlagAttachment, SlagItem, SlagItemType } from '../../types';
 import type { SegmentedOption } from '../UI/ResponsiveSegmented';
-import { StickyNote, FileText, CheckSquare } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export const ITEM_TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
-  { value: 'note', label: 'Заметка', icon: <StickyNote className="w-4 h-4" />, showLabelInTrigger: true, title: 'Заметка', ariaLabel: 'Заметка' },
-  { value: 'task', label: 'Таска', icon: <CheckSquare className="w-4 h-4" />, showLabelInTrigger: true, title: 'Таска', ariaLabel: 'Таска' },
-  { value: 'article', label: 'Статья', icon: <FileText className="w-4 h-4" />, showLabelInTrigger: true, title: 'Статья', ariaLabel: 'Статья' },
+  { value: 'note', label: 'Заметка', icon: <Icon name="entity.note" size="md" tone="inherit" />, showLabelInTrigger: true, title: 'Заметка', ariaLabel: 'Заметка' },
+  { value: 'task', label: 'Таска', icon: <Icon name="entity.task" size="md" tone="inherit" />, showLabelInTrigger: true, title: 'Таска', ariaLabel: 'Таска' },
+  { value: 'article', label: 'Статья', icon: <Icon name="entity.article" size="md" tone="inherit" />, showLabelInTrigger: true, title: 'Статья', ariaLabel: 'Статья' },
 ];
 
 export type MarkdownDropdown = 'style' | 'list';

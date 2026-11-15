@@ -75,7 +75,7 @@ export const UiSettingsTab: React.FC = () => {
             label: ACCENT_COLORS[key].label,
             icon: (
               <span
-                className="inline-block w-2.5 h-2.5 rounded-full border border-white/25"
+                className="inline-block w-2.5 h-2.5 rounded-full border border-tint-25"
                 style={{ backgroundColor: ACCENT_COLORS[key].hex }}
               />
             ),

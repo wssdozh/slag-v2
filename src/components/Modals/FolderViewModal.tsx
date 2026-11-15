@@ -2,14 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FeedViewMode, SlagItemType, SortField, InboxMode } from '../../types';
-import {
-  Layers,
-  Kanban,
-  Calendar,
-  ArrowDownAZ,
-  ArrowUpZA,
-  RotateCcw,
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
 
@@ -81,9 +74,9 @@ export const FolderViewModal: React.FC = () => {
   if (!isPresent) return null;
 
   const viewModes: { id: FeedViewMode; label: string; icon: React.ReactNode }[] = [
-    { id: 'feed', label: 'Лента', icon: <Layers className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'kanban', label: 'Канбан', icon: <Kanban className="w-3.5 h-3.5 shrink-0" /> },
-    { id: 'calendar', label: 'Календарь', icon: <Calendar className="w-3.5 h-3.5 shrink-0" /> },
+    { id: 'feed', label: 'Лента', icon: <Icon name="entity.layers" size="sm" tone="inherit" className="shrink-0" /> },
+    { id: 'kanban', label: 'Канбан', icon: <Icon name="entity.kanban" size="sm" tone="inherit" className="shrink-0" /> },
+    { id: 'calendar', label: 'Календарь', icon: <Icon name="time.date" size="sm" tone="inherit" className="shrink-0" /> },
   ];
 
   const sortFields: { id: SortField; label: string }[] = [
@@ -137,25 +130,25 @@ export const FolderViewModal: React.FC = () => {
           top: effectiveCoords ? `${effectiveCoords.top}px` : '56px',
           right: effectiveCoords ? `${effectiveCoords.right}px` : '16px',
         }}
-        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-white/[0.08] shadow-2xl shadow-black/90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-zinc-200"
+        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-tint-8 shadow-2xl shadow-scrim-90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-fg-soft"
       >
         {/* Section 1: View Modes with Reset Icon in top-right */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted">
               Режим отображения
             </span>
             <button
               type="button"
               onClick={resetCurrentFolderViewSettings}
-              className="p-1 -mr-1 rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.06] transition-colors cursor-pointer"
+              className="p-1 -mr-1 rounded-md text-fg-muted hover:text-fg-soft hover:bg-tint-6 transition-colors cursor-pointer"
               title="Сбросить вид по умолчанию"
               aria-label="Сбросить вид"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <Icon name="action.retry" size="sm" tone="inherit" />
             </button>
           </div>
-          <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+          <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
             {viewModes.map((m) => {
               const isActive = feedViewMode === m.id;
               return (
@@ -165,8 +158,8 @@ export const FolderViewModal: React.FC = () => {
                   onClick={() => updateCurrentFolderViewSettings({ viewMode: m.id })}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-[color,background-color,box-shadow] cursor-pointer ${
                     isActive
-                      ? 'bg-white/10 text-white shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      ? 'bg-tint-10 text-white shadow-sm'
+                      : 'text-fg-secondary hover:text-fg-soft'
                   }`}
                 >
                   {m.icon}
@@ -180,25 +173,25 @@ export const FolderViewModal: React.FC = () => {
         {/* Section 2: Sorting */}
         <div className="space-y-1.5 pt-0.5">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
+            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted">
               Сортировка
             </span>
             <button
               type="button"
               onClick={() => updateCurrentFolderViewSettings({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-white/[0.06] text-[11px] font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-tint-6 text-2xs font-mono text-fg-secondary hover:text-white transition-colors cursor-pointer"
               title="Переключить направление сортировки"
             >
               <span>{directionLabel}</span>
               {sortOrder === 'asc' ? (
-                <ArrowDownAZ className="w-3.5 h-3.5 text-zinc-400" />
+                <Icon name="action.sortAsc" size="sm" />
               ) : (
-                <ArrowUpZA className="w-3.5 h-3.5 text-zinc-400" />
+                <Icon name="action.sortDesc" size="sm" />
               )}
             </button>
           </div>
 
-          <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+          <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
             {sortFields.map((sf) => {
               const isActive = sortBy === sf.id;
               return (
@@ -206,10 +199,10 @@ export const FolderViewModal: React.FC = () => {
                   key={sf.id}
                   type="button"
                   onClick={() => updateCurrentFolderViewSettings({ sortBy: sf.id })}
-                  className={`flex-1 py-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer ${
+                  className={`flex-1 py-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer ${
                     isActive
-                      ? 'bg-white/10 text-white font-medium shadow-sm'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      ? 'bg-tint-10 text-white font-medium shadow-sm'
+                      : 'text-fg-secondary hover:text-fg-soft'
                   }`}
                 >
                   {sf.label}
@@ -222,10 +215,10 @@ export const FolderViewModal: React.FC = () => {
         {/* Section 3: Filters */}
         <div className="space-y-2 pt-0.5">
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 block mb-1.5">
+            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted block mb-1.5">
               Фильтрация записей
             </span>
-            <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+            <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
               {typeOptions.map((opt) => {
                 const isActive = activeTypeFilter === opt.id;
                 return (
@@ -233,10 +226,10 @@ export const FolderViewModal: React.FC = () => {
                     key={opt.id}
                     type="button"
                     onClick={() => updateCurrentFolderViewSettings({ typeFilter: opt.id })}
-                    className={`flex-1 py-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer ${
+                    className={`flex-1 py-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer ${
                       isActive
-                        ? 'bg-white/10 text-white font-medium shadow-sm'
-                        : 'text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-tint-10 text-white font-medium shadow-sm'
+                        : 'text-fg-secondary hover:text-fg-soft'
                     }`}
                   >
                     {opt.label}
@@ -248,7 +241,7 @@ export const FolderViewModal: React.FC = () => {
 
           {/* Inbox mode filter */}
           {isInbox && (
-            <div className="flex p-0.5 rounded-lg bg-white/[0.04] border border-white/[0.04]">
+            <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
               {inboxOptions.map((opt) => {
                 const isActive = inboxMode === opt.id;
                 return (
@@ -256,10 +249,10 @@ export const FolderViewModal: React.FC = () => {
                     key={opt.id}
                     type="button"
                     onClick={() => updateCurrentFolderViewSettings({ inboxMode: opt.id })}
-                    className={`flex-1 py-1 px-1 rounded-md text-[11px] text-center transition-[color,background-color,box-shadow] cursor-pointer whitespace-nowrap truncate ${
+                    className={`flex-1 py-1 px-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer whitespace-nowrap truncate ${
                       isActive
-                        ? 'bg-white/10 text-white font-medium shadow-sm'
-                        : 'text-zinc-400 hover:text-zinc-200'
+                        ? 'bg-tint-10 text-white font-medium shadow-sm'
+                        : 'text-fg-secondary hover:text-fg-soft'
                     }`}
                   >
                     {opt.label}
@@ -271,22 +264,22 @@ export const FolderViewModal: React.FC = () => {
         </div>
 
         {/* Section 4: iOS / Linear Switches */}
-        <div className="pt-2 border-t border-white/[0.06] space-y-1.5">
+        <div className="pt-2 border-t border-tint-6 space-y-1.5">
           <div
             onClick={() => updateCurrentFolderViewSettings({ hideCompletedTasks: !hideCompletedTasks })}
-            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-white/[0.04] cursor-pointer transition-colors group"
+            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-tint-4 cursor-pointer transition-colors group"
           >
-            <span className="text-zinc-300 group-hover:text-white transition-colors text-xs">
+            <span className="text-fg-tertiary group-hover:text-white transition-colors text-xs">
               Скрыть выполненные
             </span>
             <div
               className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
-                hideCompletedTasks ? 'bg-white' : 'bg-white/[0.12] group-hover:bg-white/[0.18]'
+                hideCompletedTasks ? 'bg-white' : 'bg-tint-12 group-hover:bg-tint-18'
               }`}
             >
               <div
                 className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
-                  hideCompletedTasks ? 'translate-x-3 bg-black' : 'translate-x-0 bg-zinc-400'
+                  hideCompletedTasks ? 'translate-x-3 bg-black' : 'translate-x-0 bg-fg-secondary'
                 }`}
               />
             </div>
@@ -294,19 +287,19 @@ export const FolderViewModal: React.FC = () => {
 
           <div
             onClick={() => setIsPinnedOnlyFilter(!isPinnedOnlyFilter)}
-            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-white/[0.04] cursor-pointer transition-colors group"
+            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-tint-4 cursor-pointer transition-colors group"
           >
-            <span className="text-zinc-300 group-hover:text-white transition-colors text-xs">
+            <span className="text-fg-tertiary group-hover:text-white transition-colors text-xs">
               Только закрепленные
             </span>
             <div
               className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
-                isPinnedOnlyFilter ? 'bg-white' : 'bg-white/[0.12] group-hover:bg-white/[0.18]'
+                isPinnedOnlyFilter ? 'bg-white' : 'bg-tint-12 group-hover:bg-tint-18'
               }`}
             >
               <div
                 className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
-                  isPinnedOnlyFilter ? 'translate-x-3 bg-black' : 'translate-x-0 bg-zinc-400'
+                  isPinnedOnlyFilter ? 'translate-x-3 bg-black' : 'translate-x-0 bg-fg-secondary'
                 }`}
               />
             </div>

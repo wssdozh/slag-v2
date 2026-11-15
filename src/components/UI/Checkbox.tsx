@@ -1,7 +1,6 @@
 // A checkbox with a label and hint, toggled by click or keyboard for settings rows.
 import React from 'react';
-import { Check } from 'lucide-react';
-
+import { Icon } from './icons/Icon';
 export interface CheckboxProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -51,20 +50,20 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         className={`w-4 h-4 mt-0.5 rounded-[4px] border flex items-center justify-center shrink-0 transition-[color,background-color,border-color,box-shadow] ${
           checked
             ? 'bg-white border-white text-black shadow-xs'
-            : 'border-white/20 bg-white/[0.03] group-hover:border-white/40'
+            : 'border-tint-20 bg-tint-3 group-hover:border-tint-40'
         }`}
       >
-        {checked && <Check className="w-3 h-3 stroke-[3]" />}
+        {checked && <Icon name="action.check" size="xs" tone="inherit" className="stroke-[3]" />}
       </div>
       {(label || description) && (
         <div className="flex flex-col text-left">
           {label && (
-            <span className="text-xs font-medium text-zinc-200 group-hover:text-white transition-colors">
+            <span className="text-xs font-medium text-fg-soft group-hover:text-white transition-colors">
               {label}
             </span>
           )}
           {description && (
-            <span className="text-[11px] text-zinc-500 leading-relaxed">
+            <span className="text-2xs text-fg-muted leading-relaxed">
               {description}
             </span>
           )}

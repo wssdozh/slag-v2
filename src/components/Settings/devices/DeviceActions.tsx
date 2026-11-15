@@ -1,6 +1,6 @@
 // Device row widgets: inline rename, revoke, and the local sync mode picker.
 import React, { useState } from 'react';
-import { Copy, Edit2, Loader2, Trash2, X } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile, DeviceSyncMode } from '../../../lib/sync/types';
 import type { DevicePairingController } from './useDevicePairing';
@@ -23,7 +23,7 @@ export const DeviceName: React.FC<DeviceNameProps> = ({ deviceId, name, onRename
 
   if (!isEditing) {
     return (
-      <button type="button" onClick={() => { setDraftName(name); setIsEditing(true); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{name}</span><Edit2 className="w-3 h-3 text-fg-dim" /></button>
+      <button type="button" onClick={() => { setDraftName(name); setIsEditing(true); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{name}</span><Icon name="action.rename" size="xs" tone="dim" /></button>
     );
   }
 
@@ -38,7 +38,7 @@ interface DeviceRevokeButtonProps {
 }
 
 export const DeviceRevokeButton: React.FC<DeviceRevokeButtonProps> = ({ device, onRevoke }) => (
-  <button type="button" onClick={() => onRevoke(device)} title="Отозвать устройство" aria-label={`Отозвать ${device.name}`} className="p-1 text-fg-dim hover:text-danger cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+  <button type="button" onClick={() => onRevoke(device)} title="Отозвать устройство" aria-label={`Отозвать ${device.name}`} className="p-1 text-fg-dim hover:text-danger cursor-pointer"><Icon name="action.delete" size="sm" tone="inherit" /></button>
 );
 
 interface LocalSyncModeGroupProps {
@@ -100,7 +100,7 @@ export const PairDeviceModal: React.FC<PairDeviceModalProps> = ({ pairing }) => 
       <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
           <span className="text-xs font-semibold text-fg-primary">Привязка устройства</span>
-          <button type="button" aria-label="Закрыть привязку" onClick={() => setModalOpen(false)} className="p-1 text-fg-secondary cursor-pointer"><X className="w-4 h-4" /></button>
+          <button type="button" aria-label="Закрыть привязку" onClick={() => setModalOpen(false)} className="p-1 text-fg-secondary cursor-pointer"><Icon name="action.close" size="md" tone="inherit" /></button>
         </div>
         <div className="p-4 flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-1 border-b border-border-subtle pb-2">
@@ -123,13 +123,13 @@ export const PairDeviceModal: React.FC<PairDeviceModalProps> = ({ pairing }) => 
                 <span className="text-2xs text-fg-muted font-mono">ОДНОРАЗОВЫЙ КОД</span>
                 <div className="flex items-center gap-3">
                   <span className="font-mono text-2xl font-bold tracking-widest text-fg-primary">{isGeneratingPin ? '…' : hostPin || '000-000'}</span>
-                  {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin)} className="p-1.5 text-fg-secondary cursor-pointer"><Copy className="w-4 h-4" /></button>}
+                  {hostPin && <button type="button" aria-label="Скопировать PIN" onClick={() => void copyToClipboard(hostPin)} className="p-1.5 text-fg-secondary cursor-pointer"><Icon name="action.copy" size="md" tone="inherit" /></button>}
                 </div>
                 <span className="font-mono text-2xs text-fg-muted">Действует: {formatTtl(hostPinTtl)}</span>
               </div>
             )
           ) : guestSasCode ? (
-            <div className="flex flex-col items-center gap-3 py-6"><Loader2 className="w-6 h-6 text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
+            <div className="flex flex-col items-center gap-3 py-6"><Icon name="status.loading" size="none" tone="inherit" className="w-6 h-6 text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
           ) : (
             <div className="flex flex-col gap-3">
               <label className="text-2xs text-fg-secondary">PIN с первого устройства</label>

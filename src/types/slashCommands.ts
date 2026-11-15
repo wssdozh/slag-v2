@@ -1,18 +1,5 @@
 // The slash-command palette: trigger, aliases, icon and what each command inserts.
-import React from 'react';
-import {
-  CheckSquare,
-  StickyNote,
-  FileText,
-  Calendar,
-  Clock,
-  Sparkles,
-  Mic,
-  Video,
-  Trash2,
-  Flame,
-  Zap,
-} from 'lucide-react';
+import type { IconName } from '../components/UI/icons/icons';
 
 export interface SlashCommand {
   id: string;
@@ -22,7 +9,7 @@ export interface SlashCommand {
   category: 'type' | 'date' | 'priority' | 'ai' | 'media' | 'util';
   aliases: string[];
   badge?: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: IconName;
 }
 
 export const SLASH_COMMANDS: SlashCommand[] = [
@@ -35,7 +22,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'type',
     aliases: ['таска', 'задача', 't', 'task', 'чек'],
     badge: 'T',
-    icon: CheckSquare,
+    icon: 'entity.task',
   },
   {
     id: 'note',
@@ -45,7 +32,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'type',
     aliases: ['заметка', 'мысль', 'note', 'n', 'текст'],
     badge: 'N',
-    icon: StickyNote,
+    icon: 'entity.note',
   },
   {
     id: 'article',
@@ -55,7 +42,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'type',
     aliases: ['статья', 'лонгрид', 'article', 'a', 'пост'],
     badge: 'A',
-    icon: FileText,
+    icon: 'entity.article',
   },
 
   // Даты и дедлайны
@@ -67,7 +54,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'date',
     aliases: ['сегодня', 'today', 'day', 'срок'],
     badge: 'Today',
-    icon: Calendar,
+    icon: 'time.date',
   },
   {
     id: 'tomorrow',
@@ -77,7 +64,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'date',
     aliases: ['завтра', 'tomorrow', 'tmrw'],
     badge: 'Tmrw',
-    icon: Clock,
+    icon: 'time.time',
   },
 
   // Приоритеты
@@ -89,7 +76,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'priority',
     aliases: ['urgent', 'p1', 'срочно', 'критично', 'fire'],
     badge: 'P1',
-    icon: Flame,
+    icon: 'status.urgent',
   },
   {
     id: 'high',
@@ -99,7 +86,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'priority',
     aliases: ['high', 'p2', 'важно', 'высокий'],
     badge: 'P2',
-    icon: Zap,
+    icon: 'status.priority',
   },
   {
     id: 'medium',
@@ -109,7 +96,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'priority',
     aliases: ['medium', 'med', 'p3', 'средний', 'норма'],
     badge: 'P3',
-    icon: Zap,
+    icon: 'status.priority',
   },
   {
     id: 'low',
@@ -119,7 +106,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'priority',
     aliases: ['low', 'p4', 'низкий'],
     badge: 'P4',
-    icon: Zap,
+    icon: 'status.priority',
   },
 
   // ИИ и категоризация
@@ -131,7 +118,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'ai',
     aliases: ['ai', 'ии', 'теги', 'папка', 'smart', 'автотеги'],
     badge: '+AI',
-    icon: Sparkles,
+    icon: 'system.ai',
   },
 
   // Медиа
@@ -143,7 +130,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'media',
     aliases: ['голос', 'аудио', 'войс', 'audio', 'voice', 'mic'],
     badge: 'Voice',
-    icon: Mic,
+    icon: 'media.microphone',
   },
   {
     id: 'video',
@@ -153,7 +140,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'media',
     aliases: ['видео', 'кружок', 'video', 'cam'],
     badge: 'Video',
-    icon: Video,
+    icon: 'media.video',
   },
 
   // Утилиты
@@ -165,7 +152,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     category: 'util',
     aliases: ['очистить', 'сброс', 'стереть', 'clear', 'reset'],
     badge: 'Esc',
-    icon: Trash2,
+    icon: 'action.delete',
   },
 ];
 

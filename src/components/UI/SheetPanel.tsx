@@ -425,7 +425,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
             style={{ touchAction: 'none' }}
             className={`flex shrink-0 cursor-grab items-center justify-center ${expanded ? 'h-3' : 'h-6'}`}
           >
-            {!expanded && <div className="h-1 w-8 shrink-0 rounded-full bg-white/20" />}
+            {!expanded && <div className="h-1 w-8 shrink-0 rounded-full bg-tint-20" />}
           </div>
 
           {children({ setBody, setBar })}

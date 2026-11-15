@@ -50,7 +50,7 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
 
   return (
     <div className="w-full flex items-center gap-3 mb-5 select-none">
-      <span className="text-[11px] font-mono text-zinc-400 w-8 text-left shrink-0">
+      <span className="text-2xs font-mono text-fg-secondary w-8 text-left shrink-0">
         {formatAudioDuration(currentTime)}
       </span>
 
@@ -59,7 +59,7 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
         onMouseDown={handleTimelineMouseDown}
         className="group relative flex-1 flex items-center h-4 cursor-pointer select-none"
       >
-        <div className="w-full h-1 bg-white/15 rounded-full overflow-hidden group-hover:h-1.5">
+        <div className="w-full h-1 bg-tint-15 rounded-full overflow-hidden group-hover:h-1.5">
           {/* Composited fill: `width` here re-laid-out the track on every
               `timeupdate` tick for the whole length of the track, forever.
               A `scaleX` on the compositor costs one matrix update instead. */}
@@ -74,7 +74,7 @@ export const AudioScrubber: React.FC<AudioScrubberProps> = ({
         />
       </div>
 
-      <span className="text-[11px] font-mono text-zinc-500 w-8 text-right shrink-0">
+      <span className="text-2xs font-mono text-fg-muted w-8 text-right shrink-0">
         {formatAudioDuration(duration)}
       </span>
     </div>

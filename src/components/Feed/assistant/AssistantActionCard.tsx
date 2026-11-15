@@ -1,19 +1,6 @@
 // The confirmation card for an AI action: what it will do, a diff, apply or dismiss.
 import React from 'react';
-import {
-  Calendar,
-  Clock,
-  Plus,
-  CheckSquare,
-  FolderOpen,
-  FileText,
-  GitCompare,
-  Circle,
-  ArrowUpRight,
-  X,
-  Check,
-  Loader2,
-} from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { LinearSignalBars } from '../../UI/PriorityBadge';
 import { PRIORITY_TONE_CHIP, priorityTone } from '../../UI/priorityTone';
 import { TagChip } from '../../UI/TagChip';
@@ -76,39 +63,39 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
   return (
     <div
       data-testid="action-card"
-      className={`w-full ${isSidebar ? 'max-w-full' : 'max-w-xl'} rounded-xl bg-surface border border-white/[0.08] overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
+      className={`w-full ${isSidebar ? 'max-w-full' : 'max-w-xl'} rounded-xl bg-surface border border-tint-8 overflow-hidden mt-1 text-xs shadow-sm transition-opacity ${
         isRejected ? 'opacity-50' : ''
       }`}
     >
       {/* Header bar: Monochrome Linear style */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-white/[0.02] border-b border-white/[0.04] text-2xs font-mono text-zinc-400">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-tint-2 border-b border-tint-4 text-2xs font-mono text-fg-secondary">
         <div className="flex items-center gap-1.5">
-          {action.type === 'schedule_task' && <Calendar className="w-3.5 h-3.5 text-zinc-400" />}
-          {action.type === 'batch_update' && <Clock className="w-3.5 h-3.5 text-zinc-400" />}
+          {action.type === 'schedule_task' && <Icon name="time.date" size="sm" />}
+          {action.type === 'batch_update' && <Icon name="time.time" size="sm" />}
           {action.type === 'update_item' && (
-            action.updates?.appendContent || action.appendContent ? <Plus className="w-3.5 h-3.5 text-zinc-400" /> :
-            action.updates?.dueDate || action.dueDate ? <Clock className="w-3.5 h-3.5 text-zinc-400" /> :
-            action.updates?.status ? <CheckSquare className="w-3.5 h-3.5 text-zinc-400" /> :
-            action.updates?.folder ? <FolderOpen className="w-3.5 h-3.5 text-zinc-400" /> :
-            <FileText className="w-3.5 h-3.5 text-zinc-400" />
+            action.updates?.appendContent || action.appendContent ? <Icon name="action.add" size="sm" /> :
+            action.updates?.dueDate || action.dueDate ? <Icon name="time.time" size="sm" /> :
+            action.updates?.status ? <Icon name="entity.task" size="sm" /> :
+            action.updates?.folder ? <Icon name="entity.folderOpen" size="sm" /> :
+            <Icon name="entity.article" size="sm" />
           )}
-          {(!action.type || action.type === 'create_note') && <Plus className="w-3.5 h-3.5 text-zinc-400" />}
-          <span className={isRejected ? 'text-zinc-500' : isApplied ? 'text-zinc-300 font-medium' : 'text-zinc-200 font-medium'}>
+          {(!action.type || action.type === 'create_note') && <Icon name="action.add" size="sm" />}
+          <span className={isRejected ? 'text-fg-muted' : isApplied ? 'text-fg-tertiary font-medium' : 'text-fg-soft font-medium'}>
             {card.kind}
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-zinc-500 truncate max-w-[120px]">
+          <span className="text-fg-muted truncate max-w-[120px]">
             {action.folder}
           </span>
           {canShowDiff(action) && (
             <button
               type="button"
               onClick={() => onOpenDiff()}
-              className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-tint-10 text-fg-secondary hover:text-fg-soft transition-colors cursor-pointer"
               title="Сравнить изменения (Diff)"
             >
-              <GitCompare className="w-3.5 h-3.5" />
+              <Icon name="action.diff" size="sm" tone="inherit" />
             </button>
           )}
         </div>
@@ -118,7 +105,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         {/* Title & Priority (Only for single-item actions, omitted for batch_update to prevent duplicate header) */}
         {action.type !== 'batch_update' && (
           <div className="text-xs font-semibold flex items-center justify-between gap-2">
-            <span className={isRejected ? 'line-through text-zinc-500' : isApplied ? 'text-zinc-300' : 'text-zinc-100'}>
+            <span className={isRejected ? 'line-through text-fg-muted' : isApplied ? 'text-fg-tertiary' : 'text-fg-primary'}>
               {action.title}
             </span>
             {actionPriority && !isRejected && (
@@ -134,11 +121,11 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
         {/* Single Schedule info: show ONLY if dueDate was actually set or changed */}
         {Boolean(action.type === 'schedule_task' || action.updates?.dueDate || (action.type === 'update_item' && !action.updates && action.dueDate)) && (
-          <div className="flex items-center gap-2 text-2xs font-mono text-zinc-400">
-            <Calendar className="w-3 h-3 text-zinc-500" />
+          <div className="flex items-center gap-2 text-2xs font-mono text-fg-secondary">
+            <Icon name="time.date" size="xs" tone="muted" />
             <span>Срок: {action.updates?.dueDate || action.dueDate}</span>
             {(action.updates?.reminder || action.reminder) && (
-              <span className="text-zinc-500">
+              <span className="text-fg-muted">
                 ({formatReminderTime((action.updates?.reminder || action.reminder)!)})
               </span>
             )}
@@ -149,8 +136,8 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         {action.subtasks && action.subtasks.length > 0 && (
           <div className="flex flex-col gap-1.5 py-0.5">
             {action.subtasks.map((st, sIdx) => (
-              <div key={sIdx} className="flex items-center gap-2 text-xs text-zinc-300">
-                <Circle className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+              <div key={sIdx} className="flex items-center gap-2 text-xs text-fg-tertiary">
+                <Icon name="status.todo" size="sm" tone="dim" className="shrink-0" />
                 <span className="leading-tight">{st.title}</span>
               </div>
             ))}
@@ -159,7 +146,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
         {/* Batch update items list with selection checkboxes */}
         {action.type === 'batch_update' && action.batchUpdateItems && action.batchUpdateItems.length > 0 && (
-          <div className="flex flex-col divide-y divide-white/[0.04] border-t border-b border-white/[0.04] -mx-3.5 px-3.5 py-1">
+          <div className="flex flex-col divide-y divide-tint-4 border-t border-b border-tint-4 -mx-3.5 px-3.5 py-1">
             {action.batchUpdateItems.map((item, bIdx) => {
               const selected = isTaskSelected(item.targetItemId);
               const up = item.updates || {};
@@ -173,17 +160,17 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                         type="checkbox"
                         checked={selected}
                         onChange={() => onToggleTaskSelection(item.targetItemId)}
-                        className="w-3.5 h-3.5 rounded border-white/20 bg-white/5 accent-zinc-200 cursor-pointer shrink-0"
+                        className="w-3.5 h-3.5 rounded border-tint-20 bg-tint-5 accent-fg-soft cursor-pointer shrink-0"
                       />
                     )}
-                    <span className={`truncate leading-tight ${selected ? 'text-zinc-200' : 'text-zinc-500 line-through'}`}>
+                    <span className={`truncate leading-tight ${selected ? 'text-fg-soft' : 'text-fg-muted line-through'}`}>
                       {item.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-zinc-400">
+                  <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-fg-secondary">
                     {(up.dueDate !== undefined || up.reminder) && (
                       <>
-                        <Calendar className="w-3 h-3 text-zinc-500" />
+                        <Icon name="time.date" size="xs" tone="muted" />
                         <span>{(() => {
                           const today = new Date().toISOString().slice(0, 10);
                           const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -195,7 +182,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                       </>
                     )}
                     {up.reminder && (
-                      <span className="text-zinc-400 font-medium">
+                      <span className="text-fg-secondary font-medium">
                         {formatReminderTime(up.reminder)}
                       </span>
                     )}
@@ -205,7 +192,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                       </span>
                     )}
                     {up.status && (
-                      <span className="px-1.5 py-0.5 rounded text-2xs font-mono font-semibold bg-white/[0.06] text-zinc-300">
+                      <span className="px-1.5 py-0.5 rounded text-2xs font-mono font-semibold bg-tint-6 text-fg-tertiary">
                         {up.status}
                       </span>
                     )}
@@ -215,10 +202,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                         e.stopPropagation();
                         onOpenDiff(bIdx);
                       }}
-                      className="p-1 rounded hover:bg-white/[0.08] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                      className="p-1 rounded hover:bg-tint-8 text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
                       title="Посмотреть изменения этой заметки (Diff)"
                     >
-                      <GitCompare className="w-3 h-3" />
+                      <Icon name="action.diff" size="xs" tone="inherit" />
                     </button>
                     <button
                       type="button"
@@ -226,10 +213,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                         e.stopPropagation();
                         onOpenItem(item.targetItemId || item.title);
                       }}
-                      className="p-1 rounded hover:bg-white/[0.08] text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+                      className="p-1 rounded hover:bg-tint-8 text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
                       title={`Перейти к «${item.title}»`}
                     >
-                      <ArrowUpRight className="w-3 h-3" />
+                      <Icon name="nav.open" size="xs" tone="inherit" />
                     </button>
                   </div>
                 </div>
@@ -240,14 +227,14 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
         {/* Append to note diff preview */}
         {(action.updates?.appendContent || action.appendContent) && (
-          <div className="border-l border-white/20 pl-2.5 py-0.5 text-xs text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed">
+          <div className="border-l border-tint-20 pl-2.5 py-0.5 text-xs text-fg-soft font-mono whitespace-pre-wrap leading-relaxed">
             + {action.updates?.appendContent || action.appendContent}
           </div>
         )}
 
         {/* Content snippet */}
         {!action.updates?.appendContent && !action.appendContent && action.content && (
-          <p className="text-xs text-zinc-400 line-clamp-2">
+          <p className="text-xs text-fg-secondary line-clamp-2">
             {action.content}
           </p>
         )}
@@ -263,19 +250,19 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
         {/* Dynamic extra properties (e.g. duration, customProps) */}
         {action.updates && Object.keys(action.updates).some(k => ['duration', 'kanbanColumn', 'customProps'].includes(k)) && (
-          <div className="flex items-center gap-1.5 flex-wrap text-2xs font-mono text-zinc-400 pt-0.5">
+          <div className="flex items-center gap-1.5 flex-wrap text-2xs font-mono text-fg-secondary pt-0.5">
             {action.updates.duration !== undefined && (
-              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+              <span className="px-1.5 py-0.5 rounded bg-tint-4 border border-tint-6 text-fg-tertiary">
                 ⏳ {action.updates.duration} мин
               </span>
             )}
             {action.updates.kanbanColumn !== undefined && (
-              <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+              <span className="px-1.5 py-0.5 rounded bg-tint-4 border border-tint-6 text-fg-tertiary">
                 📋 {action.updates.kanbanColumn}
               </span>
             )}
             {action.updates.customProps && Object.entries(action.updates.customProps).map(([k, v]) => (
-              <span key={k} className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-300">
+              <span key={k} className="px-1.5 py-0.5 rounded bg-tint-4 border border-tint-6 text-fg-tertiary">
                 {k}: {String(v)}
               </span>
             ))}
@@ -284,14 +271,14 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
         {/* Action Lifecycle Controls */}
         {isRejected ? (
-          <div className="mt-1 flex items-center gap-1.5 text-xs font-mono text-zinc-500 py-0.5">
-            <X className="w-3.5 h-3.5 text-zinc-600" />
+          <div className="mt-1 flex items-center gap-1.5 text-xs font-mono text-fg-muted py-0.5">
+            <Icon name="action.close" size="sm" tone="dim" />
             <span>Действие отклонено</span>
           </div>
         ) : isApplied ? (
-          <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-white/[0.04] min-w-0">
-            <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-medium min-w-0 flex-1 truncate">
-              <Check className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+          <div className="mt-1 flex items-center justify-between gap-2 pt-1 border-t border-tint-4 min-w-0">
+            <div className="flex items-center gap-1.5 text-xs text-fg-tertiary font-medium min-w-0 flex-1 truncate">
+              <Icon name="action.check" size="sm" className="shrink-0" />
               <span className="truncate">
                 {action.type === 'schedule_task' ? `Запланировано на ${action.dueDate}` :
                  action.type === 'batch_update' ? (action.actionLabel ? `${action.actionLabel}` : `Применено: ${action.batchUpdateItems?.length || 0}`) :
@@ -306,20 +293,20 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
             {action.type !== 'batch_update' ? (
               <button
                 onClick={() => onOpenItem(action.appliedItemId || action.title)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-tint-6 hover:bg-tint-12 text-fg-soft hover:text-white text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
                 title="Показать запись в ленте"
               >
                 <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
-                <ArrowUpRight className="w-3 h-3 text-zinc-400" />
+                <Icon name="nav.open" size="xs" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => onOpenDiff()}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-tint-4 hover:bg-tint-8 text-fg-secondary hover:text-fg-soft text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
                 title="Посмотреть изменения"
               >
-                <GitCompare className="w-3 h-3 text-zinc-400" />
+                <Icon name="action.diff" size="xs" />
                 <span>Сравнить</span>
               </button>
             )}
@@ -327,9 +314,9 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         ) : isExecuting ? (
           <button
             disabled
-            className="mt-1 w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 font-semibold text-xs opacity-80 cursor-not-allowed shadow-sm"
+            className="mt-1 w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-hover text-fg-tertiary font-semibold text-xs opacity-80 cursor-not-allowed shadow-sm"
           >
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+            <Icon name="status.loading" size="sm" className="animate-spin" />
             <span>Применение...</span>
           </button>
         ) : (
@@ -357,11 +344,11 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                   onClick={() => onExecute(finalAction)}
                   className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs whitespace-nowrap transition-colors shadow-sm ${
                     isDisabled
-                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/[0.04]'
-                      : 'bg-white text-black hover:bg-zinc-200 cursor-pointer'
+                      ? 'bg-surface-hover text-fg-muted cursor-not-allowed border border-tint-4'
+                      : 'bg-white text-black hover:bg-fg-soft cursor-pointer'
                   }`}
                 >
-                  <Check className="w-3.5 h-3.5 shrink-0" />
+                  <Icon name="action.check" size="sm" tone="inherit" className="shrink-0" />
                   <span>{buttonLabel}</span>
                 </button>
               );
@@ -369,10 +356,10 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
 
             <button
               onClick={onReject}
-              className="px-2.5 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-zinc-400 hover:text-zinc-200 text-xs font-medium border border-white/[0.06] transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
+              className="px-2.5 py-1.5 rounded-lg bg-tint-4 hover:bg-tint-8 text-fg-secondary hover:text-fg-soft text-xs font-medium border border-tint-6 transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
               title="Отклонить это действие"
             >
-              <X className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <Icon name="action.close" size="sm" tone="muted" className="shrink-0" />
               <span>Отклонить</span>
             </button>
           </div>

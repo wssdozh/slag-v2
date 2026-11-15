@@ -1,6 +1,6 @@
 // The app's own yes/no for destructive actions, instead of the platform's confirm.
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { BaseModal } from './BaseModal';
 import { useApp } from '../../context/AppContext';
 
@@ -19,7 +19,7 @@ export const ConfirmDialog: React.FC = () => {
       isOpen
       onClose={() => resolveConfirm(false)}
       title={confirmRequest.title}
-      icon={confirmRequest.isDestructive ? <AlertTriangle className="w-4 h-4 text-rose-400" /> : undefined}
+      icon={confirmRequest.isDestructive ? <Icon name="status.warning" size="md" tone="danger" /> : undefined}
       showCloseButton={false}
       role="alertdialog"
       maxWidth="max-w-sm"

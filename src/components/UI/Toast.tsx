@@ -4,8 +4,7 @@ import { useApp } from '../../context/AppContext';
 import type { ToastMessage } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { UI_DELAYS, UI_GESTURES } from '../../config';
-import { CheckCircle2, AlertCircle, Info, Undo2, ArchiveRestore } from 'lucide-react';
-
+import { Icon } from './icons/Icon';
 /* How far the card keeps travelling after a flick. Beyond the viewport edge, so
    the inline translate and the CSS exit never disagree. */
 const DISMISS_OFFSET_PX = 160;
@@ -130,11 +129,11 @@ const ToastCard: React.FC<{ toast: ToastMessage }> = ({ toast }) => {
         if (event.pointerType === 'mouse' && !dragRef.current) setIsPaused(false);
       }}
       style={dragStyle}
-      className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-white/[0.08] text-sm text-fg-primary shadow-2xl motion-toast max-w-full touch-none"
+      className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-2 rounded-lg bg-surface-elevated/95 backdrop-blur-md border border-tint-8 text-sm text-fg-primary shadow-2xl motion-toast max-w-full touch-none"
     >
-      {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-success shrink-0" />}
-      {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-danger shrink-0" />}
-      {toast.type === 'info' && <Info className="w-4 h-4 text-fg-muted shrink-0" />}
+      {toast.type === 'success' && <Icon name="status.done" size="md" tone="inherit" className="text-success shrink-0" />}
+      {toast.type === 'error' && <Icon name="status.alert" size="md" tone="inherit" className="text-danger shrink-0" />}
+      {toast.type === 'info' && <Icon name="status.info" size="md" tone="muted" className="shrink-0" />}
       <span className="font-medium tracking-tight text-xs min-w-0 break-words">{toast.text}</span>
       {toast.action && (
         <button
@@ -147,7 +146,7 @@ const ToastCard: React.FC<{ toast: ToastMessage }> = ({ toast }) => {
           title={toast.action.label}
           className="relative ml-1 flex shrink-0 items-center justify-center w-4 h-4 rounded-md text-fg-secondary hover:text-fg-primary focus-visible:text-fg-primary cursor-pointer after:absolute after:inset-1/2 after:w-11 after:h-11 after:-translate-x-1/2 after:-translate-y-1/2"
         >
-          {toast.action.kind === 'undo' ? <Undo2 className="w-4 h-4" /> : <ArchiveRestore className="w-4 h-4" />}
+          {toast.action.kind === 'undo' ? <Icon name="action.undo" size="md" tone="inherit" /> : <Icon name="action.restore" size="md" tone="inherit" />}
         </button>
       )}
     </div>

@@ -1,6 +1,6 @@
 // The `#tag` suggestions: matching vault tags with usage counts, keyboard selection.
 import React from 'react';
-import { Hash } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 
@@ -35,8 +35,8 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
       placement={placement}
       isModal={isModal}
       isEmpty={tags.length === 0}
-      emptyContent={<><Hash className="w-3.5 h-3.5 text-zinc-500 shrink-0" /><span>Тег «{query}» не найден в хранилище</span></>}
-      header={<SuggestionMenuHeader icon={<Hash className="w-3 h-3 text-zinc-400" />} title="Теги хранилища (#)" />}
+      emptyContent={<><Icon name="entity.tagHash" size="sm" tone="muted" className="shrink-0" /><span>Тег «{query}» не найден в хранилище</span></>}
+      header={<SuggestionMenuHeader icon={<Icon name="entity.tagHash" size="xs" />} title="Теги хранилища (#)" />}
     >
         {tags.map((item, idx) => {
           const isSelected = idx === selectedIndex;
@@ -51,20 +51,16 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
               onClick={() => onSelect(item.tag)}
               className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
                 isSelected
-                  ? 'bg-white/10 text-white font-medium shadow-sm'
-                  : 'text-zinc-300 hover:bg-white/[0.04]'
+                  ? 'bg-tint-10 text-white font-medium shadow-sm'
+                  : 'text-fg-tertiary hover:bg-tint-4'
               }`}
             >
               <div className="flex items-center gap-2 min-w-0 font-mono text-xs">
-                <Hash
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    isSelected ? 'text-cyan-300' : 'text-zinc-400'
-                  }`}
-                />
+                <Icon name="entity.tagHash" size="sm" tone="inherit" className={`shrink-0 ${isSelected ? 'text-cyan-300' : 'text-fg-secondary'}`} />
                 <span className="truncate">#{item.tag}</span>
               </div>
 
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.04] text-zinc-500 border border-white/[0.06] shrink-0">
+              <span className="px-1.5 py-0.5 rounded text-3xs font-mono bg-tint-4 text-fg-muted border border-tint-6 shrink-0">
                 {item.count}
               </span>
             </button>

@@ -1,6 +1,6 @@
 // The flyout panels of the context menu: more actions, type switch and explorer.
 import React from 'react';
-import { Copy, FileText, FolderOpen, Link2, CheckSquare, StickyNote, Check } from 'lucide-react';
+import { Icon } from '../icons/Icon';
 import type { FolderMeta, SlagItem, SlagItemType } from '../../../types';
 import type { ContextMenuTarget } from '../../../context/appContext.types';
 import { usePresence } from '../../../hooks/ui/usePresence';
@@ -71,7 +71,7 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
         style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
       >
         {/* Bridge hit-area */}
         <div
@@ -82,49 +82,49 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
 
         <button
           onClick={() => onChangeType('note')}
-          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
-            item.type === 'note' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 transition-colors text-left cursor-pointer ${
+            item.type === 'note' ? 'text-white bg-tint-6' : 'text-fg-tertiary hover:text-white'
           }`}
         >
           <div className="flex items-center gap-2">
-            <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="entity.note" size="sm" />
             <span>Заметка</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-zinc-500 font-mono">1</span>
-            {item.type === 'note' && <Check className="w-3.5 h-3.5 text-accent" />}
+            <span className="text-3xs text-fg-muted font-mono">1</span>
+            {item.type === 'note' && <Icon name="action.check" size="sm" tone="accent" />}
           </div>
         </button>
 
         <button
           onClick={() => onChangeType('task')}
-          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
-            item.type === 'task' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 transition-colors text-left cursor-pointer ${
+            item.type === 'task' ? 'text-white bg-tint-6' : 'text-fg-tertiary hover:text-white'
           }`}
         >
           <div className="flex items-center gap-2">
-            <CheckSquare className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="entity.task" size="sm" />
             <span>Таска</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-zinc-500 font-mono">2</span>
-            {item.type === 'task' && <Check className="w-3.5 h-3.5 text-accent" />}
+            <span className="text-3xs text-fg-muted font-mono">2</span>
+            {item.type === 'task' && <Icon name="action.check" size="sm" tone="accent" />}
           </div>
         </button>
 
         <button
           onClick={() => onChangeType('article')}
-          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left cursor-pointer ${
-            item.type === 'article' ? 'text-white bg-white/[0.06]' : 'text-zinc-300 hover:text-white'
+          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 transition-colors text-left cursor-pointer ${
+            item.type === 'article' ? 'text-white bg-tint-6' : 'text-fg-tertiary hover:text-white'
           }`}
         >
           <div className="flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="entity.article" size="sm" />
             <span>Статья</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-zinc-500 font-mono">3</span>
-            {item.type === 'article' && <Check className="w-3.5 h-3.5 text-accent" />}
+            <span className="text-3xs text-fg-muted font-mono">3</span>
+            {item.type === 'article' && <Icon name="action.check" size="sm" tone="accent" />}
           </div>
         </button>
       </Flyout>
@@ -137,7 +137,7 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
         style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
       >
         {/* Bridge hit-area */}
         <div
@@ -154,13 +154,13 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
               onOpenFolder(folder.path);
             }
           }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="entity.folderOpen" size="sm" />
             <span className="whitespace-nowrap">Открыть в проводнике</span>
           </div>
-          <span className="text-[10px] text-zinc-500 font-mono">⌘O</span>
+          <span className="text-3xs text-fg-muted font-mono">⌘O</span>
         </button>
 
         <button
@@ -171,10 +171,10 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
               await onCopyFolderFullPath(folder.path);
             }
           }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <FileText className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="entity.article" size="sm" />
             <span className="whitespace-nowrap">Скопировать полный путь</span>
           </div>
         </button>
@@ -187,10 +187,10 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
               onCopyFolderPath(folder.path);
             }
           }}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <Copy className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="action.copy" size="sm" />
             <span className="whitespace-nowrap">Относительный путь</span>
           </div>
         </button>
@@ -204,7 +204,7 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
         style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl p-1 text-xs text-zinc-300 flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
       >
         {/* Bridge hit-area */}
         <div
@@ -215,13 +215,13 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
 
         <button
           onClick={onCopyLink}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-2">
-            <Link2 className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="action.link" size="sm" />
             <span>Копировать [[линк]]</span>
           </div>
-          <span className="text-[10px] text-zinc-500 font-mono">⌘L</span>
+          <span className="text-3xs text-fg-muted font-mono">⌘L</span>
         </button>
       </Flyout>
     )}

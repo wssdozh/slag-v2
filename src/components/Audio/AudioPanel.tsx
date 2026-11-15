@@ -1,6 +1,6 @@
 // The audio panel: track scope and type filters, transport controls, and the queue.
 import React, { useMemo, useState } from 'react';
-import { Folder, Pin } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
@@ -128,7 +128,7 @@ export const AudioPanel: React.FC = () => {
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative w-full h-full bg-canvas text-zinc-100 flex flex-col justify-between overflow-hidden select-none outline-none"
+      className="relative w-full h-full bg-canvas text-fg-primary flex flex-col justify-between overflow-hidden select-none outline-none"
     >
       {/* Hidden HTML5 Audio Element */}
       <audio ref={audioRef} preload="metadata" />
@@ -167,23 +167,23 @@ export const AudioPanel: React.FC = () => {
         <div className="w-full max-w-sm flex flex-col items-center my-auto">
           {tracks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10 px-4">
-              <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center mb-4">
-                <Folder className="w-7 h-7 text-zinc-500" />
+              <div className="w-16 h-16 rounded-full bg-tint-4 border border-tint-8 flex items-center justify-center mb-4">
+                <Icon name="entity.folder" size="none" tone="muted" className="w-7 h-7" />
               </div>
-              <h3 className="text-sm font-medium text-zinc-200 mb-1">В папке нет аудиозаписей</h3>
-              <p className="text-xs text-zinc-500 mb-4">
+              <h3 className="text-sm font-medium text-fg-soft mb-1">В папке нет аудиозаписей</h3>
+              <p className="text-xs text-fg-muted mb-4">
                 В папке «{effectiveFolder}» отсутствуют вложения выбранных типов.
               </p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setScopeMode('active')}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-zinc-200 transition-colors cursor-pointer"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-tint-10 hover:bg-tint-15 text-fg-soft transition-colors cursor-pointer"
                 >
                   Активная папка
                 </button>
                 <button
                   onClick={() => setIsPlaylistOpen(true)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-white/[0.05] hover:bg-white/10 text-zinc-400 transition-colors cursor-pointer"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-tint-5 hover:bg-tint-10 text-fg-secondary transition-colors cursor-pointer"
                 >
                   Очередь и фильтры
                 </button>
@@ -241,20 +241,14 @@ export const AudioPanel: React.FC = () => {
               onClick={toggleScopeMode}
               aria-label="Закрепить папку"
               aria-pressed={scopeMode === 'pinned'}
-              className="p-1 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+              className="p-1 text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
               title={
                 scopeMode === 'pinned'
                   ? 'Папка закреплена (нажмите, чтобы открепить)'
                   : 'Следовать за активной (нажмите, чтобы закрепить)'
               }
             >
-              <Pin
-                className={`w-3.5 h-3.5 transition-[color,scale] ${
-                  scopeMode === 'pinned'
-                    ? 'text-zinc-200 fill-current scale-105'
-                    : 'text-zinc-500 group-hover:text-zinc-300'
-                }`}
-              />
+              <Icon name="action.pin" size="sm" tone="inherit" className={`transition-[color,scale] ${scopeMode === 'pinned' ? 'text-fg-soft fill-current scale-105' : 'text-fg-muted group-hover:text-fg-tertiary'}`} />
             </button>
 
             {/* Selecting a folder pins it; the separate pin toggle keeps following active folders. */}

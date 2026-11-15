@@ -1,6 +1,6 @@
 // File attachments on a card: one download row each, with size and the summary.
 import React, { memo } from 'react';
-import { Download, FileText } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { formatBytes } from '../../../lib/text/formatBytes';
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';
 import type { SlagAttachment } from '../../../types';
@@ -34,26 +34,26 @@ const ItemFilesComponent: React.FC<ItemFilesProps> = ({
         className={
           isFileBubble
             ? 'flex items-center gap-2.5 sm:gap-3 w-full select-none group/file cursor-pointer'
-            : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] hover:border-white/[0.12] transition-colors group/file select-none cursor-pointer w-full'
+            : 'flex items-center gap-2.5 sm:gap-3 p-2 sm:p-2.5 rounded-xl bg-tint-3 hover:bg-tint-6 border border-tint-6 hover:border-tint-12 transition-colors group/file select-none cursor-pointer w-full'
         }
       >
         {/* Pure File Icon without podlozhka */}
-        <FileText className="w-5 h-5 text-zinc-400 group-hover/file:text-zinc-200 transition-colors shrink-0" />
+        <Icon name="entity.article" size="lg" className="group-hover/file:text-fg-soft transition-colors shrink-0" />
 
         {/* Filename & Info */}
         <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
           <span
-            className="text-sm font-medium text-zinc-200 group-hover/file:text-white truncate font-sans"
+            className="text-sm font-medium text-fg-soft group-hover/file:text-white truncate font-sans"
             title={file.name}
           >
             {file.name}
           </span>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-sans truncate">
-            <span className="font-mono text-zinc-400">{formatBytes(file.size)}</span>
+          <div className="flex items-center gap-1.5 text-xs text-fg-secondary font-sans truncate">
+            <span className="font-mono text-fg-secondary">{formatBytes(file.size)}</span>
             {file.summary && (
               <>
-                <span className="w-1 h-1 rounded-full bg-zinc-600 shrink-0" />
-                <span className="truncate text-zinc-400" title={file.summary}>
+                <span className="w-1 h-1 rounded-full bg-fg-dim shrink-0" />
+                <span className="truncate text-fg-secondary" title={file.summary}>
                   {file.summary}
                 </span>
               </>
@@ -64,15 +64,15 @@ const ItemFilesComponent: React.FC<ItemFilesProps> = ({
         {/* Right Action: Timestamp + Download for pure file, or Download icon */}
         <div className="flex items-center gap-2 shrink-0 ml-1">
           {isFileBubble && (
-            <span className="text-2xs font-mono text-zinc-500 select-none leading-none">
+            <span className="text-2xs font-mono text-fg-muted select-none leading-none">
               {formattedTime}
             </span>
           )}
           <div
-            className="w-7 h-7 rounded-lg text-zinc-400 group-hover/file:text-white group-hover/file:bg-white/[0.08] flex items-center justify-center transition-colors"
+            className="w-7 h-7 rounded-lg text-fg-secondary group-hover/file:text-white group-hover/file:bg-tint-8 flex items-center justify-center transition-colors"
             title="Скачать файл"
           >
-            <Download className="w-4 h-4" />
+            <Icon name="action.download" size="md" tone="inherit" />
           </div>
         </div>
       </a>

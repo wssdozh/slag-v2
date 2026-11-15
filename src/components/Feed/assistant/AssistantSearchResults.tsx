@@ -1,13 +1,6 @@
 // The search block of a reply: count, expand into the list, open a note or show it inline.
 import React from 'react';
-import {
-  ChevronRight,
-  Search,
-  CheckSquare,
-  FileText,
-  ArrowUpRight,
-  Filter,
-} from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { DEFAULT_INBOX_FOLDER } from '../../../config';
 
 export interface AssistantSearchResult {
@@ -39,19 +32,19 @@ export const AssistantSearchResults: React.FC<AssistantSearchResultsProps> = ({
   const showFilterButton = count > 1;
 
   return (
-    <div className="max-w-[92%] w-full rounded-xl bg-surface border border-white/[0.08] overflow-hidden mt-0.5 text-xs shadow-sm">
+    <div className="max-w-[92%] w-full rounded-xl bg-surface border border-tint-8 overflow-hidden mt-0.5 text-xs shadow-sm">
       {/* Header trigger only when more than 3 results */}
       {showHeader && (
         <button
           onClick={onToggleExpanded}
-          className="w-full flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.05] transition-colors cursor-pointer text-zinc-300"
+          className="w-full flex items-center justify-between px-3 py-2 bg-tint-2 hover:bg-tint-5 transition-colors cursor-pointer text-fg-tertiary"
         >
           <div className="flex items-center gap-1.5 text-xs font-medium">
-            <Search className="w-3.5 h-3.5 text-zinc-400" />
+            <Icon name="action.search" size="sm" />
             <span>Найдено {count} в хранилище</span>
           </div>
-          <div className="flex items-center gap-1 text-2xs font-mono text-zinc-500">
-            <ChevronRight className={`w-3.5 h-3.5 text-zinc-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+          <div className="flex items-center gap-1 text-2xs font-mono text-fg-muted">
+            <Icon name="nav.next" size="sm" className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
           </div>
         </button>
       )}
@@ -62,30 +55,30 @@ export const AssistantSearchResults: React.FC<AssistantSearchResultsProps> = ({
         data-expanded={!showHeader || isExpanded}
         aria-hidden={showHeader && !isExpanded}
       >
-        <div className={`motion-accordion-inner flex flex-col divide-y divide-white/[0.04] ${showHeader ? 'border-t border-white/[0.06]' : ''}`}>
+        <div className={`motion-accordion-inner flex flex-col divide-y divide-tint-4 ${showHeader ? 'border-t border-tint-6' : ''}`}>
           {results.map((res, rIdx) => (
             <button
               key={res.id || rIdx}
               onClick={() => onOpenItem(res.id || res.title)}
-              className="flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-white/[0.04] transition-colors cursor-pointer group"
+              className="flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-tint-4 transition-colors cursor-pointer group"
               title={`Перейти к «${res.title}» (${res.folder || DEFAULT_INBOX_FOLDER})`}
             >
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {res.type === 'task' ? (
-                  <CheckSquare className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <Icon name="entity.task" size="sm" tone="muted" className="shrink-0" />
                 ) : (
-                  <FileText className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                  <Icon name="entity.article" size="sm" tone="muted" className="shrink-0" />
                 )}
-                <span className="text-zinc-200 group-hover:text-white truncate font-medium text-xs">
+                <span className="text-fg-soft group-hover:text-white truncate font-medium text-xs">
                   {res.title}
                 </span>
                 {res.folder && (
-                  <span className="text-2xs font-mono text-zinc-500 shrink-0 truncate max-w-[120px]">
+                  <span className="text-2xs font-mono text-fg-muted shrink-0 truncate max-w-[120px]">
                     {res.folder}
                   </span>
                 )}
               </div>
-              <ArrowUpRight className="w-3 h-3 text-zinc-500 group-hover:text-zinc-300 shrink-0 transition-colors" />
+              <Icon name="nav.open" size="xs" tone="muted" className="group-hover:text-fg-tertiary shrink-0 transition-colors" />
             </button>
           ))}
 
@@ -93,14 +86,14 @@ export const AssistantSearchResults: React.FC<AssistantSearchResultsProps> = ({
           {showFilterButton && (
             <button
               onClick={onShowInFeed}
-              className="flex items-center justify-between px-3 py-2 bg-white/[0.02] hover:bg-white/[0.06] text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer text-xs font-medium"
+              className="flex items-center justify-between px-3 py-2 bg-tint-2 hover:bg-tint-6 text-fg-secondary hover:text-fg-soft transition-colors cursor-pointer text-xs font-medium"
               title="Отобразить только эти найденные записи в центральной ленте"
             >
               <div className="flex items-center gap-1.5">
-                <Filter className="w-3 h-3 text-zinc-400" />
+                <Icon name="action.filter" size="xs" />
                 <span>Показать {count} в ленте</span>
               </div>
-              <ArrowUpRight className="w-3 h-3 text-zinc-500" />
+              <Icon name="nav.open" size="xs" tone="muted" />
             </button>
           )}
         </div>

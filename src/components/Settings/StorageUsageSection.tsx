@@ -1,6 +1,6 @@
 // "Занятое место": the whole store's footprint — local keys, media, snapshots and assistant memory.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { File, Image, Music, RefreshCw, Video } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import type { SlagAttachment, SlagItem } from '../../types';
 import { MEMORY_LIMIT } from '../../lib/memory';
 import { pluralRu } from '../../lib/time/dateUtils';
@@ -19,10 +19,10 @@ import {
 import { SettingsGroup } from './SettingsUI';
 
 const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
-  image: <Image className="w-3.5 h-3.5" />,
-  audio: <Music className="w-3.5 h-3.5" />,
-  video: <Video className="w-3.5 h-3.5" />,
-  file: <File className="w-3.5 h-3.5" />,
+  image: <Icon name="entity.image" size="sm" tone="inherit" />,
+  audio: <Icon name="media.music" size="sm" tone="inherit" />,
+  video: <Icon name="media.video" size="sm" tone="inherit" />,
+  file: <Icon name="entity.file" size="sm" tone="inherit" />,
 };
 
 /**
@@ -72,7 +72,7 @@ const UsageRing: React.FC<{ segments: UsageSegment[]; total: number }> = ({ segm
           r={radius}
           fill="none"
           strokeWidth={stroke}
-          className="stroke-white/[0.06]"
+          className="stroke-tint-6"
         />
         {segments.map((segment, index) => {
           // A 2px gap keeps two neighbouring arcs from reading as one.
@@ -124,7 +124,7 @@ const UsageLine: React.FC<UsageLineProps> = ({ testId, onClick, disabled = false
       data-testid={testId}
       className={`flex h-8 w-full items-center gap-2 px-3.5 text-left ${
         interactive
-          ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-white/[0.1] active:duration-0'
+          ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-tint-10 active:duration-0'
           : ''
       } ${disabled ? 'opacity-40' : ''}`}
     >
@@ -174,16 +174,16 @@ export const StorageUsageSection: React.FC = () => {
       onClick={() => setStamp((value) => value + 1)}
       aria-label="Обновить"
       title="Пересчитать занятое место"
-      className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
+      className="flex items-center gap-1 text-2xs font-mono text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
     >
-      <RefreshCw className="w-3 h-3" />
+      <Icon name="action.refresh" size="xs" tone="inherit" />
       Обновить
     </button>
   );
 
   const header = (
     <div className="flex items-center justify-between gap-2 px-1">
-      <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+      <span className="text-2xs font-mono uppercase tracking-wider text-fg-muted">
         Занятое место
       </span>
       {refreshButton}

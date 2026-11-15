@@ -169,7 +169,7 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
               left: `${effectiveCoords.left}px`,
               minWidth: `${minWidth}px`,
             }}
-            className={`z-[9999] rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl motion-popover ${dropdownClassName}`}
+            className={`z-[9999] rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover ${dropdownClassName}`}
           >
             {children}
           </div>,

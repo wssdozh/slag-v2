@@ -1,7 +1,7 @@
 // Records a voice memo in a bottom bar, previews its length, then hands the clip over.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUp } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger/logger';
 
@@ -159,21 +159,21 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
 
   return createPortal(
     <div className={`fixed inset-0 z-[200] flex flex-col justify-end px-2 pt-[max(var(--sat),1rem)] pb-[max(var(--sab),0.5rem)] record-overlay ${isClosing ? 'record-overlay-out pointer-events-none' : ''}`}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" />
+      <div className="absolute inset-0 bg-scrim-60 backdrop-blur-xl" />
 
-      <div className={`relative w-full max-w-2xl mx-auto flex flex-col gap-2 rounded-2xl bg-surface-elevated border border-white/[0.12] p-2 shadow-2xl shadow-black/50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
-        {error && <p className="px-1 text-xs text-zinc-300">{error}</p>}
+      <div className={`relative w-full max-w-2xl mx-auto flex flex-col gap-2 rounded-2xl bg-surface-elevated border border-tint-12 p-2 shadow-2xl shadow-scrim-50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
+        {error && <p className="px-1 text-xs text-fg-tertiary">{error}</p>}
 
         <div className="grid grid-cols-3 items-center gap-2">
           <div className="flex items-center gap-2 pl-1">
-            <span className={`w-2 h-2 rounded-full ${error ? 'bg-zinc-500' : 'bg-rose-500 animate-pulse'}`} />
-            <span className="font-mono text-xs text-zinc-300">{formatTimer(elapsedMs)}</span>
+            <span className={`w-2 h-2 rounded-full ${error ? 'bg-fg-muted' : 'bg-rose-500 animate-pulse'}`} />
+            <span className="font-mono text-xs text-fg-tertiary">{formatTimer(elapsedMs)}</span>
           </div>
 
           <div className="justify-self-center flex items-center gap-2">
             <button type="button" onClick={cancelAndClose} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-accent hover:bg-accent-subtle transition-colors">отмена</button>
             {error && (
-              <button type="button" onClick={() => { setError(null); void init(); }} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-zinc-300 hover:bg-surface-hover transition-colors">повторить</button>
+              <button type="button" onClick={() => { setError(null); void init(); }} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-fg-tertiary hover:bg-surface-hover transition-colors">повторить</button>
             )}
           </div>
 
@@ -181,7 +181,7 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
             <span className="w-ctrl-sm h-ctrl-sm justify-self-end" />
           ) : (
             <button type="button" onClick={() => handleFinish(true)} className="justify-self-end w-ctrl-sm h-ctrl-sm rounded-full bg-accent-strong text-white flex items-center justify-center motion-press" aria-label="Отправить аудио">
-              <ArrowUp className="w-4 h-4" />
+              <Icon name="action.send" size="md" tone="inherit" />
             </button>
           )}
         </div>

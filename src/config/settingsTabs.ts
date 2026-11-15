@@ -1,6 +1,5 @@
 // Names and orders the settings sections once, so desktop and mobile cannot drift.
-import { ArrowDownToLine, Bell, Database, Keyboard, Laptop, Plug, RefreshCw, Sliders, Sparkles, Terminal, UserRound } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import type { IconName } from '../components/UI/icons/icons';
 
 export type SettingsTabId =
   | 'account'
@@ -18,7 +17,7 @@ export type SettingsTabId =
 export interface SettingsTabDefinition {
   id: SettingsTabId;
   label: string;
-  icon: LucideIcon;
+  icon: IconName;
 }
 
 /**
@@ -30,17 +29,17 @@ export interface SettingsTabDefinition {
  * синхронизацией, потом данные, потом внешний вид и диагностика.
  */
 export const SETTINGS_TABS: readonly SettingsTabDefinition[] = [
-  { id: 'account', label: 'Аккаунт', icon: UserRound },
-  { id: 'sync', label: 'Синхронизация', icon: RefreshCw },
-  { id: 'devices', label: 'Устройства', icon: Laptop },
-  { id: 'vault', label: 'Хранилище & Бэкап', icon: Database },
-  { id: 'notifications', label: 'Уведомления', icon: Bell },
-  { id: 'integrations', label: 'Интеграции', icon: Plug },
-  { id: 'ai', label: 'ИИ & Провайдеры', icon: Sparkles },
-  { id: 'ui', label: 'Интерфейс & Панели', icon: Sliders },
-  { id: 'shortcuts', label: 'Горячие клавиши', icon: Keyboard },
-  { id: 'updates', label: 'Обновления', icon: ArrowDownToLine },
-  { id: 'logs', label: 'Логи & Диагностика', icon: Terminal },
+  { id: 'account', label: 'Аккаунт', icon: 'entity.user' },
+  { id: 'sync', label: 'Синхронизация', icon: 'system.sync' },
+  { id: 'devices', label: 'Устройства', icon: 'entity.desktop' },
+  { id: 'vault', label: 'Хранилище & Бэкап', icon: 'entity.vault' },
+  { id: 'notifications', label: 'Уведомления', icon: 'system.notifications' },
+  { id: 'integrations', label: 'Интеграции', icon: 'system.integrations' },
+  { id: 'ai', label: 'ИИ & Провайдеры', icon: 'system.ai' },
+  { id: 'ui', label: 'Интерфейс & Панели', icon: 'system.appearance' },
+  { id: 'shortcuts', label: 'Горячие клавиши', icon: 'system.shortcuts' },
+  { id: 'updates', label: 'Обновления', icon: 'system.update' },
+  { id: 'logs', label: 'Логи & Диагностика', icon: 'system.logs' },
 ];
 
 export const settingsTabLabel = (id: SettingsTabId): string =>

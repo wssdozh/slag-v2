@@ -1,6 +1,6 @@
 // Feed right-click entries: the three create actions plus folder and search jumps.
 import React from 'react';
-import { FolderOpen, Search, CheckSquare, FileText, StickyNote } from 'lucide-react';
+import { Icon } from '../icons/Icon';
 import type { SlagItem, SlagItemType } from '../../../types';
 
 export interface FeedMenuSectionsProps {
@@ -24,9 +24,9 @@ export const FeedMenuSections: React.FC<FeedMenuSectionsProps> = ({
         onSaveItem({ type: 'note', title: 'Быстрая заметка', content: '', folder: currentFolder });
         onClose();
       }}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >
-      <StickyNote className="w-3.5 h-3.5 text-zinc-400" />
+      <Icon name="entity.note" size="sm" />
       <span>Новая заметка</span>
     </button>
 
@@ -35,9 +35,9 @@ export const FeedMenuSections: React.FC<FeedMenuSectionsProps> = ({
         onSaveItem({ type: 'task', title: 'Новая задача', content: '', folder: currentFolder });
         onClose();
       }}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >
-      <CheckSquare className="w-3.5 h-3.5 text-amber-400" />
+      <Icon name="entity.task" size="sm" tone="warning" />
       <span>Новая таска</span>
     </button>
 
@@ -46,22 +46,22 @@ export const FeedMenuSections: React.FC<FeedMenuSectionsProps> = ({
         onSaveItem({ type: 'article', title: 'Новая статья', content: '', folder: currentFolder });
         onClose();
       }}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >
-      <FileText className="w-3.5 h-3.5 text-blue-400" />
+      <Icon name="entity.article" size="sm" tone="accent" />
       <span>Новая статья</span>
     </button>
 
-    <div className="my-0.5 border-t border-white/[0.06]" />
+    <div className="my-0.5 border-t border-tint-6" />
 
     <button
       onClick={() => {
         onOpenFolder(currentFolder);
         onClose();
       }}
-      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >
-      <FolderOpen className="w-3.5 h-3.5 text-zinc-400" />
+      <Icon name="entity.folderOpen" size="sm" />
       <span>Открыть папку в проводнике</span>
     </button>
 
@@ -70,13 +70,13 @@ export const FeedMenuSections: React.FC<FeedMenuSectionsProps> = ({
         onOpenSearch();
         onClose();
       }}
-      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-white/[0.06] hover:text-white transition-colors text-left cursor-pointer"
+      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >
       <div className="flex items-center gap-2">
-        <Search className="w-3.5 h-3.5 text-zinc-400" />
+        <Icon name="action.search" size="sm" />
         <span>Поиск</span>
       </div>
-      <span className="text-[10px] text-zinc-500 font-mono">⌘K</span>
+      <span className="text-3xs text-fg-muted font-mono">⌘K</span>
     </button>
   </>
 );

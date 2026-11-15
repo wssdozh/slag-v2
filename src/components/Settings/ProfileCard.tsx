@@ -1,6 +1,6 @@
 // The identity block: round photo with its edit menu, name and plan, the same on both screens.
 import React, { useRef, useState } from 'react';
-import { Camera, Pencil, Trash2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { accountClient } from '../../lib/sync/account';
@@ -14,7 +14,7 @@ const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 const PHOTO_MENU_ITEM =
   'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs text-fg-secondary ' +
-  'hover:bg-white/[0.06] hover:text-fg-primary transition-colors outline-none ring-0 cursor-pointer';
+  'hover:bg-tint-6 hover:text-fg-primary transition-colors outline-none ring-0 cursor-pointer';
 const PHOTO_MENU_ITEM_DANGER =
   'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs text-rose-400 ' +
   'hover:bg-rose-500/10 hover:text-rose-300 transition-colors outline-none ring-0 cursor-pointer';
@@ -89,7 +89,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
           avatarInputRef.current?.click();
         }}
       >
-        <Camera className="w-3.5 h-3.5 shrink-0" />
+        <Icon name="media.camera" size="sm" tone="inherit" className="shrink-0" />
         <span>Сменить фото</span>
       </button>
       {profile.avatar && (
@@ -103,7 +103,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
               save({ ...profile, avatar: undefined });
             }}
           >
-            <Trash2 className="w-3.5 h-3.5 shrink-0" />
+            <Icon name="action.delete" size="sm" tone="inherit" className="shrink-0" />
             <span>Убрать фото</span>
           </button>
         </>
@@ -122,7 +122,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
           onOpenChange={setIsMenuOpen}
           trigger={
             <IconButton size="sm" title="Изменить фото" aria-label="Изменить фото">
-              <Pencil className="w-3.5 h-3.5" />
+              <Icon name="action.edit" size="sm" tone="inherit" />
             </IconButton>
           }
         >

@@ -68,19 +68,19 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await expect(sortedBtn).toBeVisible();
 
     // Verify "Все" is active by default
-    await expect(allBtn).toHaveClass(/bg-white\/10/);
+    await expect(allBtn).toHaveClass(/bg-tint-10/);
 
     // Switch to "Разобранные"
     await sortedBtn.click();
-    await expect(sortedBtn).toHaveClass(/bg-white\/10/);
+    await expect(sortedBtn).toHaveClass(/bg-tint-10/);
 
     // Switch to "Неразобранные"
     await unsortedBtn.click();
-    await expect(unsortedBtn).toHaveClass(/bg-white\/10/);
+    await expect(unsortedBtn).toHaveClass(/bg-tint-10/);
 
     // Switch back to "Все"
     await allBtn.click();
-    await expect(allBtn).toHaveClass(/bg-white\/10/);
+    await expect(allBtn).toHaveClass(/bg-tint-10/);
     await page.keyboard.press('Escape');
   });
 
@@ -760,7 +760,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
     // 7. Switch to Month View
     await page.locator('button', { hasText: 'Месяц' }).click();
-    await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-white\/10/);
+    await expect(page.locator('button', { hasText: 'Месяц' })).toHaveClass(/bg-tint-10/);
 
     // Test Month day click directly opens ComposerModal
     const monthTodayBadge = page.locator('.grid-cols-7 .bg-white.text-canvas, .grid-cols-7 .bg-white.text-\\[\\#09090b\\]').first();

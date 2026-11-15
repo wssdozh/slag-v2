@@ -8,7 +8,7 @@ import {
   getTomorrowIso,
   getNextWeekIso,
 } from '../../lib/time/dateUtils';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface DatePickerPopoverProps {
@@ -110,7 +110,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
       onClick={(e) => e.stopPropagation()}
-      className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-white/[0.1] shadow-2xl shadow-black/90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
+      className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-tint-10 shadow-2xl shadow-scrim-90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
     >
       {/* Quick Presets */}
       <div className="grid grid-cols-3 gap-1">
@@ -120,7 +120,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
             onChange(getTodayIso());
             onClose();
           }}
-          className="px-2 py-1 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer text-center"
+          className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           Сегодня
         </button>
@@ -130,7 +130,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
             onChange(getTomorrowIso());
             onClose();
           }}
-          className="px-2 py-1 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer text-center"
+          className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           Завтра
         </button>
@@ -140,43 +140,43 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
             onChange(getNextWeekIso());
             onClose();
           }}
-          className="px-2 py-1 rounded-lg text-xs font-medium text-zinc-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer text-center"
+          className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           След. нед
         </button>
       </div>
 
-      <div className="h-px bg-white/[0.06] -mx-1" />
+      <div className="h-px bg-tint-6 -mx-1" />
 
       {/* Month Navigation */}
       <div className="flex items-center justify-between px-1">
         <button
           type="button"
           onClick={handlePrevMonth}
-          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="p-1 rounded-md text-fg-secondary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           title="Предыдущий месяц"
         >
-          <ChevronLeft className="w-4 h-4" />
+          <Icon name="nav.prev" size="md" tone="inherit" />
         </button>
 
-        <span className="text-xs font-semibold text-zinc-200">
+        <span className="text-xs font-semibold text-fg-soft">
           {RUSSIAN_MONTHS[currentMonth]} {currentYear}
         </span>
 
         <button
           type="button"
           onClick={handleNextMonth}
-          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="p-1 rounded-md text-fg-secondary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           title="Следующий месяц"
         >
-          <ChevronRight className="w-4 h-4" />
+          <Icon name="nav.next" size="md" tone="inherit" />
         </button>
       </div>
 
       {/* Weekday Labels */}
       <div className="grid grid-cols-7 gap-0.5 text-center">
         {RUSSIAN_WEEKDAYS.map(wd => (
-          <span key={wd} className="text-[10px] font-mono text-zinc-500 font-medium">
+          <span key={wd} className="text-3xs font-mono text-fg-muted font-medium">
             {wd}
           </span>
         ))}
@@ -202,8 +202,8 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
                   : isToday
                   ? 'border border-blue-500/50 text-blue-400 font-semibold hover:bg-blue-500/10'
                   : cell.isCurrentMonth
-                  ? 'text-zinc-200 hover:bg-white/[0.08] hover:text-white'
-                  : 'text-zinc-600 hover:bg-white/[0.04]'
+                  ? 'text-fg-soft hover:bg-tint-8 hover:text-white'
+                  : 'text-fg-dim hover:bg-tint-4'
               }`}
             >
               {cell.date.getDate()}
@@ -215,7 +215,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
       {/* Clear Button (if date is selected) */}
       {value && onClear && (
         <>
-          <div className="h-px bg-white/[0.06] -mx-1" />
+          <div className="h-px bg-tint-6 -mx-1" />
           <button
             type="button"
             onClick={() => {

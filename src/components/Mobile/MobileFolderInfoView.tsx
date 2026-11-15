@@ -5,8 +5,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Button } from '../UI/Button';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { FolderProfile } from '../FolderProfile/FolderProfile';
-import { ArrowUpDown, Plus } from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 /** Phone container: the profile fills the screen, editing happens in place. */
 export const MobileFolderInfoView: React.FC = () => {
   const {
@@ -25,7 +24,7 @@ export const MobileFolderInfoView: React.FC = () => {
         variant="secondary"
         size="md"
         className="flex-1"
-        icon={<Plus className="w-3.5 h-3.5" />}
+        icon={<Icon name="action.add" size="sm" tone="inherit" />}
         onClick={() => {
           setMobileFolderInfoOpen(false);
           openNewNote(currentFolder);
@@ -38,7 +37,7 @@ export const MobileFolderInfoView: React.FC = () => {
           variant="secondary"
           size="md"
           className="flex-1"
-          icon={<ArrowUpDown className="w-3.5 h-3.5 text-blue-400" />}
+          icon={<Icon name="action.sort" size="sm" tone="accent" />}
           onClick={() => {
             setMobileFolderInfoOpen(false);
             setIsTriageModalOpen(true);

@@ -1,7 +1,6 @@
 // Stepper input: minus/plus buttons and a typed value, clamped to min/max on blur.
 import React from 'react';
-import { Minus, Plus } from 'lucide-react';
-
+import { Icon } from './icons/Icon';
 export interface NumberInputProps {
   value: number;
   onChange: (value: number) => void;
@@ -56,7 +55,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
 
   return (
     <div
-      className={`inline-flex items-center h-8 bg-black/50 border border-white/[0.08] focus-within:border-white/20 rounded-lg overflow-hidden transition-colors ${
+      className={`inline-flex items-center h-8 bg-scrim-50 border border-tint-8 focus-within:border-tint-20 rounded-lg overflow-hidden transition-colors ${
         disabled ? 'opacity-40 cursor-not-allowed' : ''
       } ${className}`}
       aria-label={ariaLabel}
@@ -66,9 +65,9 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         onClick={handleDecrement}
         disabled={!canDec}
         aria-label="Уменьшить"
-        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        className="w-7 h-full flex items-center justify-center text-fg-secondary hover:text-white hover:bg-tint-6 motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
-        <Minus className="w-3 h-3" />
+        <Icon name="action.decrement" size="xs" tone="inherit" />
       </button>
 
       <input
@@ -89,9 +88,9 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         onClick={handleIncrement}
         disabled={!canInc}
         aria-label="Увеличить"
-        className="w-7 h-full flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/[0.06] motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
+        className="w-7 h-full flex items-center justify-center text-fg-secondary hover:text-white hover:bg-tint-6 motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
-        <Plus className="w-3 h-3" />
+        <Icon name="action.add" size="xs" tone="inherit" />
       </button>
     </div>
   );

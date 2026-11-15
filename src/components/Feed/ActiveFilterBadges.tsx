@@ -3,18 +3,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
-import {
-  FolderCheck,
-  Inbox,
-  StickyNote,
-  CheckSquare,
-  FileText,
-  Pin,
-  EyeOff,
-  Filter,
-  X,
-} from 'lucide-react';
-
+import { Icon } from '../UI/icons/Icon';
 export interface ActiveFilterBadgesProps {
   className?: string;
   badgeClassName?: string;
@@ -22,7 +11,7 @@ export interface ActiveFilterBadgesProps {
 
 export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
   className = '',
-  badgeClassName = 'h-6 text-[11px]',
+  badgeClassName = 'h-6 text-2xs',
 }) => {
   const {
     currentFolder,
@@ -72,11 +61,11 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Type Filter Badge */}
       {activeTypeFilter !== 'all' && (
         <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-300 font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
         >
-          {activeTypeFilter === 'note' && <StickyNote className="w-3 h-3 text-zinc-400" />}
-          {activeTypeFilter === 'task' && <CheckSquare className="w-3 h-3 text-zinc-400" />}
-          {activeTypeFilter === 'article' && <FileText className="w-3 h-3 text-zinc-400" />}
+          {activeTypeFilter === 'note' && <Icon name="entity.note" size="xs" />}
+          {activeTypeFilter === 'task' && <Icon name="entity.task" size="xs" />}
+          {activeTypeFilter === 'article' && <Icon name="entity.article" size="xs" />}
           <span>
             {activeTypeFilter === 'note'
               ? 'Заметки'
@@ -91,7 +80,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Сбросить фильтр по типу"
             aria-label="Сбросить фильтр по типу"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}
@@ -99,12 +88,12 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Inbox Mode Filter Badge */}
       {isInbox && inboxMode !== 'all' && (
         <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-300 font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
         >
           {inboxMode === 'sorted' ? (
-            <FolderCheck className="w-3 h-3 text-zinc-400" />
+            <Icon name="entity.folderFilter" size="xs" />
           ) : (
-            <Inbox className="w-3 h-3 text-zinc-400" />
+            <Icon name="entity.inbox" size="xs" />
           )}
           <span>{inboxMode === 'sorted' ? 'Разобранные' : 'Неразобранные'}</span>
           <button
@@ -114,7 +103,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Показать все входящие"
             aria-label="Сбросить фильтр входящих"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}
@@ -122,9 +111,9 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Pinned Filter Badge */}
       {isPinnedOnlyFilter && (
         <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-white/10 text-white font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1 px-2 rounded-md bg-tint-10 text-white font-mono shrink-0 ${badgeClassName}`}
         >
-          <Pin className="w-3 h-3 text-zinc-300" />
+          <Icon name="action.pin" size="xs" tone="tertiary" />
           <span>Закрепленные</span>
           <button
             type="button"
@@ -133,7 +122,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Показать все записи"
             aria-label="Сбросить фильтр закрепленных"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}
@@ -141,9 +130,9 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Hide Completed Tasks Badge */}
       {hideCompletedTasks && (
         <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-white/[0.06] border border-white/[0.08] text-zinc-400 font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-secondary font-mono shrink-0 ${badgeClassName}`}
         >
-          <EyeOff className="w-3 h-3 text-zinc-500" />
+          <Icon name="action.hide" size="xs" tone="muted" />
           <span>Без готовых</span>
           <button
             type="button"
@@ -151,7 +140,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
             title="Показать выполненные таски"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}
@@ -159,7 +148,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Tag Filter Badge */}
       {activeTagFilter && (
         <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-white/10 text-white font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1 px-2 rounded-md bg-tint-10 text-white font-mono shrink-0 ${badgeClassName}`}
         >
           <span>#{activeTagFilter}</span>
           <button
@@ -168,7 +157,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
             title="Сбросить фильтр тега"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}
@@ -176,9 +165,9 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* AI Item Filter Badge */}
       {aiItemFilter && (
         <div
-          className={`flex items-center gap-1.5 px-2 rounded-md bg-white/[0.08] border border-white/[0.12] text-zinc-200 font-mono shrink-0 ${badgeClassName}`}
+          className={`flex items-center gap-1.5 px-2 rounded-md bg-tint-8 border border-tint-12 text-fg-soft font-mono shrink-0 ${badgeClassName}`}
         >
-          <Filter className="w-3 h-3 text-zinc-400" />
+          <Icon name="action.filter" size="xs" />
           <span className="truncate max-w-[120px]">
             ИИ: "{aiItemFilter.queryLabel}"
           </span>
@@ -188,7 +177,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
             title="Сбросить фильтр ИИ"
           >
-            <X className="w-3 h-3" />
+            <Icon name="action.close" size="xs" tone="inherit" />
           </button>
         </div>
       )}

@@ -4,7 +4,7 @@ import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Button } from '../UI/Button';
-import { Database, FolderSync, HardDrive, Check, Trash2, Sparkles } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 
 export const VaultModal: React.FC = () => {
@@ -99,7 +99,7 @@ export const VaultModal: React.FC = () => {
       onClose={closeVaultModal}
       title="Новое хранилище"
       subtitle="Выберите тип и параметры хранения ваших заметок"
-      icon={<Database className="w-4 h-4 text-zinc-300" />}
+      icon={<Icon name="entity.vault" size="md" tone="tertiary" />}
       maxWidth="max-w-md"
       footer={footer}
     >
@@ -107,7 +107,7 @@ export const VaultModal: React.FC = () => {
         {/* Existing Vaults Section */}
         {vaults.length > 0 && (
           <div className="flex flex-col gap-2">
-            <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+            <div className="text-2xs font-semibold text-fg-secondary uppercase tracking-wider">
               Ваши хранилища ({vaults.length})
             </div>
             <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-0.5 scrollbar-thin">
@@ -118,29 +118,29 @@ export const VaultModal: React.FC = () => {
                     key={v.id}
                     className={`flex items-center justify-between px-3 py-2 rounded-xl border transition-colors ${
                       isCurrent
-                        ? 'bg-white/[0.08] border-white/20 text-white'
-                        : 'bg-white/[0.02] border-white/[0.06] text-zinc-300 hover:bg-white/[0.04]'
+                        ? 'bg-tint-8 border-tint-20 text-white'
+                        : 'bg-tint-2 border-tint-6 text-fg-tertiary hover:bg-tint-4'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-6 h-6 rounded-md bg-white/5 flex items-center justify-center shrink-0">
+                      <div className="w-6 h-6 rounded-md bg-tint-5 flex items-center justify-center shrink-0">
                         {v.mode === 'tauri' || v.mode === 'fsa' || v.path ? (
-                          <FolderSync className="w-3.5 h-3.5 text-zinc-400" />
+                          <Icon name="entity.folderSynced" size="sm" />
                         ) : (
-                          <Database className="w-3.5 h-3.5 text-zinc-400" />
+                          <Icon name="entity.vault" size="sm" />
                         )}
                       </div>
                       <div className="min-w-0 flex flex-col">
                         <div className="flex items-center gap-1.5">
                           <span className="text-xs font-medium truncate">{getVaultDisplayName(v, vaults)}</span>
                           {isCurrent && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-mono">
+                            <span className="text-3xs px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-mono">
                               активно
                             </span>
                           )}
                         </div>
                         {v.path && (
-                          <span className="text-[10px] text-zinc-500 font-mono truncate">{v.path}</span>
+                          <span className="text-3xs text-fg-muted font-mono truncate">{v.path}</span>
                         )}
                       </div>
                     </div>
@@ -150,7 +150,7 @@ export const VaultModal: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => switchVault(v.id)}
-                          className="px-2 py-1 rounded-md text-[11px] bg-white/[0.06] hover:bg-white/[0.12] text-zinc-200 transition-colors cursor-pointer"
+                          className="px-2 py-1 rounded-md text-2xs bg-tint-6 hover:bg-tint-12 text-fg-soft transition-colors cursor-pointer"
                         >
                           Переключить
                         </button>
@@ -160,9 +160,9 @@ export const VaultModal: React.FC = () => {
                           type="button"
                           onClick={() => deleteVault(v.id)}
                           title="Удалить хранилище"
-                          className="p-1.5 rounded-md text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-md text-fg-muted hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Icon name="action.delete" size="sm" tone="inherit" />
                         </button>
                       )}
                     </div>
@@ -173,8 +173,8 @@ export const VaultModal: React.FC = () => {
           </div>
         )}
 
-        <form id="vault-create-form" onSubmit={handleCreate} className="flex flex-col gap-4 pt-2 border-t border-white/[0.06]">
-          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+        <form id="vault-create-form" onSubmit={handleCreate} className="flex flex-col gap-4 pt-2 border-t border-tint-6">
+          <div className="text-2xs font-semibold text-fg-secondary uppercase tracking-wider">
             Создать новое хранилище
           </div>
         {/* Storage Type Selector */}
@@ -184,18 +184,18 @@ export const VaultModal: React.FC = () => {
             onClick={() => setStorageType('indexeddb')}
             className={`p-3.5 rounded-xl border text-left motion-surface cursor-pointer flex flex-col justify-between min-h-[86px] ${
               storageType === 'indexeddb'
-                ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
-                : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                ? 'bg-tint-8 border-tint-20 text-white shadow-sm'
+                : 'bg-tint-2 border-tint-6 text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
             }`}
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <HardDrive className={`w-4 h-4 ${storageType === 'indexeddb' ? 'text-zinc-100' : 'text-zinc-400'}`} />
-                <span className="text-xs font-medium text-zinc-100">Локальное</span>
+                <Icon name="entity.disk" size="md" tone="inherit" className={`${storageType === 'indexeddb' ? 'text-fg-primary' : 'text-fg-secondary'}`} />
+                <span className="text-xs font-medium text-fg-primary">Локальное</span>
               </div>
-              {storageType === 'indexeddb' && <Check className="w-3.5 h-3.5 text-zinc-200" />}
+              {storageType === 'indexeddb' && <Icon name="action.check" size="sm" tone="soft" />}
             </div>
-            <p className="text-[11px] text-zinc-400 leading-normal mt-2">
+            <p className="text-2xs text-fg-secondary leading-normal mt-2">
               Внутри приложения (IndexedDB)
             </p>
           </button>
@@ -205,18 +205,18 @@ export const VaultModal: React.FC = () => {
             onClick={() => setStorageType('disk')}
             className={`p-3.5 rounded-xl border text-left motion-surface cursor-pointer flex flex-col justify-between min-h-[86px] ${
               storageType === 'disk'
-                ? 'bg-white/[0.08] border-white/20 text-white shadow-sm'
-                : 'bg-white/[0.02] border-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.04]'
+                ? 'bg-tint-8 border-tint-20 text-white shadow-sm'
+                : 'bg-tint-2 border-tint-6 text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
             }`}
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
-                <FolderSync className={`w-4 h-4 ${storageType === 'disk' ? 'text-zinc-100' : 'text-zinc-400'}`} />
-                <span className="text-xs font-medium text-zinc-100">Папка на диске</span>
+                <Icon name="entity.folderSynced" size="md" tone="inherit" className={`${storageType === 'disk' ? 'text-fg-primary' : 'text-fg-secondary'}`} />
+                <span className="text-xs font-medium text-fg-primary">Папка на диске</span>
               </div>
-              {storageType === 'disk' && <Check className="w-3.5 h-3.5 text-zinc-200" />}
+              {storageType === 'disk' && <Icon name="action.check" size="sm" tone="soft" />}
             </div>
-            <p className="text-[11px] text-zinc-400 leading-normal mt-2">
+            <p className="text-2xs text-fg-secondary leading-normal mt-2">
               Файлы .md в выбранной папке
             </p>
           </button>
@@ -226,19 +226,19 @@ export const VaultModal: React.FC = () => {
         {storageType === 'disk' && (
           <div
             onClick={!diskPath ? handlePickFolder : undefined}
-            className={`p-3 rounded-xl bg-black/30 border border-white/[0.08] flex items-center justify-between gap-3 motion-fade ${
-              !diskPath ? 'cursor-pointer hover:border-white/20 hover:bg-black/40 transition-colors' : ''
+            className={`p-3 rounded-xl bg-scrim-30 border border-tint-8 flex items-center justify-between gap-3 motion-fade ${
+              !diskPath ? 'cursor-pointer hover:border-tint-20 hover:bg-scrim-40 transition-colors' : ''
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-white/5 border border-white/[0.06] flex items-center justify-center shrink-0">
-                <FolderSync className="w-4 h-4 text-zinc-300" />
+              <div className="w-7 h-7 rounded-lg bg-tint-5 border border-tint-6 flex items-center justify-center shrink-0">
+                <Icon name="entity.folderSynced" size="md" tone="tertiary" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-medium text-zinc-200 truncate">
+                <div className="text-xs font-medium text-fg-soft truncate">
                   {diskPath || 'Папка не выбрана'}
                 </div>
-                <div className="text-[10px] text-zinc-500 truncate">
+                <div className="text-3xs text-fg-muted truncate">
                   {diskPath ? 'Путь к хранилищу' : 'Укажите папку на диске для файлов .md'}
                 </div>
               </div>
@@ -260,7 +260,7 @@ export const VaultModal: React.FC = () => {
 
         {/* Vault Name Input */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-zinc-400">
+          <label className="text-xs font-medium text-fg-secondary">
             Название хранилища
           </label>
           <input
@@ -269,10 +269,10 @@ export const VaultModal: React.FC = () => {
             onChange={(e) => setName(e.target.value)}
             placeholder="например, work или notes"
             autoFocus
-            className="w-full bg-black/40 border border-white/[0.08] rounded-lg px-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-white/20 focus:outline-none transition-colors"
+            className="w-full bg-scrim-40 border border-tint-8 rounded-lg px-3 py-2 text-xs text-white placeholder-fg-muted focus:border-tint-20 focus:outline-none transition-colors"
           />
-          <p className="text-[11px] text-zinc-500 flex items-center gap-1.5 mt-0.5 select-none">
-            <Sparkles className="w-3 h-3 text-amber-400/80 shrink-0" />
+          <p className="text-2xs text-fg-muted flex items-center gap-1.5 mt-0.5 select-none">
+            <Icon name="system.ai" size="xs" tone="inherit" className="text-amber-400/80 shrink-0" />
             <span>В новом хранилище будут созданы только системные папки</span>
           </p>
         </div>

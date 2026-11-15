@@ -1,6 +1,6 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, PlugZap } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
@@ -55,10 +55,10 @@ export const SyncSettingsTab: React.FC = () => {
             </span>
             {status.error && <span className="text-danger">{status.error}</span>}
           </span>
-        } right={<IconButton size="lg" aria-label="Синхронизировать" title="Синхронизировать" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'}><RefreshCw className={`w-4 h-4 ${status.state === 'syncing' ? 'motion-safe:animate-spin' : ''}`} /></IconButton>} />
+        } right={<IconButton size="lg" aria-label="Синхронизировать" title="Синхронизировать" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'}><Icon name="action.refresh" size="md" tone="inherit" className={`${status.state === 'syncing' ? 'motion-safe:animate-spin' : ''}`} /></IconButton>} />
         <SettingsDivider />
         <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} right={
-          <IconButton size="lg" aria-label="Проверить" title="Проверить соединение с сервером" aria-busy={isTestingServer} onClick={() => void handleTestServerConnection()} disabled={isTestingServer}>{isTestingServer ? <RefreshCw className="w-4 h-4 motion-safe:animate-spin" /> : <PlugZap className="w-4 h-4" />}</IconButton>
+          <IconButton size="lg" aria-label="Проверить" title="Проверить соединение с сервером" aria-busy={isTestingServer} onClick={() => void handleTestServerConnection()} disabled={isTestingServer}>{isTestingServer ? <Icon name="action.refresh" size="md" tone="inherit" className="motion-safe:animate-spin" /> : <Icon name="system.connectionTest" size="md" tone="inherit" />}</IconButton>
         } />
         <SettingsDivider />
         <SettingsRow label="Синхронизировать при сохранении" right={<SettingsSwitch checked={config.autoSync} onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }} label="Синхронизировать при сохранении" />} />

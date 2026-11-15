@@ -1,7 +1,6 @@
 // The recorder plate that stands in for send on an empty draft: hold, tap to switch.
 import React from 'react';
-import { Mic, Video } from 'lucide-react';
-
+import { Icon } from '../../UI/icons/Icon';
 export interface ComposerRecordButtonProps {
   /** Which recorder a hold starts; a mobile tap flips between the two. */
   mediaType: 'audio' | 'video';
@@ -37,9 +36,9 @@ export const ComposerRecordButton: React.FC<ComposerRecordButtonProps> = ({
     aria-label={mediaType === 'audio' ? 'Записать голосовую заметку' : 'Записать видео'}
   >
     {mediaType === 'audio' ? (
-      <Mic className="w-4 h-4 transition-transform duration-150" />
+      <Icon name="media.microphone" size="md" tone="inherit" className="transition-transform duration-150" />
     ) : (
-      <Video className="w-4 h-4 transition-transform duration-150" />
+      <Icon name="media.video" size="md" tone="inherit" className="transition-transform duration-150" />
     )}
   </button>
 );

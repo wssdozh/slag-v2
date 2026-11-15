@@ -1,7 +1,7 @@
 // The overdue block above the week: counted, tinted red, and absent when empty.
 import React from 'react';
 import type { SlagItem } from '../../../types';
-import { AlertCircle } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { CalendarTaskRow } from './CalendarTaskRow';
 
 export interface AgendaOverdueSectionProps {
@@ -23,12 +23,12 @@ export const AgendaOverdueSection: React.FC<AgendaOverdueSectionProps> = ({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-rose-400 px-1">
-        <AlertCircle className="w-3.5 h-3.5" />
+        <Icon name="status.alert" size="sm" tone="inherit" />
         <span>Просрочено</span>
-        <span className="text-[10px] font-mono opacity-80">({tasks.length})</span>
+        <span className="text-3xs font-mono opacity-80">({tasks.length})</span>
       </div>
 
-      <div className="rounded-2xl bg-surface/80 border border-rose-500/20 overflow-hidden divide-y divide-white/[0.04]">
+      <div className="rounded-2xl bg-surface/80 border border-rose-500/20 overflow-hidden divide-y divide-tint-4">
         {tasks.map(task => (
           <CalendarTaskRow
             key={task.id}

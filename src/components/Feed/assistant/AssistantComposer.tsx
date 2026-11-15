@@ -1,6 +1,6 @@
 // The assistant's input row: model picker, send, and a nudge to connect when no key.
 import React from 'react';
-import { Globe } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import { useApp } from '../../../context/AppContext';
 import { BaseComposer } from '../BaseComposer';
 import { Select } from '../../UI/Select';
@@ -89,7 +89,7 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
                   title="Локальный режим без ключа. Нажмите, чтобы настроить API-ключ (⌘,)"
                   aria-label="Локальный режим, открыть настройки API-ключа"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-fg-dim shrink-0" />
                   <span className="min-w-0 truncate">Локальный</span>
                 </button>
               )}
@@ -101,7 +101,7 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
                 aria-label="Глубина рассуждений модели"
                 title="Глубина рассуждений модели: Off / Low / Med / High"
               >
-                <span className="text-zinc-500 pl-0.5" aria-hidden="true">R:</span>
+                <span className="text-fg-muted pl-0.5" aria-hidden="true">R:</span>
                 <Select
                   size="md"
                   variant="ghost"
@@ -131,7 +131,7 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
                 aria-label="Поиск в интернете"
                 aria-pressed={aiSettings.webSearchEnabled}
               >
-                <Globe className="w-4 h-4" />
+                <Icon name="system.web" size="md" tone="inherit" />
                 <span className="hidden sm:inline">Сеть</span>
               </button>
             </div>

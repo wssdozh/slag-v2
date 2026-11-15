@@ -1,6 +1,6 @@
 // The round accent arrow that confirms: send, attach or save, one plate for all forms.
 import React from 'react';
-import { ArrowUp } from 'lucide-react';
+import { Icon } from './icons/Icon';
 
 export interface SendButtonProps {
   onClick: React.MouseEventHandler<HTMLButtonElement>;
@@ -15,7 +15,6 @@ export interface SendButtonProps {
 }
 
 const BOX: Record<'sm' | 'lg', string> = { sm: 'h-9 w-9', lg: 'h-12 w-12' };
-const ICON: Record<'sm' | 'lg', string> = { sm: 'h-4 w-4', lg: 'h-5 w-5' };
 
 /**
  * The one confirm plate: the composer sends a note with it, the picker attaches, the editor
@@ -43,6 +42,6 @@ export const SendButton: React.FC<SendButtonProps> = ({
         : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
     } ${className}`}
   >
-    <ArrowUp className={ICON[size]} strokeWidth={2.5} />
+    <Icon name="action.send" size={size === 'sm' ? 'md' : 'lg'} strokeWidth={2.5} />
   </button>
 );

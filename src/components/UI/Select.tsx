@@ -1,7 +1,7 @@
 // The app's own select: grouped options, icons, colours, a portal list and placement.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check } from 'lucide-react';
+import { Icon } from './icons/Icon';
 import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface SelectOption {
@@ -244,18 +244,18 @@ export const Select: React.FC<SelectProps> = ({
             bottom: calculatedDirection === 'up' ? `${window.innerHeight - effectiveCoords.top}px` : undefined,
             minWidth: `${effectiveCoords.width}px`,
           }}
-          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-white/[0.1] shadow-2xl shadow-black/90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
+          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
         >
           {/* Subtle Search Query Badge when user types */}
           {searchQuery && (
-            <div className="flex items-center justify-between px-2.5 py-1 text-[10px] font-mono text-zinc-400 bg-white/[0.04] rounded-lg border-b border-white/[0.06] mb-0.5">
+            <div className="flex items-center justify-between px-2.5 py-1 text-3xs font-mono text-fg-secondary bg-tint-4 rounded-lg border-b border-tint-6 mb-0.5">
               <span className="truncate">Поиск: <span className="text-white font-semibold">«{searchQuery}»</span></span>
-              <span className="text-zinc-500 shrink-0">{filteredOptions.length}</span>
+              <span className="text-fg-muted shrink-0">{filteredOptions.length}</span>
             </div>
           )}
 
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-3 text-center text-xs text-zinc-500 font-mono select-none">
+            <div className="px-3 py-3 text-center text-xs text-fg-muted font-mono select-none">
               Ничего не найдено
             </div>
           ) : (
@@ -267,7 +267,7 @@ export const Select: React.FC<SelectProps> = ({
               return (
                 <React.Fragment key={opt.value}>
                   {showDivider && (
-                    <div className="h-px bg-white/[0.08] my-1 mx-1 shrink-0" />
+                    <div className="h-px bg-tint-8 my-1 mx-1 shrink-0" />
                   )}
                   <button
                     type="button"
@@ -279,22 +279,22 @@ export const Select: React.FC<SelectProps> = ({
                     onClick={() => handleSelect(opt.value, opt.disabled)}
                     className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
                       opt.disabled
-                        ? 'opacity-40 cursor-not-allowed text-zinc-600'
+                        ? 'opacity-40 cursor-not-allowed text-fg-dim'
                         : isSelected
-                        ? 'bg-white/10 text-white font-medium'
+                        ? 'bg-tint-10 text-white font-medium'
                         : isHighlighted
-                        ? 'bg-white/[0.06] text-white'
-                        : 'text-zinc-300 hover:text-white hover:bg-white/[0.06]'
+                        ? 'bg-tint-6 text-white'
+                        : 'text-fg-tertiary hover:text-white hover:bg-tint-6'
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
                       {opt.icon && <span className="shrink-0">{opt.icon}</span>}
-                      <span className={`truncate ${opt.mono ? 'font-mono whitespace-pre' : ''} ${opt.color || (isSelected ? 'text-white' : 'text-zinc-300')}`}>
+                      <span className={`truncate ${opt.mono ? 'font-mono whitespace-pre' : ''} ${opt.color || (isSelected ? 'text-white' : 'text-fg-tertiary')}`}>
                         {opt.label}
                       </span>
                     </div>
                     {isSelected && (
-                      <Check className="w-3.5 h-3.5 text-white shrink-0 stroke-[2.5]" />
+                      <Icon name="action.check" size="sm" tone="primary" className="shrink-0 stroke-[2.5]" />
                     )}
                   </button>
                 </React.Fragment>
@@ -322,27 +322,23 @@ export const Select: React.FC<SelectProps> = ({
         className={`w-full flex items-center justify-between gap-1 motion-press cursor-pointer text-left ${
           variant === 'ghost'
             ? isSmall
-              ? 'h-6 px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
-              : 'h-ctrl-md px-1.5 text-xs rounded-md bg-transparent hover:bg-white/[0.06] text-zinc-300 hover:text-white border-0'
+              ? 'h-6 px-1.5 text-xs rounded-md bg-transparent hover:bg-tint-6 text-fg-tertiary hover:text-white border-0'
+              : 'h-ctrl-md px-1.5 text-xs rounded-md bg-transparent hover:bg-tint-6 text-fg-tertiary hover:text-white border-0'
             : isSmall
-              ? 'h-ctrl-sm px-2 text-xs rounded-md bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-zinc-300'
-              : 'h-ctrl-md px-3 text-xs rounded-lg bg-black/50 hover:bg-black/70 border border-white/[0.08] focus:border-white/20 text-zinc-200'
+              ? 'h-ctrl-sm px-2 text-xs rounded-md bg-tint-4 hover:bg-tint-8 border border-tint-8 text-fg-tertiary'
+              : 'h-ctrl-md px-3 text-xs rounded-lg bg-scrim-50 hover:bg-scrim-70 border border-tint-8 focus:border-tint-20 text-fg-soft'
         } ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${triggerClassName}`}
       >
         <span className="truncate flex items-center gap-1.5">
           {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
           {showLabel && (
-            <span className={selectedOption?.color || (selectedOption ? 'text-zinc-200' : 'text-zinc-500')}>
+            <span className={selectedOption?.color || (selectedOption ? 'text-fg-soft' : 'text-fg-muted')}>
               {selectedOption ? (selectedOption.triggerLabel ?? selectedOption.label) : placeholder}
             </span>
           )}
         </span>
         {showArrow && (
-          <ChevronDown
-            className={`shrink-0 transition-transform duration-150 text-zinc-500 ${
-              isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'
-            } ${isOpen ? 'rotate-180 text-zinc-300' : ''}`}
-          />
+          <Icon name="nav.down" size="none" tone="muted" className={`shrink-0 transition-transform duration-150 ${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${isOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
         )}
       </button>
 

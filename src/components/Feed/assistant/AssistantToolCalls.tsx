@@ -1,6 +1,6 @@
 // The mono trace of tool calls a reply made: name plus the query it ran, nothing else.
 import React from 'react';
-import { Terminal } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { ChatToolCall } from '../../../types';
 
 interface AssistantToolCallsProps {
@@ -13,12 +13,12 @@ export const AssistantToolCalls: React.FC<AssistantToolCallsProps> = ({ toolCall
       {toolCalls.map((tc, idx) => (
         <div
           key={idx}
-          className="flex items-center gap-1.5 text-2xs font-mono text-zinc-500 min-w-0"
+          className="flex items-center gap-1.5 text-2xs font-mono text-fg-muted min-w-0"
         >
-          <Terminal className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
-          <span className="text-zinc-400 shrink-0">{tc.name}</span>
+          <Icon name="system.logs" size="none" tone="dim" className="w-2.5 h-2.5 shrink-0" />
+          <span className="text-fg-secondary shrink-0">{tc.name}</span>
           {tc.args?.query && (
-            <span className="text-zinc-500 truncate max-w-[200px] min-w-0">("{tc.args.query}")</span>
+            <span className="text-fg-muted truncate max-w-[200px] min-w-0">("{tc.args.query}")</span>
           )}
         </div>
       ))}

@@ -4,7 +4,8 @@ import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { BaseModal } from './BaseModal';
 import { Composer } from '../Feed/Composer';
-import { CheckSquare, StickyNote, FileText } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
+import type { IconName } from '../UI/icons/icons';
 
 export const ComposerModal: React.FC = () => {
   const { isComposerModalOpen, closeComposerModal, composerModalOptions, currentFolder } = useApp();
@@ -24,7 +25,7 @@ export const ComposerModal: React.FC = () => {
 
   const itemType = options?.type || 'task';
   const title = itemType === 'task' ? 'Новая задача' : itemType === 'article' ? 'Новая статья' : 'Новая заметка';
-  const Icon = itemType === 'task' ? CheckSquare : itemType === 'article' ? FileText : StickyNote;
+  const iconName: IconName = itemType === 'task' ? 'entity.task' : itemType === 'article' ? 'entity.article' : 'entity.note';
 
   return (
     <BaseModal
@@ -33,8 +34,8 @@ export const ComposerModal: React.FC = () => {
       onClose={closeComposerModal}
       title={
         <div className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-blue-400" />
-          <span className="text-sm font-medium text-zinc-200">{title}</span>
+          <Icon name={iconName} size="md" tone="accent" />
+          <span className="text-sm font-medium text-fg-soft">{title}</span>
         </div>
       }
       maxWidth="max-w-2xl"

@@ -1,6 +1,6 @@
 // The phone picker: photo, video, audio and file tabs over one selection, plus fullscreen.
 import React, { useRef, useState } from 'react';
-import { Maximize2, Mic, Minimize2 } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { ResponsiveSegmented, type SegmentedOption } from '../UI/ResponsiveSegmented';
 import { FolderBrowser } from './FolderBrowser';
 import { MediaGrid } from './MediaGrid';
@@ -62,7 +62,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
           aria-label={isFullscreen ? 'Свернуть' : 'На весь экран'}
           className="absolute right-0 top-0 cursor-pointer rounded-md p-1.5 text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg-primary"
         >
-          {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {isFullscreen ? <Icon name="action.collapse" size="sm" tone="inherit" /> : <Icon name="action.expand" size="sm" tone="inherit" />}
         </button>
       </div>
 
@@ -75,7 +75,7 @@ export const MobilePicker: React.FC<MobilePickerProps> = ({
             onClick={onRecordVoice}
             className="flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md bg-surface py-2 text-xs font-medium text-fg-primary transition-colors hover:bg-surface-hover"
           >
-            <Mic className="h-3.5 w-3.5" /> Записать голос
+            <Icon name="media.microphone" size="sm" tone="inherit" /> Записать голос
           </button>
           <MediaGrid
             kind="audio"

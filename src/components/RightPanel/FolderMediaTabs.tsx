@@ -1,13 +1,7 @@
 // Folder media browser: images, audio, files, links and tags in one tab strip.
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
-import {
-  Image as ImageIcon,
-  Mic,
-  File,
-  Link as LinkIcon,
-  Tag as TagIcon,
-  ExternalLink
-} from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
+import type { IconName } from '../UI/icons/icons';
 import { AudioPlayer } from '../UI/AudioPlayer';
 import type { FolderMediaData } from './useFolderMedia';
 import type { FolderMediaTabId, LightboxImage } from '../../types';
@@ -88,23 +82,23 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
     return () => window.removeEventListener('resize', updateIndicators);
   }, [updateIndicators]);
 
-  const tabDefs = [
-    { id: 'media' as const, label: isMobile ? 'Фото' : 'Медиа', icon: ImageIcon, count: allImages.length },
-    { id: 'audio' as const, label: 'Аудио', icon: Mic, count: allAudio.length },
-    { id: 'files' as const, label: 'Файлы', icon: File, count: allFiles.length },
-    { id: 'links' as const, label: 'Ссылки', icon: LinkIcon, count: allLinks.length },
-    { id: 'tags' as const, label: 'Теги', icon: TagIcon, count: folderTags.size },
+  const tabDefs: { id: FolderMediaTabId; label: string; icon: IconName; count: number }[] = [
+    { id: 'media', label: isMobile ? 'Фото' : 'Медиа', icon: 'entity.image', count: allImages.length },
+    { id: 'audio', label: 'Аудио', icon: 'media.microphone', count: allAudio.length },
+    { id: 'files', label: 'Файлы', icon: 'entity.file', count: allFiles.length },
+    { id: 'links', label: 'Ссылки', icon: 'entity.link', count: allLinks.length },
+    { id: 'tags', label: 'Теги', icon: 'entity.tag', count: folderTags.size },
   ];
 
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
       {/* Tabs Header */}
       {isMobile ? (
-        <div ref={mobileTabBarRef} className="relative flex items-center gap-1 bg-surface/90 p-1 rounded-2xl border border-white/[0.06] overflow-x-auto scrollbar-none select-none">
+        <div ref={mobileTabBarRef} className="relative flex items-center gap-1 bg-surface/90 p-1 rounded-2xl border border-tint-6 overflow-x-auto scrollbar-none select-none">
           {mobileTabIndicator.ready && (
             <div
               data-testid="folder-media-pill"
-              className="absolute top-1 bottom-1 left-0 rounded-xl bg-white/10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+              className="absolute top-1 bottom-1 left-0 rounded-xl bg-tint-10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
               style={{
                 transform: `translateX(${mobileTabIndicator.left}px)`,
                 width: `${mobileTabIndicator.width}px`,
@@ -113,7 +107,6 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
             />
           )}
           {tabDefs.map(tab => {
-            const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -123,13 +116,13 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative z-10 shrink-0 px-2.5 py-1.5 rounded-xl text-xs font-medium motion-press flex items-center gap-1 cursor-pointer whitespace-nowrap ${
                   isActive
-                    ? `${mobileTabIndicator.ready ? '' : 'bg-white/10'} text-white font-semibold`
-                    : 'text-zinc-400 hover:text-white hover:bg-white/[0.04]'
+                    ? `${mobileTabIndicator.ready ? '' : 'bg-tint-10'} text-white font-semibold`
+                    : 'text-fg-secondary hover:text-white hover:bg-tint-4'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <Icon name={tab.icon} size="sm" tone="inherit" className="shrink-0" />
                 <span>{tab.label}</span>
-                <span className={`text-[10px] font-mono shrink-0 ${isActive ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                <span className={`text-3xs font-mono shrink-0 ${isActive ? 'text-fg-soft' : 'text-fg-muted'}`}>
                   ({tab.count})
                 </span>
               </button>
@@ -137,7 +130,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
           })}
         </div>
       ) : (
-        <div ref={desktopTabBarRef} className="relative flex items-center gap-1 border-b border-white/[0.06] pb-1 overflow-x-auto scrollbar-none select-none">
+        <div ref={desktopTabBarRef} className="relative flex items-center gap-1 border-b border-tint-6 pb-1 overflow-x-auto scrollbar-none select-none">
           {desktopTabIndicator.ready && (
             <span
               className="absolute bottom-[-1px] left-0 h-[2px] bg-white rounded-full transition-[transform,width] duration-200 pointer-events-none"
@@ -154,16 +147,16 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
               data-media-tab={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`relative pb-1 px-2 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              className={`relative pb-1 px-2 text-2xs font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
+                  : 'text-fg-muted hover:text-fg-tertiary'
               }`}
             >
               <span>{tab.label}</span>
               {tab.count > 0 && (
-                <span className={`text-[10px] font-mono px-1 py-0.2 rounded ${
-                  activeTab === tab.id ? 'bg-white/10 text-zinc-300' : 'bg-white/[0.04] text-zinc-500'
+                <span className={`text-3xs font-mono px-1 py-0.2 rounded ${
+                  activeTab === tab.id ? 'bg-tint-10 text-fg-tertiary' : 'bg-tint-4 text-fg-muted'
                 }`}>
                   {tab.count}
                 </span>
@@ -178,7 +171,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
         {/* Media / Photos */}
         {activeTab === 'media' && (
           allImages.length === 0 ? (
-            <p className="text-center text-xs text-zinc-500 py-8">
+            <p className="text-center text-xs text-fg-muted py-8">
               {isMobile ? 'В этой папке нет изображений' : 'Нет фото в этой папке'}
             </p>
           ) : (
@@ -187,7 +180,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                 <div
                   key={(img.id || img.url) + idx}
                   onClick={() => onOpenLightbox(allImages, idx)}
-                  className={`aspect-square overflow-hidden bg-black/40 border border-white/[0.06] cursor-pointer hover:opacity-90 transition-opacity ${
+                  className={`aspect-square overflow-hidden bg-scrim-40 border border-tint-6 cursor-pointer hover:opacity-90 transition-opacity ${
                     isMobile ? 'rounded-xl' : 'rounded'
                   }`}
                 >
@@ -201,7 +194,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
         {/* Audio Notes */}
         {activeTab === 'audio' && (
           allAudio.length === 0 ? (
-            <p className="text-center text-xs text-zinc-500 py-8">
+            <p className="text-center text-xs text-fg-muted py-8">
               {isMobile ? 'В этой папке нет голосовых заметок' : 'Нет аудиозаписей'}
             </p>
           ) : (
@@ -209,9 +202,9 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
               {allAudio.map(aud => (
                 <div
                   key={aud.id}
-                  className={isMobile ? 'p-3 rounded-xl bg-surface border border-white/[0.06]' : 'p-1'}
+                  className={isMobile ? 'p-3 rounded-xl bg-surface border border-tint-6' : 'p-1'}
                 >
-                  {isMobile && <div className="text-xs text-zinc-300 font-medium mb-1.5">{aud.name}</div>}
+                  {isMobile && <div className="text-xs text-fg-tertiary font-medium mb-1.5">{aud.name}</div>}
                   <AudioPlayer
                     src={aud.url}
                     extractedText={aud.extractedText}
@@ -226,7 +219,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
         {/* Files */}
         {activeTab === 'files' && (
           allFiles.length === 0 ? (
-            <p className="text-center text-xs text-zinc-500 py-8">
+            <p className="text-center text-xs text-fg-muted py-8">
               {isMobile ? 'В этой папке нет документов' : 'Нет прикрепленных файлов'}
             </p>
           ) : (
@@ -236,15 +229,15 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   key={file.id}
                   href={file.url}
                   download={file.name}
-                  className={`flex items-center justify-between p-2 rounded bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] text-xs transition-colors ${
-                    isMobile ? 'p-3 rounded-xl bg-surface border-white/[0.06]' : ''
+                  className={`flex items-center justify-between p-2 rounded bg-tint-2 hover:bg-tint-5 border border-tint-4 text-xs transition-colors ${
+                    isMobile ? 'p-3 rounded-xl bg-surface border-tint-6' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <File className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
-                    <span className="truncate text-zinc-300">{file.name}</span>
+                    <Icon name="entity.file" size="sm" className="shrink-0" />
+                    <span className="truncate text-fg-tertiary">{file.name}</span>
                   </div>
-                  <span className="text-[10px] font-mono text-zinc-500 shrink-0 ml-2">
+                  <span className="text-3xs font-mono text-fg-muted shrink-0 ml-2">
                     {Math.round(file.size / 1024)} KB
                   </span>
                 </a>
@@ -256,7 +249,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
         {/* Links */}
         {activeTab === 'links' && (
           allLinks.length === 0 ? (
-            <p className="text-center text-xs text-zinc-500 py-8">
+            <p className="text-center text-xs text-fg-muted py-8">
               {isMobile ? 'В этой папке нет веб-ссылок' : 'Нет ссылок'}
             </p>
           ) : (
@@ -267,17 +260,17 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`flex items-center gap-2 p-2 rounded bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.04] text-xs text-zinc-300 transition-colors group ${
-                    isMobile ? 'justify-between p-3 rounded-xl bg-surface border-white/[0.06]' : ''
+                  className={`flex items-center gap-2 p-2 rounded bg-tint-2 hover:bg-tint-5 border border-tint-4 text-xs text-fg-tertiary transition-colors group ${
+                    isMobile ? 'justify-between p-3 rounded-xl bg-surface border-tint-6' : ''
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-zinc-300 shrink-0" />
-                    <span className="truncate text-zinc-300 group-hover:text-white">
+                    <Icon name="nav.externalLink" size="sm" tone="inherit" className="text-fg-muted group-hover:text-fg-tertiary shrink-0" />
+                    <span className="truncate text-fg-tertiary group-hover:text-white">
                       {link.text}
                     </span>
                   </div>
-                  {isMobile && <ExternalLink className="w-3.5 h-3.5 text-zinc-500 shrink-0 ml-2" />}
+                  {isMobile && <Icon name="nav.externalLink" size="sm" tone="inherit" className="text-fg-muted shrink-0 ml-2" />}
                 </a>
               ))}
             </div>
@@ -287,7 +280,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
         {/* Tags */}
         {activeTab === 'tags' && (
           folderTags.size === 0 ? (
-            <p className="text-center text-xs text-zinc-500 py-8">
+            <p className="text-center text-xs text-fg-muted py-8">
               {isMobile ? 'В этой папке нет тегов' : 'Нет тегов'}
             </p>
           ) : (
@@ -297,7 +290,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
                   key={tag}
                   type="button"
                   onClick={() => onSelectTag?.(tag)}
-                  className="px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] text-xs font-mono text-zinc-300 transition-colors cursor-pointer"
+                  className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-8 text-xs font-mono text-fg-tertiary transition-colors cursor-pointer"
                 >
                   #{tag}
                 </button>

@@ -1,20 +1,6 @@
 // The transport row: play, skip, speed, shuffle, loop, mute, and the queue toggle.
 import React from 'react';
-import {
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  RotateCcw,
-  RotateCw,
-  Repeat,
-  Repeat1,
-  Shuffle,
-  Volume2,
-  VolumeX,
-  ListMusic,
-} from 'lucide-react';
-
+import { Icon } from '../../UI/icons/Icon';
 interface AudioTransportProps {
   isPlaying: boolean;
   isLoop: boolean;
@@ -57,21 +43,21 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
         {/* -10s */}
         <button
           onClick={() => onSkipTime(-10)}
-          className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+          className="w-8 h-8 rounded-full text-fg-secondary hover:text-white hover:bg-tint-6 flex items-center justify-center transition-colors cursor-pointer"
           title="Назад на 10 секунд (←)"
           aria-label="Назад на 10 секунд"
         >
-          <RotateCcw className="w-4 h-4" />
+          <Icon name="action.retry" size="md" tone="inherit" />
         </button>
 
         {/* Prev */}
         <button
           onClick={onPrevTrack}
-          className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
+          className="w-9 h-9 rounded-full text-fg-tertiary hover:text-white hover:bg-tint-8 flex items-center justify-center transition-colors cursor-pointer"
           title="Предыдущий трек"
           aria-label="Предыдущий трек"
         >
-          <SkipBack className="w-5 h-5 fill-current" />
+          <Icon name="media.skipBack" size="lg" tone="inherit" className="fill-current" />
         </button>
 
         {/* Central Round Play / Pause */}
@@ -87,76 +73,76 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
           aria-label={isTrackMissing ? 'Файла нет на устройстве' : isPlaying ? 'Пауза' : 'Воспроизведение'}
         >
           {isPlaying ? (
-            <Pause className="w-6 h-6 fill-current" />
+            <Icon name="media.pause" size="none" tone="inherit" className="w-6 h-6 fill-current" />
           ) : (
-            <Play className="w-6 h-6 fill-current ml-0.5" />
+            <Icon name="media.play" size="none" tone="inherit" className="w-6 h-6 fill-current ml-0.5" />
           )}
         </button>
 
         {/* Next */}
         <button
           onClick={onNextTrack}
-          className="w-9 h-9 rounded-full text-zinc-300 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-colors cursor-pointer"
+          className="w-9 h-9 rounded-full text-fg-tertiary hover:text-white hover:bg-tint-8 flex items-center justify-center transition-colors cursor-pointer"
           title="Следующий трек"
           aria-label="Следующий трек"
         >
-          <SkipForward className="w-5 h-5 fill-current" />
+          <Icon name="media.skipForward" size="lg" tone="inherit" className="fill-current" />
         </button>
 
         {/* +10s */}
         <button
           onClick={() => onSkipTime(10)}
-          className="w-8 h-8 rounded-full text-zinc-400 hover:text-white hover:bg-white/[0.06] flex items-center justify-center transition-colors cursor-pointer"
+          className="w-8 h-8 rounded-full text-fg-secondary hover:text-white hover:bg-tint-6 flex items-center justify-center transition-colors cursor-pointer"
           title="Вперед на 10 секунд (→)"
           aria-label="Вперед на 10 секунд"
         >
-          <RotateCw className="w-4 h-4" />
+          <Icon name="media.seekForward" size="md" tone="inherit" />
         </button>
       </div>
 
       {/* 6. Utility Controls Row: Queue, Shuffle, Loop | Speed, Volume */}
-      <div className="flex items-center justify-between w-full max-w-[270px] text-zinc-400 select-none mt-5">
+      <div className="flex items-center justify-between w-full max-w-[270px] text-fg-secondary select-none mt-5">
         {/* Queue Button */}
         <button
           onClick={onOpenPlaylist}
-          className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           title="Очередь воспроизведения"
           aria-label="Очередь воспроизведения"
         >
-          <ListMusic className="w-4 h-4" />
+          <Icon name="media.queue" size="md" tone="inherit" />
         </button>
 
         {/* Shuffle Button */}
         <button
           onClick={onToggleShuffle}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isShuffle ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
+            isShuffle ? 'text-white bg-tint-10' : 'hover:text-white hover:bg-tint-8'
           }`}
           title={isShuffle ? 'Перемешивание включено' : 'Перемешивание выключено'}
           aria-label="Перемешать"
         >
-          <Shuffle className="w-4 h-4" />
+          <Icon name="media.shuffle" size="md" tone="inherit" />
         </button>
 
         {/* Loop Button */}
         <button
           onClick={onToggleLoop}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-            isLoop ? 'text-white bg-white/10' : 'hover:text-white hover:bg-white/[0.08]'
+            isLoop ? 'text-white bg-tint-10' : 'hover:text-white hover:bg-tint-8'
           }`}
           title={isLoop ? 'Повтор включен' : 'Повтор выключен'}
           aria-label="Повтор"
         >
-          {isLoop ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
+          {isLoop ? <Icon name="time.repeatOne" size="md" tone="inherit" /> : <Icon name="time.repeat" size="md" tone="inherit" />}
         </button>
 
         {/* Subtle Vertical Divider */}
-        <div className="h-4 w-px bg-white/15 mx-0.5" />
+        <div className="h-4 w-px bg-tint-15 mx-0.5" />
 
         {/* Playback Speed */}
         <button
           onClick={onToggleSpeed}
-          className="px-2 py-1 rounded text-[11px] font-mono text-zinc-300 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="px-2 py-1 rounded text-2xs font-mono text-fg-tertiary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           title="Скорость воспроизведения"
           aria-label="Скорость"
         >
@@ -166,14 +152,14 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
         {/* Volume / Mute Button */}
         <button
           onClick={onToggleMute}
-          className="p-1.5 rounded-lg hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
           title={isMuted ? 'Включить звук' : 'Выключить звук'}
           aria-label="Громкость"
         >
           {isMuted ? (
-            <VolumeX className="w-4 h-4 text-red-400" />
+            <Icon name="media.volumeOff" size="md" tone="danger" />
           ) : (
-            <Volume2 className="w-4 h-4" />
+            <Icon name="media.volumeOn" size="md" tone="inherit" />
           )}
         </button>
       </div>

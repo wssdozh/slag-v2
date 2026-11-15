@@ -1,6 +1,6 @@
 // Pictures on a card: one hero or a deck of thumbs, each with OCR text to unfold.
 import React, { memo, useMemo, useState } from 'react';
-import { ChevronDown, FileText, ImageOff, Loader2, Sparkles } from 'lucide-react';
+import { Icon } from '../../UI/icons/Icon';
 import type { AttachmentSrcs } from '../../../hooks/media/useAttachmentSrc';
 import type { SlagAttachment } from '../../../types';
 import {
@@ -30,10 +30,10 @@ const MissingMedia: React.FC<{ name: string }> = ({ name }) => (
   <span
     data-testid="media-missing"
     title={`Файл не найден: ${name}`}
-    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-white/[0.04] text-fg-dim"
+    className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-tint-4 text-fg-dim"
   >
-    <ImageOff className="h-4 w-4" />
-    <span className="font-mono text-[10px]">нет файла</span>
+    <Icon name="entity.imageMissing" size="md" tone="inherit" />
+    <span className="font-mono text-3xs">нет файла</span>
   </span>
 );
 
@@ -42,7 +42,7 @@ const LoadingMedia: React.FC = () => (
   <span
     data-testid="media-skeleton"
     aria-hidden
-    className="absolute inset-0 bg-white/[0.04] motion-safe:animate-pulse"
+    className="absolute inset-0 bg-tint-4 motion-safe:animate-pulse"
   />
 );
 
@@ -130,16 +130,16 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                   e.stopPropagation();
                   onToggleOcr(hero.id);
                 }}
-                className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
+                className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-scrim-80 hover:bg-scrim-90 border border-tint-15 text-fg-tertiary hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                 title={expandedOcrIds.has(hero.id) ? 'Скрыть текст' : 'Показать текст с фото'}
               >
-                <FileText className="w-3.5 h-3.5 text-zinc-300" />
+                <Icon name="entity.article" size="sm" tone="tertiary" />
                 <span>Текст</span>
-                <ChevronDown className={`w-3 h-3 text-zinc-400 transition-transform ${expandedOcrIds.has(hero.id) ? 'rotate-180' : ''}`} />
+                <Icon name="nav.down" size="xs" className={`transition-transform ${expandedOcrIds.has(hero.id) ? 'rotate-180' : ''}`} />
               </button>
             ) : hero.enrichmentStatus === 'processing' ? (
-              <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 border border-white/15 text-zinc-300 text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
+              <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-scrim-80 border border-tint-15 text-fg-tertiary text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
+                <Icon name="status.loading" size="sm" className="animate-spin" />
                 <span>Анализ...</span>
               </div>
             ) : (
@@ -150,10 +150,10 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                   e.stopPropagation();
                   onEnrich(hero);
                 }}
-                className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-black/80 hover:bg-black/90 border border-white/15 text-zinc-300 hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
+                className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-scrim-80 hover:bg-scrim-90 border border-tint-15 text-fg-tertiary hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                 title="Распознать текст на изображении"
               >
-                <Sparkles className="w-3 h-3 text-zinc-400" />
+                <Icon name="system.ai" size="xs" />
                 <span>{hero.enrichmentStatus === 'error' ? 'Повторить' : 'Текст'}</span>
               </button>
             )}
@@ -166,7 +166,7 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
               data-expanded={expandedOcrIds.has(hero.id)}
               aria-hidden={!expandedOcrIds.has(hero.id)}
             >
-              <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-white/[0.08] text-xs font-mono text-zinc-300 leading-relaxed select-text whitespace-pre-wrap">
+              <div className="motion-accordion-inner w-full mt-1.5 pt-1.5 border-t border-tint-8 text-xs font-mono text-fg-tertiary leading-relaxed select-text whitespace-pre-wrap">
                 {hero.extractedText}
               </div>
             </div>
@@ -186,7 +186,7 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                     title={tile.hidden > 0 ? `Ещё ${tile.hidden}` : tile.image.name}
                     className={`relative min-w-0 flex-1 overflow-hidden cursor-pointer transition-opacity hover:opacity-90 ${
                       perRow === 1 ? 'aspect-[3/2]' : 'aspect-square'
-                    } ${tile.hidden > 0 ? 'bg-white/[0.06]' : ''}`}
+                    } ${tile.hidden > 0 ? 'bg-tint-6' : ''}`}
                   >
                     {tile.hidden === 0 && (
                       tileSrc ? (
@@ -211,7 +211,7 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                       )
                     )}
                     {tile.hidden > 0 ? (
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-mono text-zinc-200">
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-mono text-fg-soft">
                         +{tile.hidden}
                       </span>
                     ) : (

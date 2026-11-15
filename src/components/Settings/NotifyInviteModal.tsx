@@ -1,6 +1,6 @@
 // «Ждём подтверждения»: one live code, one progress line, and a link that actually opens.
 import React, { useEffect, useState } from 'react';
-import { Check, ExternalLink, Loader2, X } from 'lucide-react';
+import { Icon } from '../UI/icons/Icon';
 import { accountClient } from '../../lib/sync/account';
 import type { NotifyInvite } from '../../lib/sync/account';
 import { openExternalUrl } from '../../lib/platform/openExternal';
@@ -87,7 +87,7 @@ export const NotifyInviteModal: React.FC<NotifyInviteModalProps> = ({ invite, va
             onClick={onClose}
             className="p-1 -m-1 rounded-md text-fg-dim hover:text-fg-primary hover:bg-surface-hover cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <Icon name="action.close" size="md" tone="inherit" />
           </button>
         </div>
 
@@ -98,24 +98,24 @@ export const NotifyInviteModal: React.FC<NotifyInviteModalProps> = ({ invite, va
 
         <ol className="flex flex-col gap-1.5">
           <li className="flex items-center gap-2 text-2xs text-fg-secondary">
-            <Check className="w-3.5 h-3.5 text-fg-muted shrink-0" />
+            <Icon name="action.check" size="sm" tone="muted" className="shrink-0" />
             код создан, живёт {Math.round(total / 60)} минут
           </li>
           <li className={`flex items-center gap-2 text-2xs ${linked ? 'text-fg-secondary' : 'text-fg-primary'}`}>
             {linked ? (
-              <Check className="w-3.5 h-3.5 text-fg-muted shrink-0" />
+              <Icon name="action.check" size="sm" tone="muted" className="shrink-0" />
             ) : (
-              <Loader2 className={`w-3.5 h-3.5 shrink-0 ${expired ? 'text-fg-dim' : 'animate-spin text-accent'}`} />
+              <Icon name="status.loading" size="sm" tone="inherit" className={`shrink-0 ${expired ? 'text-fg-dim' : 'animate-spin text-accent'}`} />
             )}
             {expired && !linked ? 'код истёк — закрой и получи новый' : 'открой бота и нажми /start'}
           </li>
           <li className={`flex items-center gap-2 text-2xs ${linked ? 'text-fg-primary' : 'text-fg-dim'}`}>
-            <Check className={`w-3.5 h-3.5 shrink-0 ${linked ? 'text-accent' : 'text-fg-dim opacity-40'}`} />
+            <Icon name="action.check" size="sm" tone="inherit" className={`shrink-0 ${linked ? 'text-accent' : 'text-fg-dim opacity-40'}`} />
             канал подключён
           </li>
         </ol>
 
-        <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+        <div className="h-1 rounded-full bg-tint-6 overflow-hidden">
           <div
             className={`h-full rounded-full transition-[width] duration-500 ${linked ? 'bg-accent' : 'bg-fg-dim'}`}
             style={{ width: `${progress}%` }}
@@ -132,9 +132,9 @@ export const NotifyInviteModal: React.FC<NotifyInviteModalProps> = ({ invite, va
                 type="button"
                 disabled={expired || linked}
                 onClick={() => void openExternalUrl(invite.link as string)}
-                className="px-2.5 py-1.5 rounded-md text-2xs text-fg-primary bg-white/[0.06] hover:bg-surface-hover disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
+                className="px-2.5 py-1.5 rounded-md text-2xs text-fg-primary bg-tint-6 hover:bg-surface-hover disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
               >
-                <ExternalLink className="w-3 h-3" />
+                <Icon name="nav.externalLink" size="xs" tone="inherit" />
                 открыть telegram
               </button>
             )}
