@@ -1,13 +1,17 @@
-// Records the hero clip: a note is written, found again through the palette, and ticked off.
-// Three beats, each with a reason a person would actually have.
+// Records the hero clip. Story, not a feature tour — each beat is something a person would do for
+// their own reason:
+//
+//   1. пишет строку в поле и жмёт Enter          — не заполняет форму, а говорит вслух
+//   2. ищет ту же вещь с опечаткой в палитре     — ищет по памяти, а не по точному слову
+//   3. ставит доску рядом с лентой               — окно собирается под его режим
 //
 // The frame is one screen, not a dashboard: the assistant panel and the empty Info tab are closed
-// through dockview's own tab action, the saved layout is reloaded, and only then does the clip
-// start — its first useful frame is the resting view with the folder rail on the left.
+// through dockview's own tab action and the saved layout is reloaded before recording starts, so
+// the first useful frame is the resting view with the folder rail on the left.
 //
-// Every beat is asserted, not assumed: the note has to reach the feed, the palette has to return
-// it, the tick has to land. A clip with a silent "nothing found" in the middle is worse than no
-// clip, and that is exactly how the first take shipped.
+// Every beat is asserted: the note has to reach the feed, the palette has to return it, the drag has
+// to produce a second group. A clip with a silent «ничего не найдено» in the middle is worse than no
+// clip, and that is how the first take shipped.
 //
 //   BASE_URL=http://127.0.0.1:5199/ node scripts/landing-video.mjs
 import { chromium } from '@playwright/test';
@@ -36,14 +40,6 @@ const closeTab = async (page, panelId) => {
   return true;
 };
 
-const waitForText = async (page, text, timeout = 15000) => {
-  await page.waitForFunction(
-    (needle) => document.body.innerText.toLowerCase().includes(needle),
-    text.toLowerCase(),
-    { timeout },
-  );
-};
-
 const browser = await chromium.launch();
 const ctx = await browser.newContext({
   viewport: { width: 1440, height: 900 },
@@ -57,7 +53,6 @@ const startedAt = Date.now();
 await page.goto(base, { waitUntil: 'load' });
 await boot(page);
 
-// Drop the right-hand group, then reload so the saved layout restores without it.
 const closed = [];
 for (const panelId of HIDDEN_PANELS) {
   if (await closeTab(page, panelId)) {
@@ -69,9 +64,7 @@ if (closed.length === 0) throw new Error('не нашёл вкладки пра�
 await page.reload({ waitUntil: 'load' });
 await boot(page);
 const readyAt = Date.now();
-console.log(
-  `closed [${closed.join(', ')}] — settled screen at +${((readyAt - startedAt) / 1000).toFixed(2)}s of the recording`,
-);
+console.log(`closed [${closed.join(', ')}] — settled at +${((readyAt - startedAt) / 1000).toFixed(2)}s`);
 await page.screenshot({ path: path.join(out, 'beat-0-start.png') });
 await writeFile(
   path.join(out, 'meta.json'),
@@ -81,28 +74,25 @@ await writeFile(
 // 1. write it down: the date is parsed out of the sentence as it is typed
 const composer = page.locator('textarea').last();
 await composer.click();
-await page.waitForTimeout(400);
-await page.keyboard.type('позвонить в сервис завтра в 15:00', { delay: 62 });
-await page.waitForTimeout(500);
+await page.waitForTimeout(350);
+await page.keyboard.type('позвонить в сервис завтра в 15:00', { delay: 50 });
+await page.waitForTimeout(700);
 await page.keyboard.press('Enter');
-// The composer is cleared on send, so this only passes once the note is actually a card in the feed.
 await page.waitForFunction(
   () => {
-    const composer = document.querySelector('textarea');
-    return !!composer && composer.value === '' && document.body.innerText.toLowerCase().includes('позвонить в сервис');
+    const box = document.querySelector('textarea');
+    return !!box && box.value === '' && document.body.innerText.toLowerCase().includes('позвонить в сервис');
   },
   null,
   { timeout: 15000 },
 );
-await page.waitForTimeout(1400);
+await page.waitForTimeout(1000);
 await page.screenshot({ path: path.join(out, 'beat-1-written.png') });
 
-// 2. make sure it will be found later: same word, same note
+// 2. found by a word he does not remember exactly: one wrong letter, same note in the palette
 await page.keyboard.press('Control+k');
-await page.waitForTimeout(700);
-await page.keyboard.type('сервис', { delay: 110 });
-// The feed behind the dialog already contains the note, so the check reads the dialog itself: an
-// empty palette in the middle of the clip was the bug that made this assertion necessary.
+await page.waitForTimeout(600);
+await page.keyboard.type('позванить', { delay: 100 });
 await page.waitForFunction(
   () => {
     const dialog = document.querySelector('[role="dialog"]');
@@ -111,17 +101,40 @@ await page.waitForFunction(
   null,
   { timeout: 15000 },
 );
-await page.waitForTimeout(1800);
+await page.waitForTimeout(1200);
 await page.screenshot({ path: path.join(out, 'beat-2-found.png') });
 await page.keyboard.press('Escape');
-await page.waitForTimeout(900);
+await page.waitForTimeout(700);
 
-// 3. the call is done — tick it off
-const status = page.locator('button[aria-label^="Изменить статус"]').last();
-await status.click({ timeout: 8000 });
-await page.waitForTimeout(1600);
-await page.screenshot({ path: path.join(out, 'beat-3-done.png') });
-await page.waitForTimeout(1200);
+// 3. the board next to the feed: "+" adds a tab, the tab is dragged out into its own pane
+const feedGroup = page
+  .locator('.dv-groupview')
+  .filter({ has: page.locator('.dv-tab', { hasText: 'Входящие' }) })
+  .first();
+await feedGroup.locator('button[title="Добавить вкладку в эту группу"]').click();
+await page.waitForTimeout(500);
+await page.getByRole('button', { name: 'Канбан' }).first().click();
+await page.waitForTimeout(1100);
+await page.screenshot({ path: path.join(out, 'beat-3-board.png') });
+
+const boardTab = page.locator('.dv-tab', { hasText: 'Канбан' }).first();
+const tabBox = await boardTab.boundingBox();
+const groupBox = await feedGroup.boundingBox();
+if (!tabBox || !groupBox) throw new Error('не нашёл вкладку доски или группу ленты');
+const from = { x: tabBox.x + tabBox.width / 2, y: tabBox.y + tabBox.height / 2 };
+const to = { x: groupBox.x + groupBox.width * 0.84, y: groupBox.y + groupBox.height * 0.5 };
+await page.mouse.move(from.x, from.y);
+await page.mouse.down();
+for (let step = 1; step <= 16; step += 1) {
+  await page.mouse.move(from.x + ((to.x - from.x) * step) / 16, from.y + ((to.y - from.y) * step) / 16);
+  await page.waitForTimeout(45);
+}
+await page.mouse.up();
+const groups = await page.evaluate(() => document.querySelectorAll('.dv-groupview').length);
+if (groups < 3) throw new Error(`перетаскивание не разделило окно: групп ${groups}`);
+await page.waitForTimeout(1400);
+await page.screenshot({ path: path.join(out, 'beat-4-split.png') });
+await page.waitForTimeout(900);
 
 const video = page.video();
 await ctx.close();
