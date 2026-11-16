@@ -1,0 +1,4 @@
+# pnpm hashes patch files byte-for-byte (`patch_hash` in pnpm-lock.yaml) and
+# refuses to install when the checkout rewrote the line endings. Keep patches
+# verbatim: no EOL conversion, no smudge.
+*.patch -text
