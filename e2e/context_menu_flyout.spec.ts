@@ -140,6 +140,63 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
   });
 });
 
+test.describe('Context Menu viewport fit', () => {
+  test('opens upward at the bottom edge and keeps every entry on screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 560 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 30000 });
+    await page.waitForTimeout(600);
+
+    // Scroll the feed to the end so the last card sits against its lower edge.
+    await page.evaluate(() => {
+      const list = Array.from(document.querySelectorAll('*')).find((element) =>
+        element instanceof HTMLElement && /overflow-y-auto/.test(element.className));
+      if (list) list.scrollTop = list.scrollHeight;
+    });
+    await page.waitForTimeout(300);
+
+    const card = page.locator('[id^="item-"]').last();
+    await expect(card).toBeVisible();
+    const cardBox = await card.boundingBox();
+    expect(cardBox).toBeTruthy();
+    if (!cardBox) return;
+
+    const clickX = cardBox.x + 40;
+    const clickY = Math.min(cardBox.y + cardBox.height - 8, 550);
+    await page.mouse.click(clickX, clickY, { button: 'right' });
+
+    const menu = page.locator('.fixed.z-50', { hasText: 'Ответить' });
+    await expect(menu).toBeVisible();
+    const viewport = page.viewportSize();
+    expect(viewport).toBeTruthy();
+    if (!viewport) return;
+
+    // The panel is measured, so the clamp uses its real height instead of a constant.
+    const panelBox = await menu.locator('> div').first().boundingBox();
+    expect(panelBox).toBeTruthy();
+    if (!panelBox) return;
+    expect(panelBox.y).toBeGreaterThanOrEqual(0);
+    expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(viewport.height);
+    // No room below the cursor: the menu opens upward instead of being cut.
+    expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(clickY + 8);
+    await expect(menu.getByRole('button', { name: 'Удалить' })).toBeVisible();
+
+    await page.screenshot({ path: 'test-results/screenshots/context-menu-bottom-edge.png' });
+
+    // Flyouts are clamped to the same viewport on both axes.
+    await menu.getByRole('button', { name: 'Проводник', exact: true }).hover();
+    const explorerFlyout = page.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
+    await expect(explorerFlyout).toBeVisible();
+    const flyoutBox = await explorerFlyout.boundingBox();
+    expect(flyoutBox).toBeTruthy();
+    if (!flyoutBox) return;
+    expect(flyoutBox.x).toBeGreaterThanOrEqual(0);
+    expect(flyoutBox.x + flyoutBox.width).toBeLessThanOrEqual(viewport.width);
+    expect(flyoutBox.y).toBeGreaterThanOrEqual(0);
+    expect(flyoutBox.y + flyoutBox.height).toBeLessThanOrEqual(viewport.height);
+  });
+});
+
 test.describe('Context Menu flyout exit', () => {
   test('a side panel keeps its node while it fades instead of vanishing', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

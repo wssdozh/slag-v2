@@ -31,6 +31,7 @@ export interface MenuSubmenusProps {
   submenuX: number;
   submenuY: number;
   submenuDirection: 'right' | 'left';
+  submenuMaxHeight: number;
   onChangeType: (type: SlagItemType) => void;
   onOpenInExplorer: () => void;
   onCopyFullPath: () => void;
@@ -52,6 +53,7 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
   submenuX,
   submenuY,
   submenuDirection,
+  submenuMaxHeight,
   onChangeType,
   onOpenInExplorer,
   onCopyFullPath,
@@ -68,10 +70,10 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
     {type === 'item' && item && triggerRect && (
       <Flyout
         open={activeSubmenu === 'type'}
-        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px`, maxHeight: `${submenuMaxHeight}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-44 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover overflow-y-auto scrollbar-thin"
       >
         {/* Bridge hit-area */}
         <div
@@ -134,10 +136,10 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
     {((type === 'item' && item) || (type === 'folder' && folder)) && triggerRect && (
       <Flyout
         open={activeSubmenu === 'explorer'}
-        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px`, maxHeight: `${submenuMaxHeight}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-64 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover overflow-y-auto scrollbar-thin"
       >
         {/* Bridge hit-area */}
         <div
@@ -201,10 +203,10 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
     {type === 'item' && item && triggerRect && (
       <Flyout
         open={activeSubmenu === 'more'}
-        style={{ left: `${submenuX}px`, top: `${submenuY}px` }}
+        style={{ left: `${submenuX}px`, top: `${submenuY}px`, maxHeight: `${submenuMaxHeight}px` }}
         onMouseEnter={onSubmenuMouseEnter}
         onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
+        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover overflow-y-auto scrollbar-thin"
       >
         {/* Bridge hit-area */}
         <div

@@ -1,5 +1,5 @@
 // Right-click menu for items, folders and feed rows: sections, submenus and hover bridge.
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
 import { useItemActions } from '../../hooks/useItemActions';
@@ -38,6 +38,10 @@ export const ContextMenu: React.FC = () => {
   const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
   const [prevContextMenu, setPrevContextMenu] = useState(contextMenu);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Rendered height of the current target's panel. Entries differ per target, so a
+  // constant clamp let the last row sit below the window edge.
+  const [panelHeight, setPanelHeight] = useState(0);
 
   // Synchronously reset submenu state when the menu target changes
   if (contextMenu !== prevContextMenu) {
@@ -45,8 +49,19 @@ export const ContextMenu: React.FC = () => {
     if (contextMenu) {
       setActiveSubmenu(null);
       setTriggerRect(null);
+      setPanelHeight(0);
     }
   }
+
+  // Measure before paint so the menu never flashes at the wrong edge.
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    // Border-box height, so the clamp accounts for the panel's border as well.
+    const height = panel.getBoundingClientRect().height;
+    setPanelHeight(current => (current === height ? current : height));
+  }, [isOpen, activeTarget]);
 
   const actions = useItemActions(contextMenu?.item, closeContextMenu);
 
@@ -201,9 +216,26 @@ export const ContextMenu: React.FC = () => {
 
   // Viewport clamping
   const menuWidth = 240;
-  const menuHeight = 280;
-  const clampedX = Math.min(Math.max(8, x), window.innerWidth - menuWidth - 8);
-  const clampedY = Math.min(Math.max(8, y), window.innerHeight - menuHeight - 8);
+  const margin = 8;
+  const menuHeight = panelHeight > 0 ? panelHeight : window.innerHeight - margin * 2;
+  const clampedX = Math.max(margin, Math.min(x, window.innerWidth - menuWidth - margin));
+
+  // Open toward the side that has room; if neither fits, scroll inside the larger one.
+  const anchorY = Math.max(margin, Math.min(y, window.innerHeight - margin));
+  const spaceBelow = window.innerHeight - anchorY - margin;
+  const spaceAbove = anchorY - margin;
+  let menuTop = anchorY;
+  let menuMaxHeight = window.innerHeight - margin * 2;
+  if (menuHeight > spaceBelow) {
+    if (menuHeight <= spaceAbove) {
+      menuTop = anchorY - menuHeight;
+    } else if (spaceAbove > spaceBelow) {
+      menuTop = margin;
+      menuMaxHeight = spaceAbove;
+    } else {
+      menuMaxHeight = spaceBelow;
+    }
+  }
 
   // Submenu geometry calculation based on active trigger button rect
   let submenuWidth = 192;
@@ -220,19 +252,25 @@ export const ContextMenu: React.FC = () => {
   }
 
   const gap = 4;
-  const margin = 8;
   let submenuX = 0;
   let submenuY = 0;
   let submenuDirection: 'right' | 'left' = 'right';
 
   if (triggerRect) {
     const spaceRight = window.innerWidth - (triggerRect.right + gap + margin);
-    submenuDirection = spaceRight >= submenuWidth ? 'right' : 'left';
-    submenuX = submenuDirection === 'right' ? triggerRect.right + gap : triggerRect.left - submenuWidth - gap;
+    const spaceLeft = triggerRect.left - gap - margin;
+    const openRight = spaceRight >= submenuWidth || spaceRight >= spaceLeft;
+    submenuX = openRight ? triggerRect.right + gap : triggerRect.left - submenuWidth - gap;
+    // Never let a flyout leave the viewport on either axis.
+    submenuX = Math.max(margin, Math.min(submenuX, window.innerWidth - submenuWidth - margin));
+    submenuDirection = submenuX < triggerRect.left ? 'left' : 'right';
     // Align top with the trigger button (with a 4px optical inset)
     const idealY = triggerRect.top - 4;
     submenuY = Math.max(margin, Math.min(idealY, window.innerHeight - submenuHeight - margin));
   }
+
+  // A flyout may be taller than the room left under its trigger: cap it to the viewport.
+  const submenuMaxHeight = Math.max(96, window.innerHeight - submenuY - margin);
 
   return (
     <div
@@ -241,13 +279,15 @@ export const ContextMenu: React.FC = () => {
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
       onClick={isOpen ? (e) => e.stopPropagation() : undefined}
-      style={{ left: `${clampedX}px`, top: `${clampedY}px` }}
+      style={{ left: `${clampedX}px`, top: `${menuTop}px` }}
       className="fixed z-50 motion-fade"
     >
       {/* Main Menu Container */}
       <div
+        ref={panelRef}
         data-motion-state={phase}
-        className="w-60 max-h-[calc(100vh-24px)] overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
+        style={{ maxHeight: `${menuMaxHeight}px` }}
+        className="w-60 overflow-y-auto scrollbar-thin rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover"
       >
         {type === 'item' && item && (
           <ItemMenuSections
@@ -301,6 +341,7 @@ export const ContextMenu: React.FC = () => {
         submenuX={submenuX}
         submenuY={submenuY}
         submenuDirection={submenuDirection}
+        submenuMaxHeight={submenuMaxHeight}
         onChangeType={actions.handleChangeType}
         onOpenInExplorer={actions.handleOpenInExplorer}
         onCopyFullPath={actions.handleCopyFullPath}
