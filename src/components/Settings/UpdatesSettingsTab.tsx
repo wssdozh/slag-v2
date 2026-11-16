@@ -82,7 +82,7 @@ export const UpdatesSettingsTab: React.FC = () => {
           testId="update-channel-row"
           description="адрес манифеста, который опрашивается"
           value={
-            <span className="text-2xs font-mono text-fg-dim max-w-[15rem] truncate" data-testid="update-endpoint">
+            <span className="block max-w-[15rem] truncate text-2xs font-mono text-fg-dim" data-testid="update-endpoint">
               {platform?.endpoint ?? '—'}
             </span>
           }
