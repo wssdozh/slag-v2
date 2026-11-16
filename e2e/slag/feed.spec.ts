@@ -284,6 +284,40 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await page.screenshot({ path: 'test-results/screenshots/feed-column-composer-aligned.png' });
   });
 
+  test('19. A task marked done shows it at once, with no reload', async ({ page }) => {
+    await page.locator('aside span', { hasText: 'Проекты' }).first().click();
+    await expect(page.locator('header')).toContainText('Проекты');
+
+    const card = page.locator('#item-demo_task_3');
+    await expect(card).toBeVisible();
+
+    await test.step('the checkbox in the feed repaints the card', async () => {
+      await card.locator('button[aria-label="Изменить статус таски"]').click();
+      await expect(card.locator('h3')).toHaveClass(/line-through/);
+      await expect(card.locator('h3')).toContainText('Синхронизация по архитектуре баз данных');
+
+      // And back: reopening must clear the mark without a reload too.
+      await card.locator('button[aria-label="Изменить статус таски"]').click();
+      await expect(card.locator('h3')).not.toHaveClass(/line-through/);
+    });
+
+    await test.step('the status set in the focus editor lands in the feed', async () => {
+      await card.click({ button: 'right' });
+      await page.locator('.fixed.z-50 button', { hasText: 'Фокус-редактор' }).first().click();
+      await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
+
+      await page.getByRole('button', { name: 'Отметить как выполненную', exact: true }).click();
+      await expect(page.locator('textarea[placeholder="Название таски..."]')).toHaveClass(/line-through/);
+
+      // Closing flushes the draft straight into the storage layer; the feed must see it.
+      await page.locator('header button', { hasText: 'Назад' }).click();
+      await expect(page.locator('#fullscreen-editor-root')).not.toBeVisible();
+
+      await expect(page.locator('#item-demo_task_3 h3')).toHaveClass(/line-through/);
+      await page.screenshot({ path: 'test-results/screenshots/feed-task-done-without-reload.png' });
+    });
+  });
+
   test('8. Image Lightbox full-screen gallery with Escape dismissal', async ({ page }) => {
     // Open an image in demo item or create one with base64 1x1 image
     const composerTextarea = page.locator('main textarea');
