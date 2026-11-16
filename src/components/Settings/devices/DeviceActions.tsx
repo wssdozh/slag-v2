@@ -1,5 +1,6 @@
 // Device row widgets: inline rename, revoke, and the local sync mode picker.
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '../../UI/icons/Icon';
 import type { AccountDevice } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile, DeviceSyncMode } from '../../../lib/sync/types';
@@ -95,7 +96,8 @@ export const PairDeviceModal: React.FC<PairDeviceModalProps> = ({ pairing }) => 
 
   if (!isModalOpen) return null;
 
-  return (
+  return createPortal((
+    // Same reason as the access dialog: a transformed settings card would clip this overlay.
     <div className="fixed inset-0 z-[70] bg-canvas/85 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) setModalOpen(false); }}>
       <div data-testid="pair-device-modal" role="dialog" aria-modal="true" className="w-full max-w-sm bg-surface-elevated border border-border-subtle rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
@@ -143,5 +145,5 @@ export const PairDeviceModal: React.FC<PairDeviceModalProps> = ({ pairing }) => 
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 };

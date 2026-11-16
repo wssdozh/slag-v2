@@ -25,12 +25,16 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     await expect(master).toHaveAttribute('aria-checked', 'true');
     await expect(channelToggle).toHaveAttribute('aria-checked', 'true');
     await expect(scope.getByTestId('integration-telegram-settings')).toBeVisible();
+    await expect(scope.getByTestId('integration-telegram-settings')).toHaveAttribute('title', 'настройки telegram');
     // No descriptions in the list: the row is a name and two controls.
     await expect(scope.getByText('не подключён · напоминания и вопросы боту')).toHaveCount(0);
     await expect(scope.locator('button button')).toHaveCount(0);
     expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     await settle(page);
     await page.screenshot({ path: `test-results/screenshots/settings-integrations-${viewport.width}.png` });
+    if (viewport.width === 1280) {
+      await page.screenshot({ path: 'test-results/screenshots/integrations-gear.png' });
+    }
 
     // The master takes the channel down with it, and the channel cannot outvote it.
     await master.click();

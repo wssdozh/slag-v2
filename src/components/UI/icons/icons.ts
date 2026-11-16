@@ -68,6 +68,7 @@ import {
   HardDrive,
   Hashtag,
   Heart,
+  HelpCircle,
   HomeSimple,
   InfoCircle,
   Italic,
@@ -157,8 +158,8 @@ import {
   Xmark,
   ZoomIn,
 } from 'iconoir-react';
-// Iconoir has no counterpart for these four; swapping them out means drawing them.
-import { CircleDashed, Heading1, Heading2, Loader2 } from 'lucide-react';
+// Iconoir has no counterpart for these five; swapping them out means drawing them.
+import { CircleDashed, Heading1, Heading2, Loader2, Tablet } from 'lucide-react';
 
 /**
  * A glyph component. Deliberately structural, not tied to one package: any icon set whose
@@ -276,6 +277,10 @@ export const ICONS = {
   'entity.user': User,
   'entity.desktop': Laptop,
   'entity.phone': SmartphoneDevice,
+  'entity.tablet': Tablet, // Iconoir has no tablet glyph
+  'entity.computer': Computer,
+  'entity.browser': Globe,
+  'entity.deviceUnknown': HelpCircle,
 
   // ─── time: dates, clocks, recurrence ───────────────────────────────────
   'time.date': Calendar,

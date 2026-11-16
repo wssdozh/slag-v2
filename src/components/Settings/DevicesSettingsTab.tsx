@@ -172,6 +172,8 @@ export const DevicesSettingsTab: React.FC = () => {
         onManage={setManagingDevice}
         onRevoke={handleRevokeDevice}
         onApprove={handleApproveDevice}
+        onPair={pairing.openModal}
+        pairDisabled={locked}
       />
 
       <LocalSyncModeGroup value={config.localSyncMode ?? 'read-write'} onChange={handleLocalSyncModeChange} />
