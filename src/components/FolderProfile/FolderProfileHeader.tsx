@@ -1,5 +1,5 @@
 // Folder header: name, icon, path, counters and the inline edit controls.
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Icon } from '../UI/icons/Icon';
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -67,6 +67,13 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
   const isEditingName = edit.mode === 'name';
   const isEditingDescription = edit.mode === 'description';
 
+  // Focus follows the mode instead of the mount: the row unfolds from zero height, and a
+  // `scrollIntoView` here would drag the dock away from the header.
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (isEditingDescription) descriptionRef.current?.focus({ preventScroll: true });
+  }, [isEditingDescription]);
+
   const folderIcon = folderIconName(folder?.icon);
   const TitleTag = variant === 'screen' ? 'h1' : 'div';
 
@@ -82,7 +89,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
               type="button"
               title="Сменить иконку папки"
               aria-label="Сменить иконку папки"
-              className={`${iconButtonClass[variant]} shrink-0 flex items-center justify-center border border-tint-8 bg-tint-3 text-fg-secondary hover:text-fg-primary hover:bg-tint-7 motion-surface outline-none ring-0 cursor-pointer`}
+              className={`${iconButtonClass[variant]} shrink-0 flex items-center justify-center text-fg-secondary hover:text-fg-primary hover:bg-tint-6 motion-surface outline-none ring-0 cursor-pointer`}
             >
               <Icon name={folderIcon} size="none" tone="inherit" className={iconGlyphClass[variant]} />
             </button>
@@ -147,43 +154,50 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
         </div>
       </div>
 
-      {isEditingDescription ? (
-        <div className="flex flex-col gap-1.5">
-          <textarea
-            autoFocus
-            rows={3}
-            value={edit.descriptionDraft}
-            onChange={event => edit.updateDescriptionDraft(event.target.value)}
-            onBlur={edit.commitDescription}
-            onKeyDown={event => {
-              if (event.key === 'Escape') {
-                event.stopPropagation();
-                edit.cancel();
-                return;
-              }
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                event.stopPropagation();
-                event.preventDefault();
-                edit.commitDescription();
-              }
-            }}
-            aria-label="Описание папки для ИИ"
-            placeholder="Опишите, какие заметки и темы должны попадать в эту папку…"
-            className={`w-full bg-scrim-40 border border-tint-12 rounded-md p-2 text-fg-primary placeholder-fg-dim outline-none ring-0 resize-none focus:border-tint-25 ${descriptionClass[variant]}`}
-          />
+      {/* Description and its editor are one stacked block: the open row grows exactly as
+          the closed one shrinks, so the profile changes height in a single motion instead
+          of the textarea popping in. */}
+      <div className="flex flex-col min-w-0">
+        <div className="motion-fold" data-expanded={!isEditingDescription} inert={isEditingDescription}>
+          <button
+            type="button"
+            onClick={edit.startDescription}
+            title="Изменить описание для ИИ"
+            className={`group/desc w-full text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-tint-4 motion-surface outline-none ring-0 cursor-text ${descriptionClass[variant]} ${
+              folder?.description ? 'text-fg-secondary' : 'text-fg-dim italic'
+            }`}
+          >
+            {folder?.description || 'Добавить описание для ИИ…'}
+          </button>
         </div>
-      ) : (
-        <button
-          type="button"
-          onClick={edit.startDescription}
-          title="Изменить описание для ИИ"
-          className={`group/desc text-left rounded-md -mx-1 px-1 py-0.5 hover:bg-tint-4 motion-surface outline-none ring-0 cursor-text ${descriptionClass[variant]} ${
-            folder?.description ? 'text-fg-secondary' : 'text-fg-dim italic'
-          }`}
-        >
-          {folder?.description || 'Добавить описание для ИИ…'}
-        </button>
-      )}
+
+        {isEditingDescription && (
+          <div className="motion-fold-in">
+            <textarea
+              ref={descriptionRef}
+              rows={3}
+              value={edit.descriptionDraft}
+              onChange={event => edit.updateDescriptionDraft(event.target.value)}
+              onBlur={edit.commitDescription}
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation();
+                  edit.cancel();
+                  return;
+                }
+                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  edit.commitDescription();
+                }
+              }}
+              aria-label="Описание папки для ИИ"
+              placeholder="Опишите, какие заметки и темы должны попадать в эту папку…"
+              className={`w-full bg-scrim-40 border border-tint-12 rounded-md p-2 text-fg-primary placeholder-fg-dim outline-none ring-0 resize-none focus:border-tint-25 ${descriptionClass[variant]}`}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 };
