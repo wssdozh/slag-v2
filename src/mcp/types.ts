@@ -24,13 +24,16 @@ export interface NoteMatch {
 
 // Zod Schemas for Tools
 
+// NOTE: `type` and `folder` deliberately have no zod default. A client that updates a task and
+// sends only `status` must not be silently moved to «Входящие» and demoted to a note: defaults
+// belong to the create path inside McpVault.saveNote, not to the schema.
 export const SaveNoteSchema = {
   id: z.string().optional().describe('ID или имя файла существующей заметки для обновления. Если не указан — создается новая.'),
   title: z.string().optional().describe('Заголовок заметки или задачи (обязателен при создании новой).'),
   content: z.string().optional().describe('Основной текст в формате Markdown.'),
   appendContent: z.string().optional().describe('Текст для добавления в конец существующей заметки.'),
-  type: z.enum(['note', 'task', 'article']).default('note').describe('Тип записи: note (заметка), task (задача), article (статья).'),
-  folder: z.string().default(DEFAULT_INBOX_FOLDER).describe(`Папка сохранения (например "${DEFAULT_INBOX_FOLDER}" или "Проекты/Дизайн").`),
+  type: z.enum(['note', 'task', 'article']).optional().describe('Тип записи: note (заметка), task (задача), article (статья). Не указан при создании — note, при обновлении — тип не меняется.'),
+  folder: z.string().optional().describe(`Папка сохранения (например "${DEFAULT_INBOX_FOLDER}" или "Проекты/Дизайн"). Не указана при создании — "${DEFAULT_INBOX_FOLDER}", при обновлении — папка не меняется.`),
   tags: z.array(z.string()).optional().describe('Список тегов без знака решетки #.'),
   status: z.enum(['backlog', 'todo', 'in_progress', 'done']).optional().describe('Статус задачи.'),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional().describe('Приоритет задачи.'),
@@ -41,6 +44,11 @@ export const SaveNoteSchema = {
 
 export const GetNoteSchema = {
   idOrTitle: z.string().describe('Идентификатор (id), заголовок или имя файла заметки (с расширением .md или без).'),
+};
+
+export const ReadAttachmentSchema = {
+  note: z.string().describe('Идентификатор (id), заголовок или имя файла заметки, к которой приложен файл.'),
+  filename: z.string().describe('Имя вложения из списка attachments карточки заметки: имя файла, например "photo.webp", или его relativePath.'),
 };
 
 export const SearchNotesSchema = {
