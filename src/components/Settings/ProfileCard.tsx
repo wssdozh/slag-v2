@@ -7,9 +7,13 @@ import { accountClient } from '../../lib/sync/account';
 import type { ProfileInfo } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { MenuDropdown } from '../UI/MenuDropdown';
+import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { ProfileAvatar } from './ProfileAvatar';
 
-const AVATAR_SIZE = 128;
+/** The stored crop is square and a bit larger than the biggest on-screen circle. */
+const AVATAR_SIZE = 192;
+const AVATAR_DESKTOP = 132;
+const AVATAR_MOBILE = 92;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 const PHOTO_MENU_ITEM =
@@ -49,6 +53,7 @@ interface ProfileCardProps {
  */
 export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
   const { addToast } = useApp();
+  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<ProfileInfo>(() => storage.getWorkspaceState().profile ?? { name: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -128,32 +133,43 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
   );
 
   return (
-    <div className="relative flex flex-col items-center gap-1 px-4 pt-5 pb-5">
-      <div className="absolute right-2 top-2">
-        <MenuDropdown
-          ariaLabel="Действия с фото профиля"
-          minWidth={168}
-          align="end"
-          isOpen={isMenuOpen}
-          onOpenChange={setIsMenuOpen}
-          trigger={
-            <IconButton size="sm" title="Изменить фото" aria-label="Изменить фото">
-              <Icon name="action.edit" size="sm" tone="inherit" />
-            </IconButton>
-          }
+    <div className="flex flex-col items-center px-4 pt-6 pb-5">
+      <div className="relative mb-4">
+        <button
+          type="button"
+          aria-label="Сменить фото профиля"
+          title="Сменить фото профиля"
+          onClick={() => avatarInputRef.current?.click()}
+          style={{ width: isMobile ? AVATAR_MOBILE : AVATAR_DESKTOP, height: isMobile ? AVATAR_MOBILE : AVATAR_DESKTOP }}
+          className="block rounded-full overflow-hidden border border-subtle bg-tint-6 hover:border-hover transition-colors cursor-pointer outline-none ring-0 focus-visible:ring-2 focus-visible:ring-accent/40"
         >
-          {menuItems}
-        </MenuDropdown>
+          <ProfileAvatar
+            profile={profile}
+            className={`w-full h-full ${isMobile ? 'text-2xl' : 'text-3xl'}`}
+          />
+        </button>
+        <div className="absolute -bottom-1 -right-1">
+          <MenuDropdown
+            ariaLabel="Действия с фото профиля"
+            minWidth={168}
+            align="end"
+            isOpen={isMenuOpen}
+            onOpenChange={setIsMenuOpen}
+            trigger={
+              <IconButton
+                size="md"
+                title="Изменить фото"
+                aria-label="Изменить фото"
+                className="max-sm:w-9 max-sm:h-9 rounded-full border border-subtle bg-surface-elevated shadow-sm hover:border-hover hover:bg-surface-hover"
+              >
+                <Icon name="action.edit" size="sm" tone="inherit" />
+              </IconButton>
+            }
+          >
+            {menuItems}
+          </MenuDropdown>
+        </div>
       </div>
-      <button
-        type="button"
-        aria-label="Сменить фото профиля"
-        title="Сменить фото профиля"
-        onClick={() => avatarInputRef.current?.click()}
-        className="w-[72px] h-[72px] mb-1 rounded-full overflow-hidden hover:opacity-90 transition-opacity cursor-pointer"
-      >
-        <ProfileAvatar profile={profile} className="w-full h-full text-base" />
-      </button>
       <input
         ref={nameInputRef}
         aria-label="Имя профиля"
@@ -165,9 +181,11 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
           if (event.key === 'Enter') event.currentTarget.blur();
         }}
         spellCheck={false}
-        className="w-full max-w-[220px] bg-transparent text-center text-sm font-medium text-fg-primary placeholder:text-fg-dim outline-none truncate border-b border-transparent focus:border-hover transition-colors"
+        className={`w-full max-w-[240px] bg-transparent text-center font-semibold text-fg-primary placeholder:text-fg-dim outline-none truncate border-b border-transparent focus:border-hover transition-colors ${isMobile ? 'text-base' : 'text-lg'}`}
       />
-      <span className="text-xs text-fg-muted text-center">{planLabel}</span>
+      <span className="mt-1 max-w-[320px] text-center text-sm leading-relaxed text-fg-muted text-pretty">
+        {planLabel}
+      </span>
       <input
         ref={avatarInputRef}
         type="file"
