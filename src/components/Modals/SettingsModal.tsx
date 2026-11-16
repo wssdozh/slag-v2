@@ -77,7 +77,7 @@ export const SettingsModal: React.FC = () => {
   );
 
   const tabPane = (
-    <div key={activeTab} className="flex-1 min-h-0 overflow-y-auto p-4 pb-8 sm:p-5 sm:pb-5 motion-fade motion-settings-tab">
+    <div key={activeTab} className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 pb-8 sm:p-5 sm:pb-5 motion-fade motion-settings-tab">
       {activeTab === 'account' && (
         <AccountSettingsTab />
       )}
@@ -173,7 +173,7 @@ export const SettingsModal: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           {tabRail}
           {tabPane}
         </div>
@@ -192,10 +192,10 @@ export const SettingsModal: React.FC = () => {
       contentClassName="flex flex-col h-full overflow-hidden"
       containerClassName="rounded-none md:rounded-2xl border-0 md:border md:border-border-subtle"
     >
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 min-w-0">
         {tabRail}
 
-        <div className="flex-1 flex flex-col min-h-0 bg-panel">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 bg-panel">
           {/* The pane keeps its own header: the rail runs the full height, so the
               wordmark is the only thing that would otherwise start under it. */}
           <div
