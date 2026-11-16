@@ -552,7 +552,7 @@ export interface AppUpdateOffer {
   notes: string | null;
   pubDate: string | null;
   currentVersion: string;
-  kind: 'portable' | 'installer' | 'apk' | 'manual';
+  kind: 'portable' | 'installer' | 'apk' | 'appimage' | 'manual';
   size: number | null;
 }
 
@@ -561,6 +561,12 @@ export interface AppUpdateOffer {
  * GitHub's latest, `beta` and `dev` read their rolling prerelease tag.
  */
 export type AppUpdateChannel = 'release' | 'beta' | 'dev';
+
+/**
+ * How this build is installed, which is what decides who may replace it: the app owns its portable
+ * exe and its AppImage, while a package or a flatpak belongs to the system and is updated there.
+ */
+export type AppUpdateInstallForm = 'portable' | 'installer' | 'apk' | 'appimage' | 'flatpak' | 'package' | 'bundle';
 
 /** What this build is and whether it can replace its own binary. */
 export interface AppUpdatePlatform {
@@ -571,6 +577,8 @@ export interface AppUpdatePlatform {
   releasePage: string;
   /** The stream the native side was asked about. */
   channel: AppUpdateChannel;
+  /** How this build is installed; the UI picks its wording from it. */
+  installForm: AppUpdateInstallForm;
   /** The manifest URL actually in use; a dev override shows up here. */
   endpoint: string;
   /** Android only: `PackageManager.canRequestPackageInstalls()`, null elsewhere or unknown. */

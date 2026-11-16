@@ -17,12 +17,35 @@ const OS_LABEL: Record<string, string> = {
   macos: 'macos',
 };
 
+/** How the build is installed, in the words of the thing that installs it. */
+const INSTALL_FORM_LABEL: Record<string, string> = {
+  portable: 'portable exe',
+  installer: 'установщик',
+  apk: 'apk',
+  appimage: 'appimage',
+  flatpak: 'flatpak',
+  package: 'пакет',
+  bundle: 'bundle',
+};
+
 function installLabel(kind: string | undefined): string {
   if (kind === 'installer') return 'скачать установщик';
-  // Android: the apk is downloaded, verified and handed to the system installer — the phone
-  // owner reads that as "update", not as "download apk" next to an older version on screen.
-  if (kind === 'apk') return 'обновить';
+  // Android and AppImage both replace the file in place: "обновить" is what the owner reads.
+  if (kind === 'apk' || kind === 'appimage') return 'обновить';
   return 'скачать и установить';
+}
+
+/**
+ * Why this build cannot update itself, said as the thing the owner would actually type. A deb, an
+ * rpm, an Arch package and a flatpak all belong to a manager that owns the files: the app must not
+ * reach for sudo, it should point at the command instead.
+ */
+function manualHint(installForm: string | undefined): string {
+  if (installForm === 'flatpak') return 'flatpak обновляется сам: flatpak update com.slag.notes';
+  if (installForm === 'package') {
+    return 'поставлен пакетом — обнови его через apt / dnf / pacman: приложение не трогает системные файлы';
+  }
+  return 'linux: обнови из пакетного менеджера или скачай файл со страницы релиза';
 }
 
 export const UpdatesSettingsTab: React.FC = () => {
@@ -76,7 +99,13 @@ export const UpdatesSettingsTab: React.FC = () => {
           label="платформа"
           value={
             <span className="text-xs font-mono text-fg-muted">
-              {platform ? `${OS_LABEL[platform.os] ?? platform.os} · ${platform.arch}` : 'браузер'}
+              {platform
+                ? [
+                    OS_LABEL[platform.os] ?? platform.os,
+                    platform.arch,
+                    INSTALL_FORM_LABEL[platform.installForm] ?? platform.installForm,
+                  ].join(' · ')
+                : 'браузер'}
             </span>
           }
         />
@@ -243,7 +272,7 @@ export const UpdatesSettingsTab: React.FC = () => {
                   )}
                   {offer.kind === 'manual' && (
                     <span className="text-2xs text-fg-dim">
-                      linux: обнови из пакетного менеджера или скачай файл со страницы релиза.
+                      {manualHint(platform?.installForm)}.
                     </span>
                   )}
                 </div>

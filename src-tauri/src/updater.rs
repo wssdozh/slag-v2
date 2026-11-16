@@ -42,6 +42,10 @@ pub struct PlatformEntry {
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     #[serde(default)]
     pub apk: Option<Asset>,
+    /// Linux: only an AppImage is a file the app owns and may replace while running.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[serde(default)]
+    pub appimage: Option<Asset>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -78,6 +82,9 @@ pub struct PlatformInfo {
     pub release_page: String,
     /// The stream this install reads: `release` | `beta` | `dev`.
     pub channel: String,
+    /// How this build got onto the machine: `portable`, `installer`, `apk`, `appimage`, `flatpak`
+    /// or `package`. The UI explains the update path from it instead of guessing from the OS.
+    pub install_form: String,
     /// The manifest actually used, so a dev override (`SLAG_UPDATE_ENDPOINT`) is visible in the UI.
     pub endpoint: String,
     /// Android: `PackageManager.canRequestPackageInstalls()`, i.e. whether the system installer
@@ -265,6 +272,64 @@ pub fn can_write_exe_folder() -> bool {
     false
 }
 
+/// How this Linux build got onto the machine. It decides who is allowed to replace it: an AppImage
+/// is a single file the user owns and the app can swap while running; a .deb/.rpm/Arch package
+/// belongs to apt/dnf/pacman, and a flatpak belongs to flatpak. Nothing here needs root.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LinuxForm {
+    AppImage,
+    Flatpak,
+    Package,
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+impl LinuxForm {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AppImage => "appimage",
+            Self::Flatpak => "flatpak",
+            Self::Package => "package",
+        }
+    }
+}
+
+/// `APPIMAGE` is set by the AppImage runtime and points at the file the user launched: that is the
+/// only reliable signal, because a deb can also be unpacked anywhere and run from a folder.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn linux_form() -> LinuxForm {
+    if std::env::var_os("APPIMAGE").is_some() {
+        return LinuxForm::AppImage;
+    }
+    if Path::new("/.flatpak-info").exists() {
+        return LinuxForm::Flatpak;
+    }
+    LinuxForm::Package
+}
+
+/// What the UI should call this install when it explains why an update cannot be applied.
+pub fn install_form() -> &'static str {
+    #[cfg(target_os = "android")]
+    {
+        "apk"
+    }
+    #[cfg(target_os = "windows")]
+    {
+        if can_write_exe_folder() {
+            "portable"
+        } else {
+            "installer"
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        linux_form().as_str()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "bundle"
+    }
+}
+
 fn parse_version(text: &str) -> Option<semver::Version> {
     semver::Version::parse(text.trim().trim_start_matches('v')).ok()
 }
@@ -296,7 +361,16 @@ fn select_asset(entry: &PlatformEntry) -> Option<(String, Asset)> {
     {
         entry.apk.clone().map(|asset| ("apk".to_string(), asset))
     }
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(target_os = "linux")]
+    {
+        // Only the AppImage form can take an update: a package-managed install would need root,
+        // and the honest answer there is "update it with your package manager".
+        match linux_form() {
+            LinuxForm::AppImage => entry.appimage.clone().map(|asset| ("appimage".to_string(), asset)),
+            _ => None,
+        }
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
     {
         let _ = entry;
         None
@@ -366,6 +440,7 @@ pub async fn update_platform(
         can_apply: cfg!(any(target_os = "windows", target_os = "android")),
         release_page: RELEASE_PAGE.to_string(),
         channel: channel.as_str().to_string(),
+        install_form: install_form().to_string(),
         endpoint: endpoint(channel),
         can_install_packages,
     })
@@ -650,10 +725,10 @@ pub async fn install(app: &AppHandle, channel: Channel) -> Result<InstallOutcome
             download_dir(&offer.version)
         }
     };
-    let file_name = if kind == "apk" {
-        format!("SLAG-{}.apk", offer.version)
-    } else {
-        format!("slag-v2-{}.exe", offer.version)
+    let file_name = match kind.as_str() {
+        "apk" => format!("SLAG-{}.apk", offer.version),
+        "appimage" => format!("SLAG-{}.AppImage", offer.version),
+        _ => format!("slag-v2-{}.exe", offer.version),
     };
     let destination = directory.join(file_name);
     let _ = std::fs::remove_file(&destination);
@@ -728,7 +803,57 @@ pub async fn install(app: &AppHandle, channel: Channel) -> Result<InstallOutcome
         }
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "android")))]
+    #[cfg(target_os = "linux")]
+    {
+        if kind != "appimage" {
+            log_line(Some(app), "error", "not an appimage install", install_form().to_string());
+            return Err("unsupported".to_string());
+        }
+        // `APPIMAGE` is the file the user launched. Stage the new build next to it: `rename()` is
+        // atomic only inside one filesystem, and the AppImage usually lives on another mount than
+        // /tmp. Replacing the file while it is mounted is fine — the running process keeps its own
+        // inode, and the next start executes the new one.
+        let target = std::env::var_os("APPIMAGE")
+            .map(PathBuf::from)
+            .ok_or_else(|| "unsupported".to_string())?;
+        let name = target
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_else(|| "SLAG.AppImage".to_string());
+        let staged = target.with_file_name(format!("{name}.new"));
+        let _ = std::fs::remove_file(&staged);
+        std::fs::copy(&destination, &staged).map_err(|error| {
+            log_line(Some(app), "error", "stage appimage failed", error.to_string());
+            "write_failed".to_string()
+        })?;
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(0o755)).map_err(
+                |error| {
+                    log_line(Some(app), "error", "chmod appimage failed", error.to_string());
+                    "write_failed".to_string()
+                },
+            )?;
+        }
+        std::fs::rename(&staged, &target).map_err(|error| {
+            log_line(Some(app), "error", "replace appimage failed", error.to_string());
+            "write_failed".to_string()
+        })?;
+        log_line(Some(app), "info", "appimage replaced", target.display().to_string());
+        std::process::Command::new(&target)
+            .spawn()
+            .map_err(|error| {
+                log_line(Some(app), "error", "relaunch failed", error.to_string());
+                "restart_failed".to_string()
+            })?;
+        app.exit(0);
+        Ok(InstallOutcome {
+            status: "restarting".to_string(),
+            version: offer.version,
+        })
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
     {
         let _ = (kind, asset);
         Err("unsupported".to_string())

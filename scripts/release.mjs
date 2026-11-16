@@ -13,6 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync, copyFil
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { CHANNELS, ROLLING_TAGS } from './release-meta.mjs';
+import { makeManifest } from './release-assets.mjs';
 
 const MANIFEST_NAME = 'latest.json';
 
@@ -67,47 +68,6 @@ function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
-/**
- * Which manifest slot an artifact fills. Everything else (deb, AppImage, pkg.tar.zst, msi) is a
- * release-page attachment: no platform applies it through the updater.
- */
-function slotOf(name) {
-  if (name === 'slag-v2.exe') return ['windows-x86_64', 'portable'];
-  if (/setup\.exe$/i.test(name)) return ['windows-x86_64', 'installer'];
-  if (/\.apk$/i.test(name)) return ['android-aarch64', 'apk'];
-  return null;
-}
-
-function sign(path, key) {
-  const args = key ? ['tauri', 'signer', 'sign', '-f', key, path] : ['tauri', 'signer', 'sign', path];
-  run(`sign ${basename(path)}`, 'npx', args);
-  const signaturePath = `${path}.sig`;
-  if (!existsSync(signaturePath)) fail(`no .sig next to ${basename(path)}`);
-  return readFileSync(signaturePath, 'utf8').trim();
-}
-
-function makeManifest({ version, notes, assets, repo, tag }) {
-  const platforms = {};
-  for (const asset of assets) {
-    const slot = slotOf(asset.name);
-    if (!slot) continue;
-    const [platform, kind] = slot;
-    platforms[platform] ??= {};
-    platforms[platform][kind] = {
-      url: `https://github.com/${repo}/releases/download/${tag}/${asset.name}`,
-      size: asset.size,
-      sha256: asset.sha256,
-      signature: asset.signature,
-    };
-  }
-  if (Object.keys(platforms).length === 0) fail('nothing to publish: no installable artifact');
-  return {
-    version,
-    pub_date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
-    notes,
-    platforms,
-  };
-}
 
 function releaseExists(repo, tag) {
   return capture('gh', ['release', 'view', tag, '--repo', repo]).status === 0;
@@ -150,6 +110,7 @@ function main() {
   }
 
   const manifest = makeManifest({ version: options.version, notes, assets, repo: options.repo, tag });
+  if (Object.keys(manifest.platforms).length === 0) fail('nothing to publish: no installable artifact');
   const manifestPath = join(staging, MANIFEST_NAME);
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
   process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`);
