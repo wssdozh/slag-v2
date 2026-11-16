@@ -1478,13 +1478,15 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(contextMenu.locator('text=Закрепить')).toBeVisible();
     await expect(contextMenu.locator('text=Разобрать с ИИ')).toBeVisible();
     await expect(contextMenu.locator('text=Копировать текст')).toBeVisible();
-    await expect(contextMenu.locator('text=Дополнительно')).toBeVisible();
+    await expect(contextMenu.locator('text=Файл')).toBeVisible();
 
     // Take screenshot of enhanced context menu
     await page.screenshot({ path: 'test-results/screenshots/context-menu-enhanced.png' });
 
-    // "Дополнительно" keeps only the wiki link; duplicate and archive are gone.
-    await contextMenu.locator('button', { hasText: 'Дополнительно' }).click();
+    // The "Файл" flyout holds the wiki link; duplicate and archive are gone.
+    await contextMenu.getByRole('button', { name: 'Файл', exact: true }).click();
+    await expect(contextMenu.locator('button', { hasText: 'Копировать [[линк]]' })).toBeVisible();
+    await expect(contextMenu.locator('button', { hasText: 'Скопировать ID' })).toBeVisible();
     await expect(contextMenu.locator('button', { hasText: 'Дублировать' })).toHaveCount(0);
     await expect(contextMenu.locator('button', { hasText: 'В архив' })).toHaveCount(0);
     await page.keyboard.press('Escape');

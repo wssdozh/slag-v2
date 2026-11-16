@@ -112,6 +112,20 @@ pwsh scripts/publish-release.ps1 -Version 0.2.0 -Notes "что поменяло�
 3. Скрипт сам проверяет, что `releases/latest/download/latest.json` отдаёт новую версию. Если
    github ещё кэширует — повторить `Invoke-WebRequest` через минуту.
 
+### arch
+
+Пакет `.pkg.tar.zst` собирается из того же `.deb`, без повторной сборки Rust: джоб `arch` в
+`release.yml` поднимает `archlinux:latest` в docker, ставит `base-devel`, и
+`scripts/pack-arch.sh` перепаковывает deb через `makepkg` (зависимости — `webkit2gtk-4.1`,
+`libappindicator-gtk3`, `librsvg`, `gtk3`, `libsoup`). Результат идёт в `ExtraAssets` и просто
+прикрепляется к релизу: клиент на linux себя не обновляет.
+
+### проверки на каждый пуш
+
+`ci.yml` на ubuntu гоняет `pnpm install --frozen-lockfile`, `npm run check`, `npm run build` и
+`e2e/slag` на одном воркере. `--frozen-lockfile` заодно доказывает, что патч `@atomic-editor`
+из `patches/` применяется на чистой установке. релиз по-прежнему только руками.
+
 ## 5. Проверка обновления вживую
 
 Механику удобно гонять локально, не публикуя релиз:
