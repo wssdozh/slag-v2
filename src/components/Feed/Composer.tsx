@@ -30,7 +30,8 @@ import { useComposerSlashCommands } from './composer/useComposerSlashCommands';
 import { useComposerSubmit } from './composer/useComposerSubmit';
 import { resolveComposerFields, type ComposerDismissals } from './composer/composerFields';
 import { buildComposerHighlights, type ComposerHighlight } from './composer/composerHighlights';
-import { useComposerField } from './composer/useComposerField';
+import type { ComposerEditorKeyEvent } from './composer/ComposerEditorField';
+import { useComposerField, type ComposerEngine } from './composer/useComposerField';
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -78,8 +79,23 @@ export const Composer: React.FC<ComposerProps> = ({
   const activeFolder = effectiveDefaultFolder;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // The markdown surface keeps its host here; the handle resolves the live view from it.
+  const editorContainerRef = useRef<HTMLDivElement | null>(null);
   // The composer talks to the field through this handle, never to the DOM node directly.
-  const field = useComposerField(textareaRef);
+  const [engine] = useState<ComposerEngine>(() => {
+    // Explicit opt-out wins; automation keeps the plain field so the existing specs, which
+    // drive a <textarea>, still describe a real surface. The live-preview spec opts in.
+    try {
+      const stored = localStorage.getItem('slag:composer-engine');
+      if (stored === 'textarea' || stored === 'markdown') return stored;
+    } catch {
+      // private mode: fall through to the default
+    }
+    const automated = typeof navigator !== 'undefined' && navigator.webdriver;
+    return automated ? 'textarea' : 'markdown';
+  });
+  const field = useComposerField(textareaRef, editorContainerRef, engine);
+  const [documentId] = useState(() => `composer-draft-${Date.now()}`);
 
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [reminder] = useState<string | undefined>(initialReminder);
@@ -243,9 +259,9 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   }, [replyTarget, isModal, field]);
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  // One path for both surfaces: CodeMirror hands the text, the textarea hands an event.
+  const applyContent = (text: string) => {
     notifyUserEdit();
-    const text = e.target.value;
     setContent(text);
 
     if (!text.trim()) {
@@ -263,9 +279,20 @@ export const Composer: React.FC<ComposerProps> = ({
       }
     }
 
-    const cursorPos = e.target.selectionStart || text.length;
+    const cursorPos = field.getSelection().from || text.length;
     updateAutocompleteQueries(text, cursorPos);
   };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    applyContent(e.target.value);
+  };
+
+  // Draft restore, `/clear` and the AI tag pass all change `content` behind the field's back:
+  // push those into the CodeMirror document so the two never drift apart.
+  useEffect(() => {
+    if (engine !== 'markdown') return;
+    if (field.getValue() !== content) field.setValue(content);
+  }, [content, engine, field]);
 
   const removeAttachment = (id: string) => {
     setAttachments(attachments.filter(a => a.id !== id));
@@ -396,7 +423,7 @@ export const Composer: React.FC<ComposerProps> = ({
     setIsFullscreenEditorOpen(true);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: ComposerEditorKeyEvent) => {
     if (handleAutocompleteKeyDown(e)) {
       return;
     }
@@ -461,7 +488,7 @@ export const Composer: React.FC<ComposerProps> = ({
       return;
     }
 
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !isMobile) {
       e.preventDefault();
       handleSend();
     }
@@ -634,9 +661,14 @@ export const Composer: React.FC<ComposerProps> = ({
       value={content}
       variant={variant ?? (isModal ? 'flat' : 'card')}
       minHeight={24}
+      mode={engine}
+      editorContainerRef={engine === 'markdown' ? editorContainerRef : undefined}
+      documentId={documentId}
+      onTextChange={applyContent}
+      onEditorKeyDown={handleKeyDown}
       onChange={handleContentChange}
       onSubmit={handleSend}
-      onKeyDown={handleKeyDown}
+      onKeyDown={(event) => handleKeyDown(event)}
       onPaste={handlePaste}
       placeholder={
         isModal

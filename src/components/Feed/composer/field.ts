@@ -2,6 +2,9 @@
 // Every piece of composer logic (autocomplete, slash commands, files, drafts) talks to this
 // handle instead of reaching into `HTMLTextAreaElement`, so the surface can grow into a
 // CodeMirror view without touching those hooks again.
+// CodeMirror view, typed only: the handle reads the live document through it.
+import type { EditorView } from '@codemirror/view';
+
 export interface FieldSelection {
   from: number;
   to: number;
@@ -68,5 +71,44 @@ export function textareaFieldHandle(getElement: () => HTMLTextAreaElement | null
       getElement()?.focus({ preventScroll: true });
     },
     isFocused: () => getElement() === document.activeElement,
+  };
+}
+
+/**
+ * The CodeMirror implementation. The view owns the document, so every write is a transaction;
+ * the view itself is resolved lazily because it only exists after the editor mounts.
+ */
+export function codeMirrorFieldHandle(getView: () => EditorView | null): ComposerFieldHandle {
+  const view = () => getView();
+
+  return {
+    getValue: () => view()?.state.doc.toString() ?? '',
+    getSelection: () => {
+      const main = view()?.state.selection.main;
+      return { from: main?.from ?? 0, to: main?.to ?? 0 };
+    },
+    replaceRange: (from, to, text, caret) => {
+      const current = view();
+      if (!current) return;
+      current.dispatch({
+        changes: { from, to, insert: text },
+        selection: caret !== undefined ? { anchor: caret } : undefined,
+      });
+    },
+    setValue: (text) => {
+      const current = view();
+      if (!current) return;
+      current.dispatch({ changes: { from: 0, to: current.state.doc.length, insert: text } });
+    },
+    setCaret: (offset) => {
+      const current = view();
+      if (!current) return;
+      const anchor = Math.max(0, Math.min(offset, current.state.doc.length));
+      current.dispatch({ selection: { anchor } });
+    },
+    focus: () => {
+      view()?.focus();
+    },
+    isFocused: () => view()?.hasFocus ?? false,
   };
 }
