@@ -14,6 +14,12 @@ import {
   AI_CATEGORY_KEYWORDS,
 } from '../../config';
 import { formatTag, isStopTag } from './tags';
+import {
+  buildDraftTaggingPrompt,
+  buildTriageTaggingPrompt,
+  sortTagsByUsage,
+  type TagUsage,
+} from './taggingPrompt';
 
 export {
   resolveKieEndpoint,
@@ -62,39 +68,54 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Tag counters, most used first: reuse beats invention, so the fallback reads them in that order. */
+function collectTagUsage(): TagUsage[] {
+  return sortTagsByUsage(
+    Object.entries(storage.getVaultStats().tags)
+      .filter(([tag, count]) => tag.length > 0 && count > 0 && !isStopTag(tag))
+      .map(([tag, count]) => ({ tag, count }))
+  );
+}
+
+/** JS RegExp \b has no Cyrillic boundaries, so word edges are spelled out with unicode classes. */
+function matchesWord(lower: string, word: string): boolean {
+  const escaped = escapeRegex(word);
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?=[^\\p{L}\\p{N}_]|$)`, 'u').test(lower);
+}
+
+/** Stems match a word start only: `ui` must not fire inside `build`. */
+function matchesStem(lower: string, stem: string): boolean {
+  return new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escapeRegex(stem)}`, 'u').test(lower);
+}
+
 function localHeuristicTags(
   content: string,
-  existingTags: string[],
+  tagUsage: TagUsage[],
   style: 'lowercase' | 'kebab-case',
-  maxTags: number
+  maxTags: number,
+  allowNewTags: boolean
 ): string[] {
   const explicit = extractExplicitHashtags(content, style);
   const lower = content.toLowerCase();
-  const matchedExisting = existingTags.filter((tag) => {
-    const clean = tag.toLowerCase().trim();
-    if (clean.length < 3 || isStopTag(clean)) return false;
-    const escaped = escapeRegex(clean);
-    // ponytail: JS RegExp \b does not match Cyrillic boundaries; use unicode boundary
-    const regex = new RegExp(`(?:^|[^\\p{L}\\p{N}_])${escaped}(?=[^\\p{L}\\p{N}_]|$)`, 'iu');
-    return regex.test(lower);
-  });
+  const matchedExisting = tagUsage
+    .filter(({ tag }) => tag.length >= 3 && !isStopTag(tag) && matchesWord(lower, tag))
+    .map(({ tag }) => formatTag(tag, style));
 
-  const keywords = AI_CATEGORY_KEYWORDS;
-
+  // Keyword categories are general by construction, never picked from the note's own words, and
+  // they are new tags — so they queue behind dictionary matches and vanish when new tags are off.
   const detected: string[] = [];
-  for (const [tag, triggers] of Object.entries(keywords)) {
-    if (triggers.some((tr) => lower.includes(tr))) {
-      detected.push(formatTag(tag, style));
+  if (allowNewTags) {
+    for (const [tag, triggers] of Object.entries(AI_CATEGORY_KEYWORDS)) {
+      if (triggers.some((trigger) => matchesStem(lower, trigger))) {
+        detected.push(formatTag(tag, style));
+      }
     }
   }
 
-  const result = Array.from(
-    new Set([...explicit, ...matchedExisting.map((t) => formatTag(t, style)), ...detected])
-  )
+  // The user's own hashtags survive the slice: they are intent, not a guess.
+  return Array.from(new Set([...explicit, ...matchedExisting, ...detected]))
     .filter((t) => !isStopTag(t))
     .slice(0, maxTags);
-
-  return result;
 }
 
 function localMatchFolder(
@@ -159,59 +180,30 @@ export async function categorizeDraft(
   folders: FolderMeta[],
   settings: AiSettings
 ): Promise<CategorizeResult> {
-  const existingTags = storage.getAllExistingTags();
+  const tagUsage = collectTagUsage();
   const maxTags = settings.maxTagsPerNote || 4;
   const style = settings.tagCaseStyle || 'lowercase';
+  const allowNewTags = settings.allowNewTags !== false;
   const explicit = extractExplicitHashtags(content, style);
 
   const eligibleFolders = folders.filter((f) => f.path !== DEFAULT_INBOX_FOLDER);
-  const foldersContext = eligibleFolders.map((f) => ({
-    path: f.path,
-    name: f.name,
-    description: f.description || 'Общие заметки этой темы',
-  }));
 
-  const systemPrompt = `Ты — экспертный диспетчер каталогизации и таксономист персональной базы знаний SLAG.
-Твоя задача — для текста заметки определить:
-1. Наиболее подходящую целевую папку (targetFolder).
-2. От 0 до ${maxTags} лучших тегов (tags).
-3. Краткую причину (reason, 5-8 слов на русском).
-4. Сформулировать ёмкий, нормализованный заголовок (suggestedTitle, 3-6 слов на русском, без спецсимволов и кавычек).
+  const { systemPrompt, userPrompt } = buildDraftTaggingPrompt({
+    content,
+    currentFolder,
+    inboxFolder: DEFAULT_INBOX_FOLDER,
+    folders: eligibleFolders.map((f) => ({
+      path: f.path,
+      description: f.description || 'Общие заметки этой темы',
+    })),
+    tags: tagUsage,
+    style,
+    maxTags,
+    allowNewTags,
+    customRules: settings.customTagRules,
+  });
 
-СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
-[${existingTags.join(', ')}]
-
-СПИСОК ДОСТУПНЫХ ПАПОК:
-${JSON.stringify(foldersContext, null, 2)}
-ТЕКУЩАЯ ПАПКА ПОЛЬЗОВАТЕЛЯ: "${currentFolder}"
-
-ПРАВИЛА:
-1. ПАПКА:
-   - Если текущая папка пользователя — не "Входящие" (например, проект или конкретная тема), отдавай ей приоритет, если заметка подходит по смыслу.
-   - Если текущая папка — "Входящие", обязательно выбери наиболее подходящую папку из доступных по их смыслу и описанию (targetFolder должен совпадать с полем path одной из папок). Если ни одна явно не подходит, верни "${currentFolder}".
-2. ТЕГИ:
-   - Выдели суть темы, стек, ключевые сущности.
-   - От 0 до ${maxTags} точных тегов. Если в заметке нет выраженной темы или это бытовой фрагмент/тест/слишком короткий текст — верни пустой массив [].
-   - КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать в качестве тегов типы сущностей ("заметка", "таска", "задача", "статья", "файл", "аудио", "фото").
-   - Используй существующие теги из словаря при точном совпадении, либо смело создавай новые точные теги.
-   - Формат тегов: ${style === 'kebab-case' ? 'kebab-case без пробелов' : 'строчные буквы без знака #'}.
-3. ПРИЧИНА:
-   - 5-8 слов на русском языке, объясняющих выбор.
-4. ЗАГОЛОВОК:
-   - 3-6 слов на русском, отражающих суть.
-${settings.customTagRules ? `Пользовательские правила: ${settings.customTagRules}` : ''}
-
-Ответь СТРОГО в формате JSON:
-{
-  "suggestedTitle": "краткий заголовок",
-  "targetFolder": "путь_папки",
-  "tags": ["тег1", "тег2"],
-  "reason": "краткая причина"
-}`;
-
-  const userPrompt = `Текст заметки:\n${content.slice(0, 2000)}`;
-
-  aiLog.info(`Draft classification requested: len=${content.length} chars, folder="${currentFolder}", folders=${eligibleFolders.length}, tags=${existingTags.length}`);
+  aiLog.info(`Draft classification requested: len=${content.length} chars, folder="${currentFolder}", folders=${eligibleFolders.length}, tags=${tagUsage.length}`);
   const startTime = performance.now();
 
   const parsed = await callJsonLlm<{
@@ -253,7 +245,7 @@ ${settings.customTagRules ? `Пользовательские правила: ${
 
   const fallbackResult = {
     targetFolder: localMatch.folder,
-    tags: localHeuristicTags(content, existingTags, style, maxTags),
+    tags: localHeuristicTags(content, tagUsage, style, maxTags, allowNewTags),
     reason: localMatch.reason,
   };
   aiLog.info(`Draft categorized (heuristic): -> "${fallbackResult.targetFolder}" [${fallbackResult.tags.map(t => '#' + t).join(' ')}]`);
@@ -283,13 +275,13 @@ export async function triageInboxItems(
     return [];
   }
 
-  const existingTags = storage.getAllExistingTags();
+  const tagUsage = collectTagUsage();
   const maxTags = settings.maxTagsPerNote || 4;
   const style = settings.tagCaseStyle || 'lowercase';
+  const allowNewTags = settings.allowNewTags !== false;
 
-  const foldersContext = eligibleFolders.map((f) => ({
+  const folderContext = eligibleFolders.map((f) => ({
     path: f.path,
-    name: f.name,
     description: f.description || 'Общие заметки этой темы',
   }));
 
@@ -302,35 +294,24 @@ export async function triageInboxItems(
   for (let i = 0; i < inboxItems.length; i += CHUNK_SIZE) {
     const chunkIndex = Math.floor(i / CHUNK_SIZE) + 1;
     const chunk = inboxItems.slice(i, i + CHUNK_SIZE);
-    const itemsContext = chunk.map((it) => ({
-      id: it.id,
-      title: it.title,
-      content: it.content.slice(0, 350),
-      tags: it.tags,
-      type: it.type,
-    }));
 
-    const systemPrompt = `Ты — интеллектуальный диспетчер сортировки заметок (AI Triage) и таксономист базы знаний SLAG.
-Твоя задача — для каждой неразобранной заметки из папки "Входящие":
-1. Выбрать наиболее подходящую целевую папку (targetFolder) на основе описаний папок.
-2. Подобрать от 0 до ${maxTags} точных тегов (tags). Если тема не выражена или это бытовой фрагмент — верни пустой массив []. Запрещено использовать в качестве тегов слова "заметка", "таска", "задача", "статья", "файл", "аудио", "фото".
-3. Написать краткую причину на русском языке (reason, 5-8 слов).
-4. Сформулировать ёмкий, нормализованный заголовок заметки (suggestedTitle, 3-6 слов на русском, без спецсимволов и кавычек). Если текущий заголовок уже информативен, оставь его.
-
-СПИСОК ДОСТУПНЫХ ПАПОК:
-${JSON.stringify(foldersContext, null, 2)}
-
-СЛОВАРЬ СУЩЕСТВУЮЩИХ ТЕГОВ:
-[${existingTags.join(', ')}]
-
-ПРАВИЛА:
-1. targetFolder должен в точности совпадать с полем path одной из папок.
-2. Теги должны отражать суть заметки (${style === 'kebab-case' ? 'kebab-case' : 'строчные буквы без #'}). Если тема не выражена — верни пустой массив tags: [].
-3. reason — 5-8 слов на русском.
-4. suggestedTitle — 3-6 слов на русском, суть заметки для имени файла.
-5. Верни ТОЛЬКО JSON-массив объектов: [{ "itemId": "...", "suggestedTitle": "...", "targetFolder": "...", "tags": ["..."], "reason": "..." }]`;
-
-    const userPrompt = `НЕРАЗОБРАННЫЕ ЗАМЕТКИ (ПАКЕТ):\n${JSON.stringify(itemsContext, null, 2)}`;
+    const { systemPrompt, userPrompt } = buildTriageTaggingPrompt({
+      notes: chunk.map((item) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        content: item.content,
+        tags: item.tags,
+      })),
+      currentFolder: DEFAULT_INBOX_FOLDER,
+      inboxFolder: DEFAULT_INBOX_FOLDER,
+      folders: folderContext,
+      tags: tagUsage,
+      style,
+      maxTags,
+      allowNewTags,
+      customRules: settings.customTagRules,
+    });
 
     let chunkResult: TriageSuggestion[] | null = null;
 
@@ -371,7 +352,7 @@ ${JSON.stringify(foldersContext, null, 2)}
       chunkResult = chunk.map((item) => {
         const textToMatch = `${item.title} ${item.content} ${item.tags.join(' ')}`;
         const matched = localMatchFolder(textToMatch, eligibleFolders, eligibleFolders[0].path);
-        const tags = localHeuristicTags(textToMatch, existingTags, style, maxTags);
+        const tags = localHeuristicTags(textToMatch, tagUsage, style, maxTags, allowNewTags);
         const itemExisting = (item.tags || []).filter((t) => !isStopTag(t));
         const mergedTags = Array.from(new Set([...itemExisting, ...tags])).slice(0, maxTags);
 
