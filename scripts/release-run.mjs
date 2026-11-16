@@ -114,7 +114,7 @@ async function verifyManifest(repo, channel, expected) {
     const response = await fetch(base, { headers: { 'cache-control': 'no-cache' } }).catch(() => null);
     if (response?.ok) {
       const manifest = await response.json().catch(() => null);
-      // elease must match exactly; a prerelease carries a run number we cannot know in advance.
+      // A stable release must match exactly; a prerelease carries a run number we cannot know.
       const matches = channel === 'release'
         ? manifest?.version === expected
         : typeof manifest?.version === 'string' && manifest.version.startsWith(expected);
