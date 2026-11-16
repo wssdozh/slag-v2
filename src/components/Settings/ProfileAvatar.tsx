@@ -19,10 +19,10 @@ interface ProfileAvatarProps {
 
 export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({ profile, className = '' }) => (
   <span
-    className={`flex items-center justify-center rounded-full overflow-hidden bg-tint-6 font-mono text-fg-muted ${className}`}
+    className={`flex items-center justify-center rounded-full overflow-hidden bg-tint-6 font-mono text-fg-muted select-none ${className}`}
   >
     {profile.avatar ? (
-      <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+      <img src={profile.avatar} alt="" className="w-full h-full object-cover object-center" />
     ) : (
       initialsFor(profile)
     )}
