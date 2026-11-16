@@ -105,3 +105,50 @@ test('a workspace change to one field only keeps the rest of the remote state', 
     profileAvatar: 'data:image/jpeg;base64,A',
   });
 });
+
+test('an empty profile from another device never wipes the filled one', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 120_000 });
+
+  const result = await page.evaluate(async () => {
+    const { reconcileSyncedVault } = await import(/* @vite-ignore */ '/src/lib/storage/syncReconcile.ts');
+    const { storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    const workspace = storage.getWorkspaceState();
+    const filled = { name: 'Мори', avatar: 'data:image/jpeg;base64,AAA' };
+
+    const fromEmptyDevice = reconcileSyncedVault({
+      base: { items: [], folders: [], workspace },
+      current: { items: [], folders: [], workspace: { ...workspace, profile: filled } },
+      incoming: { items: [], folders: [], workspace: { ...workspace, profile: { name: '  ' } } },
+    });
+
+    const nameOnly = reconcileSyncedVault({
+      base: { items: [], folders: [], workspace },
+      current: { items: [], folders: [], workspace: { ...workspace, profile: filled } },
+      incoming: { items: [], folders: [], workspace: { ...workspace, profile: { name: 'Мори' } } },
+    });
+
+    const filledFromEmptyLocal = reconcileSyncedVault({
+      base: { items: [], folders: [], workspace },
+      current: { items: [], folders: [], workspace: { ...workspace, profile: { name: '' } } },
+      incoming: { items: [], folders: [], workspace: { ...workspace, profile: { name: 'Мори', avatar: 'data:image/jpeg;base64,BBB' } } },
+    });
+
+    return {
+      keptName: fromEmptyDevice.workspace.profile?.name,
+      keptAvatar: fromEmptyDevice.workspace.profile?.avatar,
+      nameOnlyAvatar: nameOnly.workspace.profile?.avatar,
+      adoptedName: filledFromEmptyLocal.workspace.profile?.name,
+      adoptedAvatar: filledFromEmptyLocal.workspace.profile?.avatar,
+    };
+  });
+
+  // A device that never filled the profile in must not clear the name or the photo.
+  expect(result.keptName).toBe('Мори');
+  expect(result.keptAvatar).toBe('data:image/jpeg;base64,AAA');
+  // A name-only update keeps the avatar the vault already carries.
+  expect(result.nameOnlyAvatar).toBe('data:image/jpeg;base64,AAA');
+  // An empty local profile still adopts a filled one coming from the other side.
+  expect(result.adoptedName).toBe('Мори');
+  expect(result.adoptedAvatar).toBe('data:image/jpeg;base64,BBB');
+});
