@@ -5,6 +5,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Compartment, Prec, type Extension } from '@codemirror/state';
 import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { AtomicCodeMirrorEditor } from '@atomic-editor/editor';
+import { composerHighlightExtensions, setComposerHighlights } from './composerDecorations';
+import type { ComposerHighlight } from './composerHighlights';
 
 export interface ComposerEditorKeyEvent {
   key: string;
@@ -27,6 +29,8 @@ export interface ComposerEditorFieldProps {
   onKeyDown: (event: ComposerEditorKeyEvent) => void;
   /** The host element: the field handle resolves the live view from it. */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Ranges the parser understood: date, tags, priority. Painted, not edited. */
+  highlights?: ComposerHighlight[];
 }
 
 export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
@@ -39,6 +43,7 @@ export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
   onChange,
   onKeyDown,
   containerRef,
+  highlights = [],
 }) => {
   // The keymap extensions are captured once at mount, so they read the latest handlers
   // through this box instead of closing over the first render's props.
@@ -66,6 +71,7 @@ export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
   // oxlint-disable-next-line react-hooks/refs -- the keymap only reads the box from an event
   const [extensions] = useState<readonly Extension[]>(() => [
     EditorView.lineWrapping,
+    composerHighlightExtensions,
     placeholderCompartment.of(placeholder(placeholderText)),
     EditorView.theme({
       '&': {
@@ -107,6 +113,21 @@ export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
     if (!view) return;
     view.dispatch({ effects: placeholderCompartment.reconfigure(placeholder(placeholderText)) });
   }, [placeholderText, placeholderCompartment, containerRef]);
+
+  // Painted ranges follow the parser: every render that produced new offsets repaints them.
+  // The editor may still be mounting on the first pass, so a missing view is retried next frame.
+  useEffect(() => {
+    const element = containerRef.current;
+    const view = element ? EditorView.findFromDOM(element) : null;
+    if (!view) {
+      const frame = requestAnimationFrame(() => {
+        const late = element ? EditorView.findFromDOM(element) : null;
+        late?.dispatch({ effects: setComposerHighlights.of(highlights) });
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    view.dispatch({ effects: setComposerHighlights.of(highlights) });
+  }, [highlights, containerRef]);
 
   return (
     <div

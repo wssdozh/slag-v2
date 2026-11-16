@@ -219,6 +219,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 onChange={(text) => onTextChange?.(text)}
                 onKeyDown={(event) => onEditorKeyDown?.(event)}
                 containerRef={editorContainerRef}
+                highlights={highlights}
               />
             ) : (
               <>
