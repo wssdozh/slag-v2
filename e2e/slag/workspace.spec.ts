@@ -7,6 +7,38 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
   });
 
   test('audio folder selects preserve pin scope and keyboard selection', async ({ page }) => {
+    // The queue drawer opens from the transport, so an empty folder has no way in: seed a track.
+    await page.evaluate(() => {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key?.startsWith('slag_items_')) continue;
+        const items = JSON.parse(localStorage.getItem(key) || '[]');
+        items.unshift({
+          id: 'probe_pinned_audio',
+          type: 'note',
+          title: 'Трек для проверки закрепления',
+          content: '',
+          folder: 'Проекты',
+          tags: [],
+          attachments: [{
+            id: 'probe_pinned_track',
+            name: 'voice_07-45-00.webm',
+            type: 'audio',
+            mimeType: 'audio/webm',
+            size: 1024,
+            duration: 3,
+            relativePath: '.attachments/voice_07-45-00.webm',
+          }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        localStorage.setItem(key, JSON.stringify(items));
+        break;
+      }
+    });
+    await page.reload({ waitUntil: 'commit' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
+
     await page.evaluate(() => {
       const channel = new BroadcastChannel('slag_cross_window_tabs_v2');
       channel.postMessage({
@@ -43,7 +75,7 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
 
     await page.locator('aside span', { hasText: 'Личное' }).first().click();
     await expect(folderSelect).toHaveText('Проекты');
-    await page.getByRole('button', { name: 'Очередь и фильтры', exact: true }).click();
+    await page.getByRole('button', { name: 'Очередь воспроизведения', exact: true }).click();
     const pinnedSelect = page.getByRole('button', { name: 'Закреплённая папка аудио', exact: true });
     await pinnedSelect.click();
     await page.getByRole('option', { name: 'Входящие', exact: true }).click();
