@@ -132,25 +132,33 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
       ) {
         return;
       }
+      // The popover is the top layer: the click that dismisses it is spent on the menu.
+      // Letting it through would also close the dialog underneath (LIFO violation) —
+      // capture runs before React's root, so the target never sees this click.
+      e.stopPropagation();
+      e.preventDefault();
       setOpen(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
+        // The popover is the top layer: the dialog it sits in must stay open. The
+        // shared hotkeys listen on window, downstream of this document-level handler.
+        e.stopPropagation();
         setOpen(false);
       }
     };
 
     window.addEventListener('scroll', handleScrollOrResize, true);
     window.addEventListener('resize', handleScrollOrResize);
-    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('click', handleClickOutside, true);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('scroll', handleScrollOrResize, true);
       window.removeEventListener('resize', handleScrollOrResize);
-      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('click', handleClickOutside, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, updatePosition, setOpen, dropdownRef]);

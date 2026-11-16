@@ -117,6 +117,73 @@ test.describe('Folder profile', () => {
     await expect(modal).toBeHidden();
   });
 
+  test('the actions menu is its own layer: Escape and an outside click leave the profile open', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await folderRow(page, 'Проекты').click();
+    const modal = await openProfileModal(page);
+    const renameItem = page.getByRole('button', { name: 'Переименовать' });
+
+    await modal.locator('button[aria-label="Действия с папкой"]').click();
+    await expect(renameItem).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(renameItem).toHaveCount(0);
+    await expect(modal).toBeVisible();
+
+    await modal.locator('button[aria-label="Действия с папкой"]').click();
+    await expect(renameItem).toBeVisible();
+    await page.mouse.click(20, 20);
+    await expect(renameItem).toHaveCount(0);
+    await expect(modal).toBeVisible();
+  });
+
+  test('moving a folder opens a dialog over the profile and keeps the profile in place', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await folderRow(page, 'Проекты').click();
+    const modal = await openProfileModal(page);
+    await page.waitForTimeout(400);
+    const before = await modal.boundingBox();
+
+    const openMove = async () => {
+      await modal.locator('button[aria-label="Действия с папкой"]').click();
+      await page.getByRole('button', { name: 'Переместить' }).first().click();
+      const dialog = page.getByRole('dialog', { name: 'Переместить папку' });
+      await expect(dialog).toBeVisible();
+      return dialog;
+    };
+
+    // The action is a dialog of its own, not an inline panel: the menu closes and the
+    // profile keeps its geometry underneath.
+    const moveDialog = await openMove();
+    await expect(page.getByRole('button', { name: 'Переименовать' })).toHaveCount(0);
+    await page.waitForTimeout(400);
+    const after = await modal.boundingBox();
+    expect(after && before).toBeTruthy();
+    expect(Math.abs(after!.x - before!.x)).toBeLessThan(1);
+    expect(Math.abs(after!.y - before!.y)).toBeLessThan(1);
+    expect(Math.abs(after!.width - before!.width)).toBeLessThan(1);
+    expect(Math.abs(after!.height - before!.height)).toBeLessThan(1);
+    await page.screenshot({ path: 'test-results/screenshots/folder-profile-move-dialog.png' });
+
+    // LIFO: Escape and a click outside close the dialog, not the profile under it.
+    await page.keyboard.press('Escape');
+    await expect(moveDialog).not.toBeVisible();
+    await expect(modal).toBeVisible();
+
+    await openMove();
+    await page.mouse.click(20, 20);
+    await expect(moveDialog).not.toBeVisible();
+    await expect(modal).toBeVisible();
+
+    await openMove();
+    await moveDialog.getByRole('button', { name: 'Новая родительская папка' }).click();
+    await page.getByRole('option', { name: 'Личное' }).click();
+    await moveDialog.getByRole('button', { name: 'Переместить', exact: true }).click();
+    await expect(folderRow(page, 'Личное/Проекты')).toBeVisible();
+    await expect(moveDialog).not.toBeVisible();
+    await expect(modal).toBeVisible();
+    await page.screenshot({ path: 'test-results/screenshots/folder-profile-move.png' });
+  });
+
   test('inbox profile offers no rename or delete', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     const modal = await openProfileModal(page);

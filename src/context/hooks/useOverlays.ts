@@ -70,6 +70,7 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
   const [folderModalParent, setFolderModalParent] = useState<string | null>(null);
   const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
   const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
+  const [folderMoveTarget, setFolderMoveTarget] = useState<string | null>(null);
   const [isFolderViewModalOpen, setIsFolderViewModalOpen] = useState(false);
 
   const openFolderInfoModal = useCallback((folderPath?: string) => {
@@ -80,6 +81,15 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
   const closeFolderInfoModal = useCallback(() => {
     setIsFolderInfoModalOpen(false);
     setFolderInfoTarget(null);
+  }, []);
+
+  // A move gets its own dialog: the folder stays where it is until the dialog commits.
+  const openFolderMoveModal = useCallback((folderPath: string) => {
+    setFolderMoveTarget(folderPath);
+  }, []);
+
+  const closeFolderMoveModal = useCallback(() => {
+    setFolderMoveTarget(null);
   }, []);
 
   // Vault, triage, composer
@@ -203,6 +213,9 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
     setIsFolderViewModalOpen,
     openFolderInfoModal,
     closeFolderInfoModal,
+    folderMoveTarget,
+    openFolderMoveModal,
+    closeFolderMoveModal,
     isVaultModalOpen,
     setIsVaultModalOpen,
     openVaultModal,

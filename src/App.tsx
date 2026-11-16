@@ -48,6 +48,9 @@ const FolderModal = lazy(() =>
 const FolderInfoModal = lazy(() =>
   import('./components/Modals/FolderInfoModal').then((m) => ({ default: m.FolderInfoModal }))
 );
+const FolderMoveModal = lazy(() =>
+  import('./components/Modals/FolderMoveModal').then((m) => ({ default: m.FolderMoveModal }))
+);
 const FolderViewModal = lazy(() =>
   import('./components/Modals/FolderViewModal').then((m) => ({ default: m.FolderViewModal }))
 );
@@ -105,6 +108,7 @@ const AppContent: React.FC = () => {
     isFullscreenEditorOpen,
     isFolderModalOpen,
     isFolderInfoModalOpen,
+    folderMoveTarget,
     isFolderViewModalOpen,
     isVaultModalOpen,
     isComposerModalOpen,
@@ -134,6 +138,7 @@ const AppContent: React.FC = () => {
   const isEditorMounted = useMountedOnOpen(isFullscreenEditorOpen);
   const isFolderModalMounted = useMountedOnOpen(isFolderModalOpen);
   const isFolderInfoModalMounted = useMountedOnOpen(isFolderInfoModalOpen);
+  const isFolderMoveModalMounted = useMountedOnOpen(folderMoveTarget !== null);
   const isFolderViewModalMounted = useMountedOnOpen(isFolderViewModalOpen);
   const isVaultModalMounted = useMountedOnOpen(isVaultModalOpen);
   const isComposerModalMounted = useMountedOnOpen(isComposerModalOpen);
@@ -314,6 +319,9 @@ const AppContent: React.FC = () => {
         <LazyOverlay mounted={isFolderInfoModalMounted}>
           <FolderInfoModal />
         </LazyOverlay>
+        <LazyOverlay mounted={isFolderMoveModalMounted}>
+          <FolderMoveModal />
+        </LazyOverlay>
         <LazyOverlay mounted={isFolderViewModalMounted}>
           <FolderViewModal />
         </LazyOverlay>
@@ -395,6 +403,9 @@ const AppContent: React.FC = () => {
       </LazyOverlay>
       <LazyOverlay mounted={isFolderInfoModalMounted}>
         <FolderInfoModal />
+      </LazyOverlay>
+      <LazyOverlay mounted={isFolderMoveModalMounted}>
+        <FolderMoveModal />
       </LazyOverlay>
       <LazyOverlay mounted={isFolderViewModalMounted}>
         <FolderViewModal />
