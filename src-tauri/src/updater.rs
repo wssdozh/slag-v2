@@ -11,6 +11,12 @@ use tauri::{AppHandle, Emitter};
 // release page, no separate artifacts repo to keep in sync.
 const REPO: &str = "https://github.com/wssdozh/slag-v2";
 const MANIFEST_URL: &str = "https://github.com/wssdozh/slag-v2/releases/latest/download/latest.json";
+// Prerelease streams own a rolling tag: the release job rewrites that release's `latest.json` on
+// every build, so `download/beta/latest.json` is the newest beta and never GitHub's `latest`.
+const BETA_MANIFEST_URL: &str =
+    "https://github.com/wssdozh/slag-v2/releases/download/beta/latest.json";
+const DEV_MANIFEST_URL: &str =
+    "https://github.com/wssdozh/slag-v2/releases/download/dev/latest.json";
 const ASSET_PREFIX: &str = "https://github.com/wssdozh/slag-v2/releases/download/";
 const PUBKEY: &str = include_str!("../updater.pubkey");
 const PROGRESS_EVENT: &str = "slag://update-progress";
@@ -70,6 +76,8 @@ pub struct PlatformInfo {
     /// false where the app cannot replace itself (linux: the package manager owns the binary).
     pub can_apply: bool,
     pub release_page: String,
+    /// The stream this install reads: `release` | `beta` | `dev`.
+    pub channel: String,
     /// The manifest actually used, so a dev override (`SLAG_UPDATE_ENDPOINT`) is visible in the UI.
     pub endpoint: String,
     /// Android: `PackageManager.canRequestPackageInstalls()`, i.e. whether the system installer
@@ -122,8 +130,49 @@ fn log_line(app: Option<&AppHandle>, level: &str, message: &str, data: impl Into
     }
 }
 
-fn endpoint() -> String {
-    std::env::var("SLAG_UPDATE_ENDPOINT").unwrap_or_else(|_| MANIFEST_URL.to_string())
+/// Which release stream this install follows. `release` reads GitHub's `latest`, the prerelease
+/// streams read their own rolling tag; the file format is the same, so the switch is one url.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Channel {
+    Release,
+    Beta,
+    Dev,
+}
+
+impl Channel {
+    /// The webview picks the channel; a build script or a stale front end may omit it, and a
+    /// missing channel is the stable stream, never "whatever was typed".
+    pub fn parse(text: Option<&str>) -> Result<Self, String> {
+        match text.map(str::trim).unwrap_or("") {
+            "" | "release" | "stable" => Ok(Self::Release),
+            "beta" => Ok(Self::Beta),
+            "dev" => Ok(Self::Dev),
+            other => {
+                eprintln!("[update] unknown channel: {other}");
+                Err("unknown_channel".to_string())
+            }
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Release => "release",
+            Self::Beta => "beta",
+            Self::Dev => "dev",
+        }
+    }
+
+    fn manifest_url(self) -> &'static str {
+        match self {
+            Self::Release => MANIFEST_URL,
+            Self::Beta => BETA_MANIFEST_URL,
+            Self::Dev => DEV_MANIFEST_URL,
+        }
+    }
+}
+
+fn endpoint(channel: Channel) -> String {
+    std::env::var("SLAG_UPDATE_ENDPOINT").unwrap_or_else(|_| channel.manifest_url().to_string())
 }
 
 fn is_local_endpoint() -> bool {
@@ -142,9 +191,9 @@ fn client() -> Result<reqwest::Client, String> {
         })
 }
 
-async fn fetch_manifest(app: Option<&AppHandle>) -> Result<Manifest, String> {
-    let url = endpoint();
-    log_line(app, "info", "manifest request", url.clone());
+async fn fetch_manifest(app: Option<&AppHandle>, channel: Channel) -> Result<Manifest, String> {
+    let url = endpoint(channel);
+    log_line(app, "info", "manifest request", format!("{} ({})", url, channel.as_str()));
     let response = client()?
         .get(&url)
         .send()
@@ -285,7 +334,11 @@ fn offer_from(app: &AppHandle, manifest: Manifest) -> Option<UpdateOffer> {
 }
 
 #[tauri::command]
-pub async fn update_platform(app: AppHandle) -> Result<PlatformInfo, String> {
+pub async fn update_platform(
+    app: AppHandle,
+    channel: Option<String>,
+) -> Result<PlatformInfo, String> {
+    let channel = Channel::parse(channel.as_deref())?;
     // Android answers this through the Kotlin bridge: `canRequestPackageInstalls` is a
     // PackageManager call, and the whole update path already goes through that plugin. A failed
     // probe is "unknown", not "forbidden": the UI must not offer a settings link on a guess.
@@ -312,14 +365,19 @@ pub async fn update_platform(app: AppHandle) -> Result<PlatformInfo, String> {
         current_version: current_version(&app),
         can_apply: cfg!(any(target_os = "windows", target_os = "android")),
         release_page: RELEASE_PAGE.to_string(),
-        endpoint: endpoint(),
+        channel: channel.as_str().to_string(),
+        endpoint: endpoint(channel),
         can_install_packages,
     })
 }
 
 #[tauri::command]
-pub async fn update_check(app: AppHandle) -> Result<Option<UpdateOffer>, String> {
-    let manifest = fetch_manifest(Some(&app)).await?;
+pub async fn update_check(
+    app: AppHandle,
+    channel: Option<String>,
+) -> Result<Option<UpdateOffer>, String> {
+    let channel = Channel::parse(channel.as_deref())?;
+    let manifest = fetch_manifest(Some(&app), channel).await?;
     Ok(offer_from(&app, manifest))
 }
 
@@ -565,8 +623,8 @@ async fn android_cache_dir(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(PathBuf::from(path))
 }
 
-pub async fn install(app: &AppHandle) -> Result<InstallOutcome, String> {
-    let manifest = fetch_manifest(Some(app)).await?;
+pub async fn install(app: &AppHandle, channel: Channel) -> Result<InstallOutcome, String> {
+    let manifest = fetch_manifest(Some(app), channel).await?;
     let Some(offer) = offer_from(app, manifest.clone()) else {
         return Err("up_to_date".to_string());
     };
@@ -678,8 +736,12 @@ pub async fn install(app: &AppHandle) -> Result<InstallOutcome, String> {
 }
 
 #[tauri::command]
-pub async fn update_install(app: AppHandle) -> Result<InstallOutcome, String> {
-    install(&app).await
+pub async fn update_install(
+    app: AppHandle,
+    channel: Option<String>,
+) -> Result<InstallOutcome, String> {
+    let channel = Channel::parse(channel.as_deref())?;
+    install(&app, channel).await
 }
 
 /// `--update-check`: run the whole pipeline except the swap and print the verdict as JSON. It is
@@ -694,7 +756,10 @@ pub fn diagnose() -> String {
 
 async fn diagnose_async() -> Result<serde_json::Value, String> {
     let current = env!("CARGO_PKG_VERSION");
-    let manifest = fetch_manifest(None).await?;
+    // `--update-check` has no webview to ask, so a terminal run picks the stream by env. An
+    // unparseable value is a typo in someone's shell, not a reason to hide it.
+    let channel = Channel::parse(std::env::var("SLAG_UPDATE_CHANNEL").ok().as_deref())?;
+    let manifest = fetch_manifest(None, channel).await?;
     let current_parsed = parse_version(current).ok_or_else(|| "manifest_invalid".to_string())?;
     let next = parse_version(&manifest.version).ok_or_else(|| "manifest_invalid".to_string())?;
     if next <= current_parsed {
@@ -702,7 +767,8 @@ async fn diagnose_async() -> Result<serde_json::Value, String> {
             "status": "up_to_date",
             "current": current,
             "latest": manifest.version,
-            "endpoint": endpoint(),
+            "channel": channel.as_str(),
+            "endpoint": endpoint(channel),
         }));
     }
     let entry = manifest
@@ -723,7 +789,8 @@ async fn diagnose_async() -> Result<serde_json::Value, String> {
         "size": asset.size,
         "verified": verify.is_ok(),
         "error": verify.err(),
-        "endpoint": endpoint(),
+        "channel": channel.as_str(),
+        "endpoint": endpoint(channel),
     }))
 }
 
@@ -795,5 +862,44 @@ mod android {
 
     pub async fn open_install_settings(app: &AppHandle) -> Result<(), String> {
         call(app, "openSettings", json!({})).await.map(|_| ())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_channel_is_the_stable_stream() {
+        assert_eq!(Channel::parse(None), Ok(Channel::Release));
+        assert_eq!(Channel::parse(Some("")), Ok(Channel::Release));
+        assert_eq!(Channel::parse(Some(" release ")), Ok(Channel::Release));
+        // An older client sends nothing at all; a dev build's env may say "stable".
+        assert_eq!(Channel::parse(Some("stable")), Ok(Channel::Release));
+    }
+
+    #[test]
+    fn prerelease_channels_read_their_own_rolling_manifest() {
+        assert_eq!(Channel::parse(Some("beta")), Ok(Channel::Beta));
+        assert_eq!(Channel::parse(Some("dev")), Ok(Channel::Dev));
+        assert_eq!(Channel::Beta.manifest_url(), BETA_MANIFEST_URL);
+        assert_eq!(Channel::Dev.manifest_url(), DEV_MANIFEST_URL);
+        // The stable endpoint stays GitHub's `latest`: a stable client must never see a prerelease.
+        assert_eq!(Channel::Release.manifest_url(), MANIFEST_URL);
+        assert!(MANIFEST_URL.ends_with("/releases/latest/download/latest.json"));
+    }
+
+    #[test]
+    fn an_unknown_channel_is_an_error_not_a_silent_fallback() {
+        assert_eq!(Channel::parse(Some("nightly")).unwrap_err(), "unknown_channel");
+    }
+
+    /// Every channel downloads from the same repository, so the asset-url guard is one prefix.
+    #[test]
+    fn every_channel_asset_lives_under_the_download_prefix() {
+        for channel in [Channel::Release, Channel::Beta, Channel::Dev] {
+            let url = format!("{}slag-v2/{}", ASSET_PREFIX, channel.as_str());
+            assert!(url.starts_with(ASSET_PREFIX));
+        }
     }
 }

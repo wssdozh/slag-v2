@@ -32,6 +32,9 @@ jobs:
       # --frozen-lockfile also proves the @atomic-editor patch from patches/ applies.
       - run: pnpm install --frozen-lockfile
       - run: npm run check
+      # The channel rules in scripts/ decide which client sees which build; they are pure
+      # functions, so the cheapest place to catch a wrong one is here.
+      - run: node --test scripts/release-meta.test.mjs
       - run: npm run build
 
   e2e:

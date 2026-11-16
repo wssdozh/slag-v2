@@ -556,6 +556,12 @@ export interface AppUpdateOffer {
   size: number | null;
 }
 
+/**
+ * Which release stream this install follows. Each one has its own `latest.json`: `release` reads
+ * GitHub's latest, `beta` and `dev` read their rolling prerelease tag.
+ */
+export type AppUpdateChannel = 'release' | 'beta' | 'dev';
+
 /** What this build is and whether it can replace its own binary. */
 export interface AppUpdatePlatform {
   os: string;
@@ -563,6 +569,8 @@ export interface AppUpdatePlatform {
   currentVersion: string;
   canApply: boolean;
   releasePage: string;
+  /** The stream the native side was asked about. */
+  channel: AppUpdateChannel;
   /** The manifest URL actually in use; a dev override shows up here. */
   endpoint: string;
   /** Android only: `PackageManager.canRequestPackageInstalls()`, null elsewhere or unknown. */
@@ -616,6 +624,9 @@ export interface AppUpdateState {
   error: string | null;
   isNoticeVisible: boolean;
   canInstall: boolean;
+  /** Which stream this install follows; switching re-reads that stream's manifest. */
+  channel: AppUpdateChannel;
+  setChannel: (channel: AppUpdateChannel) => void;
   check: () => Promise<void>;
   install: () => Promise<void>;
   dismiss: () => void;

@@ -40,3 +40,33 @@ test('updates row is reachable from the phone settings list', async ({ page }) =
   await expect(page.getByTestId('update-web-hint')).toBeVisible();
   await page.screenshot({ path: `${SHOT_DIR}/updates-tab-375.png` });
 });
+
+
+// The channel is a device-local choice: it decides which manifest is polled, so it must survive a
+// reload and must not be silently reset by anything else in the tab.
+test('the channel switch picks the stream and survives a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
+
+  await page.getByTestId('sidebar-settings-btn').click();
+  const scope = page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="updates"]') });
+  await scope.locator('[data-tab="updates"]').click();
+
+  const trigger = page.getByTestId('update-stream-select').locator('button');
+  await expect(trigger).toContainText('релиз');
+
+  await trigger.click();
+  await page.getByTestId('update-stream-dev').click();
+  await expect(trigger).toContainText('дев');
+  expect(await page.evaluate(() => localStorage.getItem('slag_update_channel'))).toBe('dev');
+
+  await page.reload();
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
+  await page.getByTestId('sidebar-settings-btn').click();
+  const reloaded = page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="updates"]') });
+  await reloaded.locator('[data-tab="updates"]').click();
+  await expect(page.getByTestId('update-stream-select').locator('button')).toContainText('дев');
+
+  await page.screenshot({ path: `${SHOT_DIR}/updates-channel.png` });
+});

@@ -4,6 +4,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { logger } from '../logger/logger';
 import type {
+  AppUpdateChannel,
   AppUpdateInstallOutcome,
   AppUpdateLogLine,
   AppUpdateOffer,
@@ -36,6 +37,7 @@ const KNOWN_CODES = [
   'settings_failed',
   'up_to_date',
   'unsupported',
+  'unknown_channel',
 ];
 
 export function updateErrorCode(error: unknown): string {
@@ -67,6 +69,7 @@ const ERROR_TEXT: Record<string, string> = {
   settings_failed: 'не открылись настройки установки',
   up_to_date: 'уже последняя версия',
   unsupported: 'эта платформа не ставит обновления сама',
+  unknown_channel: 'неизвестный канал обновлений',
 };
 
 export function updateErrorText(code: string | null): string {
@@ -75,23 +78,27 @@ export function updateErrorText(code: string | null): string {
   return ERROR_TEXT[code] ?? code;
 }
 
-export async function getAppUpdatePlatform(): Promise<AppUpdatePlatform | null> {
+export async function getAppUpdatePlatform(
+  channel: AppUpdateChannel
+): Promise<AppUpdatePlatform | null> {
   if (!isTauri()) return null;
   try {
-    return await invoke<AppUpdatePlatform>('update_platform');
+    return await invoke<AppUpdatePlatform>('update_platform', { channel });
   } catch (error) {
     updateLog.warn('platform probe failed', { error: String(error) });
     return null;
   }
 }
 
-export async function checkAppUpdate(): Promise<AppUpdateOffer | null> {
+export async function checkAppUpdate(channel: AppUpdateChannel): Promise<AppUpdateOffer | null> {
   if (!isTauri()) return null;
-  return invoke<AppUpdateOffer | null>('update_check');
+  return invoke<AppUpdateOffer | null>('update_check', { channel });
 }
 
-export async function installAppUpdate(): Promise<AppUpdateInstallOutcome> {
-  return invoke<AppUpdateInstallOutcome>('update_install');
+export async function installAppUpdate(
+  channel: AppUpdateChannel
+): Promise<AppUpdateInstallOutcome> {
+  return invoke<AppUpdateInstallOutcome>('update_install', { channel });
 }
 
 export async function openInstallPermissionSettings(): Promise<void> {

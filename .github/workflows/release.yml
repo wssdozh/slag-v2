@@ -1,81 +1,147 @@
-# Releases are explicit: nothing is built on push. Pick the version, the channel and the notes,
-# and the job builds Windows, Linux and Android from the same commit, then publishes them.
-# Only `stable` becomes GitHub's "latest", which is the stable client's manifest endpoint, so
-# beta/alpha/dev never reach anyone who did not ask for them.
+# Builds and publishes SLAG.
+#
+#   push to master        → dev build: 0.2.6-dev.<run>, published as a prerelease on the `dev` tag
+#   tag v1.2.3            → stable: becomes GitHub's `latest`, which is what a release client reads
+#   tag v1.2.3-beta.4     → beta: its own release plus a rewritten `latest.json` on the `beta` tag
+#
+# The rules themselves live in scripts/release-meta.mjs and are covered by node --test, so this
+# workflow only wires them to the build. A stable client can never see a prerelease: GitHub's
+# `latest` skips prereleases, and the beta/dev manifests live on their own rolling tags.
 name: release
+
 on:
+  push:
+    tags:
+      - 'v*'
+    branches: [master]
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Версия x.y.z (уже должна стоять в src-tauri/tauri.conf.json)'
-        required: true
       channel:
-        description: 'Канал: stable становится latest, остальные уходят как prerelease'
+        description: 'канал предварительной сборки (стабильный релиз выпускается тегом v1.2.3)'
         type: choice
-        options: [stable, beta, alpha, dev]
-        default: stable
+        options: [dev, beta]
+        default: dev
       notes:
-        description: 'Что поменялось (пойдёт в заметки релиза и latest.json)'
-        required: true
+        description: 'что поменялось (пусто — соберём из коммитов)'
+        required: false
 
 permissions:
   contents: write
 
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  verify:
+  prepare:
     runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      channel: ${{ steps.meta.outputs.channel }}
+      tag: ${{ steps.meta.outputs.tag }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+      manifest_tag: ${{ steps.meta.outputs.manifest_tag }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: версия совпадает с tauri.conf.json
+      - name: версия, канал и тег
+        id: meta
+        shell: bash
+        env:
+          NOTES: ${{ inputs.notes }}
+          ASKED_CHANNEL: ${{ inputs.channel }}
         run: |
-          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "$conf" != "${{ inputs.version }}" ]; then
-            echo "tauri.conf.json = $conf, а релиз ${{ inputs.version }}. бампни версию локально и запушь." >&2
-            exit 1
+          set -euo pipefail
+          base=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          notes="${NOTES:-}"
+          if [ -z "$notes" ]; then
+            previous=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+            notes=$(git log --pretty='- %s' ${previous:+$previous..HEAD} -n 40)
           fi
-      - run: corepack enable
+          meta=$(node scripts/release-meta.mjs --ref "$GITHUB_REF" --base "$base" \
+            --run "$GITHUB_RUN_NUMBER" --channel "${ASKED_CHANNEL:-}" --notes "$notes")
+          echo "$meta"
+          echo "$meta" | node -e '
+            const meta = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const out = {
+              version: meta.version,
+              channel: meta.channel,
+              tag: meta.tag,
+              prerelease: String(meta.prerelease),
+              manifest_tag: meta.manifestTag ?? "",
+            };
+            for (const [key, value] of Object.entries(out)) console.log(`${key}=${value}`);
+          ' >> "$GITHUB_OUTPUT"
+          echo "$meta" | node -e '
+            process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).notes + "\n");
+          ' > notes.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
+
+  verify:
+    needs: prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: npm run check
+      # The channel rules decide who gets what; a green pipeline on broken rules is worse than red.
+      - run: node --test scripts/release-meta.test.mjs
 
   desktop:
-    needs: verify
+    needs: [prepare, verify]
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
             artifact: desktop-windows
+            bundles: nsis
           - os: ubuntu-22.04
             artifact: desktop-linux
+            bundles: deb,appimage
+    # A dev build ships the two platforms that can self-update; linux packaging rides releases.
+    if: matrix.os == 'windows-latest' || needs.prepare.outputs.channel == 'release'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - name: linux libs
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
-      - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - name: версия сборки
+        shell: bash
+        run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
       - name: build
         shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            npx tauri build --bundles nsis
-          else
-            npx tauri build --bundles deb,appimage
-          fi
+        run: npx tauri build --config "$RUNNER_TEMP/version.json" --bundles ${{ matrix.bundles }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -85,16 +151,21 @@ jobs:
             src-tauri/target/release/bundle/**
 
   android:
-    needs: verify
-    # An unsigned or missing keystore must not swallow the whole release: the desktop and
-    # Arch artifacts are still worth publishing, and publish falls back to -SkipAndroid.
+    needs: [prepare, verify]
+    # A missing keystore must not swallow the whole release: the desktop build is still worth
+    # publishing, and the manifest simply has no android entry that time.
     continue-on-error: true
     runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -108,10 +179,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
-      - run: corepack enable
       - run: pnpm install --frozen-lockfile
+      - name: версия сборки
+        run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
       - name: build apk
-        run: npx tauri android build --apk --target aarch64
+        run: npx tauri android build --apk --target aarch64 --config "$RUNNER_TEMP/version.json"
       - name: sign apk
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -123,18 +195,21 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
           unsigned=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -n1)
           bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n1)
-          "$bt/zipalign" -p -f 4 "$unsigned" "$RUNNER_TEMP/SLAG-${{ inputs.version }}-universal.apk"
+          "$bt/zipalign" -p -f 4 "$unsigned" "$RUNNER_TEMP/SLAG-${{ needs.prepare.outputs.version }}.apk"
           "$bt/apksigner" sign --ks "$RUNNER_TEMP/release.keystore" --ks-pass "pass:$KS_PASS" \
-            --key-pass "pass:$KEY_PASS" --ks-key-alias "$KEY_ALIAS" "$RUNNER_TEMP/SLAG-${{ inputs.version }}-universal.apk"
+            --key-pass "pass:$KEY_PASS" --ks-key-alias "$KEY_ALIAS" \
+            "$RUNNER_TEMP/SLAG-${{ needs.prepare.outputs.version }}.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
           if-no-files-found: error
-          path: ${{ runner.temp }}/SLAG-*-universal.apk
+          path: ${{ runner.temp }}/SLAG-*.apk
 
   arch:
-    needs: desktop
+    needs: [prepare, verify, desktop]
+    if: needs.prepare.outputs.channel == 'release' && needs.desktop.result == 'success'
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -143,7 +218,7 @@ jobs:
           path: .artifacts/desktop-linux
       - name: .pkg.tar.zst
         env:
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           chmod +x scripts/pack-arch.sh
           mkdir -p arch-out
@@ -160,37 +235,43 @@ jobs:
           path: arch-out/*.pkg.tar.zst
 
   publish:
-    needs: [desktop, android, arch]
-    # android/arch are optional: publish runs when the desktop matrix succeeded.
-    if: always() && needs.desktop.result == 'success'
-    runs-on: windows-latest
+    needs: [prepare, desktop, android, arch]
+    # android and arch are optional: a build goes out when the desktop job succeeded.
+    if: always() && needs.prepare.result == 'success' && needs.desktop.result == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/download-artifact@v4
         with:
           path: .artifacts
-      - name: разложить под скрипт публикации
-        shell: pwsh
+      - name: что публикуем
+        shell: bash
         run: |
-          $version = '${{ inputs.version }}'
-          New-Item -ItemType Directory -Force src-tauri/target/release/bundle/nsis | Out-Null
-          Copy-Item .artifacts/desktop-windows/slag-v2.exe src-tauri/target/release/slag-v2.exe -Force
-          Copy-Item .artifacts/desktop-windows/bundle/nsis/*setup.exe src-tauri/target/release/bundle/nsis/ -Force
-          $linux = @(Get-ChildItem .artifacts/desktop-linux/bundle -Recurse -Include *.deb,*.AppImage -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-          $arch = @(Get-ChildItem .artifacts/desktop-arch -Filter *.pkg.tar.zst -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-          $apkFile = Get-ChildItem .artifacts/android-apk -Filter *.apk -ErrorAction SilentlyContinue | Select-Object -First 1
-          Write-Host "linux: $($linux -join ', ')"
-          Write-Host "arch: $($arch -join ', ')"
-          Write-Host "apk: $($apkFile.FullName)"
-          $releaseArgs = @{
-            Version = $version
-            Channel = '${{ inputs.channel }}'
-            Notes = '${{ inputs.notes }}'
-            ExtraAssets = @($linux) + @($arch)
-            SkipBuild = $true
-          }
-          if ($apkFile) { $releaseArgs.ApkPath = $apkFile.FullName } else { $releaseArgs.SkipAndroid = $true }
-          ./scripts/publish-release.ps1 @releaseArgs
+          set -euo pipefail
+          find .artifacts -type f | sort
+          mkdir -p out
+          cp .artifacts/release-notes/notes.md out/notes.md
+          cp .artifacts/desktop-windows/slag-v2.exe out/ 2>/dev/null || true
+          cp .artifacts/desktop-windows/bundle/nsis/*setup.exe out/ 2>/dev/null || true
+          cp .artifacts/android-apk/*.apk out/ 2>/dev/null || true
+          cp .artifacts/desktop-linux/bundle/deb/*.deb out/ 2>/dev/null || true
+          cp .artifacts/desktop-linux/bundle/appimage/*.AppImage out/ 2>/dev/null || true
+          cp .artifacts/desktop-arch/*.pkg.tar.zst out/ 2>/dev/null || true
+          ls -la out
+      - name: sign and publish
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/release.mjs \
+            --version '${{ needs.prepare.outputs.version }}' \
+            --channel '${{ needs.prepare.outputs.channel }}' \
+            --repo '${{ github.repository }}' \
+            --notes-file out/notes.md \
+            $(find out -maxdepth 1 -type f ! -name 'notes.md' ! -name '*.sig' | sort)

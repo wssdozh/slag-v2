@@ -4,9 +4,11 @@
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
-import { SettingsDivider, SettingsGroup, SettingsRow } from './SettingsUI';
+import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect } from './SettingsUI';
 import { Button } from '../UI/Button';
 import { formatBytes } from '../../lib/text/formatBytes';
+import { UPDATE_CHANNEL_OPTIONS } from '../../lib/platform/updateChannel';
+import type { AppUpdateChannel } from '../../types';
 
 const OS_LABEL: Record<string, string> = {
   windows: 'windows',
@@ -31,6 +33,8 @@ export const UpdatesSettingsTab: React.FC = () => {
     status,
     progress,
     canInstall,
+    channel,
+    setChannel,
     check,
     install,
     openReleasePage,
@@ -75,6 +79,18 @@ export const UpdatesSettingsTab: React.FC = () => {
               {platform ? `${OS_LABEL[platform.os] ?? platform.os} · ${platform.arch}` : 'браузер'}
             </span>
           }
+        />
+        <SettingsDivider />
+        <SettingsSelect
+          label="канал"
+          testId="update-stream-select"
+          description="откуда брать обновления: релиз — стабильные, бета и дев — предварительные"
+          value={channel}
+          onChange={(next) => setChannel(next as AppUpdateChannel)}
+          options={UPDATE_CHANNEL_OPTIONS.map((option) => ({
+            ...option,
+            testId: `update-stream-${option.value}`,
+          }))}
         />
         <SettingsDivider />
         <SettingsRow

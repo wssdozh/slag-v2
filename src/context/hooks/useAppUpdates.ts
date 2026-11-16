@@ -13,9 +13,11 @@ import {
   watchUpdateProgress,
 } from '../../lib/platform/appUpdate';
 import { openExternalUrl } from '../../lib/platform/openExternal';
+import { readUpdateChannel, writeUpdateChannel } from '../../lib/platform/updateChannel';
 import { shouldResumeInstall } from '../../lib/platform/installResume';
 import { logger } from '../../lib/logger/logger';
 import type {
+  AppUpdateChannel,
   AppUpdateOffer,
   AppUpdatePlatform,
   AppUpdateProgress,
@@ -45,6 +47,7 @@ export function useAppUpdates(
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(readDismissedVersion);
+  const [channel, setChannelState] = useState<AppUpdateChannel>(readUpdateChannel);
   const isBusy = useRef(false);
   /** The offer android refused to install, kept until the system permission changes. */
   const pendingInstall = useRef<string | null>(null);
@@ -52,8 +55,8 @@ export function useAppUpdates(
   const resumedInstall = useRef<string | null>(null);
 
   useEffect(() => {
-    void getAppUpdatePlatform().then(setPlatform);
-  }, []);
+    void getAppUpdatePlatform(channel).then(setPlatform);
+  }, [channel]);
 
   // The native side narrates every step; mirror it into the app log so a failed update on a phone
   // leaves a readable trace instead of a silent "nothing happened".
@@ -82,7 +85,7 @@ export function useAppUpdates(
         setError(null);
       }
       try {
-        const found = await checkAppUpdate();
+        const found = await checkAppUpdate(channel);
       setOffer(found);
       setStatus(found ? 'available' : 'up-to-date');
       updateLog.info('check', { found: found?.version ?? 'none' });
@@ -101,7 +104,7 @@ export function useAppUpdates(
       isBusy.current = false;
     }
     },
-    [addToast]
+    [addToast, channel]
   );
 
   // One silent check per launch, after the first paint: a cold start must not race the feed.
@@ -126,7 +129,7 @@ export function useAppUpdates(
     setProgress({ downloaded: 0, total: offer.size ?? null });
     const unlisten = await watchUpdateProgress(setProgress);
     try {
-      const outcome = await installAppUpdate();
+      const outcome = await installAppUpdate(channel);
       updateLog.info('installed', { version: outcome.version, status: outcome.status });
       if (outcome.status === 'permission_required') {
         // Android cannot install silently: the switch lives in system settings, so this is a
@@ -160,7 +163,7 @@ export function useAppUpdates(
       unlisten?.();
       isBusy.current = false;
     }
-  }, [offer, confirmAction, addToast]);
+  }, [offer, confirmAction, addToast, channel]);
 
   /**
    * Android: the install permission and the install itself both happen outside the app, and the
@@ -174,7 +177,7 @@ export function useAppUpdates(
       // Neither a blocked install nor an open permission row on screen: nothing to look at.
       if (!pending && platform?.canInstallPackages !== false) return;
       void (async () => {
-        const next = await getAppUpdatePlatform();
+        const next = await getAppUpdatePlatform(channel);
         if (next) setPlatform(next);
         const canInstallPackages = next?.canInstallPackages ?? null;
         updateLog.info('install permission check', {
@@ -202,7 +205,7 @@ export function useAppUpdates(
       document.removeEventListener('visibilitychange', onReturn);
       window.removeEventListener('focus', onReturn);
     };
-  }, [platform, offer, install]);
+  }, [platform, offer, install, channel]);
 
   const dismiss = useCallback(() => {
     const version = offer?.version;
@@ -214,6 +217,24 @@ export function useAppUpdates(
       // A blocked localStorage only costs the reminder, not the update itself.
     }
   }, [offer]);
+
+  /**
+   * Switching the stream drops the offer from the previous one: an update that came from `dev`
+   * must not stay installable while the client now reads `release`. The probe effect re-runs on
+   * the channel and its silent check refills the card with the answer of the new stream.
+   */
+  const setChannel = useCallback(
+    (next: AppUpdateChannel) => {
+      if (next === channel) return;
+      writeUpdateChannel(next);
+      updateLog.info('channel', { from: channel, to: next });
+      setChannelState(next);
+      setOffer(null);
+      setStatus('idle');
+      setError(null);
+    },
+    [channel]
+  );
 
   const openReleasePage = useCallback(() => {
     const url = platform?.releasePage;
@@ -240,6 +261,8 @@ export function useAppUpdates(
       error,
       isNoticeVisible,
       canInstall,
+      channel,
+      setChannel,
       check,
       install,
       dismiss,
@@ -254,6 +277,8 @@ export function useAppUpdates(
       error,
       isNoticeVisible,
       canInstall,
+      channel,
+      setChannel,
       check,
       install,
       dismiss,
