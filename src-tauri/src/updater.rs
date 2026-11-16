@@ -66,7 +66,7 @@ pub struct UpdateOffer {
     pub notes: Option<String>,
     pub pub_date: Option<String>,
     pub current_version: String,
-    /// `portable` | `installer` | `apk` | `manual`
+    /// `portable` | `installer` | `apk` | `appimage` | `manual`
     pub kind: String,
     pub size: Option<u64>,
 }
