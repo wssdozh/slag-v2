@@ -25,7 +25,7 @@ export const FolderIconGrid: React.FC<FolderIconGridProps> = ({ value, onSelect 
             aria-pressed={isActive}
             className={`w-9 h-9 rounded-lg flex items-center justify-center outline-none ring-0 cursor-pointer motion-surface ${
               isActive
-                ? 'bg-white text-black'
+                ? 'bg-tint-12 text-fg-primary'
                 : 'text-fg-secondary hover:text-fg-primary hover:bg-tint-6'
             }`}
           >

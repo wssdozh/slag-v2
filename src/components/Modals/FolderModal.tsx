@@ -105,7 +105,7 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
                 onClick={() => setSelectedIcon(key)}
                 className={`p-1.5 rounded-md flex items-center justify-center motion-surface outline-none ring-0 cursor-pointer ${
                   folderIconName(selectedIcon) === key
-                    ? 'bg-white text-black'
+                    ? 'bg-tint-12 text-fg-primary'
                     : 'text-fg-secondary hover:text-fg-primary hover:bg-tint-6'
                 }`}
                 title={label}

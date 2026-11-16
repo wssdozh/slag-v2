@@ -337,6 +337,45 @@
   min-height: 0;
 }
 
+/* Folder profile: the description line and its in-place editor hand the height to each
+   other instead of the textarea popping in. The read row folds away while the editor
+   unfolds; the full width is kept, because `.motion-accordion` zeroes it, the text
+   re-wraps per word, and the resolved `1fr` start would be that taller, narrower height. */
+.motion-fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--slag-motion-slow) var(--ease-standard),
+    opacity var(--slag-motion-base) var(--ease-standard);
+}
+.motion-fold[data-expanded="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  /* The editor is gone in the same frame, so the line has nothing to animate against:
+     only its collapse is a gesture. */
+  transition: none;
+}
+.motion-fold > *,
+.motion-fold-in > * {
+  min-height: 0;
+}
+
+/* A row that only appears: it unfolds on mount, so the editor needs no state to grow. */
+@keyframes motion-fold-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+}
+.motion-fold-in {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  animation: motion-fold-in var(--slag-motion-slow) var(--ease-standard) both;
+}
+
 /* The single settings card. Every tab used to hand-roll this as `bg-panel` or
    `bg-white/[0.02]` with its own padding, radius and border, so openings the same
    row read as different screens. One definition, one tone. */
@@ -560,7 +599,8 @@ html[data-motion-swap="pop"]::view-transition-new(root) { animation-name: motion
   }
   /* Functional transforms still reach their target; only interpolation stops. */
   .transition-transform,
-  .motion-accordion {
+  .motion-accordion,
+  .motion-fold {
     transition: none !important;
   }
   .motion-accordion[data-expanded="true"] {
