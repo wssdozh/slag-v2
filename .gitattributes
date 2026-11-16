@@ -2,3 +2,7 @@
 # refuses to install when the checkout rewrote the line endings. Keep patches
 # verbatim: no EOL conversion, no smudge.
 *.patch -text
+
+# Shell scripts run inside the Arch container and through bash on CI: CRLF would
+# turn `#!/usr/bin/env bash` into a bad interpreter.
+*.sh text eol=lf

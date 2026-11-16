@@ -1,0 +1,65 @@
+# Checks on every push and pull request. Releases stay manual: see release.yml.
+# The point is to notice a broken write, a broken bundle or a broken Linux build
+# long before the release button is pressed.
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      # --frozen-lockfile also proves the @atomic-editor patch from patches/ applies.
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check
+      - run: npm run build
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: npx playwright install --with-deps chromium
+      # One worker: sync and audio specs measure timing and flake on six.
+      - run: npx playwright test e2e/slag
+        env:
+          PLAYWRIGHT_WORKERS: 1
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: test-results
+          if-no-files-found: ignore

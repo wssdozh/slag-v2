@@ -86,6 +86,9 @@ jobs:
 
   android:
     needs: verify
+    # An unsigned or missing keystore must not swallow the whole release: the desktop and
+    # Arch artifacts are still worth publishing, and publish falls back to -SkipAndroid.
+    continue-on-error: true
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -129,8 +132,37 @@ jobs:
           if-no-files-found: error
           path: ${{ runner.temp }}/SLAG-*-universal.apk
 
+  arch:
+    needs: desktop
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux
+          path: .artifacts/desktop-linux
+      - name: .pkg.tar.zst
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          chmod +x scripts/pack-arch.sh
+          mkdir -p arch-out
+          # makepkg needs a real Arch userspace; deb is only repackaged, no Rust rebuild here.
+          docker run --rm -e VERSION -v "$PWD/.artifacts:/artifacts:ro" -v "$PWD/arch-out:/out" \
+            -v "$PWD/scripts:/scripts:ro" archlinux:latest bash -lc '
+              pacman -Syu --noconfirm --needed base-devel sudo libarchive >/dev/null
+              /scripts/pack-arch.sh /artifacts/desktop-linux/bundle "$VERSION" /out
+            '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-arch
+          if-no-files-found: error
+          path: arch-out/*.pkg.tar.zst
+
   publish:
-    needs: [desktop, android]
+    needs: [desktop, android, arch]
+    # android/arch are optional: publish runs when the desktop matrix succeeded.
+    if: always() && needs.desktop.result == 'success'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,11 +177,20 @@ jobs:
           Copy-Item .artifacts/desktop-windows/slag-v2.exe src-tauri/target/release/slag-v2.exe -Force
           Copy-Item .artifacts/desktop-windows/bundle/nsis/*setup.exe src-tauri/target/release/bundle/nsis/ -Force
           $linux = @(Get-ChildItem .artifacts/desktop-linux/bundle -Recurse -Include *.deb,*.AppImage -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
-          $apk = (Get-ChildItem .artifacts/android-apk -Filter *.apk | Select-Object -First 1).FullName
+          $arch = @(Get-ChildItem .artifacts/desktop-arch -Filter *.pkg.tar.zst -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })
+          $apkFile = Get-ChildItem .artifacts/android-apk -Filter *.apk -ErrorAction SilentlyContinue | Select-Object -First 1
           Write-Host "linux: $($linux -join ', ')"
-          Write-Host "apk: $apk"
-          ./scripts/publish-release.ps1 -Version $version -Channel '${{ inputs.channel }}' `
-            -Notes '${{ inputs.notes }}' -ApkPath $apk -ExtraAssets $linux -SkipBuild
+          Write-Host "arch: $($arch -join ', ')"
+          Write-Host "apk: $($apkFile.FullName)"
+          $releaseArgs = @{
+            Version = $version
+            Channel = '${{ inputs.channel }}'
+            Notes = '${{ inputs.notes }}'
+            ExtraAssets = @($linux) + @($arch)
+            SkipBuild = $true
+          }
+          if ($apkFile) { $releaseArgs.ApkPath = $apkFile.FullName } else { $releaseArgs.SkipAndroid = $true }
+          ./scripts/publish-release.ps1 @releaseArgs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
