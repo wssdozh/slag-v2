@@ -77,6 +77,15 @@ function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
+/** `tauri signer` writes `<file>.sig` next to the file; the key is `--key` or the env var. */
+function sign(path, key) {
+  const args = key ? ['tauri', 'signer', 'sign', '-f', key, path] : ['tauri', 'signer', 'sign', path];
+  run('sign ' + basename(path), 'npx', args);
+  const signaturePath = path + '.sig';
+  if (!existsSync(signaturePath)) fail('no .sig next to ' + basename(path));
+  return readFileSync(signaturePath, 'utf8').trim();
+}
+
 
 function releaseExists(repo, tag) {
   return capture('gh', ['release', 'view', tag, '--repo', repo]).status === 0;
