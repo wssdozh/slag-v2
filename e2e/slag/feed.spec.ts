@@ -52,6 +52,45 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await expect(page.locator('text=Таска выполнена').or(page.locator('text=Таска возобновлена'))).toBeVisible();
   });
 
+  test('2.1. Last checked subtask completes its task without a status click', async ({ page }) => {
+    const typeDropdownButton = page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first();
+    await typeDropdownButton.click();
+    await page.locator('button', { hasText: 'Таска' }).click();
+
+    const taskTitle = 'Автозакрытие подзадач E2E ' + Date.now();
+    const composerTextarea = page.locator('main textarea');
+    await composerTextarea.fill(`${taskTitle}\n- [ ] первая\n- [ ] вторая`);
+    await page.locator('button[title*="Отправить"]').click();
+
+    const taskCard = page.locator('.group', { hasText: taskTitle }).first();
+    await expect(taskCard).toBeVisible();
+    const taskHeading = taskCard.locator('h3', { hasText: taskTitle });
+    // The card title carries the status in the feed: line-through means done.
+    await expect(taskHeading).not.toHaveClass(/line-through/);
+    await expect(taskCard.locator('text=Подзадачи: 0 из 2')).toBeVisible();
+
+    await taskCard.getByLabel('Отметить подзадачу первая').click();
+    await expect(taskCard.locator('text=Подзадачи: 1 из 2')).toBeVisible();
+    // One open line left: the task is still in work.
+    await expect(taskHeading).not.toHaveClass(/line-through/);
+
+    await taskCard.getByLabel('Отметить подзадачу вторая').click();
+    await expect(taskCard.locator('text=Подзадачи: 2 из 2')).toBeVisible();
+    // The last tick closes the parent: no separate click on the status.
+    await expect(taskHeading).toHaveClass(/line-through/);
+
+    // Persisted, not just painted: the store behind the feed agrees.
+    const storedStatus = await page.evaluate(() => {
+      const items = Object.entries(localStorage)
+        .filter(([key]) => key.startsWith('slag_items_'))
+        .flatMap(([, raw]) => JSON.parse(raw) as Array<{ title?: string; status?: string }>);
+      return items.find(item => item.title?.startsWith('Автозакрытие подзадач E2E'))?.status;
+    });
+    expect(storedStatus).toBe('done');
+
+    await page.screenshot({ path: 'test-results/screenshots/b16-subtask-autoclose.png', fullPage: true });
+  });
+
   test('3. Hybrid Inbox mode switching (Unsorted, All, Sorted)', async ({ page }) => {
     // Navigate to Inbox
     await page.locator('button', { hasText: 'Входящие' }).first().click();

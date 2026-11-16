@@ -146,8 +146,11 @@ export function useItemWrites(deps: ItemWritesDeps) {
         ? parsed
         : currentSubtasks.map(st => (st.id === subtaskId ? { ...st, completed: !st.completed } : st));
 
-      const allDone = updatedSubtasks.length > 0 && updatedSubtasks.every(st => st.completed);
-      const newStatus = allDone ? 'done' : item.status === 'done' ? 'in_progress' : item.status;
+      // Closing on the last tick lives in applyTaskCompletion, so the editor and every other
+      // write agree with the feed. This branch owns only the reverse: un-ticking one line of a
+      // done task puts it back to work.
+      const hasOpenSubtasks = updatedSubtasks.some(st => !st.completed);
+      const newStatus = item.status === 'done' && hasOpenSubtasks ? 'in_progress' : item.status;
 
       updateItem({
         ...item,
