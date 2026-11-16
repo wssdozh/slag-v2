@@ -1584,4 +1584,56 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(activeDateBtn).toBeVisible();
     await expect(activeDateBtn).toHaveClass(/text-blue-400/);
   });
+
+  test('48. Fullscreen editor: tag chips step into an inline edit instead of playing a picture', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+
+    await page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first().click();
+    const editor = page.locator('[data-testid="fullscreen-editor-modal"]');
+    await expect(editor).toBeVisible();
+
+    // Two tags through the trailing field.
+    const tagInput = editor.getByTestId('editor-tag-input');
+    await tagInput.click();
+    await tagInput.fill('инструменты');
+    await tagInput.press('Enter');
+    await tagInput.fill('интерфейс');
+    await tagInput.press('Enter');
+
+    const ribbon = editor.getByTestId('editor-tags');
+    await expect(ribbon.getByRole('button', { name: '#инструменты', exact: true })).toBeVisible();
+    await expect(ribbon.getByRole('button', { name: '#интерфейс', exact: true })).toBeVisible();
+
+    // The click lands in the chip: an input takes its place, caret and value inside.
+    await ribbon.getByRole('button', { name: '#инструменты', exact: true }).click();
+    const renameField = editor.getByTestId('editor-tag-edit');
+    await expect(renameField).toBeFocused();
+    await expect(renameField).toHaveValue('инструменты');
+    await page.screenshot({ path: 'test-results/screenshots/editor-tags-inline-edit.png' });
+
+    await renameField.fill('инструменты-ui');
+    await renameField.press('Enter');
+    await expect(ribbon.getByRole('button', { name: '#инструменты-ui', exact: true })).toBeVisible();
+    await expect(ribbon.getByRole('button', { name: '#инструменты', exact: true })).toHaveCount(0);
+
+    // Keyboard walks the ribbon: left arrow from the add field opens the last chip.
+    await tagInput.click();
+    await page.keyboard.press('ArrowLeft');
+    await expect(renameField).toBeFocused();
+    await expect(renameField).toHaveValue('интерфейс');
+    // The chip opens with its name selected: the first left collapses that selection,
+    // the second steps to the previous chip.
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowLeft');
+    await expect(renameField).toHaveValue('инструменты-ui');
+
+    // Emptying a chip deletes it.
+    await renameField.fill('');
+    await renameField.press('Enter');
+    await expect(ribbon.getByRole('button', { name: '#интерфейс', exact: true })).toBeVisible();
+    await expect(editor.getByTestId('editor-tag-edit')).toHaveCount(0);
+    await expect(ribbon).toHaveText('#интерфейс');
+  });
 });
