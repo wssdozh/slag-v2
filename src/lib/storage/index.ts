@@ -54,7 +54,6 @@ import {
 } from './trashStore';
 import {
   draftsStorageKey,
-  workspaceStateStorageKey,
   readComposerDrafts,
   readComposerDraft,
   writeComposerDraft,
@@ -82,6 +81,7 @@ import {
   type VaultImportIo,
   type VaultImportPayload,
 } from './vaultTransfer';
+import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -604,14 +604,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     workspaceState?: WorkspaceState;
   }): Promise<void> {
     const vault = this.currentVault;
-    const previous = this.getItems();
-    const previousItems = JSON.stringify(previous);
-    const previousFolders = JSON.stringify(this.getFolders());
-    const previousWorkspace = JSON.stringify(this.getWorkspaceState());
-    const folders = data.folders ?? this.getFolders();
-    const workspace = { ...this.getWorkspaceState(), ...data.workspaceState };
-    for (const folder of folders) {
-      safeVaultRelativePath(folder.path);
+    const base = {
+      items: this.getItems(),
+      folders: this.getFolders(),
+      workspace: this.getWorkspaceState(),
+    };
+    const previous = base.items;
+    const folders = data.folders ?? base.folders;
+    const workspace = { ...base.workspace, ...data.workspaceState };
+    for (const folder of folders) {      safeVaultRelativePath(folder.path);
     }
     for (const item of data.items ?? []) {
       const filename = item.filename || getSafeNoteFilename(item.title, item.id);
@@ -655,34 +656,57 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       }
       if (data.folders) {
         const nextFolderPaths = new Set(folders.map(f => f.path));
-        try {
-          const oldFoldersList: FolderMeta[] = JSON.parse(previousFolders);
-          for (const oldF of oldFoldersList) {
-            if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
-              await this.files.removeFolderFromDisk(oldF.path);
-            }
+        for (const oldF of base.folders) {
+          if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
+            await this.files.removeFolderFromDisk(oldF.path);
           }
-        } catch {
-          // ignore parsing error
         }
       }
       await writeTextFile(this.files.getVaultStatePath(vault), JSON.stringify({ folders, workspace, updatedAt: Date.now() }), { baseDir: BaseDirectory.AppData });
     }
     if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
-    if (JSON.stringify(this.getItems()) !== previousItems || JSON.stringify(this.getFolders()) !== previousFolders || JSON.stringify(this.getWorkspaceState()) !== previousWorkspace) {
-      // Re-persist the latest local state so an in-flight remote write cannot win on disk.
-      const latest = this.getItems();
-      const latestPaths = new Set(latest.map(item => `${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`));
-      for (const item of data.items ?? []) {
-        if (!latestPaths.has(`${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`)) await this.files.removeItemFromDisk(item, vault, true);
+
+    // The bundle was merged from a snapshot, and the person may have saved something while it was
+    // on its way to disk. Reconcile instead of failing: the newer copy wins either way, and a red
+    // error used to leave the whole burst pending over one keystroke.
+    const reconciled = reconcileSyncedVault({
+      base,
+      current: {
+        items: this.getItems(),
+        folders: this.getFolders(),
+        workspace: this.getWorkspaceState(),
+      },
+      incoming: { items: data.items ?? base.items, folders, workspace: data.workspaceState },
+    });
+    if (isTauri() && reconciled.drifted) {
+      const notePath = (item: SlagItem) => `${this.files.getVaultNotesPath(vault)}/${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
+      const incomingPaths = new Set((data.items ?? []).map(notePath));
+      const incomingById = new Map((data.items ?? []).map(item => [item.id, item]));
+      // The pass above wrote the remote copy of every changed note. Any note the screen won has
+      // to go back on disk, or the next start reads the older version back.
+      for (const item of reconciled.localWins) {
+        const staged = incomingById.get(item.id);
+        await this.files.flushItemToDisk(item, staged?.folder, staged?.filename, vault, true, incomingPaths);
       }
-      await this.importSyncedVaultData({ items: this.getItems(), folders: this.getFolders(), workspaceState: this.getWorkspaceState() });
-      throw new Error('Local state changed while persisting sync; bundle remains pending');
+      for (const item of reconciled.dropped) {
+        await this.files.removeItemFromDisk(item, vault, true);
+      }
+      fsLog.info('Reconciled sync import with local changes made during the write', {
+        localWins: reconciled.localWins.length,
+        dropped: reconciled.dropped.length,
+      });
     }
-    if (!this.importVaultData({ items: data.items, folders: data.folders })) {
+    if (!this.importVaultData({
+      // Only what the bundle carried: a workspace-only bundle has no business rewriting the notes.
+      items: data.items ? reconciled.items : undefined,
+      folders: data.folders ? reconciled.folders : undefined,
+    })) {
       throw new Error('Failed to store received vault data');
     }
-    localStorage.setItem(workspaceStateStorageKey(this), JSON.stringify(workspace));
+    if (JSON.stringify(reconciled.workspace) !== JSON.stringify(this.getWorkspaceState())) {
+      // Origin `remote`: the change is already persisted state, not something to push back.
+      this.saveWorkspaceState(reconciled.workspace, 'remote');
+    }
   }
 
   private transferIo(): VaultImportIo {

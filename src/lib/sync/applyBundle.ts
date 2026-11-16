@@ -381,11 +381,6 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       engine.status.state = engine.batchUpdating ? 'syncing' : 'connected';
       engine.notify();
     } catch (err) {
-      if (err instanceof Error && err.message.includes('Local state changed')) {
-        // Keep the bundle pending; the caller must not advance past a failed persist.
-        syncLog.warn('Local changed during sync persist; bundle remains pending');
-        throw err;
-      }
       syncLog.error('Error applying incoming bundle:', err);
       if (generation !== engine.initGeneration) return;
       engine.status.state = 'error';
