@@ -5,7 +5,7 @@ import type { FolderMeta, SlagItem, SlagItemType } from '../../../types';
 import type { ContextMenuTarget } from '../../../context/appContext.types';
 import { usePresence } from '../../../hooks/ui/usePresence';
 
-export type MenuSubmenuName = 'more' | 'type' | 'explorer';
+export type MenuSubmenuName = 'type' | 'explorer';
 
 /**
  * A side panel of the menu. The menu itself already outlives its own exit; a
@@ -36,6 +36,7 @@ export interface MenuSubmenusProps {
   onOpenInExplorer: () => void;
   onCopyFullPath: () => void;
   onCopyRelativePath: () => void;
+  onCopyId: () => void;
   onCopyLink: () => void;
   onOpenFolder: (path: string) => void;
   onCopyFolderFullPath: (path: string) => Promise<void>;
@@ -58,6 +59,7 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
   onOpenInExplorer,
   onCopyFullPath,
   onCopyRelativePath,
+  onCopyId,
   onCopyLink,
   onOpenFolder,
   onCopyFolderFullPath,
@@ -148,6 +150,19 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
           }`}
         />
 
+        {type === 'item' && (
+          <button
+            onClick={onCopyLink}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="action.link" size="sm" />
+              <span className="whitespace-nowrap">Копировать [[линк]]</span>
+            </div>
+            <span className="text-3xs text-fg-muted font-mono">⌘L</span>
+          </button>
+        )}
+
         <button
           onClick={() => {
             if (type === 'item') {
@@ -196,35 +211,18 @@ export const MenuSubmenus: React.FC<MenuSubmenusProps> = ({
             <span className="whitespace-nowrap">Относительный путь</span>
           </div>
         </button>
-      </Flyout>
-    )}
 
-    {/* Side Submenu Panel: Additional Utilities */}
-    {type === 'item' && item && triggerRect && (
-      <Flyout
-        open={activeSubmenu === 'more'}
-        style={{ left: `${submenuX}px`, top: `${submenuY}px`, maxHeight: `${submenuMaxHeight}px` }}
-        onMouseEnter={onSubmenuMouseEnter}
-        onMouseLeave={onSubmenuMouseLeave}
-        className="fixed z-[120] w-48 rounded-xl bg-surface-elevated/95 backdrop-blur-xl border border-tint-8 shadow-2xl p-1 text-xs text-fg-tertiary flex flex-col gap-0.5 select-none motion-popover overflow-y-auto scrollbar-thin"
-      >
-        {/* Bridge hit-area */}
-        <div
-          className={`absolute top-0 bottom-0 w-3 pointer-events-auto ${
-            submenuDirection === 'right' ? '-left-2' : '-right-2'
-          }`}
-        />
-
-        <button
-          onClick={onCopyLink}
-          className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <Icon name="action.link" size="sm" />
-            <span>Копировать [[линк]]</span>
-          </div>
-          <span className="text-3xs text-fg-muted font-mono">⌘L</span>
-        </button>
+        {type === 'item' && (
+          <button
+            onClick={onCopyId}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="action.copy" size="sm" />
+              <span className="whitespace-nowrap">Скопировать ID</span>
+            </div>
+          </button>
+        )}
       </Flyout>
     )}
   </>

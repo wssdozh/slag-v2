@@ -118,6 +118,13 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     onDone?.();
   };
 
+  const handleCopyId = () => {
+    if (!item) return;
+    navigator.clipboard.writeText(item.id);
+    addToast(`ID скопирован: ${item.id}`, 'success');
+    onDone?.();
+  };
+
   const handleCopyFullLink = () => {
     if (!item) return;
     const fullLink = `slag://note/${item.id}`;
@@ -260,6 +267,7 @@ export function useItemActions(item: SlagItem | null | undefined, onDone?: () =>
     handleMoveFolder,
     handleCopyMarkdown,
     handleCopyLink,
+    handleCopyId,
     handleCopyFullLink,
     handleCopyFullPath,
     handleCopyRelativePath,

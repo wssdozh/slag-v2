@@ -129,7 +129,7 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
       </div>
     </button>
 
-    {/* Explorer Flyout Submenu */}
+    {/* File Flyout Submenu: path, id and wiki link */}
     <button
       onMouseEnter={(e) => onTriggerMouseEnter('explorer', e)}
       onMouseLeave={onTriggerMouseLeave}
@@ -140,7 +140,7 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
     >
       <div className="flex items-center gap-2">
         <Icon name="entity.folderOpen" size="sm" />
-        <span>Проводник</span>
+        <span>Файл</span>
       </div>
       <Icon name="nav.next" size="xs" tone="muted" />
     </button>
@@ -156,22 +156,6 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
         <span>Копировать текст</span>
       </div>
       <span className="text-3xs text-fg-muted font-mono">⌘C</span>
-    </button>
-
-    {/* Additional Utilities Flyout Submenu */}
-    <button
-      onMouseEnter={(e) => onTriggerMouseEnter('more', e)}
-      onMouseLeave={onTriggerMouseLeave}
-      onClick={(e) => onTriggerClick('more', e)}
-      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors text-left cursor-pointer ${
-        activeSubmenu === 'more' ? 'bg-tint-8 text-white' : 'hover:bg-tint-6 hover:text-white'
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <Icon name="action.more" size="sm" />
-        <span>Дополнительно</span>
-      </div>
-      <Icon name="nav.next" size="xs" tone="muted" />
     </button>
 
     <div className="my-0.5 border-t border-tint-6" />

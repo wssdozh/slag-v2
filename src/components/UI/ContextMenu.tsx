@@ -242,12 +242,9 @@ export const ContextMenu: React.FC = () => {
   let submenuHeight = 120;
   if (activeSubmenu === 'explorer') {
     submenuWidth = 256;
-    submenuHeight = 156;
+    submenuHeight = 196;
   } else if (activeSubmenu === 'type') {
     submenuWidth = 176;
-    submenuHeight = 116;
-  } else if (activeSubmenu === 'more') {
-    submenuWidth = 192;
     submenuHeight = 116;
   }
 
@@ -346,6 +343,7 @@ export const ContextMenu: React.FC = () => {
         onOpenInExplorer={actions.handleOpenInExplorer}
         onCopyFullPath={actions.handleCopyFullPath}
         onCopyRelativePath={actions.handleCopyRelativePath}
+        onCopyId={actions.handleCopyId}
         onCopyLink={actions.handleCopyLink}
         onOpenFolder={handleOpenFolder}
         onCopyFolderFullPath={handleCopyFolderFullPath}
