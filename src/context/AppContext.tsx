@@ -168,6 +168,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setItems(storage.getItems());
   }, []);
 
+  const refreshItems = useCallback(() => {
+    setItems(storage.getItems());
+  }, []);
+
+  // Every note write has to land in the hub, whoever made it. The editor's autosave writes
+  // straight into `storage.saveItem` and returns through no action of ours, so a task marked
+  // done there used to reach the feed only on the next reload. The storage layer already
+  // announces each change; the provider owns the list, so it re-reads on that event.
+  // Remote bundles stay out: the sync engine packs a whole burst into one `slag-sync-updated`,
+  // and one render per bundle is the point of that event.
+  useEffect(() => storage.subscribeChanges((event) => {
+    if (event.kind === 'item' && event.origin !== 'remote') refreshItems();
+  }), [refreshItems]);
+
   useRecurringRollover(refreshData);
   useNotifyArm(items, vault);
   const appUpdate = useAppUpdates(addToast, confirmAction);
