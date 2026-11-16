@@ -24,6 +24,7 @@ test('updates tab explains the browser mode and shows the running version', asyn
   await expect(page.getByTestId('update-install-btn')).toHaveCount(0);
 
   await page.screenshot({ path: `${SHOT_DIR}/updates-tab-1280.png` });
+  await page.screenshot({ path: `${SHOT_DIR}/settings-updates.png` });
   expect(errors).toEqual([]);
 });
 

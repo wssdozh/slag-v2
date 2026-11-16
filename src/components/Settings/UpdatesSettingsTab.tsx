@@ -17,17 +17,6 @@ const OS_LABEL: Record<string, string> = {
   macos: 'macos',
 };
 
-/** How the build is installed, in the words of the thing that installs it. */
-const INSTALL_FORM_LABEL: Record<string, string> = {
-  portable: 'portable exe',
-  installer: 'установщик',
-  apk: 'apk',
-  appimage: 'appimage',
-  flatpak: 'flatpak',
-  package: 'пакет',
-  bundle: 'bundle',
-};
-
 function installLabel(kind: string | undefined): string {
   if (kind === 'installer') return 'скачать установщик';
   // Android and AppImage both replace the file in place: "обновить" is what the owner reads.
@@ -73,15 +62,6 @@ export const UpdatesSettingsTab: React.FC = () => {
       ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
       : null;
 
-  const offerDescription = offer
-    ? [
-        `сейчас ${offer.currentVersion}`,
-        offer.size ? formatBytes(offer.size) : null,
-      ]
-        .filter(Boolean)
-        .join(' · ')
-    : null;
-
   return (
     <div className="flex flex-col gap-5" data-testid="updates-settings">
       <SettingsGroup title="приложение">
@@ -100,11 +80,7 @@ export const UpdatesSettingsTab: React.FC = () => {
           value={
             <span className="text-xs font-mono text-fg-muted">
               {platform
-                ? [
-                    OS_LABEL[platform.os] ?? platform.os,
-                    platform.arch,
-                    INSTALL_FORM_LABEL[platform.installForm] ?? platform.installForm,
-                  ].join(' · ')
+                ? [OS_LABEL[platform.os] ?? platform.os, platform.arch].join(' · ')
                 : 'браузер'}
             </span>
           }
@@ -113,24 +89,13 @@ export const UpdatesSettingsTab: React.FC = () => {
         <SettingsSelect
           label="канал"
           testId="update-stream-select"
-          description="откуда брать обновления: релиз — стабильные, бета и дев — предварительные"
+          description="релиз — стабильные, бета и дев — предварительные"
           value={channel}
           onChange={(next) => setChannel(next as AppUpdateChannel)}
           options={UPDATE_CHANNEL_OPTIONS.map((option) => ({
             ...option,
             testId: `update-stream-${option.value}`,
           }))}
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="манифест"
-          testId="update-channel-row"
-          description="адрес манифеста, который опрашивается"
-          value={
-            <span className="block max-w-[15rem] truncate text-2xs font-mono text-fg-dim" data-testid="update-endpoint">
-              {platform?.endpoint ?? '—'}
-            </span>
-          }
         />
       </SettingsGroup>
 
@@ -154,15 +119,6 @@ export const UpdatesSettingsTab: React.FC = () => {
                     : status === 'error'
                       ? 'не удалось проверить'
                       : 'версия актуальна'
-              }
-              description={
-                offer
-                  ? offerDescription
-                  : status === 'up-to-date'
-                    ? 'проверено только что'
-                    : status === 'error'
-                      ? 'причина — в тосте и в логе UPDATE'
-                      : undefined
               }
               testId="update-offer-row"
               right={
@@ -278,15 +234,9 @@ export const UpdatesSettingsTab: React.FC = () => {
                 </div>
               </>
             )}
-
           </>
         )}
       </SettingsGroup>
-
-      <p className="text-2xs text-fg-dim px-1 leading-relaxed">
-        обновления берутся из публичного репозитория релизов и проверяются по sha256 и подписи до
-        запуска. без подписи файл не запускается.
-      </p>
     </div>
   );
 };
