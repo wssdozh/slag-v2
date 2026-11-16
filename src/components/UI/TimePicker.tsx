@@ -66,7 +66,13 @@ const WheelColumn: React.FC<WheelColumnProps> = ({
   }, [itemHeight]);
 
   useEffect(() => {
-    if (autoFocus) listRef.current?.focus({ preventScroll: true });
+    if (!autoFocus) return;
+    // The dialog mounts behind its entrance transition; the first frame is the earliest moment
+    // the wheel is both present and allowed to take focus, so arrows work without a click.
+    const frame = requestAnimationFrame(() => {
+      listRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [autoFocus]);
 
   const indexAt = useCallback(
@@ -122,6 +128,8 @@ const WheelColumn: React.FC<WheelColumnProps> = ({
         data-testid={testId}
         onKeyDown={handleKeyDown}
         onScroll={handleScroll}
+        // A tap on the wheel also arms the arrows: the row is not the only way in.
+        onPointerDown={() => listRef.current?.focus({ preventScroll: true })}
         style={{ height: itemHeight * VISIBLE_ROWS, paddingTop: half, paddingBottom: half }}
         className="relative overflow-y-auto scrollbar-none snap-y snap-mandatory overscroll-contain outline-none ring-0"
       >

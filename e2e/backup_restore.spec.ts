@@ -38,7 +38,7 @@ test.describe('Backup & Restore System Verification', () => {
     // 4. Switch to "Хранилище & Бэкап" tab, then to its «бэкапы» subsection
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
-    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
+    await settingsModal.getByTestId('vault-fold-backups').click();
     await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 5. Create a snapshot
@@ -71,7 +71,7 @@ test.describe('Backup & Restore System Verification', () => {
     await settingsBtn.click();
     await expect(settingsModal).toBeVisible();
     await vaultTabBtn.click();
-    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
+    await settingsModal.getByTestId('vault-fold-backups').click();
 
     // 10. Click restore button on the snapshot
     const restoreBtn = settingsModal.locator('[data-testid^="btn-restore-snapshot-"]').first();
@@ -111,7 +111,7 @@ test.describe('Backup & Restore System Verification', () => {
     // 2. Switch to "Хранилище & Бэкап" tab, then to its «бэкапы» subsection
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
-    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
+    await settingsModal.getByTestId('vault-fold-backups').click();
     await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 3. Inject simulated duplicate snapshots into IndexedDB (like the user had from React StrictMode race condition)

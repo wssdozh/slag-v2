@@ -46,7 +46,7 @@ test('an irreversible action asks in the app dialog, not in the system one', asy
   await page.keyboard.press('Control+,');
   await page.locator('button[data-tab="vault"]').click();
   // Export/import live in the «перенос» subsection of the vault tab.
-  await page.getByRole('button', { name: 'перенос' }).click();
+  await page.getByTestId('vault-fold-transfer').click();
 
   // Replacing the vault from an archive is the irreversible kind: cancelling must stop before
   // anything touches the notes, and the question must be ours.
