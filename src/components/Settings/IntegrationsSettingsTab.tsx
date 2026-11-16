@@ -1,6 +1,7 @@
 // Integrations: the master switch, the list of channels, and one detail screen behind a gear.
 import React, { useState } from 'react';
 import { Icon } from '../UI/icons/Icon';
+import { IconButton } from '../UI/IconButton';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import type { NotifyInvite } from '../../lib/sync/account';
@@ -247,15 +248,15 @@ export const IntegrationsSettingsTab: React.FC = () => {
           label="telegram"
           right={
             <span className="flex items-center gap-1">
-              <button
-                type="button"
+              <IconButton
+                size="md"
                 aria-label="настройки telegram"
+                title="настройки telegram"
                 data-testid="integration-telegram-settings"
                 onClick={() => setIsTelegramOpen(true)}
-                className="p-1.5 rounded-md text-fg-muted hover:text-fg-primary hover:bg-surface-hover cursor-pointer motion-press"
-              >
-                <Icon name="system.integrationConfig" size="md" tone="inherit" />
-              </button>
+                icon={<Icon name="system.integrationConfig" size="md" tone="inherit" />}
+                className="text-fg-muted hover:bg-surface-hover"
+              />
               <SettingsSwitch
                 label="канал telegram"
                 checked={live}

@@ -1,5 +1,6 @@
 // Per-device vault access dialog: grant mode and a toggle for each vault.
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '../../UI/icons/Icon';
 import type { AccountDevice, AccountVault } from '../../../lib/sync/accountTypes';
 import type { DeviceProfile, DeviceSyncMode } from '../../../lib/sync/types';
@@ -26,8 +27,11 @@ export const DevicePermissions: React.FC<DevicePermissionsProps> = ({
   onGrantModeChange,
   onToggleVaultAccess,
   onClose,
-}) => (
-  <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-canvas/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+}) => createPortal((
+  // The settings card is a transformed, clipped surface: a `fixed` overlay left inside it is
+  // positioned by the card and cropped to it. Portalling to the body keeps the dialog on the
+  // viewport, which is also what makes it cover the whole screen instead of a 740px box.
+  <div role="dialog" aria-modal="true" aria-label="Доступ к хранилищам" className="fixed inset-0 z-[60] bg-canvas/60 flex items-center justify-center p-4" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <DeviceCard device={device} onClose={onClose}>
       {'status' in device && (
         <SettingsGroup title="Приглашение">
@@ -55,4 +59,4 @@ export const DevicePermissions: React.FC<DevicePermissionsProps> = ({
       </SettingsGroup>
     </DeviceCard>
   </div>
-);
+), document.body);
