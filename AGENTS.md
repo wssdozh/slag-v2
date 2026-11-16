@@ -18,7 +18,7 @@
 - Всегда: `npm run check` (tsc + 0 warnings линтера, две строки вывода). Перед сдачей — `npm run build`.
 - Трогал `src/components/**` или `src/*.css`: `npx playwright test`, скриншот в `test-results/screenshots/`, показать в ответе `![Результат](<test-results/screenshots/…>)`.
 - Синк- и аудио-спеки (`sync_*.spec.ts`, `*audio*.spec.ts`) чувствительны к нагрузке: в первых 120-мс буфер импорта и замеры «сколько пушей успело», во вторых — реальное воспроизведение и позиция плейхеда. На шести воркерах флакуют, на одном зелёные. Гоняй их `PLAYWRIGHT_WORKERS=1`; остальную пачку можно параллельно.
-- Трогал `src-tauri/`: `npm run build:android`. Есть устройство в `adb devices` — поставить, запустить, снять `adb exec-out screencap -p`, проверить `read_image`.
+- Трогал `src-tauri/`: сборку **не** гоняй. exe, установщик и apk собирает GitHub Actions (`npm run release:dev` / тег), локальный `build:desktop` и `build:android` — впустую сожжённые минуты и артефакт без подписи. Есть устройство в `adb devices` и нужен нативный вид — поставить последнюю сборку из канала и снять `adb exec-out screencap -p`. Подробности — `BUILD.md` §0.
 - Коммит — Conventional Commits на английском, по одной задаче.
 
 ## 3. По зонам
