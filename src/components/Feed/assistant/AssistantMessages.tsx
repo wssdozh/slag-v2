@@ -66,9 +66,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
       <div className={`w-full flex-1 flex flex-col gap-3.5 ${isSidebar ? '' : 'max-w-2xl mx-auto'}`}>
         {messages.length === 0 ? (
           <div className="flex-1 min-h-0 flex flex-col items-center justify-center text-center p-4 max-w-sm mx-auto">
-            <div className="w-9 h-9 rounded-xl bg-tint-4 border border-tint-6 flex items-center justify-center text-fg-tertiary mb-2.5">
-              <Icon name="system.ai" size="md" tone="tertiary" />
-            </div>
+            <Icon name="system.ai" size="md" tone="tertiary" className="mb-2.5" />
             <h3 className="text-sm font-semibold text-fg-soft mb-1">
               {isInbox ? 'Ассистент по всем заметкам' : `Ассистент «${folderLabel}»`}
             </h3>
@@ -79,7 +77,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
             <div className="flex flex-col gap-1.5 w-full">
               <button
                 onClick={() => onQuickPrompt('Покажи план на сегодня и календарную повестку')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 hover:border-transparent text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <Icon name="time.date" size="sm" className="shrink-0" />
@@ -89,7 +87,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
               </button>
               <button
                 onClick={() => onQuickPrompt('Найди ключевые заметки')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 hover:border-transparent text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <Icon name="action.search" size="sm" className="shrink-0" />
@@ -99,7 +97,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
               </button>
               <button
                 onClick={() => onQuickPrompt('Создай новую таску: Проверить синхронизацию заметок')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 hover:border-transparent text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <Icon name="entity.task" size="sm" className="shrink-0" />
@@ -109,7 +107,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
               </button>
               <button
                 onClick={() => onQuickPrompt('Сколько заметок и задач в хранилище?')}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
+                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-tint-2 hover:bg-tint-6 border border-tint-4 hover:border-transparent text-xs text-fg-tertiary transition-colors flex items-center justify-between cursor-pointer"
               >
                 <span className="flex items-center gap-2">
                   <Icon name="admin.chart" size="sm" className="shrink-0" />
