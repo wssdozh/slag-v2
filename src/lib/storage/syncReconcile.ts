@@ -1,5 +1,5 @@
 // A bundle is written from a snapshot: the user keeps typing while it travels to disk.
-import type { FolderMeta, SlagItem, WorkspaceState } from '../../types';
+import type { FolderMeta, ProfileInfo, SlagItem, WorkspaceState } from '../../types';
 
 /**
  * The three states a staged sync import touches.
@@ -36,6 +36,28 @@ export interface ReconciledSyncImport {
 
 const sameJson = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right);
 
+const profileName = (profile: ProfileInfo | undefined): string => (profile?.name ?? '').trim();
+
+/**
+ * An empty profile must never win. A device that never filled it in would otherwise wipe the name
+ * and avatar the other device already has — the merge looks like it lost data, and the person has
+ * to type the name again on every device.
+ */
+function mergeProfile(
+  current: ProfileInfo | undefined,
+  incoming: ProfileInfo | undefined,
+): ProfileInfo | undefined {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  const incomingName = profileName(incoming);
+  if (!incomingName) return current;
+  // A name-only update must not drop the avatar the vault already carries.
+  if (!incoming.avatar && current.avatar && profileName(current) === incomingName) {
+    return { ...incoming, avatar: current.avatar };
+  }
+  return incoming;
+}
+
 /** Wall-clock last-writer-wins, the same rule the bundle merge itself uses. */
 const newerThan = (candidate: SlagItem, other: SlagItem): boolean =>
   (candidate.updatedAt ?? 0) > (other.updatedAt ?? 0);
@@ -53,6 +75,11 @@ function mergeWorkspace(
   for (const key of Object.keys(now)) {
     if (!sameJson(now[key], before[key])) merged[key] = now[key];
   }
+  // An absent profile and an empty one are the same thing for comparison purposes.
+  const profileTouched =
+    profileName(current.profile) !== profileName(base.profile) ||
+    (current.profile?.avatar ?? '') !== (base.profile?.avatar ?? '');
+  merged.profile = profileTouched ? current.profile : mergeProfile(current.profile, incoming.profile);
   return merged as unknown as WorkspaceState;
 }
 
