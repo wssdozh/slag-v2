@@ -20,19 +20,24 @@ test.describe('Composer live preview', () => {
     const editor = await openComposer(page);
 
     await editor.click();
-    await page.keyboard.type('- [ ] первая');
+    await page.keyboard.type('# План на день');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('- [ ] купить чай');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('> цитата без каретки');
     await page.keyboard.press('Shift+Enter');
     await page.keyboard.type('вторая строка');
     await page.waitForTimeout(300);
 
     const lines = page.locator('[data-composer-editor] .cm-line');
-    await expect(lines).toHaveCount(2);
+    await expect(lines).toHaveCount(4);
 
-    // The line without the caret is rendered: its checkbox is a widget, not text.
-    await expect(lines.nth(0).locator('input[type="checkbox"]')).toHaveCount(1);
+    // Rendered lines hide their markers: the heading drops its `#`, the task turns into a widget.
+    await expect(lines.nth(0)).not.toContainText('#');
+    await expect(lines.nth(1).locator('input[type="checkbox"]')).toHaveCount(1);
     // The caret line is raw markdown: the source is still in the text, no widget.
-    await expect(lines.nth(1)).toContainText('вторая строка');
-    await expect(lines.nth(1).locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(lines.nth(3)).toContainText('вторая строка');
+    await expect(lines.nth(3).locator('input[type="checkbox"]')).toHaveCount(0);
 
     await page.screenshot({ path: 'test-results/screenshots/composer-live-preview.png' });
   });
