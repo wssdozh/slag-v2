@@ -155,6 +155,90 @@ test('a fresh note lands, and the list settles when one is deleted', async ({ pa
   expect(travelled).toBe(true);
 });
 
+test('a sent note rises from the composer, and the cards above it do not jump', async ({ page }) => {
+  await page.goto('/');
+  // Long enough to read the start keyframe before the animation ends.
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 1600ms; }' });
+  const field = page.locator('.composer-surface textarea').first();
+  await expect(field).toBeVisible();
+
+  const before = await page.evaluate(() => {
+    const feed = document.querySelector<HTMLElement>('[data-testid="feed-list-container"]')!;
+    feed.scrollTop = feed.scrollHeight;
+    const cards = Array.from(feed.querySelectorAll<HTMLElement>('[data-flip-id]'));
+    const last = cards[cards.length - 1];
+    const dock = document.querySelector<HTMLElement>('[data-testid="composer-dock"]')!;
+    return {
+      id: last.dataset.flipId,
+      top: last.getBoundingClientRect().top,
+      composerTop: dock.getBoundingClientRect().top,
+    };
+  });
+
+  // Start keyframe of a card's first running animation, in px down from its slot.
+  const startOffset = (id: string) => page.evaluate((flipId) => {
+    const animation = document.querySelector<HTMLElement>(`[data-flip-id="${flipId}"]`)?.getAnimations()[0];
+    if (!animation || !(animation.effect instanceof KeyframeEffect)) return null;
+    const keyframe = animation.effect.getKeyframes()[0];
+    const transform = String(keyframe?.transform ?? '');
+    const values = transform.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+    const translateY = transform.startsWith('translate(') ? values[1] ?? 0 : values[0] ?? 0;
+    return { translateY, opacity: String(keyframe?.opacity ?? '') };
+  }, id);
+
+  await field.fill('Из композера ' + Date.now());
+  await field.press('Enter');
+  const lastId = () => page.locator('[data-flip-id]').last().getAttribute('data-flip-id');
+  await expect.poll(lastId).not.toBe(before.id);
+  const createdId = (await lastId())!;
+
+  await expect.poll(() => startOffset(before.id), { timeout: 5000 }).not.toBeNull();
+  const survivor = (await startOffset(before.id))!;
+  // The first frame is the old screen position, so the list's own scroll is not motion.
+  expect(survivor.translateY).toBeGreaterThan(1);
+
+  await expect.poll(() => startOffset(createdId), { timeout: 5000 }).not.toBeNull();
+  const entrance = (await startOffset(createdId))!;
+  expect(entrance.opacity).toBe('0');
+  expect(entrance.translateY).toBeGreaterThan(0);
+
+  // Compare against the slot the card occupies right now, not after the animation:
+  // a later settle must not change where the motion started.
+  const slot = (id: string) => page.evaluate((flipId) => {
+    const element = document.querySelector<HTMLElement>(`[data-flip-id="${flipId}"]`)!;
+    const transform = getComputedStyle(element).transform;
+    const offset = transform === 'none' ? 0 : new DOMMatrixReadOnly(transform).m42;
+    return element.getBoundingClientRect().top - offset;
+  }, id);
+  expect(Math.abs((await slot(before.id)) + survivor.translateY - before.top)).toBeLessThan(2);
+  expect((await slot(createdId)) + entrance.translateY).toBeGreaterThanOrEqual(before.composerTop - 2);
+
+  await page.waitForTimeout(1700);
+  await page.screenshot({ path: 'test-results/screenshots/motion_note_from_composer.png' });
+});
+
+test('reduced motion lands a sent note without rising', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  const field = page.locator('.composer-surface textarea').first();
+  await expect(field).toBeVisible();
+
+  const previousId = await page.locator('[data-flip-id]').last().getAttribute('data-flip-id');
+  await field.fill('Без движения ' + Date.now());
+  await field.press('Enter');
+  await expect.poll(() => page.locator('[data-flip-id]').last().getAttribute('data-flip-id')).not.toBe(previousId);
+
+  const running = await page.evaluate((id) => {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-flip-id]'));
+    const survivor = document.querySelector<HTMLElement>(`[data-flip-id="${id}"]`);
+    return cards
+      .filter((element) => element === survivor || element === cards[cards.length - 1])
+      .flatMap((element) => element.getAnimations())
+      .length;
+  }, previousId);
+  expect(running).toBe(0);
+});
+
 test('the editor unfolds out of the card it was opened from', async ({ page }) => {
   await page.goto('/');
   await page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first().click();

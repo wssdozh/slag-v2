@@ -33,6 +33,11 @@ import {
   windowSizeAroundTarget,
 } from './list/feedWindow';
 
+// Within this distance of the bottom the note is arriving in front of the reader:
+// settle the list in the same frame as the render, so the movement is the one FLIP
+// animation instead of a glide plus a smooth scroll racing each other.
+const COMPOSER_SETTLE_PX = 200;
+
 function subscribeToNow() {
   return () => {};
 }
@@ -159,9 +164,6 @@ export const FeedList: React.FC = () => {
 
   const hasMoreOlder = hasOlderItems(filteredItems.length, windowSize);
 
-  // Cards glide when the list shrinks or reorders; a fresh note lands instead.
-  useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'));
-
   // Load more older items with scroll position preservation
   const loadMoreOlder = useCallback(() => {
     const container = containerRef.current;
@@ -178,10 +180,16 @@ export const FeedList: React.FC = () => {
 
   const isStuckToBottomRef = useRef(true);
 
-  // Maintain scroll anchor when prepending items at the top OR keep pinned to bottom on layout shifts
+  // One owner of the scroll position: a prepend restores the anchor, and a note
+  // appended at the bottom settles before the motion is measured. Keep it a single
+  // jump in the same frame — a smooth scroll on top of the card animation reads as a
+  // bounce, and it also runs when the reader is nowhere near the composer.
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const added = filteredItems.length > prevItemsLengthRef.current;
+    prevItemsLengthRef.current = filteredItems.length;
 
     if (isPrependRef.current) {
       const delta = container.scrollHeight - prevScrollHeightRef.current;
@@ -192,9 +200,19 @@ export const FeedList: React.FC = () => {
       return;
     }
 
-    if (isStuckToBottomRef.current && !highlightedItemId) {
+    if (highlightedItemId) return;
+    const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (isStuckToBottomRef.current || (added && distFromBottom <= COMPOSER_SETTLE_PX)) {
+      isStuckToBottomRef.current = true;
       container.scrollTop = container.scrollHeight;
     }
+  });
+
+  // Cards glide when the list shrinks or reorders; a note appended at the end rises
+  // from under the composer instead. Runs after the settle above, so the measured
+  // boxes are the final ones and the delta carries the scroll the list just took.
+  useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'), {
+    enterFromBelow: true,
   });
 
   // The keyboard and a growing composer resize the scrollport without rendering this list.
@@ -318,23 +336,6 @@ export const FeedList: React.FC = () => {
       clearTimeout(timerId);
     };
   }, [currentFolder, windowedItems, highlightedItemId]);
-
-  // Smart bottom scroll: only auto-scroll on new items if user is already near bottom
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const isNewItemAdded = filteredItems.length > prevItemsLengthRef.current;
-    prevItemsLengthRef.current = filteredItems.length;
-
-    if (isNewItemAdded) {
-      const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      if (distFromBottom <= 200 || isStuckToBottomRef.current) {
-        isStuckToBottomRef.current = true;
-        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-      }
-    }
-  }, [filteredItems.length]);
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
