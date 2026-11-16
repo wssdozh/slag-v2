@@ -22,7 +22,7 @@ test.describe('Device Actions with Panic Re-keying', () => {
 
     const syncTabBtn = settingsModal.getByTestId('settings-tab-sync');
     await syncTabBtn.click();
-    await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
+    await expect(settingsModal.getByTestId('sync-refresh-btn')).toBeVisible();
 
     // 3. Test Sync Mode Toggle (Read-Write vs Receive-Only) on the current device.
     // The mode is a select in the devices tab, not a pair of toggle buttons.
