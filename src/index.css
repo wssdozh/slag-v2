@@ -553,28 +553,6 @@ body.window-transparent #root {
   background-color: transparent !important;
 }
 
-@keyframes record-overlay-in { from { opacity: 0 } to { opacity: 1 } }
-@keyframes record-overlay-out { from { opacity: 1 } to { opacity: 0 } }
-@keyframes record-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(46vh - 24px)) scale(0.38);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes record-card-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(calc(46vh - 24px)) scale(0.38);
-  }
-}
 @keyframes record-bar-in {
   from {
     opacity: 0;
@@ -595,18 +573,6 @@ body.window-transparent #root {
     transform: scale(0.985);
   }
 }
-.record-overlay { animation: record-overlay-in 260ms var(--ease-standard) both }
-.record-overlay-out { animation: record-overlay-out 200ms var(--ease-standard) both }
-.record-card {
-  transform-origin: center bottom;
-  animation: record-card-in 340ms var(--ease-settle) both;
-  will-change: transform, opacity;
-}
-.record-card-out {
-  transform-origin: center bottom;
-  animation: record-card-out 220ms var(--ease-standard) both;
-  will-change: transform, opacity;
-}
 .record-bar {
   animation: record-bar-in 200ms var(--ease-entrance) both;
   will-change: opacity, transform;
@@ -616,6 +582,5 @@ body.window-transparent #root {
   will-change: opacity, transform;
 }
 @media (prefers-reduced-motion: reduce) {
-  .record-overlay, .record-card, .record-bar,
-  .record-overlay-out, .record-card-out, .record-bar-out { animation: none !important }
+  .record-bar, .record-bar-out { animation: none !important }
 }

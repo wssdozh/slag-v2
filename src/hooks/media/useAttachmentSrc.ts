@@ -23,7 +23,9 @@ export interface AttachmentSources {
 export function useAttachmentSrcs(attachments: SlagAttachment[] | undefined): AttachmentSources {
   const list = attachments ?? [];
   // Keyed by ids, not by array identity: the parent rebuilds the array on every render.
-  const key = list.map((att) => att.id).join('|');
+  // Whether the bytes arrived inline is part of the key: a draft read back from storage
+  // hands over the same ids without `dataUrl`, and that is exactly when a `src` is due.
+  const key = list.map((att) => (att.dataUrl ? `${att.id}+` : att.id)).join('|');
   const [srcs, setSrcs] = useState<AttachmentSrcs>({});
   const [missing, setMissing] = useState<ReadonlySet<string>>(() => new Set());
 

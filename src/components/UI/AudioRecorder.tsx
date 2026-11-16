@@ -1,6 +1,5 @@
 // Records a voice memo in a bottom bar, previews its length, then hands the clip over.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { Icon } from './icons/Icon';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger/logger';
@@ -25,6 +24,8 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
   const timerIntervalRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const closingRef = useRef(false);
+  /** Which `init` attempt is allowed to own the recorder; see the guard inside it. */
+  const initRunRef = useRef(0);
 
   // Keep the bar on screen for the exit animation, then hand control back.
   const closeThen = useCallback((after: () => void) => {
@@ -51,9 +52,11 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
 
     mediaRecorderRef.current.onstop = () => {
-      const mime = mediaRecorderRef.current?.mimeType || 'audio/webm';
+      // The container, not the encoder's codec list: `audio/webm;codecs=opus` carries a comma,
+      // and a data URL splits on the first one — the memo then reads as unreadable.
+      const mime = (mediaRecorderRef.current?.mimeType || 'audio/webm').split(';')[0];
       const blob = new Blob(chunksRef.current, { type: mime });
-      
+
       if (blob.size === 0) {
         setError('запись пустая, попробуй ещё раз');
         return;
@@ -90,9 +93,22 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
   }, [finishTriggerRef, handleFinish]);
 
   const init = useCallback(async () => {
+    // StrictMode's double effect and the retry button both start another take; only the newest
+    // attempt may own the recorder, or two of them interleave chunks into one unreadable file.
+    const run = initRunRef.current + 1;
+    initRunRef.current = run;
     chunksRef.current = [];
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      if (mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (run !== initRunRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       streamRef.current = stream;
 
       const mediaRecorder = new MediaRecorder(stream, {
@@ -157,36 +173,36 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecorded, onCanc
     return `${m}:${sec < 10 ? '0' : ''}${sec}.${t}`;
   };
 
-  return createPortal(
-    <div className={`fixed inset-0 z-[200] flex flex-col justify-end px-2 pt-[max(var(--sat),1rem)] pb-[max(var(--sab),0.5rem)] record-overlay ${isClosing ? 'record-overlay-out pointer-events-none' : ''}`}>
-      <div className="absolute inset-0 bg-scrim-60 backdrop-blur-xl" />
+  return (
+    <div
+      data-testid="audio-recorder"
+      className={`w-full select-none flex flex-col gap-2 rounded-2xl bg-surface-elevated p-2 record-bar ${
+        isClosing ? 'record-bar-out pointer-events-none' : ''
+      }`}
+    >
+      {error && <p className="px-1 text-xs text-fg-tertiary">{error}</p>}
 
-      <div className={`relative w-full max-w-2xl mx-auto flex flex-col gap-2 rounded-2xl bg-surface-elevated border border-tint-12 p-2 shadow-2xl shadow-scrim-50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
-        {error && <p className="px-1 text-xs text-fg-tertiary">{error}</p>}
+      <div className="grid grid-cols-3 items-center gap-2">
+        <div className="flex items-center gap-2 pl-1">
+          <span className={`w-2 h-2 rounded-full ${error ? 'bg-fg-muted' : 'bg-rose-500 animate-pulse'}`} />
+          <span className="font-mono text-xs text-fg-tertiary">{formatTimer(elapsedMs)}</span>
+        </div>
 
-        <div className="grid grid-cols-3 items-center gap-2">
-          <div className="flex items-center gap-2 pl-1">
-            <span className={`w-2 h-2 rounded-full ${error ? 'bg-fg-muted' : 'bg-rose-500 animate-pulse'}`} />
-            <span className="font-mono text-xs text-fg-tertiary">{formatTimer(elapsedMs)}</span>
-          </div>
-
-          <div className="justify-self-center flex items-center gap-2">
-            <button type="button" onClick={cancelAndClose} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-accent hover:bg-accent-subtle transition-colors">отмена</button>
-            {error && (
-              <button type="button" onClick={() => { setError(null); void init(); }} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-fg-tertiary hover:bg-surface-hover transition-colors">повторить</button>
-            )}
-          </div>
-
-          {error ? (
-            <span className="w-ctrl-sm h-ctrl-sm justify-self-end" />
-          ) : (
-            <button type="button" onClick={() => handleFinish(true)} className="justify-self-end w-ctrl-sm h-ctrl-sm rounded-full bg-accent-strong text-white flex items-center justify-center motion-press" aria-label="Отправить аудио">
-              <Icon name="action.send" size="md" tone="inherit" />
-            </button>
+        <div className="justify-self-center flex items-center gap-2">
+          <button type="button" onClick={cancelAndClose} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-accent hover:bg-accent-subtle transition-colors">отмена</button>
+          {error && (
+            <button type="button" onClick={() => { setError(null); void init(); }} className="h-ctrl-sm px-3 rounded-md text-xs font-medium text-fg-tertiary hover:bg-surface-hover transition-colors">повторить</button>
           )}
         </div>
+
+        {error ? (
+          <span className="w-ctrl-sm h-ctrl-sm justify-self-end" />
+        ) : (
+          <button type="button" onClick={() => handleFinish(true)} className="justify-self-end w-ctrl-sm h-ctrl-sm rounded-full bg-accent-strong text-white flex items-center justify-center motion-press" aria-label="Отправить аудио">
+            <Icon name="action.send" size="md" tone="inherit" />
+          </button>
+        )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };

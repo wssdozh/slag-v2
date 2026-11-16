@@ -129,6 +129,66 @@ test('an attached image survives a reload', async ({ page }) => {
   await page.screenshot({ path: 'test-results/screenshots/attach-survives-reload.png' });
 });
 
+test('a pasted photo survives the draft read-back when the window takes focus', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+
+  const button = attachButton(page);
+  await expect(button).toBeVisible({ timeout: 20000 });
+  await button.click();
+
+  await page.locator('[data-testid="attach-input-media"]').setInputFiles({
+    name: 'shot.png',
+    mimeType: 'image/png',
+    buffer: PNG_BYTES,
+  });
+  const tray = page.locator('[data-composer-attachments] img[alt="shot.webp"]');
+  await expect(tray).toBeVisible({ timeout: 5000 });
+
+  // The draft on disk keeps metadata only, and a screenshot tool steals focus and hands it
+  // back. That read-back used to replace the photo in the field with that metadata — no
+  // bytes behind it, so the tray went blank and the note it was sent into arrived broken.
+  await expect.poll(
+    () => page.evaluate(() => Object.keys(localStorage).some((key) => key.startsWith('slag_drafts_'))),
+    { timeout: 5000 },
+  ).toBe(true);
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(tray).toBeVisible();
+  await expect.poll(() => tray.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+
+  // A stored draft that lags behind the field is not news either: this is the window where a
+  // photo is attached and the own autosave has not landed yet. Adopting it drops the photo.
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith('slag_drafts_')) continue;
+      const drafts = JSON.parse(localStorage.getItem(key) || '{}') as Record<string, { attachments?: unknown[] }>;
+      for (const draft of Object.values(drafts)) draft.attachments = [];
+      localStorage.setItem(key, JSON.stringify(drafts));
+    }
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect(tray).toBeVisible();
+
+  // The draft on disk is metadata only, so the photo after a restart is the bytes the store
+  // kept for it. Without those, the tray comes back blank and the note is sent broken.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const restored = page.locator('[data-composer-attachments] img[alt="shot.webp"]');
+  await expect(restored).toBeVisible({ timeout: 10000 });
+  await expect.poll(() => restored.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
+
+  await page.locator('main textarea').first().fill('фото после скриншота');
+  await page.keyboard.press('Enter');
+  const note = page.locator('[id^="item-"]', { hasText: 'фото после скриншота' }).first();
+  await expect(note).toBeVisible({ timeout: 10000 });
+  const sent = note.locator('img[alt="shot.webp"]').first();
+  await sent.scrollIntoViewIfNeeded();
+  await expect.poll(
+    () => sent.evaluate((el: HTMLImageElement) => el.naturalWidth),
+    { timeout: 15000 },
+  ).toBeGreaterThan(0);
+  await page.screenshot({ path: 'test-results/screenshots/composer-photo-after-focus.png' });
+});
+
 test('Esc closes the sheet, not the surface it was opened from', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });

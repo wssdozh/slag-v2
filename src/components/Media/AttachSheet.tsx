@@ -142,62 +142,66 @@ export const AttachSheet: React.FC = () => {
       >
         {({ setBody, setBar }) => (
           <>
-            {isMobile ? (
-              <MobilePicker
-                bodyRef={setBody}
-                selected={selected}
-                onToggle={togglePick}
-                onAttach={(picks) => void attachPicked(picks)}
-                onCameraFiles={(files) => void addFiles(files)}
-                onRecordVoice={() => setIsRecordingVoice(true)}
-                isFullscreen={isPickerFullscreen}
-                onToggleFullscreen={() => setIsPickerFullscreen((prev) => !prev)}
-              />
+            {isRecordingVoice ? (
+              // The recorder is a surface of its own, so it takes the panel instead of
+              // floating over the window the sheet was opened from.
+              <AudioRecorder onRecorded={addRecorded} onCancel={() => setIsRecordingVoice(false)} />
             ) : (
-              <DesktopSources
-                onPickFiles={(files) => void addFiles(files)}
-                onRecordVoice={() => setIsRecordingVoice(true)}
-              />
-            )}
-
-            <div
-              ref={isMobile ? setBar : undefined}
-              data-testid="attach-footer"
-              className={
-                isMobile
-                  // The bar rides the panel's counter-translate, so it stays on the screen edge.
-                  ? 'absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-tint-8 bg-canvas-subtle px-3 pb-[max(var(--sab),0.75rem)] pt-2'
-                  : 'flex shrink-0 items-center gap-2 pt-1'
-              }
-            >
-              <Checkbox
-                checked={noCompress}
-                onChange={setNoCompress}
-                label="не сжимать"
-                className="text-fg-secondary"
-              />
-
-              {isMobile && (
-                <>
-                  <span className="ml-auto shrink-0 font-mono text-3xs text-fg-muted">
-                    {selected.length > 0 ? `${selected.length} · ${formatBytes(selectedBytes)}` : ''}
-                  </span>
-                  <SendButton
-                    size="lg"
-                    onClick={() => void attachPicked(selected)}
-                    disabled={selected.length === 0 || isAttaching}
-                    label={isAttaching ? 'Прикрепляю…' : 'Прикрепить'}
+              <>
+                {isMobile ? (
+                  <MobilePicker
+                    bodyRef={setBody}
+                    selected={selected}
+                    onToggle={togglePick}
+                    onAttach={(picks) => void attachPicked(picks)}
+                    onCameraFiles={(files) => void addFiles(files)}
+                    onRecordVoice={() => setIsRecordingVoice(true)}
+                    isFullscreen={isPickerFullscreen}
+                    onToggleFullscreen={() => setIsPickerFullscreen((prev) => !prev)}
                   />
-                </>
-              )}
-            </div>
+                ) : (
+                  <DesktopSources
+                    onPickFiles={(files) => void addFiles(files)}
+                    onRecordVoice={() => setIsRecordingVoice(true)}
+                  />
+                )}
+
+                <div
+                  ref={isMobile ? setBar : undefined}
+                  data-testid="attach-footer"
+                  className={
+                    isMobile
+                      // The bar rides the panel's counter-translate, so it stays on the screen edge.
+                      ? 'absolute inset-x-0 bottom-0 z-10 flex shrink-0 items-center gap-2 border-t border-tint-8 bg-canvas-subtle px-3 pb-[max(var(--sab),0.75rem)] pt-2'
+                      : 'flex shrink-0 items-center gap-2 pt-1'
+                  }
+                >
+                  <Checkbox
+                    checked={noCompress}
+                    onChange={setNoCompress}
+                    label="не сжимать"
+                    className="text-fg-secondary"
+                  />
+
+                  {isMobile && (
+                    <>
+                      <span className="ml-auto shrink-0 font-mono text-3xs text-fg-muted">
+                        {selected.length > 0 ? `${selected.length} · ${formatBytes(selectedBytes)}` : ''}
+                      </span>
+                      <SendButton
+                        size="lg"
+                        onClick={() => void attachPicked(selected)}
+                        disabled={selected.length === 0 || isAttaching}
+                        label={isAttaching ? 'Прикрепляю…' : 'Прикрепить'}
+                      />
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
       </SheetPanel>
-
-      {isRecordingVoice && (
-        <AudioRecorder onRecorded={addRecorded} onCancel={() => setIsRecordingVoice(false)} />
-      )}
     </div>
   );
 };

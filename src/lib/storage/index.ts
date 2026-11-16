@@ -517,6 +517,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
+    // The stored draft keeps metadata only, so the bytes have to be in the store before that
+    // strip — otherwise the draft is the last place a just-attached photo ever existed.
+    this.attachments.persistDrafts(draft.attachments ?? []);
     writeComposerDraft(this, folderPath, draft, origin);
   }
 

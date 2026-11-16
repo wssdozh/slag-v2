@@ -164,6 +164,64 @@ test('quick composer route: all types at narrow width', async ({ page }) => {
   await page.screenshot({ path: `${screenshots}/composer-quick-unified.png`, animations: 'disabled' });
 });
 
+test('desktop: the recorders stay inside the composer, not over the window', async ({ page }) => {
+  await open(page, 1440);
+  const dock = page.locator('[data-testid="composer-dock"]');
+  const column = await dock.boundingBox();
+  expect(column).not.toBeNull();
+
+  await page.locator('button[aria-label="Записать голосовую заметку"]').first().click();
+  const audio = page.locator('[data-testid="audio-recorder"]');
+  await expect(audio).toBeVisible();
+  await expect(audio.getByRole('button', { name: 'Отправить аудио', exact: true })).toBeVisible();
+  // The recorder takes the composer's own slot: same column, no full-window takeover.
+  expect(await audio.evaluate((el) => Boolean(el.closest('[data-testid="composer-dock"]')))).toBe(true);
+  const audioBox = await audio.boundingBox();
+  expect(audioBox).not.toBeNull();
+  expect(audioBox!.x).toBeGreaterThanOrEqual(column!.x - 1);
+  expect(audioBox!.x + audioBox!.width).toBeLessThanOrEqual(column!.x + column!.width + 1);
+  await page.screenshot({ path: `${screenshots}/composer-recording-inline.png`, animations: 'disabled' });
+
+  await page.keyboard.press('Escape');
+  await expect(audio).toHaveCount(0);
+
+  // `/video` is the way into the circle recorder, and its preview belongs to the composer too.
+  await page.locator('.composer-surface textarea').first().fill('/video');
+  await page.keyboard.press('Enter');
+  const video = page.locator('[data-testid="video-recorder"]');
+  await expect(video).toBeVisible();
+  expect(await video.evaluate((el) => Boolean(el.closest('[data-testid="composer-dock"]')))).toBe(true);
+  await expect.poll(
+    () => video.locator('video').evaluate((el: HTMLVideoElement) => el.videoWidth),
+    { timeout: 15000 },
+  ).toBeGreaterThan(0);
+  await page.screenshot({ path: `${screenshots}/composer-video-inline.png`, animations: 'disabled' });
+
+  // A MediaRecorder hands over chunks as it goes: sending before the first one lands gives
+  // an empty blob and no note at all.
+  await expect.poll(
+    async () => Number((await video.locator('span.font-mono').last().textContent())?.replace('s', '')),
+    { timeout: 15000 },
+  ).toBeGreaterThan(0.5);
+  await video.getByRole('button', { name: 'Отправить видео', exact: true }).click();
+  // A note with no text is titled by its attachment, and the card shows the circle, not the title.
+  const circles = page.locator('[id^="item-"] video');
+  await expect(circles).toHaveCount(1, { timeout: 20000 });
+  const circle = circles.first();
+  await circle.scrollIntoViewIfNeeded();
+  // The clip is readable as media, not just present: a data URL carrying the encoder's codec
+  // list (`;codecs=vp9,opus`) splits on that comma and never reaches metadata at all.
+  await expect.poll(
+    () => circle.evaluate((el: HTMLVideoElement) => el.videoWidth),
+    { timeout: 20000 },
+  ).toBeGreaterThan(0);
+  expect(await circle.evaluate((el) => (el.getAttribute('src') || '').split(';')[0])).toBe('data:video/webm');
+  // No ring around the circle: the progress arc is drawn only while it plays.
+  expect(await circle.evaluate((el) => getComputedStyle(el.parentElement as HTMLElement).borderTopWidth)).toBe('0px');
+  expect(await circle.evaluate((el) => (el.parentElement as HTMLElement).querySelectorAll('svg circle').length)).toBe(0);
+  await page.screenshot({ path: `${screenshots}/composer-video-circle.png`, animations: 'disabled' });
+});
+
 test('assistant: narrow desktop dock and mobile main area', async ({ page }) => {
   await open(page, 1280);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('slag:toggle-assistant')));

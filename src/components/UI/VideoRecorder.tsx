@@ -1,6 +1,5 @@
 // Records a video memo with a live preview, then hands the clip to the composer.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { Icon } from './icons/Icon';
 import type { SlagAttachment } from '../../types';
 import { logger } from '../../lib/logger/logger';
@@ -27,6 +26,8 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
   const timerIntervalRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
   const closingRef = useRef(false);
+  /** Which `init` attempt is allowed to own the recorder; see the guard inside it. */
+  const initRunRef = useRef(0);
 
   const closeThen = useCallback((after: () => void) => {
     if (closingRef.current) return;
@@ -52,7 +53,9 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
     if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') return;
 
     mediaRecorderRef.current.onstop = () => {
-      const mime = mediaRecorderRef.current?.mimeType || 'video/webm';
+      // The container, not the encoder's codec list: `video/webm;codecs=vp9,opus` carries a
+      // comma, and a data URL splits on the first one — the file then reads as unreadable.
+      const mime = (mediaRecorderRef.current?.mimeType || 'video/webm').split(';')[0];
       const blob = new Blob(chunksRef.current, { type: mime });
 
       if (blob.size === 0) {
@@ -98,7 +101,16 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
   }, [finishTriggerRef, handleFinish]);
 
   const init = useCallback(async () => {
+    // StrictMode's double effect and the retry button both start another take; only the newest
+    // attempt may own the recorder, or two of them interleave chunks into one unreadable file.
+    const run = initRunRef.current + 1;
+    initRunRef.current = run;
     chunksRef.current = [];
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.ondataavailable = null;
+      if (mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
 
     try {
@@ -106,6 +118,10 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
         video: { width: { ideal: 480 }, height: { ideal: 480 }, aspectRatio: 1, facingMode: 'user' },
         audio: true,
       });
+      if (run !== initRunRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
 
@@ -163,36 +179,35 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [cancelAndClose, handleFinish]);
 
-  return createPortal(
-    <div className={`fixed inset-0 z-[200] flex flex-col px-2 pt-[max(var(--sat),1rem)] pb-[max(var(--sab),0.5rem)] record-overlay ${isClosing ? 'record-overlay-out pointer-events-none' : ''}`}>
-      <div className="absolute inset-0 bg-scrim-60 backdrop-blur-xl" />
-
-      <div className="relative flex-1 min-h-0 flex items-center justify-center">
-        <div className={`relative aspect-square w-[min(82vw,340px)] rounded-2xl overflow-hidden bg-surface border border-tint-10 shadow-2xl record-card ${isClosing ? 'record-card-out' : ''} flex flex-col`}>
-          {error ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-4">
-              <p className="text-sm text-fg-tertiary">{error}</p>
-              <button onClick={() => { setError(null); setIsReady(false); void init(); }} className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium">Повторить</button>
-            </div>
-          ) : (
-            <>
-              <video ref={videoRef} autoPlay playsInline muted className="flex-1 w-full min-h-0 object-cover scale-x-[-1]" />
-
-              {!isReady && (
-                <div className="absolute inset-0 flex items-center justify-center bg-scrim-40">
-                  <span className="text-xs font-mono text-fg-tertiary">включаю камеру…</span>
-                </div>
-              )}
-
-              <div className="absolute bottom-0 left-0 w-full h-1 bg-tint-15">
-                <div className="h-full bg-white transition-all duration-100" style={{ width: `${Math.min(100, (elapsedMs / 60000) * 100)}%` }} />
-              </div>
-            </>
-          )}
+  return (
+    <div
+      data-testid="video-recorder"
+      className={`w-full select-none flex flex-col gap-2 rounded-2xl bg-surface-elevated p-2 record-bar ${
+        isClosing ? 'record-bar-out pointer-events-none' : ''
+      }`}
+    >
+      {error ? (
+        <div className="mx-auto flex w-full max-w-[240px] flex-col items-center justify-center gap-4 rounded-xl bg-surface p-6 text-center">
+          <p className="text-sm text-fg-tertiary">{error}</p>
+          <button onClick={() => { setError(null); setIsReady(false); void init(); }} className="px-4 py-2 bg-white text-black rounded-lg text-sm font-medium">Повторить</button>
         </div>
-      </div>
+      ) : (
+        <div className="relative mx-auto aspect-square w-[min(58vw,240px)] overflow-hidden rounded-xl bg-surface border border-tint-10 motion-fade">
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
 
-      <div className={`relative w-full max-w-2xl mx-auto grid grid-cols-3 items-center gap-2 rounded-2xl bg-surface-elevated border border-tint-12 p-2 shadow-2xl shadow-scrim-50 record-bar ${isClosing ? 'record-bar-out' : ''}`}>
+          {!isReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-scrim-40">
+              <span className="text-xs font-mono text-fg-tertiary">включаю камеру…</span>
+            </div>
+          )}
+
+          <div className="absolute bottom-0 left-0 w-full h-1 bg-tint-15">
+            <div className="h-full bg-white transition-all duration-100" style={{ width: `${Math.min(100, (elapsedMs / 60000) * 100)}%` }} />
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 items-center gap-2">
         <div className="flex items-center gap-2 pl-1">
           <span className={`w-2 h-2 rounded-full ${error ? 'bg-fg-muted' : 'bg-rose-500 animate-pulse'}`} />
           <span className="font-mono text-xs text-fg-tertiary">{(elapsedMs / 1000).toFixed(1)}s</span>
@@ -206,7 +221,6 @@ export const VideoRecorder: React.FC<VideoRecorderProps> = ({ onRecorded, onCanc
           </button>
         )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };

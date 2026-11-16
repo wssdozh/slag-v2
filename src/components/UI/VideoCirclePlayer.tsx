@@ -25,7 +25,9 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
       }
     };
     const onLoadedMetadata = () => {
-      if (video.duration) setDuration(video.duration);
+      // A live-recorded clip has no duration in its header: it reads as `Infinity`, and the
+      // badge would say so instead of a time. Those clips get no badge, not a wrong one.
+      if (Number.isFinite(video.duration)) setDuration(video.duration);
     };
     const onEnded = () => {
       setIsPlaying(false);
@@ -65,43 +67,36 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
   return (
     <div
       onClick={togglePlay}
-      className={`relative ${sizeClass} rounded-full overflow-hidden bg-black border border-tint-10 shadow-2xl cursor-pointer group select-none shrink-0`}
+      className={`relative ${sizeClass} rounded-full overflow-hidden bg-black shadow-2xl cursor-pointer group select-none shrink-0`}
       title="Нажмите для воспроизведения/паузы"
     >
       <video
         ref={videoRef}
         src={src}
+        preload="auto"
         playsInline
         className="w-full h-full object-cover scale-x-[-1]"
       />
 
-      {/* SVG Circular Progress Arc along the edge */}
-      <svg
-        className="absolute inset-0 w-full h-full pointer-events-none -rotate-90"
-        viewBox={compact ? '0 0 96 96' : '0 0 224 224'}
-      >
-        {/* Background track */}
-        <circle
-          cx={compact ? 48 : 112}
-          cy={compact ? 48 : 112}
-          r={radius}
-          fill="none"
-          className="stroke-tint-15"
-          strokeWidth={compact ? 2.5 : 3.5}
-        />
-        {/* Active progress arc */}
-        <circle
-          cx={compact ? 48 : 112}
-          cy={compact ? 48 : 112}
-          r={radius}
-          fill="none"
-          className="stroke-fg-primary transition-[stroke-dashoffset] duration-75"
-          strokeWidth={compact ? 2.5 : 3.5}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-        />
-      </svg>
+      {/* The progress arc is the only ring on the circle: a track would read as a border. */}
+      {progressFraction > 0 && (
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none -rotate-90"
+          viewBox={compact ? '0 0 96 96' : '0 0 224 224'}
+        >
+          <circle
+            cx={compact ? 48 : 112}
+            cy={compact ? 48 : 112}
+            r={radius}
+            fill="none"
+            className="stroke-fg-primary transition-[stroke-dashoffset] duration-75"
+            strokeWidth={compact ? 2.5 : 3.5}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+          />
+        </svg>
+      )}
 
       {/* Play/Pause Center Button on hover or when paused */}
       <div

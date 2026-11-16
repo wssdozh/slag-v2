@@ -168,6 +168,21 @@ export class AttachmentStore {
     for (const att of item.attachments || []) await this.persistOne(att);
   }
 
+  /**
+   * Bytes of the attachments a draft is holding. A draft stores metadata only, so they have
+   * to reach IndexedDB and `.attachments/` before the first draft write strips the inline
+   * copy: a photo attached a second ago has no other home, and the note saved from that draft
+   * would point at a file that never existed.
+   */
+  public persistDrafts(attachments: SlagAttachment[]): void {
+    for (const att of attachments) {
+      if (!att.dataUrl || this.persistedIds.has(att.id)) continue;
+      this.dataUrlCache.set(att.id, att.dataUrl);
+      void this.persistOne(att);
+      void this.enqueueWrite(att);
+    }
+  }
+
   private async persistOne(att: SlagAttachment): Promise<boolean> {
     if (!att.dataUrl?.startsWith('data:')) return false;
     if (this.persistedIds.has(att.id)) return true;
