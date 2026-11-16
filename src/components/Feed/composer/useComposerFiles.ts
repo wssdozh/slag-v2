@@ -3,13 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import type React from 'react';
 import type { SlagAttachment } from '../../../types';
 import { processFileListToAttachments } from '../../../lib/media/fileDropHelper';
+import type { ComposerFieldHandle } from './field';
 
 type Toast = (text: string, type?: 'info' | 'success' | 'error') => void;
 
 interface ComposerFilesOptions {
   addToast: Toast;
   setAttachments: React.Dispatch<React.SetStateAction<SlagAttachment[]>>;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  field: ComposerFieldHandle;
   /** A composer that lives in its own window is the only one that listens on `window`. */
   isModal: boolean;
   isActive: boolean;
@@ -21,7 +22,7 @@ interface ComposerFilesOptions {
  * One reason to change — how the platform hands us bytes. It knows about drag
  * events and the clipboard, and nothing about titles, tags or folders.
  */
-export function useComposerFiles({ addToast, setAttachments, textareaRef, isModal, isActive }: ComposerFilesOptions) {
+export function useComposerFiles({ addToast, setAttachments, field, isModal, isActive }: ComposerFilesOptions) {
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   const attachFiles = useCallback(async (files: FileList | File[]) => {
@@ -31,13 +32,13 @@ export function useComposerFiles({ addToast, setAttachments, textareaRef, isModa
         setAttachments((prev) => [...prev, ...processed]);
         addToast(`Прикреплено: ${processed.length === 1 ? processed[0].name : `${processed.length} файла`}`, 'success');
         requestAnimationFrame(() => {
-          textareaRef.current?.focus({ preventScroll: true });
+          field.focus();
         });
       }
     } catch {
       addToast('Не удалось обработать прикрепленные файлы', 'error');
     }
-  }, [addToast, setAttachments, textareaRef]);
+  }, [addToast, setAttachments, field]);
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     if (e.dataTransfer.types.includes('Files')) {

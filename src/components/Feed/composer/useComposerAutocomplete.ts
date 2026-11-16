@@ -3,27 +3,32 @@ import { useState, useMemo } from 'react';
 import type { SlagItem, FolderMeta } from '../../../types';
 import type { TagMeta } from '../TagSuggestionMenu';
 import { SLASH_COMMANDS } from '../../../types/slashCommands';
+import type { ComposerFieldHandle } from './field';
+
+/** The bit of a keyboard event the suggestions need, shared by the textarea and CM surfaces. */
+export interface ComposerKeyEvent {
+  key: string;
+  preventDefault: () => void;
+}
 
 export interface UseComposerAutocompleteOptions {
   content: string;
-  setContent: (content: string) => void;
   items: SlagItem[];
   folders: FolderMeta[];
   currentFolder: string;
   DEFAULT_INBOX_FOLDER: string;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  field: ComposerFieldHandle;
   addToast: (message: string, type: 'info' | 'success' | 'error') => void;
   setTargetFolder: (path: string | null) => void;
 }
 
 export const useComposerAutocomplete = ({
   content,
-  setContent,
   items,
   folders,
   currentFolder,
   DEFAULT_INBOX_FOLDER,
-  textareaRef,
+  field,
   addToast,
   setTargetFolder,
 }: UseComposerAutocompleteOptions) => {
@@ -123,95 +128,54 @@ export const useComposerAutocomplete = ({
   }
 
   const insertTag = (selectedTag: string) => {
-    const el = textareaRef.current;
-    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
-      ? el.selectionStart
-      : content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
+    const { from: cursorPos } = field.getSelection();
+    const value = field.getValue() || content;
+    const textBefore = value.slice(0, cursorPos);
     const hashIndex = textBefore.lastIndexOf('#');
     if (hashIndex !== -1) {
-      const newText = textBefore.slice(0, hashIndex) + `#${selectedTag} ` + textAfter;
-      setContent(newText);
+      const inserted = `#${selectedTag} `;
+      field.replaceRange(hashIndex, cursorPos, inserted, hashIndex + inserted.length);
       setTagQuery(null);
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          const newCursor = hashIndex + selectedTag.length + 2;
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
-    } else {
-      const globalHashIndex = content.lastIndexOf('#');
-      if (globalHashIndex !== -1) {
-        const newText = content.slice(0, globalHashIndex) + `#${selectedTag} `;
-        setContent(newText);
-        setTagQuery(null);
-        setTimeout(() => {
-          if (el) {
-            el.focus({ preventScroll: true });
-            const newCursor = newText.length;
-            el.setSelectionRange(newCursor, newCursor);
-          }
-        }, 0);
-      }
+      return;
+    }
+    const globalHashIndex = value.lastIndexOf('#');
+    if (globalHashIndex !== -1) {
+      const inserted = `#${selectedTag} `;
+      field.replaceRange(globalHashIndex, value.length, inserted, globalHashIndex + inserted.length);
+      setTagQuery(null);
     }
   };
 
   const insertWikiLink = (targetItem: SlagItem) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const cursorPos = el.selectionStart || content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
+    const { from: cursorPos } = field.getSelection();
+    const value = field.getValue() || content;
+    const textBefore = value.slice(0, cursorPos);
     const match = textBefore.match(/\[\[([^\]\n]*)$/);
     if (match && match.index !== undefined) {
-      const startIdx = match.index;
       const cleanTitle = targetItem.title || targetItem.id;
-      const newText = textBefore.slice(0, startIdx) + `[[${cleanTitle}]] ` + textAfter;
-      setContent(newText);
+      const inserted = `[[${cleanTitle}]] `;
+      field.replaceRange(match.index, cursorPos, inserted, match.index + inserted.length);
       setWikiQuery(null);
-      setTimeout(() => {
-        el.focus({ preventScroll: true });
-        const newCursor = startIdx + cleanTitle.length + 5;
-        el.setSelectionRange(newCursor, newCursor);
-      }, 10);
     }
   };
 
   const selectFolder = (folder: FolderMeta) => {
-    const el = textareaRef.current;
-    const cursorPos = el && typeof el.selectionStart === 'number' && el.selectionStart > 0
-      ? el.selectionStart
-      : content.length;
-    const textBefore = content.slice(0, cursorPos);
-    const textAfter = content.slice(cursorPos);
+    const { from: cursorPos } = field.getSelection();
+    const value = field.getValue() || content;
+    const textBefore = value.slice(0, cursorPos);
     const atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
-
     const inserted = `@${folder.name} `;
+
     if (atMatch && atMatch.index !== undefined) {
       const isStartOfLine = atMatch[0].startsWith('@');
       const replaceStart = isStartOfLine ? atMatch.index : atMatch.index + 1;
-      setContent(textBefore.slice(0, replaceStart) + inserted + textAfter);
-      const newCursor = replaceStart + inserted.length;
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
+      field.replaceRange(replaceStart, cursorPos, inserted, replaceStart + inserted.length);
     } else {
-      const joiner = content && !/\s$/.test(content) ? ' ' : '';
-      const newText = content + joiner + inserted;
-      setContent(newText);
-      const newCursor = newText.length;
-      setTimeout(() => {
-        if (el) {
-          el.focus({ preventScroll: true });
-          el.setSelectionRange(newCursor, newCursor);
-        }
-      }, 0);
+      const joiner = value && !/\s$/.test(value) ? ' ' : '';
+      const appended = joiner + inserted;
+      field.replaceRange(value.length, value.length, appended, value.length + appended.length);
     }
+    field.focus();
 
     setTargetFolder(folder.path);
     setFolderQuery(null);
@@ -266,7 +230,7 @@ export const useComposerAutocomplete = ({
     setWikiQuery(null);
   };
 
-  const handleAutocompleteKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): boolean => {
+  const handleAutocompleteKeyDown = (e: ComposerKeyEvent): boolean => {
     // Folder autocomplete keyboard controls
     if (folderQuery !== null) {
       if (e.key === 'Escape') {

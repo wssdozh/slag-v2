@@ -30,6 +30,7 @@ import { useComposerSlashCommands } from './composer/useComposerSlashCommands';
 import { useComposerSubmit } from './composer/useComposerSubmit';
 import { resolveComposerFields, type ComposerDismissals } from './composer/composerFields';
 import { buildComposerHighlights, type ComposerHighlight } from './composer/composerHighlights';
+import { useComposerField } from './composer/useComposerField';
 
 export interface ComposerProps {
   isModal?: boolean;
@@ -77,6 +78,8 @@ export const Composer: React.FC<ComposerProps> = ({
   const activeFolder = effectiveDefaultFolder;
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // The composer talks to the field through this handle, never to the DOM node directly.
+  const field = useComposerField(textareaRef);
 
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
   const [reminder] = useState<string | undefined>(initialReminder);
@@ -119,7 +122,7 @@ export const Composer: React.FC<ComposerProps> = ({
     replyTarget,
     setReplyTarget,
     folders,
-    textareaRef,
+    field,
     isModal,
     isActive,
     isFullscreenEditorOpen,
@@ -161,12 +164,11 @@ export const Composer: React.FC<ComposerProps> = ({
     handleAutocompleteKeyDown,
   } = useComposerAutocomplete({
     content,
-    setContent,
     items,
     folders,
     currentFolder,
     DEFAULT_INBOX_FOLDER,
-    textareaRef,
+    field,
     addToast,
     setTargetFolder,
   });
@@ -204,7 +206,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const { executeSlashCommand } = useComposerSlashCommands({
     content,
     setContent,
-    textareaRef,
+    field,
     setItemType,
     setDueDate,
     setPriority,
@@ -234,12 +236,12 @@ export const Composer: React.FC<ComposerProps> = ({
     return () => clearTimeout(timer);
   }, [content, itemType, setItemType]);
 
-  // Focus textarea when replying or when mounted in modal
+  // Focus the field when replying or when mounted in modal
   useEffect(() => {
-    if ((replyTarget || isModal) && textareaRef.current) {
-      textareaRef.current.focus({ preventScroll: true });
+    if (replyTarget || isModal) {
+      field.focus();
     }
-  }, [replyTarget, isModal]);
+  }, [replyTarget, isModal, field]);
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     notifyUserEdit();
@@ -319,7 +321,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   const {
     isDraggingOver, handleDragOver, handleDragLeave, handleDrop, handlePaste,
-  } = useComposerFiles({ addToast, setAttachments, textareaRef, isModal, isActive });
+  } = useComposerFiles({ addToast, setAttachments, field, isModal, isActive });
 
   const { handleSend, handleRecordedAudio, handleRecordedVideo } = useComposerSubmit({
     content,
@@ -347,7 +349,7 @@ export const Composer: React.FC<ComposerProps> = ({
     setRecordMode,
     setLockHint,
     resetDraftState,
-    textareaRef,
+    field,
     onComplete,
   });
 
