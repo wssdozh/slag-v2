@@ -320,8 +320,11 @@ export function createOrbRenderer(canvas: HTMLCanvasElement) {
 
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-    const height = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    const width = Math.floor(canvas.clientWidth * dpr);
+    const height = Math.floor(canvas.clientHeight * dpr);
+    // An inactive dockview tab detaches the panel: it reports 0x0 for a while.
+    // Keep the last good backing store instead of shrinking the orb to 1x1.
+    if (width < 1 || height < 1) return;
     if (canvas.width === width && canvas.height === height) return;
     canvas.width = width;
     canvas.height = height;

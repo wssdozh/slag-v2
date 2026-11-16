@@ -44,7 +44,6 @@ export const AudioPanel: React.FC = () => {
   }, [items, effectiveFolder, scopeMode, typeFilters, inboxMode]);
 
   const {
-    audioRef,
     analyser,
     currentTrack,
     resolvedSrcs,
@@ -117,12 +116,14 @@ export const AudioPanel: React.FC = () => {
 
   // A recorded memo has a machine name; the note title is the only human label it owns.
   const trackLabel = currentTrack ? audioTrackLabel(currentTrack.name) : null;
+  // Parsed `Artist - Title` already names who made it; the file name under it is noise.
+  const hasParsedMetadata = Boolean(trackLabel && !trackLabel.isRecorded && trackLabel.author);
   const trackTitle = trackLabel
     ? trackLabel.isRecorded
       ? currentTrack?.itemTitle || 'Аудиозапись'
       : trackLabel.title || currentTrack?.itemTitle || 'Аудиозапись'
     : 'Аудиозапись';
-  const trackAuthor = trackLabel && !trackLabel.isRecorded ? trackLabel.author : '';
+  const trackAuthor = hasParsedMetadata ? trackLabel?.author ?? '' : '';
 
   return (
     <div
@@ -130,9 +131,6 @@ export const AudioPanel: React.FC = () => {
       onKeyDown={handleKeyDown}
       className="relative w-full h-full bg-canvas text-fg-primary flex flex-col justify-between overflow-hidden select-none outline-none"
     >
-      {/* Hidden HTML5 Audio Element */}
-      <audio ref={audioRef} preload="metadata" />
-
       {/* Atmospheric Ambient Glow Backdrop */}
       {currentTrack?.coverUrl && (
         <div
@@ -165,7 +163,8 @@ export const AudioPanel: React.FC = () => {
       {/* Main Center Stage */}
       <main className="relative z-10 flex flex-1 min-h-0 flex-col items-center justify-center overflow-y-auto overflow-x-hidden p-4">
         <div className="w-full max-w-sm flex flex-col items-center my-auto">
-          {tracks.length === 0 ? (
+          {/* A folder change can filter the playing track out; its controls stay put. */}
+          {tracks.length === 0 && !isPlaying ? (
             <div className="flex flex-col items-center justify-center text-center py-10 px-4">
               <div className="w-16 h-16 rounded-full bg-tint-4 border border-tint-8 flex items-center justify-center mb-4">
                 <Icon name="entity.folder" size="none" tone="muted" className="w-7 h-7" />
@@ -198,6 +197,7 @@ export const AudioPanel: React.FC = () => {
                 isTrackMissing={isTrackMissing}
                 title={trackTitle}
                 author={trackAuthor}
+                hasParsedMetadata={hasParsedMetadata}
                 onOpenNote={(itemId) => scrollToItem(itemId)}
               />
 

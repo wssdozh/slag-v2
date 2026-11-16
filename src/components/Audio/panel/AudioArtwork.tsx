@@ -11,6 +11,8 @@ interface AudioArtworkProps {
   isTrackMissing: boolean;
   title: string;
   author: string;
+  /** `Artist - Title` parsed out of the file name: the caption carries the author, not the name. */
+  hasParsedMetadata: boolean;
   onOpenNote: (itemId: string) => void;
 }
 
@@ -21,8 +23,12 @@ export const AudioArtwork: React.FC<AudioArtworkProps> = ({
   isTrackMissing,
   title,
   author,
+  hasParsedMetadata,
   onOpenNote,
 }) => {
+  // Parsed metadata already answers "who"; the file name under the title is noise.
+  const noteLabel = !hasParsedMetadata && track?.itemTitle && track.itemTitle !== title ? track.itemTitle : null;
+  const caption = hasParsedMetadata ? author : noteLabel;
   return (
     <>
       {/* 1. Square Art Tile (Clean, without buttons) */}
@@ -45,27 +51,18 @@ export const AudioArtwork: React.FC<AudioArtworkProps> = ({
         </div>
       )}
 
-      {/* 3. Author line: who made it, before where it lives */}
-      {author && (
-        <div className="text-xs text-fg-secondary text-center truncate max-w-full px-2 mb-1">
-          {author}
-        </div>
-      )}
-
-      {/* 4. Subtitle: Note title • Folder */}
+      {/* 3. Subtitle: author • folder once metadata parsed, note title • folder otherwise */}
       <div className="text-xs text-fg-secondary text-center flex items-center justify-center gap-1.5 max-w-full truncate px-2 mb-5">
-        {track?.itemTitle && track.itemTitle !== title && (
+        {caption && track && (
           <button
             onClick={() => onOpenNote(track.itemId)}
             className="hover:text-fg-soft transition-colors truncate cursor-pointer underline-offset-2 hover:underline"
             title="Перейти к заметке"
           >
-            {track.itemTitle}
+            {caption}
           </button>
         )}
-        {track?.itemTitle && track.itemTitle !== title && (
-          <span className="text-fg-dim">•</span>
-        )}
+        {caption && <span className="text-fg-dim">•</span>}
         <span className="text-fg-muted truncate">{track?.itemFolder}</span>
       </div>
     </>
