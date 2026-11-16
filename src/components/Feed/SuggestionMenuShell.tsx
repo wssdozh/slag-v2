@@ -9,7 +9,6 @@ interface SuggestionMenuShellProps {
   isModal: boolean;
   isEmpty: boolean;
   emptyContent: React.ReactNode;
-  header: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -20,7 +19,6 @@ export const SuggestionMenuShell: React.FC<SuggestionMenuShellProps> = ({
   isModal,
   isEmpty,
   emptyContent,
-  header,
   children,
 }) => {
   const { ref: shellRef, phase, isPresent, onTransitionEnd } = usePresence(isOpen);
@@ -49,12 +47,9 @@ export const SuggestionMenuShell: React.FC<SuggestionMenuShellProps> = ({
       {isEmpty ? (
         <div className="flex items-center gap-2 text-xs text-fg-secondary">{emptyContent}</div>
       ) : (
-        <>
-          {header}
-          <div ref={listRef} className="flex flex-col gap-0.5 pt-1 max-h-44 overflow-y-auto pr-0.5">
-            {children}
-          </div>
-        </>
+        <div ref={listRef} className="flex flex-col gap-0.5 max-h-44 overflow-y-auto pr-0.5">
+          {children}
+        </div>
       )}
     </div>
   );

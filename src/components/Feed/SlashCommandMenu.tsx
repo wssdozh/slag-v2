@@ -2,7 +2,6 @@
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { SLASH_COMMANDS, CATEGORY_LABELS, type SlashCommand } from '../../types/slashCommands';
-import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 
 interface SlashCommandMenuProps {
@@ -40,7 +39,6 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
       isModal={isModal}
       isEmpty={filteredCommands.length === 0}
       emptyContent={<><Icon name="system.command" size="sm" tone="muted" className="shrink-0" /><span>Команда «/{query}» не найдена</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="system.command" size="xs" />} title="Команды композера" />}
     >
       {filteredCommands.map((cmd, idx) => {
         const isSelected = idx === selectedIndex;

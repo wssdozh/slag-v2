@@ -14,7 +14,6 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
-import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import { Icon } from '../UI/icons/Icon';
@@ -532,7 +531,6 @@ export const Composer: React.FC<ComposerProps> = ({
         isModal={isModal}
         isEmpty={(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).length === 0}
         emptyContent={<span>Заметка не найдена</span>}
-        header={<SuggestionMenuHeader icon={<Icon name="entity.article" size="xs" />} title="Связать заметку [[...]]" />}
       >
         {(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).map((wikiItem, idx) => {
           const isSelected = idx === wikiSelectedIndex;

@@ -3,7 +3,6 @@ import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import type { FolderMeta } from '../../types';
 import { folderIconName } from '../UI/icons/icons';
-import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 
 interface FolderSuggestionMenuProps {
@@ -37,7 +36,6 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
       isModal={isModal}
       isEmpty={folders.length === 0}
       emptyContent={<><Icon name="entity.folder" size="sm" tone="muted" className="shrink-0" /><span>Папка «{query}» не найдена</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="entity.folder" size="xs" />} title="Целевая папка" />}
     >
         {folders.map((f, idx) => {
           const isSelected = idx === selectedIndex;

@@ -1,7 +1,6 @@
 // The `#tag` suggestions: matching vault tags with usage counts, keyboard selection.
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
-import { SuggestionMenuHeader } from './SuggestionMenuHeader';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 
 export interface TagMeta {
@@ -36,7 +35,6 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
       isModal={isModal}
       isEmpty={tags.length === 0}
       emptyContent={<><Icon name="entity.tagHash" size="sm" tone="muted" className="shrink-0" /><span>Тег «{query}» не найден в хранилище</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="entity.tagHash" size="xs" />} title="Теги хранилища (#)" />}
     >
         {tags.map((item, idx) => {
           const isSelected = idx === selectedIndex;
@@ -56,13 +54,11 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
               }`}
             >
               <div className="flex items-center gap-2 min-w-0 font-mono text-xs">
-                <Icon name="entity.tagHash" size="sm" tone="inherit" className={`shrink-0 ${isSelected ? 'text-cyan-300' : 'text-fg-secondary'}`} />
+                <Icon name="entity.tagHash" size="sm" tone="inherit" className={`shrink-0 ${isSelected ? 'text-white' : 'text-fg-secondary'}`} />
                 <span className="truncate">#{item.tag}</span>
               </div>
 
-              <span className="px-1.5 py-0.5 rounded text-3xs font-mono bg-tint-4 text-fg-muted border border-tint-6 shrink-0">
-                {item.count}
-              </span>
+              <span className="text-3xs font-mono text-fg-muted shrink-0">{item.count}</span>
             </button>
           );
         })}

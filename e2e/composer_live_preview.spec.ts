@@ -64,6 +64,6 @@ test.describe('Composer live preview', () => {
 
     await editor.click();
     await page.keyboard.type('Мысль #');
-    await expect(page.getByText('Теги хранилища (#)')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('[data-tag-item]').first()).toBeVisible({ timeout: 5_000 });
   });
 });
