@@ -137,6 +137,9 @@ export interface AppContextType {
   folderInfoTarget: string | null;
   openFolderInfoModal: (folderPath?: string) => void;
   closeFolderInfoModal: () => void;
+  folderMoveTarget: string | null;
+  openFolderMoveModal: (folderPath: string) => void;
+  closeFolderMoveModal: () => void;
   renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
   setIsTriageModalOpen: (open: boolean) => void;
   isComposerModalOpen: boolean;

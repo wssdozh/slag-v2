@@ -3,13 +3,11 @@ import { useCallback, useState } from 'react';
 import type { FolderMeta } from '../../types';
 import {
   folderPathForName,
-  folderPathUnder,
   isFolderPathFree,
-  parentPathOf,
   sanitizeFolderName,
 } from '../../lib/vault/folderPaths';
 
-export type FolderProfileEditMode = 'name' | 'description' | 'move' | null;
+export type FolderProfileEditMode = 'name' | 'description' | null;
 
 export interface FolderProfileEditOptions {
   path: string;
@@ -25,25 +23,21 @@ export interface FolderProfileEdit {
   mode: FolderProfileEditMode;
   nameDraft: string;
   descriptionDraft: string;
-  moveTarget: string;
   startRename: () => void;
   startDescription: () => void;
-  startMove: () => void;
   cancel: () => void;
   updateNameDraft: (value: string) => void;
   updateDescriptionDraft: (value: string) => void;
-  updateMoveTarget: (value: string) => void;
   commitName: () => void;
   commitDescription: () => void;
-  commitMove: () => void;
   selectIcon: (icon: string) => void;
 }
 
 /**
  * Inline editing for the folder profile. One field at a time, nothing is written
  * until the field commits, and every write goes through the single storage action
- * for that change: `renameFolder` for name and parent, `updateFolderDescription`
- * for the AI description.
+ * for that change: `renameFolder` for the name, `updateFolderDescription` for the
+ * AI description. Moving is a dialog of its own (`FolderMoveModal`), not an edit mode.
  */
 export function useFolderProfileEdit({
   path,
@@ -57,7 +51,6 @@ export function useFolderProfileEdit({
   const [mode, setMode] = useState<FolderProfileEditMode>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
-  const [moveTarget, setMoveTarget] = useState('');
 
   const cancel = useCallback(() => setMode(null), []);
 
@@ -70,11 +63,6 @@ export function useFolderProfileEdit({
     setDescriptionDraft(folder?.description || '');
     setMode('description');
   }, [folder]);
-
-  const startMove = useCallback(() => {
-    setMoveTarget(parentPathOf(path));
-    setMode('move');
-  }, [path]);
 
   const commitName = useCallback(() => {
     if (!folder) {
@@ -104,24 +92,6 @@ export function useFolderProfileEdit({
     setMode(null);
   }, [descriptionDraft, folder, path, updateFolderDescription]);
 
-  const commitMove = useCallback(() => {
-    if (!folder) {
-      setMode(null);
-      return;
-    }
-    const nextPath = folderPathUnder(moveTarget, folder.name);
-    if (nextPath === path) {
-      setMode(null);
-      return;
-    }
-    if (!isFolderPathFree(folders, nextPath, path)) {
-      addToast(`Папка «${nextPath}» уже существует`, 'error');
-      return;
-    }
-    renameFolder(path, { ...folder, path: nextPath });
-    setMode(null);
-  }, [addToast, folder, folders, moveTarget, path, renameFolder]);
-
   const selectIcon = useCallback(
     (icon: string) => {
       if (!folder) return;
@@ -134,17 +104,13 @@ export function useFolderProfileEdit({
     mode,
     nameDraft,
     descriptionDraft,
-    moveTarget,
     startRename,
     startDescription,
-    startMove,
     cancel,
     updateNameDraft: setNameDraft,
     updateDescriptionDraft: setDescriptionDraft,
-    updateMoveTarget: setMoveTarget,
     commitName,
     commitDescription,
-    commitMove,
     selectIcon,
   };
 }

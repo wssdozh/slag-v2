@@ -41,6 +41,7 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
     renameFolder,
     updateFolderDescription,
     deleteFolder,
+    openFolderMoveModal,
     addToast,
     confirmAction,
     openLightbox,
@@ -73,6 +74,8 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
     onClose?.();
   }, [confirmAction, deleteFolder, folder, folderPath, onClose]);
 
+  const handleMove = useCallback(() => openFolderMoveModal(folderPath), [folderPath, openFolderMoveModal]);
+
   const statsVariant = variant === 'dock' ? 'rows' : variant === 'screen' ? 'grid' : 'inline';
 
   return (
@@ -80,10 +83,10 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
       <FolderProfileHeader
         folder={folder}
         path={folderPath}
-        folders={folders}
         itemCount={folderItems.length}
         variant={variant}
         edit={edit}
+        onMove={handleMove}
         onDelete={handleDelete}
         onClose={onClose}
       />

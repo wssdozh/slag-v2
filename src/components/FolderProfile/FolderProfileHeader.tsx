@@ -1,29 +1,25 @@
 // Folder header: name, icon, path, counters and the inline edit controls.
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { folderIconName } from '../UI/icons/icons';
 import { MenuDropdown } from '../UI/MenuDropdown';
 import { IconButton } from '../UI/IconButton';
-import { Select, type SelectOption } from '../UI/Select';
-import { Button } from '../UI/Button';
 import { FolderIconGrid } from './FolderIconGrid';
 import { FolderActionsMenu } from './FolderActionsMenu';
 import { recordCountLabel } from './folderStatsConfig';
 import type { FolderProfileEdit } from './useFolderProfileEdit';
-import { buildFolderOptions } from '../../lib/vault/folderOptions';
-import { movableTargets } from '../../lib/vault/folderPaths';
 
 export type FolderProfileVariant = 'dock' | 'modal' | 'screen';
 
 export interface FolderProfileHeaderProps {
   folder: FolderMeta | undefined;
   path: string;
-  folders: FolderMeta[];
   itemCount: number;
   variant: FolderProfileVariant;
   edit: FolderProfileEdit;
+  onMove: () => void;
   onDelete: () => void;
   onClose?: () => void;
 }
@@ -60,35 +56,19 @@ const descriptionClass: Record<FolderProfileVariant, string> = {
 export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
   folder,
   path,
-  folders,
   itemCount,
   variant,
   edit,
+  onMove,
   onDelete,
   onClose,
 }) => {
   const isSystem = path === DEFAULT_INBOX_FOLDER || folder?.isSystem === true;
   const isEditingName = edit.mode === 'name';
   const isEditingDescription = edit.mode === 'description';
-  const isMoving = edit.mode === 'move';
 
   const folderIcon = folderIconName(folder?.icon);
   const TitleTag = variant === 'screen' ? 'h1' : 'div';
-
-  const moveOptions = useMemo<SelectOption[]>(() => {
-    const targets = movableTargets(folders, path).filter(target => target.path !== DEFAULT_INBOX_FOLDER);
-    return [
-      { value: '', label: 'Корень хранилища', triggerLabel: 'Корень хранилища', mono: true },
-      ...buildFolderOptions(targets)
-        .filter(option => option.value !== DEFAULT_INBOX_FOLDER)
-        .map(option => ({
-          value: option.value,
-          label: option.label,
-          triggerLabel: option.triggerLabel,
-          mono: true as const,
-        })),
-    ];
-  }, [folders, path]);
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
@@ -157,7 +137,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
 
         <div className="flex items-center gap-0.5 shrink-0">
           {!isSystem && (
-            <FolderActionsMenu onRename={edit.startRename} onMove={edit.startMove} onDelete={onDelete} />
+            <FolderActionsMenu onRename={edit.startRename} onMove={onMove} onDelete={onDelete} />
           )}
           {onClose && (
             <IconButton size="sm" title="Закрыть (Esc)" aria-label="Закрыть" onClick={onClose}>
@@ -167,26 +147,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
         </div>
       </div>
 
-      {isMoving ? (
-        <div className="flex flex-col gap-2 pt-1">
-          <span className="text-2xs font-mono text-fg-muted">Переместить в</span>
-          <Select
-            value={edit.moveTarget}
-            onChange={edit.updateMoveTarget}
-            options={moveOptions}
-            size="sm"
-            aria-label="Новая родительская папка"
-          />
-          <div className="flex justify-end gap-1.5">
-            <Button type="button" variant="ghost" size="sm" onClick={edit.cancel}>
-              Отмена
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={edit.commitMove}>
-              Переместить
-            </Button>
-          </div>
-        </div>
-      ) : isEditingDescription ? (
+      {isEditingDescription ? (
         <div className="flex flex-col gap-1.5">
           <textarea
             autoFocus
