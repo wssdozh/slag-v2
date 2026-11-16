@@ -584,3 +584,23 @@ body.window-transparent #root {
 @media (prefers-reduced-motion: reduce) {
   .record-bar, .record-bar-out { animation: none !important }
 }
+
+/* The editor frame is built for a fullscreen pane (height 100%); inside the composer it must
+   hug its content up to the composer's own ceiling. The height Comes from the package styles,
+   hence !important here and nowhere else. */
+.composer-editor-field .atomic-cm-editor,
+.composer-editor-field .cm-editor {
+  height: auto !important;
+}
+.composer-editor-field .cm-editor {
+  max-height: var(--composer-editor-max-height, 220px);
+}
+.composer-editor-field .cm-scroller {
+  height: auto !important;
+  max-height: var(--composer-editor-max-height, 220px);
+  overflow-y: auto;
+}
+.composer-editor-field .cm-content {
+  min-height: 0 !important;
+  padding: 0 !important;
+}

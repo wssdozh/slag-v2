@@ -1,9 +1,10 @@
-// The shared composer shell: growing textarea, slot layout, and the send plate.
+// The shared composer shell: the text surface, slot layout, and the send plate.
 import React, { useRef, useLayoutEffect, useMemo } from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { SendButton } from '../UI/SendButton';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { segmentText, type ComposerHighlight } from './composer/composerHighlights';
+import { ComposerEditorField, type ComposerEditorKeyEvent } from './composer/ComposerEditorField';
 
 export interface BaseComposerProps {
   /** Текстовое значение поля ввода */
@@ -16,6 +17,19 @@ export interface BaseComposerProps {
   placeholder?: string;
   /** Внешний ref на textarea */
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /**
+   * 'markdown' renders the CodeMirror field with the editor's inline preview;
+   * 'textarea' (default) keeps the plain input, which the assistant still uses.
+   */
+  mode?: 'textarea' | 'markdown';
+  /** Host element of the CodeMirror field: the handle resolves the live view from it. */
+  editorContainerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Identity of the editor document: change it to reset/restore the draft. */
+  documentId?: string;
+  /** Markdown mode's change callback: it gets the text, not a DOM event. */
+  onTextChange?: (text: string) => void;
+  /** Markdown mode's keydown: the same composer keymap, without React's event shape. */
+  onEditorKeyDown?: (e: ComposerEditorKeyEvent) => void;
   /** Кастомный обработчик keydown (например, для навигации по автокомплиту) */
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Обработчик вставки файлов/изображений */
@@ -75,6 +89,11 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   onSubmit,
   placeholder,
   textareaRef,
+  mode = 'textarea',
+  editorContainerRef,
+  documentId,
+  onTextChange,
+  onEditorKeyDown,
   onKeyDown,
   onPaste,
   disabled = false,
@@ -189,6 +208,20 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {!hideTextarea && (
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="relative flex min-w-0 flex-1">
+            {mode === 'markdown' && editorContainerRef ? (
+              <ComposerEditorField
+                value={value}
+                documentId={documentId ?? 'composer-draft'}
+                placeholder={placeholder ?? ''}
+                minHeight={minHeight}
+                maxHeight={maxHeight}
+                isMobile={isMobile}
+                onChange={(text) => onTextChange?.(text)}
+                onKeyDown={(event) => onEditorKeyDown?.(event)}
+                containerRef={editorContainerRef}
+              />
+            ) : (
+              <>
             {mirrorSegments.length > 0 && (
               /* A textarea cannot colour a substring, so the same text is mirrored
                  underneath it and the field renders its own glyphs transparent. */
@@ -234,6 +267,8 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 ...(highlights.length > 0 ? { color: 'transparent', caretColor: 'var(--color-fg-primary)' } : {}),
               }}
             />
+            </>
+            )}
             </div>
             {topRightSlot && (
               <div className="composer-top-actions flex shrink-0 items-center gap-1">
