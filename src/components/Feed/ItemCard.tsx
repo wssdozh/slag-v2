@@ -438,11 +438,12 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.push(
       <span
         key="pin"
-        className="flex items-center gap-1 text-2xs font-mono text-amber-400/90 shrink-0"
+        role="img"
+        className="flex items-center shrink-0"
         title="Закрепленная запись"
+        aria-label="Закрепленная запись"
       >
-        <Icon name="action.pin" size="none" tone="inherit" className="w-2.5 h-2.5 rotate-45 shrink-0" />
-        <span>Закреп</span>
+        <Icon name="action.pin" size="xs" tone="warning" className="rotate-45 shrink-0" />
       </span>
     );
   }
