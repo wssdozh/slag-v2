@@ -1,10 +1,10 @@
 // "Занятое место": the whole store's footprint — local keys, media, snapshots and assistant memory.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '../UI/icons/Icon';
-import type { SlagAttachment, SlagItem } from '../../types';
-import { MEMORY_LIMIT } from '../../lib/memory';
-import { pluralRu } from '../../lib/time/dateUtils';
-import { useApp } from '../../context/AppContext';
+import { Icon } from '../../UI/icons/Icon';
+import type { SlagAttachment, SlagItem } from '../../../types';
+import { MEMORY_LIMIT } from '../../../lib/memory';
+import { pluralRu } from '../../../lib/time/dateUtils';
+import { useApp } from '../../../context/AppContext';
 import {
   collectSegments,
   collectStorageUsage,
@@ -13,10 +13,11 @@ import {
   sharePercent,
   usageTotalBytes,
   type StorageUsage,
-  type UsageSegment,
   type UsageUnit,
-} from '../../lib/storage/usage';
-import { SettingsGroup } from './SettingsUI';
+} from '../../../lib/storage/usage';
+import { SettingsGroup } from '../SettingsUI';
+import { EmptyLine, UsageLine, UsageRing } from './StorageUsageParts';
+import { MEDIA_SEGMENT_IDS, toneOf } from './usageTone';
 
 const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
   image: <Icon name="entity.image" size="sm" tone="inherit" />,
@@ -24,24 +25,6 @@ const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
   video: <Icon name="media.video" size="sm" tone="inherit" />,
   file: <Icon name="entity.file" size="sm" tone="inherit" />,
 };
-
-/**
- * Six kinds, six existing tokens: the ring reads at a glance, and no colour is invented here.
- * Media gets the loud hues, plain data and snapshots stay in the grey/amber register.
- */
-const SEGMENT_TONE: Record<string, { stroke: string; dot: string }> = {
-  video: { stroke: 'stroke-accent', dot: 'bg-accent' },
-  image: { stroke: 'stroke-success', dot: 'bg-success' },
-  audio: { stroke: 'stroke-mention', dot: 'bg-mention' },
-  file: { stroke: 'stroke-fg-muted', dot: 'bg-fg-muted' },
-  data: { stroke: 'stroke-fg-secondary', dot: 'bg-fg-secondary' },
-  snapshots: { stroke: 'stroke-warning', dot: 'bg-warning' },
-};
-
-const toneOf = (id: string) => SEGMENT_TONE[id] ?? SEGMENT_TONE.data;
-
-/** Only the media sectors carry a test hook; data and snapshots are not files. */
-const MEDIA_SEGMENT_IDS = new Set(['image', 'audio', 'video', 'file']);
 
 const UNIT_FORMS: Record<UsageUnit, [string, string, string]> = {
   'файл': ['файл', 'файла', 'файлов'],
@@ -54,86 +37,6 @@ const countOf = (count: number, unit: UsageUnit): string =>
 
 const shareOf = (part: number, whole: number): string =>
   formatUsageShare(sharePercent(part, whole));
-
-/** The composition of everything the store holds: total in the middle, one arc per sector. */
-const UsageRing: React.FC<{ segments: UsageSegment[]; total: number }> = ({ segments, total }) => {
-  const size = 168;
-  const stroke = 22;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const lengths = segments.map((segment) => (total > 0 ? (segment.bytes / total) * circumference : 0));
-
-  return (
-    <div className="relative h-[168px] w-[168px] shrink-0">
-      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90" aria-hidden>
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={stroke}
-          className="stroke-tint-6"
-        />
-        {segments.map((segment, index) => {
-          // A 2px gap keeps two neighbouring arcs from reading as one.
-          const dash = Math.max(lengths[index] - 2, 0.5);
-          const dashOffset = -lengths.slice(0, index).reduce((sum, value) => sum + value, 0);
-          return (
-            <circle
-              key={segment.id}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              strokeWidth={stroke}
-              className={toneOf(segment.id).stroke}
-              strokeDasharray={`${dash} ${circumference - dash}`}
-              strokeDashoffset={dashOffset}
-            />
-          );
-        })}
-      </svg>
-      <div
-        data-testid="storage-total"
-        className="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-      >
-        <span className="font-mono text-base text-fg-primary">{formatUsageBytes(total)}</span>
-        <span className="text-2xs text-fg-dim">всего</span>
-      </div>
-    </div>
-  );
-};
-
-interface UsageLineProps {
-  testId?: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}
-
-/** One line per entry, 32px tall: a second line of description is what made the old list tall. */
-const UsageLine: React.FC<UsageLineProps> = ({ testId, onClick, disabled = false, children }) => {
-  const interactive = Boolean(onClick);
-  const Element = interactive ? 'button' : 'div';
-
-  return (
-    <Element
-      {...(interactive
-        ? { type: 'button' as const, onClick, disabled, 'aria-disabled': disabled }
-        : {})}
-      data-testid={testId}
-      className={`flex h-8 w-full items-center gap-2 px-3.5 text-left ${
-        interactive
-          ? 'cursor-pointer transition-colors hover:bg-surface-hover active:bg-tint-10 active:duration-0'
-          : ''
-      } ${disabled ? 'opacity-40' : ''}`}
-    >
-      {children}
-    </Element>
-  );
-};
-
-const EmptyLine: React.FC = () => <div className="px-3.5 py-3 text-2xs text-fg-muted">пока пусто</div>;
 
 /**
  * Read once on mount, then on demand: the stamp is what makes the button a real recount

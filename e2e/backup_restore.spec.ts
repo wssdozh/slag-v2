@@ -35,9 +35,10 @@ test.describe('Backup & Restore System Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
-    // 4. Switch to "Хранилище & Бэкап" tab
+    // 4. Switch to "Хранилище & Бэкап" tab, then to its «бэкапы» subsection
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
+    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
     await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 5. Create a snapshot
@@ -66,10 +67,11 @@ test.describe('Backup & Restore System Verification', () => {
     // Verify note is gone from feed
     await expect(page.locator('.group', { hasText: noteText })).not.toBeVisible({ timeout: 5000 });
 
-    // 9. Re-open Settings modal -> Хранилище & Бэкап
+    // 9. Re-open Settings modal -> Хранилище & Бэкап -> «бэкапы»
     await settingsBtn.click();
     await expect(settingsModal).toBeVisible();
     await vaultTabBtn.click();
+    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
 
     // 10. Click restore button on the snapshot
     const restoreBtn = settingsModal.locator('[data-testid^="btn-restore-snapshot-"]').first();
@@ -106,9 +108,10 @@ test.describe('Backup & Restore System Verification', () => {
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible();
 
-    // 2. Switch to "Хранилище & Бэкап" tab
+    // 2. Switch to "Хранилище & Бэкап" tab, then to its «бэкапы» subsection
     const vaultTabBtn = settingsModal.locator('button', { hasText: 'Хранилище & Бэкап' });
     await vaultTabBtn.click();
+    await settingsModal.getByRole('button', { name: 'бэкапы' }).click();
     await expect(settingsModal.locator('text=Резервное копирование')).toBeVisible();
 
     // 3. Inject simulated duplicate snapshots into IndexedDB (like the user had from React StrictMode race condition)
