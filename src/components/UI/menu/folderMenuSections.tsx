@@ -66,7 +66,7 @@ export const FolderMenuSections: React.FC<FolderMenuSectionsProps> = ({
         <Icon name="entity.folderOpen" size="sm" />
         <span>Проводник</span>
       </div>
-      <Icon name="nav.next" size="xs" tone="muted" />
+      <Icon name="nav.next" size="sm" tone="muted" />
     </button>
 
     {folder.path !== DEFAULT_INBOX_FOLDER && (

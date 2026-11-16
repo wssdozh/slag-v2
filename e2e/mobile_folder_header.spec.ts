@@ -26,7 +26,7 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
     await expect(dotsBtn).toBeVisible();
 
     // Verify SVG icon inside 3-dots button has MoreVertical icon (3 vertical dots: vertical line of circles/paths)
-    await expect(dotsBtn.locator('svg.lucide-more-vertical')).toBeVisible();
+    await expect(dotsBtn.locator('[data-icon="action.more"]')).toBeVisible();
 
     // Verify old segmented filter bars are NOT rendered on the screen
     await expect(page.locator('div[aria-label="Фильтр входящих"]')).not.toBeVisible();

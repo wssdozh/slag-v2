@@ -40,7 +40,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
       isModal={isModal}
       isEmpty={filteredCommands.length === 0}
       emptyContent={<><Icon name="system.command" size="sm" tone="muted" className="shrink-0" /><span>Команда «/{query}» не найдена</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="system.command" size="xs" />} title="Команды композера" />}
+      header={<SuggestionMenuHeader icon={<Icon name="system.command" size="sm" />} title="Команды композера" />}
     >
       {filteredCommands.map((cmd, idx) => {
         const isSelected = idx === selectedIndex;
@@ -69,7 +69,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <Icon
                   name={cmd.icon}
-                  size="none"
+                  size="md"
                   tone="inherit"
                   className={`w-4 h-4 shrink-0 transition-colors ${
                     isSelected ? 'text-fg-primary' : 'text-fg-secondary'

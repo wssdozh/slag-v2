@@ -122,7 +122,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
         {/* Single Schedule info: show ONLY if dueDate was actually set or changed */}
         {Boolean(action.type === 'schedule_task' || action.updates?.dueDate || (action.type === 'update_item' && !action.updates && action.dueDate)) && (
           <div className="flex items-center gap-2 text-2xs font-mono text-fg-secondary">
-            <Icon name="time.date" size="xs" tone="muted" />
+            <Icon name="time.date" size="sm" tone="muted" />
             <span>Срок: {action.updates?.dueDate || action.dueDate}</span>
             {(action.updates?.reminder || action.reminder) && (
               <span className="text-fg-muted">
@@ -170,7 +170,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                   <div className="flex items-center gap-1.5 shrink-0 text-2xs font-mono text-fg-secondary">
                     {(up.dueDate !== undefined || up.reminder) && (
                       <>
-                        <Icon name="time.date" size="xs" tone="muted" />
+                        <Icon name="time.date" size="sm" tone="muted" />
                         <span>{(() => {
                           const today = new Date().toISOString().slice(0, 10);
                           const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -205,7 +205,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                       className="p-1 rounded hover:bg-tint-8 text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
                       title="Посмотреть изменения этой заметки (Diff)"
                     >
-                      <Icon name="action.diff" size="xs" tone="inherit" />
+                      <Icon name="action.diff" size="sm" tone="inherit" />
                     </button>
                     <button
                       type="button"
@@ -216,7 +216,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                       className="p-1 rounded hover:bg-tint-8 text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
                       title={`Перейти к «${item.title}»`}
                     >
-                      <Icon name="nav.open" size="xs" tone="inherit" />
+                      <Icon name="nav.open" size="sm" tone="inherit" />
                     </button>
                   </div>
                 </div>
@@ -297,7 +297,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                 title="Показать запись в ленте"
               >
                 <span>{action.updates?.appendContent || action.appendContent ? 'Открыть' : 'Перейти к записи'}</span>
-                <Icon name="nav.open" size="xs" />
+                <Icon name="nav.open" size="sm" />
               </button>
             ) : (
               <button
@@ -306,7 +306,7 @@ export const AssistantActionCard: React.FC<AssistantActionCardProps> = ({
                 className="flex items-center gap-1 px-2 py-1 rounded-lg bg-tint-4 hover:bg-tint-8 text-fg-secondary hover:text-fg-soft text-xs font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap ml-1"
                 title="Посмотреть изменения"
               >
-                <Icon name="action.diff" size="xs" />
+                <Icon name="action.diff" size="sm" />
                 <span>Сравнить</span>
               </button>
             )}

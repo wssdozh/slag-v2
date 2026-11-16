@@ -63,9 +63,9 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
         <div
           className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
         >
-          {activeTypeFilter === 'note' && <Icon name="entity.note" size="xs" />}
-          {activeTypeFilter === 'task' && <Icon name="entity.task" size="xs" />}
-          {activeTypeFilter === 'article' && <Icon name="entity.article" size="xs" />}
+          {activeTypeFilter === 'note' && <Icon name="entity.note" size="sm" />}
+          {activeTypeFilter === 'task' && <Icon name="entity.task" size="sm" />}
+          {activeTypeFilter === 'article' && <Icon name="entity.article" size="sm" />}
           <span>
             {activeTypeFilter === 'note'
               ? 'Заметки'
@@ -80,7 +80,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Сбросить фильтр по типу"
             aria-label="Сбросить фильтр по типу"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}
@@ -91,9 +91,9 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
           className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
         >
           {inboxMode === 'sorted' ? (
-            <Icon name="entity.folderFilter" size="xs" />
+            <Icon name="entity.folderFilter" size="sm" />
           ) : (
-            <Icon name="entity.inbox" size="xs" />
+            <Icon name="entity.inbox" size="sm" />
           )}
           <span>{inboxMode === 'sorted' ? 'Разобранные' : 'Неразобранные'}</span>
           <button
@@ -103,7 +103,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Показать все входящие"
             aria-label="Сбросить фильтр входящих"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}
@@ -122,7 +122,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             title="Показать все записи"
             aria-label="Сбросить фильтр закрепленных"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}
@@ -132,7 +132,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
         <div
           className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-secondary font-mono shrink-0 ${badgeClassName}`}
         >
-          <Icon name="action.hide" size="xs" tone="muted" />
+          <Icon name="action.hide" size="sm" tone="muted" />
           <span>Без готовых</span>
           <button
             type="button"
@@ -140,7 +140,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
             title="Показать выполненные таски"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}
@@ -157,7 +157,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-rose-400 transition-colors cursor-pointer ml-0.5"
             title="Сбросить фильтр тега"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}
@@ -167,7 +167,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
         <div
           className={`flex items-center gap-1.5 px-2 rounded-md bg-tint-8 border border-tint-12 text-fg-soft font-mono shrink-0 ${badgeClassName}`}
         >
-          <Icon name="action.filter" size="xs" />
+          <Icon name="action.filter" size="sm" />
           <span className="truncate max-w-[120px]">
             ИИ: "{aiItemFilter.queryLabel}"
           </span>
@@ -177,7 +177,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
             title="Сбросить фильтр ИИ"
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         </div>
       )}

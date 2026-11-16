@@ -144,7 +144,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="p-0.5 text-blue-400 hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять срок"
             >
-              <Icon name="action.close" size="xs" tone="inherit" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           </div>
         ) : (
@@ -198,7 +198,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="p-0.5 text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять длительность"
             >
-              <Icon name="action.close" size="xs" tone="inherit" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           </div>
         ) : (
@@ -255,7 +255,7 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
               className="p-0.5 text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer"
               title="Снять повторение"
             >
-              <Icon name="action.close" size="xs" tone="inherit" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           </div>
         ) : (

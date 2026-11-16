@@ -34,7 +34,7 @@ const VIEW_OPTIONS: SegmentedOption<MobileTasksViewMode>[] = [
   {
     value: 'calendar',
     label: 'Календарь',
-    icon: <Icon name="time.date" size="xs" tone="inherit" />,
+    icon: <Icon name="time.date" size="sm" tone="inherit" />,
     buttonClassName: 'flex items-center gap-1',
     labelClassName: 'hidden sm:inline',
     title: 'Календарь',
@@ -211,7 +211,7 @@ export const MobileTasksView: React.FC = () => {
 
                     {task.dueDate && (
                       <span className="flex items-center gap-1 text-3xs font-mono text-blue-400">
-                        <Icon name="time.date" size="xs" tone="inherit" />
+                        <Icon name="time.date" size="sm" tone="inherit" />
                         <span>{formatDueDateLabel(task.dueDate)}</span>
                       </span>
                     )}

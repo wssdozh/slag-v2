@@ -294,7 +294,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
                       : 'border border-tint-40 bg-scrim-50 text-transparent'
                   }`}
                 >
-                  {order >= 0 ? order + 1 : <Icon name="action.check" size="none" tone="inherit" className="h-2.5 w-2.5 opacity-0" />}
+                  {order >= 0 ? order + 1 : <Icon name="action.check" size="xs" tone="inherit" className="opacity-0" />}
                 </span>
               </button>
             );
@@ -303,7 +303,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ kind, selected, onToggle, 
 
         {isLoading && items.length === 0 && (
           <span className="col-span-3 flex items-center justify-center gap-2 py-6 text-3xs text-fg-muted">
-            <Icon name="action.refresh" size="xs" tone="inherit" className="motion-safe:animate-spin" /> читаю галерею
+            <Icon name="action.refresh" size="sm" tone="inherit" className="motion-safe:animate-spin" /> читаю галерею
           </span>
         )}
         {!isLoading && items.length === 0 && (

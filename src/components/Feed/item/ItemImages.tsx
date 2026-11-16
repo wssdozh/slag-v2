@@ -135,7 +135,7 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
               >
                 <Icon name="entity.article" size="sm" tone="tertiary" />
                 <span>Текст</span>
-                <Icon name="nav.down" size="xs" className={`transition-transform ${expandedOcrIds.has(hero.id) ? 'rotate-180' : ''}`} />
+                <Icon name="nav.down" size="sm" className={`transition-transform ${expandedOcrIds.has(hero.id) ? 'rotate-180' : ''}`} />
               </button>
             ) : hero.enrichmentStatus === 'processing' ? (
               <div className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-scrim-80 border border-tint-15 text-fg-tertiary text-2xs font-mono flex items-center gap-1.5 shadow-md z-10 animate-pulse">
@@ -153,7 +153,7 @@ const ItemImagesComponent: React.FC<ItemImagesProps> = ({
                 className="absolute bottom-2 right-2 px-2 py-1 rounded-md bg-scrim-80 hover:bg-scrim-90 border border-tint-15 text-fg-tertiary hover:text-white flex items-center gap-1.5 cursor-pointer select-none text-2xs font-mono shadow-md motion-press z-10"
                 title="Распознать текст на изображении"
               >
-                <Icon name="system.ai" size="xs" />
+                <Icon name="system.ai" size="sm" />
                 <span>{hero.enrichmentStatus === 'error' ? 'Повторить' : 'Текст'}</span>
               </button>
             )}

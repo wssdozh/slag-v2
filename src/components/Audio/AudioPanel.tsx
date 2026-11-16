@@ -168,7 +168,7 @@ export const AudioPanel: React.FC = () => {
           {tracks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10 px-4">
               <div className="w-16 h-16 rounded-full bg-tint-4 border border-tint-8 flex items-center justify-center mb-4">
-                <Icon name="entity.folder" size="none" tone="muted" className="w-7 h-7" />
+                <Icon name="entity.folder" size="xl" tone="muted" />
               </div>
               <h3 className="text-sm font-medium text-fg-soft mb-1">В папке нет аудиозаписей</h3>
               <p className="text-xs text-fg-muted mb-4">
@@ -248,7 +248,7 @@ export const AudioPanel: React.FC = () => {
                   : 'Следовать за активной (нажмите, чтобы закрепить)'
               }
             >
-              <Icon name="action.pin" size="sm" tone="inherit" className={`transition-[color,scale] ${scopeMode === 'pinned' ? 'text-fg-soft fill-current scale-105' : 'text-fg-muted group-hover:text-fg-tertiary'}`} />
+              <Icon name="action.pin" size="sm" tone="inherit" variant={scopeMode === 'pinned' ? 'filled' : 'outline'} className={`transition-[color,scale] ${scopeMode === 'pinned' ? 'text-fg-soft scale-105' : 'text-fg-muted group-hover:text-fg-tertiary'}`} />
             </button>
 
             {/* Selecting a folder pins it; the separate pin toggle keeps following active folders. */}

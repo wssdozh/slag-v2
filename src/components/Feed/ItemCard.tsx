@@ -411,7 +411,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         className="flex items-center gap-1 text-2xs text-fg-muted font-mono shrink-0"
         title={`Срок: ${dueLabel}`}
       >
-        <Icon name="time.date" size="xs" tone="dim" />
+        <Icon name="time.date" size="sm" tone="dim" />
         <span>{dueLabel}</span>
       </span>
     );
@@ -441,7 +441,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         className="flex items-center gap-1 text-2xs font-mono text-amber-400/90 shrink-0"
         title="Закрепленная запись"
       >
-        <Icon name="action.pin" size="none" tone="inherit" className="w-2.5 h-2.5 rotate-45 shrink-0" />
+        <Icon name="action.pin" size="xs" tone="inherit" className="rotate-45 shrink-0" />
         <span>Закреп</span>
       </span>
     );
@@ -801,7 +801,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           }}
           className="flex items-center gap-1.5 text-2xs font-mono text-fg-muted hover:text-blue-400 transition-colors pt-1 select-none w-fit"
         >
-          <Icon name="action.reply" size="xs" tone="muted" className="rotate-180" />
+          <Icon name="action.reply" size="sm" tone="muted" className="rotate-180" />
           <span>{repliesCount} {repliesCount === 1 ? 'ответ' : repliesCount < 5 ? 'ответа' : 'ответов'}</span>
         </button>
       )}

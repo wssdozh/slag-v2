@@ -191,7 +191,7 @@ export const AttachmentStrip: React.FC<AttachmentStripProps> = ({
                   className="flex items-center gap-1 px-2.5 py-1 rounded bg-tint-5 hover:bg-tint-10 text-fg-tertiary hover:text-white text-2xs font-mono transition-colors cursor-pointer"
                   title="Вставить ссылку ![[файл]] в позицию курсора markdown для структурирования заметки"
                 >
-                  <Icon name="action.link" size="xs" tone="accent" />
+                  <Icon name="action.link" size="sm" tone="accent" />
                   <span>Вставить в текст</span>
                 </button>
 

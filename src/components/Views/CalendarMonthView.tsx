@@ -131,7 +131,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-tint-8 text-fg-secondary hover:text-white transition-opacity cursor-pointer"
                     title="Добавить таску"
                   >
-                    <Icon name="action.add" size="xs" tone="inherit" />
+                    <Icon name="action.add" size="sm" tone="inherit" />
                   </button>
                 </div>
 
@@ -174,7 +174,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                         </span>
                         {task.recurrence && (
                           <span title="Повторяющаяся таска" className="shrink-0 flex items-center">
-                            <Icon name="time.repeat" size="none" tone="warning" className="w-2.5 h-2.5" />
+                            <Icon name="time.repeat" size="xs" tone="warning" />
                           </span>
                         )}
                         {!slot.isAllDay && (

@@ -176,7 +176,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
 
   const modalSubtitle = isAnalyzing ? (
     <span className="flex items-center gap-1.5 text-fg-secondary">
-      <Icon name="status.loading" size="xs" tone="warning" className="animate-spin shrink-0" />
+      <Icon name="status.loading" size="sm" tone="warning" className="animate-spin shrink-0" />
       <span>
         Пакетный анализ: {progress.processed} из {progress.total}...
       </span>
@@ -215,7 +215,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
     <>
       {isAnalyzing && suggestions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-fg-secondary">
-          <Icon name="status.loading" size="none" tone="primary" className="w-6 h-6 animate-spin" />
+          <Icon name="status.loading" size="xl" tone="primary" className="animate-spin" />
           <p className="text-xs">
             ИИ анализирует первую партию заметок из «Входящих»...
           </p>
@@ -284,7 +284,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                         <span className="text-fg-muted hidden sm:inline">
                           Входящие
                         </span>
-                        <Icon name="nav.forward" size="xs" tone="dim" className="hidden sm:inline" />
+                        <Icon name="nav.forward" size="sm" tone="dim" className="hidden sm:inline" />
                         <Select
                           value={s.targetFolder}
                           onChange={(val) => updateSuggestionFolder(s.itemId, val)}
@@ -315,7 +315,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                             title={`Удалить тег #${t}`}
                             aria-label={`Удалить тег #${t}`}
                           >
-                            <Icon name="action.close" size="none" tone="inherit" className="w-2.5 h-2.5" />
+                            <Icon name="action.close" size="xs" tone="inherit" />
                           </button>
                         </span>
                       ))}
@@ -359,7 +359,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
                           className="inline-flex items-center gap-0.5 text-2xs font-mono text-fg-dim hover:text-fg-tertiary transition-colors cursor-pointer py-0.5 shrink-0"
                           title="Добавить тег к этой заметке"
                         >
-                          <Icon name="action.add" size="none" tone="inherit" className="w-2.5 h-2.5" />
+                          <Icon name="action.add" size="xs" tone="inherit" />
                           <span>тег</span>
                         </button>
                       )}

@@ -145,7 +145,7 @@ export const AdminPanel: React.FC = () => {
   if (isDesktopShell) {
     return (
       <div className="min-h-screen bg-canvas-subtle text-fg-primary flex flex-col items-center justify-center p-6 text-center">
-        <Icon name="system.security" size="none" tone="warning" className="w-10 h-10 mb-4" />
+        <Icon name="system.security" size="xl" tone="warning" className="mb-4" />
         <p className="text-sm font-medium text-fg-soft">доступно только в веб-версии</p>
         <p className="text-xs text-fg-muted mt-1 mb-6">админ-панель релея работает только на сайте</p>
         <button

@@ -35,7 +35,7 @@ export const AssistantBanner: React.FC<AssistantBannerProps> = ({
           className="flex items-center gap-1 text-2xs text-fg-muted hover:text-rose-400 transition-colors px-1.5 py-0.5 rounded hover:bg-tint-4 shrink-0"
           title="Очистить диалог"
         >
-          <Icon name="action.delete" size="xs" tone="inherit" />
+          <Icon name="action.delete" size="sm" tone="inherit" />
           <span className={isSidebar ? 'hidden sm:inline' : ''}>Очистить</span>
         </button>
       )}

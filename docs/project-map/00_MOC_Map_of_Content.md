@@ -118,7 +118,7 @@ mindmap
             Enter to Send / Shift+Enter
             Smart Type Inference
             Voice & Square Video 1:1
-            Maximize2 to Focus Editor
+            action.expand to Focus Editor
             Wikilink Autocomplete
         Right Folder Info Panel
           Editable AI Description

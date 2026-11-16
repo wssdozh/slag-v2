@@ -177,7 +177,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
 
         {/* Flat Minimal Search Input */}
         <div className="flex-1 max-w-xs min-w-[140px] relative">
-          <Icon name="action.search" size="xs" tone="dim" className="absolute left-2 top-1/2 -translate-y-1/2" />
+          <Icon name="action.search" size="sm" tone="dim" className="absolute left-2 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
@@ -190,7 +190,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
               onClick={() => setSearchQuery('')}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-dim hover:text-fg-secondary"
             >
-              <Icon name="action.close" size="xs" tone="inherit" />
+              <Icon name="action.close" size="sm" tone="inherit" />
             </button>
           )}
         </div>
@@ -204,7 +204,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
               autoScroll ? 'text-fg-primary bg-surface-active' : 'text-fg-muted hover:text-fg-primary'
             }`}
           >
-            <Icon name="action.moveDown" size="xs" tone="inherit" className={`${autoScroll ? 'text-fg-primary' : 'text-fg-dim'}`} />
+            <Icon name="action.moveDown" size="sm" tone="inherit" className={`${autoScroll ? 'text-fg-primary' : 'text-fg-dim'}`} />
             <span className="text-2xs">Авто</span>
           </button>
 
@@ -213,7 +213,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             title="Копировать отчёт для баг-репорта (Markdown)"
             className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            <Icon name="action.copy" size="xs" tone="inherit" />
+            <Icon name="action.copy" size="md" tone="inherit" />
             <span className="text-2xs hidden sm:inline">Отчёт</span>
           </button>
 
@@ -223,7 +223,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             data-testid="log-download-plain"
             className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            <Icon name="entity.article" size="xs" tone="inherit" />
+            <Icon name="entity.article" size="md" tone="inherit" />
             <span className="text-2xs hidden sm:inline">.log</span>
           </button>
 
@@ -233,7 +233,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             data-testid="log-download-json"
             className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            <Icon name="action.download" size="xs" tone="inherit" />
+            <Icon name="action.download" size="md" tone="inherit" />
             <span className="text-2xs hidden sm:inline">JSON</span>
           </button>
 
@@ -243,7 +243,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             data-testid="log-open-folder"
             className="flex items-center gap-1 px-1.5 py-1 text-fg-secondary hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            <Icon name="entity.folderOpen" size="xs" tone="inherit" />
+            <Icon name="entity.folderOpen" size="md" tone="inherit" />
             <span className="text-2xs hidden sm:inline">Папка</span>
           </button>
 
@@ -252,7 +252,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             title="Очистить буфер"
             className="p-1 text-fg-muted hover:text-fg-primary hover:bg-surface-hover rounded transition-colors"
           >
-            <Icon name="action.delete" size="xs" tone="inherit" />
+            <Icon name="action.delete" size="sm" tone="inherit" />
           </button>
 
           {onClose && (
@@ -330,7 +330,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
       >
         {filteredEntries.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-44 text-fg-dim text-xs">
-            <Icon name="system.logs" size="none" tone="dim" className="w-6 h-6 stroke-1 mb-1.5" />
+            <Icon name="system.logs" size="xl" tone="dim" className="stroke-1 mb-1.5" />
             <p>Логов нет или фильтр пуст</p>
           </div>
         ) : (
@@ -390,11 +390,11 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
                       title="Копировать строку"
                       className="text-fg-muted hover:text-fg-primary p-0.5"
                     >
-                      <Icon name="action.copy" size="xs" tone="inherit" />
+                      <Icon name="action.copy" size="sm" tone="inherit" />
                     </button>
                     {hasData && (
                       <span className="text-fg-muted p-0.5">
-                        <Icon name="nav.next" size="xs" tone="inherit" className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-fg-primary' : ''}`} />
+                        <Icon name="nav.next" size="sm" tone="inherit" className={`transition-transform duration-200 ${isExpanded ? 'rotate-90 text-fg-primary' : ''}`} />
                       </span>
                     )}
                   </div>

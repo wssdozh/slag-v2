@@ -112,7 +112,7 @@ const AttachmentEmbedView: React.FC<AttachmentEmbedViewProps> = ({
 
   const chip = (
     <>
-      <Icon name="action.attach" size="xs" tone="muted" className="shrink-0" />
+      <Icon name="action.attach" size="sm" tone="muted" className="shrink-0" />
       <span className="truncate max-w-[16rem]">{label}</span>
       {size && <span className="shrink-0 text-fg-muted normal-case">{size}</span>}
     </>

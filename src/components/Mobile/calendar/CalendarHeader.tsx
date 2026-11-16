@@ -21,13 +21,13 @@ const MODE_OPTIONS: SegmentedOption<MobileCalendarMode>[] = [
   {
     value: 'agenda',
     label: 'Список',
-    icon: <Icon name="entity.taskList" size="xs" tone="inherit" />,
+    icon: <Icon name="entity.taskList" size="sm" tone="inherit" />,
     title: 'Режим списка (Повестка)',
   },
   {
     value: '3day',
     label: '3 дня',
-    icon: <Icon name="time.threeDay" size="xs" tone="inherit" />,
+    icon: <Icon name="time.threeDay" size="sm" tone="inherit" />,
     title: 'Режим 3 дня (24 часа)',
   },
 ];

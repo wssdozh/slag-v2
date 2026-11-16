@@ -15,7 +15,7 @@ const FeedDropOverlayComponent: React.FC<FeedDropOverlayProps> = ({ isVisible })
 
   return (
     <div className="absolute inset-2 z-30 rounded-2xl bg-canvas border-2 border-dashed border-blue-500/40 flex flex-col items-center justify-center gap-2 pointer-events-none select-none motion-fade">
-      <Icon name="action.upload" size="none" tone="accent" className="w-8 h-8 animate-bounce" />
+      <Icon name="action.upload" size="xl" tone="accent" className="animate-bounce" />
       <span className="text-sm font-medium text-fg-soft">
         Перетащите файлы сюда для создания заметки
       </span>

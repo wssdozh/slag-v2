@@ -42,6 +42,7 @@ export const SendButton: React.FC<SendButtonProps> = ({
         : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
     } ${className}`}
   >
-    <Icon name="action.send" size={size === 'sm' ? 'md' : 'lg'} strokeWidth={2.5} />
+    {/* weight is decided by Icon, not by the call site */}
+    <Icon name="action.send" size={size === 'sm' ? 'md' : 'lg'} />
   </button>
 );

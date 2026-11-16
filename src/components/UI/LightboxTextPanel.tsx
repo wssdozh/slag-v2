@@ -122,7 +122,7 @@ export const LightboxTextPanel: React.FC<LightboxTextPanelProps> = ({ image, isO
                   onClick={() => onRetryEnrich(image)}
                   className="motion-press mt-1 flex cursor-pointer items-center gap-1.5 self-start rounded bg-rose-500/15 px-2.5 py-1 text-xs font-medium text-rose-200 hover:bg-rose-500/25"
                 >
-                  <Icon name="action.retry" size="xs" tone="inherit" /> Повторить OCR
+                  <Icon name="action.retry" size="sm" tone="inherit" /> Повторить OCR
                 </button>
               )}
             </div>
@@ -130,7 +130,7 @@ export const LightboxTextPanel: React.FC<LightboxTextPanelProps> = ({ image, isO
 
           {!hasText && image.enrichmentStatus !== 'processing' && image.enrichmentStatus !== 'error' && (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-center text-fg-muted">
-              <Icon name="entity.article" size="none" tone="inherit" className="h-7 w-7 opacity-30" />
+              <Icon name="entity.article" size="xl" tone="inherit" className="opacity-30" />
               <div className="text-xs">На изображении нет текста</div>
               {onRetryEnrich && (
                 <button

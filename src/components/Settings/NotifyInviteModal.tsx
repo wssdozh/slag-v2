@@ -134,7 +134,7 @@ export const NotifyInviteModal: React.FC<NotifyInviteModalProps> = ({ invite, va
                 onClick={() => void openExternalUrl(invite.link as string)}
                 className="px-2.5 py-1.5 rounded-md text-2xs text-fg-primary bg-tint-6 hover:bg-surface-hover disabled:opacity-40 cursor-pointer flex items-center gap-1.5"
               >
-                <Icon name="nav.externalLink" size="xs" tone="inherit" />
+                <Icon name="nav.externalLink" size="sm" tone="inherit" />
                 открыть telegram
               </button>
             )}

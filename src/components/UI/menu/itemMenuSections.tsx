@@ -125,7 +125,7 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
       </div>
       <div className="flex items-center gap-1">
         <span className="text-3xs text-fg-muted font-mono">{TYPE_LABELS[item.type]}</span>
-        <Icon name="nav.next" size="xs" tone="muted" />
+        <Icon name="nav.next" size="sm" tone="muted" />
       </div>
     </button>
 
@@ -142,7 +142,7 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
         <Icon name="entity.folderOpen" size="sm" />
         <span>Проводник</span>
       </div>
-      <Icon name="nav.next" size="xs" tone="muted" />
+      <Icon name="nav.next" size="sm" tone="muted" />
     </button>
 
     {/* Clipboard */}
@@ -171,7 +171,7 @@ export const ItemMenuSections: React.FC<ItemMenuSectionsProps> = ({
         <Icon name="action.more" size="sm" />
         <span>Дополнительно</span>
       </div>
-      <Icon name="nav.next" size="xs" tone="muted" />
+      <Icon name="nav.next" size="sm" tone="muted" />
     </button>
 
     <div className="my-0.5 border-t border-tint-6" />

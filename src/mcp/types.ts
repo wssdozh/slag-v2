@@ -78,5 +78,5 @@ export const ToggleTaskSchema = {
 export const CreateFolderSchema = {
   path: z.string().describe('Относительный путь новой папки (например, "Проекты/Мобилка").'),
   description: z.string().optional().describe('Описание назначения папки (используется ИИ для правильной классификации).'),
-  icon: z.string().optional().describe('Иконка Lucide (например, "Folder", "Briefcase", "Code").'),
+  icon: z.string().optional().describe('Ключ реестра иконок (например, "folder.generic", "folder.briefcase", "folder.code").'),
 };

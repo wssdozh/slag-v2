@@ -272,7 +272,7 @@ export const VaultModal: React.FC = () => {
             className="w-full bg-scrim-40 border border-tint-8 rounded-lg px-3 py-2 text-xs text-white placeholder-fg-muted focus:border-tint-20 focus:outline-none transition-colors"
           />
           <p className="text-2xs text-fg-muted flex items-center gap-1.5 mt-0.5 select-none">
-            <Icon name="system.ai" size="xs" tone="inherit" className="text-amber-400/80 shrink-0" />
+            <Icon name="system.ai" size="sm" tone="inherit" className="text-amber-400/80 shrink-0" />
             <span>В новом хранилище будут созданы только системные папки</span>
           </p>
         </div>

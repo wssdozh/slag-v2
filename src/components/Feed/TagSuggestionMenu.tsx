@@ -36,7 +36,7 @@ export const TagSuggestionMenu: React.FC<TagSuggestionMenuProps> = ({
       isModal={isModal}
       isEmpty={tags.length === 0}
       emptyContent={<><Icon name="entity.tagHash" size="sm" tone="muted" className="shrink-0" /><span>Тег «{query}» не найден в хранилище</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="entity.tagHash" size="xs" />} title="Теги хранилища (#)" />}
+      header={<SuggestionMenuHeader icon={<Icon name="entity.tagHash" size="sm" />} title="Теги хранилища (#)" />}
     >
         {tags.map((item, idx) => {
           const isSelected = idx === selectedIndex;

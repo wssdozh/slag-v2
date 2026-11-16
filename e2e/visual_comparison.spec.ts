@@ -30,7 +30,7 @@ test.describe('Visual Comparison Suite', () => {
       await settingsBtn.click();
       await page.waitForTimeout(200);
       await page.screenshot({ path: 'test-results/screenshots/after_modal_settings.png' });
-      // Escape closes the top layer by contract; a blind `.lucide-x` first match can land on a
+      // Escape closes the top layer by contract; a blind `[data-icon="action.close"]` first match can land on a
       // different surface now that overlays mount on first open and stay mounted after.
       await page.keyboard.press('Escape');
       await page.waitForTimeout(200);

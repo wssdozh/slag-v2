@@ -213,9 +213,9 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                       {isMissing ? (
                         <Icon name="entity.fileMissing" size="sm" tone="inherit" />
                       ) : isCurrent && isPlaying ? (
-                        <Icon name="media.pause" size="sm" tone="inherit" className="fill-current" />
+                        <Icon name="media.pause" size="sm" tone="inherit" variant="filled" />
                       ) : (
-                        <Icon name="media.play" size="sm" tone="inherit" className="fill-current" />
+                        <Icon name="media.play" size="sm" tone="inherit" variant="filled" />
                       )}
                     </span>
                   </div>
@@ -251,7 +251,7 @@ export const AudioPlaylistDrawer: React.FC<AudioPlaylistDrawerProps> = ({
                       title="Перейти к заметке"
                       aria-label="Перейти к заметке"
                     >
-                      <Icon name="nav.externalLink" size="xs" tone="inherit" />
+                      <Icon name="nav.externalLink" size="sm" tone="inherit" />
                     </button>
                   )}
                 </div>

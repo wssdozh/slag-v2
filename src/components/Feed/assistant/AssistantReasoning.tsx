@@ -20,7 +20,7 @@ export const AssistantReasoning: React.FC<AssistantReasoningProps> = ({
         onClick={onToggle}
         className="flex items-center gap-1 text-2xs font-mono text-fg-secondary hover:text-fg-soft transition-colors cursor-pointer w-fit"
       >
-        <Icon name="nav.next" size="xs" tone="warning" className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+        <Icon name="nav.next" size="sm" tone="warning" className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
         <span>Рассуждения {reasoningTimeMs ? `(${(reasoningTimeMs / 1000).toFixed(1)}s)` : ''}</span>
       </button>
 

@@ -338,7 +338,7 @@ export const Select: React.FC<SelectProps> = ({
           )}
         </span>
         {showArrow && (
-          <Icon name="nav.down" size="none" tone="muted" className={`shrink-0 transition-transform duration-150 ${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${isOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
+          <Icon name="nav.down" size="md" tone="muted" className={`shrink-0 transition-transform duration-150 ${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} ${isOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
         )}
       </button>
 

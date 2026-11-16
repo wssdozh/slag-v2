@@ -37,7 +37,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
       isModal={isModal}
       isEmpty={folders.length === 0}
       emptyContent={<><Icon name="entity.folder" size="sm" tone="muted" className="shrink-0" /><span>Папка «{query}» не найдена</span></>}
-      header={<SuggestionMenuHeader icon={<Icon name="entity.folder" size="xs" />} title="Целевая папка" />}
+      header={<SuggestionMenuHeader icon={<Icon name="entity.folder" size="sm" />} title="Целевая папка" />}
     >
         {folders.map((f, idx) => {
           const isSelected = idx === selectedIndex;
@@ -65,7 +65,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <Icon
                   name={iconName}
-                  size="none"
+                  size="md"
                   tone="inherit"
                   className={`w-4 h-4 shrink-0 transition-colors ${
                     isSelected ? 'text-fg-primary' : 'text-fg-secondary'

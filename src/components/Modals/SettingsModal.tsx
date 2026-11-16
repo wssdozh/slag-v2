@@ -68,7 +68,7 @@ export const SettingsModal: React.FC = () => {
                 : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
             }`}
           >
-            <Icon name={tab.icon} size="none" tone="inherit" className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
+            <Icon name={tab.icon} size="md" tone="inherit" className="text-fg-muted shrink-0" />
             <span>{tab.label}</span>
           </button>
         );

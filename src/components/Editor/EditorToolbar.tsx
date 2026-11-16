@@ -162,7 +162,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
             title="Сохранить изменения (Ctrl+S / ⌘S)"
             aria-label={item.id.startsWith('draft_') ? 'Создать' : 'Готово'}
           >
-            <Icon name="action.send" size="md" tone="inherit" strokeWidth={2.5} />
+            {/* weight is decided by Icon, not by the call site */}
+            <Icon name="action.send" size="md" tone="inherit" />
           </button>
         </div>
       </div>

@@ -15,7 +15,7 @@ export const AssistantToolCalls: React.FC<AssistantToolCallsProps> = ({ toolCall
           key={idx}
           className="flex items-center gap-1.5 text-2xs font-mono text-fg-muted min-w-0"
         >
-          <Icon name="system.logs" size="none" tone="dim" className="w-2.5 h-2.5 shrink-0" />
+          <Icon name="system.logs" size="sm" tone="dim" className="shrink-0" />
           <span className="text-fg-secondary shrink-0">{tc.name}</span>
           {tc.args?.query && (
             <span className="text-fg-muted truncate max-w-[200px] min-w-0">("{tc.args.query}")</span>

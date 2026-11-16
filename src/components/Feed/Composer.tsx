@@ -503,7 +503,7 @@ export const Composer: React.FC<ComposerProps> = ({
         isModal={isModal}
         isEmpty={(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).length === 0}
         emptyContent={<span>Заметка не найдена</span>}
-        header={<SuggestionMenuHeader icon={<Icon name="entity.article" size="xs" />} title="Связать заметку [[...]]" />}
+        header={<SuggestionMenuHeader icon={<Icon name="entity.article" size="sm" />} title="Связать заметку [[...]]" />}
       >
         {(wikiQuery !== null ? matchingWikiItems : lastMatchingWikiItems).map((wikiItem, idx) => {
           const isSelected = idx === wikiSelectedIndex;

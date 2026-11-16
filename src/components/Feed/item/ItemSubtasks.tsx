@@ -37,7 +37,7 @@ const ItemSubtasksComponent: React.FC<ItemSubtasksProps> = ({
         <span>
           Подзадачи: {completedCount} из {totalCount}
         </span>
-        <Icon name="nav.down" size="xs" tone="muted" className={`transition-transform duration-200 ease-out ${isExpanded ? 'rotate-180' : ''}`} />
+        <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-200 ease-out ${isExpanded ? 'rotate-180' : ''}`} />
       </button>
 
       <div

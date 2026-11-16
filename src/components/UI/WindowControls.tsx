@@ -32,7 +32,7 @@ export const WindowControls: React.FC = () => {
         title="Развернуть"
         className="w-8 h-[26px] rounded flex items-center justify-center text-fg-secondary hover:text-white hover:bg-tint-8 transition-colors cursor-pointer"
       >
-        <Icon name="system.windowMaximize" size="xs" tone="inherit" />
+        <Icon name="system.windowMaximize" size="md" tone="inherit" />
       </button>
       <button
         type="button"
