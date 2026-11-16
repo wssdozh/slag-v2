@@ -1636,4 +1636,95 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await expect(editor.getByTestId('editor-tag-edit')).toHaveCount(0);
     await expect(ribbon).toHaveText('#интерфейс');
   });
+
+  test('49. Fullscreen editor: the caret line keeps raw list markdown, neighbours stay rendered', async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1200);
+
+    // Seed instead of typing: Enter continues the list and reorders the lines we assert on.
+    await page.evaluate(() => {
+      const item = {
+        id: 'test_raw_markers_' + Date.now(),
+        type: 'article',
+        title: 'Сырые маркеры',
+        content: '- [ ] fsafdadfsasf\n- пункт списка\n- [x] готово',
+        folder: 'Входящие',
+        tags: [],
+        attachments: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      let seeded = false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('slag_items_')) {
+          const items = JSON.parse(localStorage.getItem(key) || '[]');
+          items.unshift(item);
+          localStorage.setItem(key, JSON.stringify(items));
+          seeded = true;
+        }
+      }
+      if (!seeded) {
+        localStorage.setItem('slag_items_default_vault', JSON.stringify([item]));
+      }
+    });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 30000 });
+
+    // The card's own action button opens the note in the fullscreen editor.
+    const card = page.locator('.group').filter({ hasText: 'fsafdadfsasf' }).first();
+    await expect(card).toBeVisible();
+    await card.locator('button[aria-label="Открыть в фокус-редакторе"]').first().click();
+
+    const editor = page.locator('[data-testid="fullscreen-editor-modal"]');
+    await expect(editor).toBeVisible();
+    await expect(editor.locator('.cm-content')).toBeVisible();
+
+    const rawTaskLine = editor.locator('.cm-line').filter({ hasText: 'fsafdadfsasf' }).first();
+    const bulletLine = editor.locator('.cm-line').filter({ hasText: 'пункт списка' }).first();
+    const doneTaskLine = editor.locator('.cm-line').filter({ hasText: 'готово' }).first();
+
+    // Somewhere in the note there is a rendered task widget — the list preview is on.
+    expect(await editor.locator('.cm-atomic-task-checkbox').count()).toBeGreaterThan(0);
+
+    // Caret onto the task line, past the text so the click never lands on the checkbox.
+    await rawTaskLine.click({ position: { x: 400, y: 10 } });
+    // Decorations stay frozen for 100ms after pointerup; give the rebuild a beat.
+    await page.waitForTimeout(300);
+
+    // Caret line: literal `- [ ]`, no widget.
+    await expect(rawTaskLine).toContainText('- [ ] fsafdadfsasf');
+    await expect(rawTaskLine.locator('.cm-atomic-task-checkbox')).toHaveCount(0);
+    await expect(rawTaskLine.locator('.cm-atomic-bullet')).toHaveCount(0);
+
+    // Neighbours keep the rendered treatment: bullet widget, checked checkbox, no raw markers.
+    await expect(bulletLine.locator('.cm-atomic-bullet')).toHaveCount(1);
+    await expect(bulletLine).not.toContainText('- пункт');
+    await expect(doneTaskLine.locator('.cm-atomic-task-checkbox')).toHaveCount(1);
+    await expect(doneTaskLine).not.toContainText('[x]');
+
+    await page.screenshot({ path: 'test-results/screenshots/editor-active-line-raw-markers.png' });
+
+    // Moving the caret flips the roles: raw on the bullet line, widget on the task line behind.
+    await bulletLine.click({ position: { x: 400, y: 10 } });
+    await page.waitForTimeout(300);
+    await expect(bulletLine).toContainText('- пункт списка');
+    await expect(bulletLine.locator('.cm-atomic-bullet')).toHaveCount(0);
+    await expect(rawTaskLine.locator('.cm-atomic-task-checkbox')).toHaveCount(1);
+    await expect(rawTaskLine).not.toContainText('[ ]');
+
+    // Typing and deleting on the caret line must not break the decoration pass.
+    await page.keyboard.press('End');
+    await page.keyboard.type(' и хвост');
+    await expect(bulletLine).toContainText('пункт списка и хвост');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await expect(bulletLine).toContainText('пункт списка и хво');
+    await expect(editor.locator('.cm-content')).toBeVisible();
+    expect(pageErrors).toEqual([]);
+  });
 });
