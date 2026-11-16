@@ -3,15 +3,43 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { SlagItem, FolderMeta } from '../types';
+import type { SlagAttachment, SlagItem, FolderMeta } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
+import { resolveAttachmentByName } from '../lib/text/attachmentEmbed';
+import { applyNotePatch } from './notePatch';
+import { buildNoteCard, formatBytes } from './noteCard';
+import type { AttachmentCard, NoteCard, NoteRelation } from './noteCard';
+import {
+  INLINE_ATTACHMENT_LIMIT_BYTES,
+  TEXT_ATTACHMENT_LIMIT_BYTES,
+  attachmentFileUrl,
+  attachmentResourceUri,
+  isImageAttachment,
+  isTextAttachment,
+  resolveAttachmentPath,
+} from './attachments';
 
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 export { getSafeNoteFilename } from '../lib/vault/noteFilename';
+
+/** What came out of one attachment: text, raw bytes, or a reason there is nothing to give. */
+export type AttachmentPayload =
+  | { kind: 'text'; text: string; origin: 'file' | 'transcript' }
+  | { kind: 'image'; mimeType: string; base64: string }
+  | { kind: 'binary'; mimeType: string; base64: string }
+  | { kind: 'no-bytes' }
+  | { kind: 'no-transcript' }
+  | { kind: 'too-large'; size: number; limit: number };
+
+export interface AttachmentRead {
+  note: { id: string; title: string; path: string };
+  attachment: AttachmentCard;
+  payload: AttachmentPayload;
+}
 
 export function resolveVaultConfig(customPath?: string): McpVaultConfig {
   let targetPath = customPath || process.env.SLAG_VAULT_PATH;
@@ -224,7 +252,13 @@ export class McpVault {
     return null;
   }
 
-  public async getNote(idOrTitle: string): Promise<{ item: SlagItem; rawMarkdown: string; path: string }> {
+  public async getNote(idOrTitle: string): Promise<{
+    item: SlagItem;
+    rawMarkdown: string;
+    path: string;
+    absolutePath: string;
+    folderAbsolutePath: string;
+  }> {
     const match = await this.findNote(idOrTitle);
     if (!match) {
       throw new Error(`Заметка «${idOrTitle}» не найдена в хранилище.`);
@@ -233,8 +267,175 @@ export class McpVault {
     return {
       item: match.item,
       rawMarkdown,
-      path: match.relativePath,
+      path: match.relativePath.replace(/\\/g, '/'),
+      absolutePath: match.absolutePath,
+      folderAbsolutePath: path.dirname(match.absolutePath),
     };
+  }
+
+  /**
+   * Everything about one note in a single answer. The tool and the `slag://notes/{id}` resource
+   * share it, so a client never has to chain a metadata call with a markdown call.
+   */
+  public async getNoteCard(idOrTitle: string): Promise<NoteCard> {
+    const note = await this.getNote(idOrTitle);
+    const all = await this.scanAllNotes();
+    const attachments = await Promise.all(
+      note.item.attachments.map((attachment) => this.describeAttachment(note.item.id, attachment)),
+    );
+
+    const byId = new Map(all.map((match) => [match.item.id, match]));
+    const relationOf = (id: string): NoteRelation => {
+      const match = byId.get(id);
+      return match
+        ? { id, title: match.item.title, type: match.item.type, path: match.relativePath.replace(/\\/g, '/') }
+        : { id };
+    };
+
+    const linked = (note.item.linkedItemIds ?? []).map(relationOf);
+    const backlinks = all
+      .filter((match) => match.item.id !== note.item.id && (
+        match.item.replyToId === note.item.id ||
+        (match.item.linkedItemIds ?? []).includes(note.item.id)
+      ))
+      .map((match) => ({
+        id: match.item.id,
+        title: match.item.title,
+        type: match.item.type,
+        path: match.relativePath.replace(/\\/g, '/'),
+      }));
+
+    return buildNoteCard({
+      item: note.item,
+      rawMarkdown: note.rawMarkdown,
+      relativePath: note.path,
+      absolutePath: note.absolutePath,
+      folderAbsolutePath: note.folderAbsolutePath,
+      attachments,
+      replyTo: note.item.replyToId ? relationOf(note.item.replyToId) : undefined,
+      linked,
+      backlinks,
+    });
+  }
+
+  /** One entry of the card's attachment list: where the bytes are and how a client can reach them. */
+  private async describeAttachment(noteId: string, attachment: SlagAttachment): Promise<AttachmentCard> {
+    const absolutePath = await resolveAttachmentPath(this.config, attachment);
+    return {
+      name: attachment.name,
+      type: attachment.type,
+      mimeType: attachment.mimeType || 'application/octet-stream',
+      size: attachment.size,
+      sizeHuman: formatBytes(attachment.size),
+      isImage: isImageAttachment(attachment),
+      relativePath: attachment.relativePath,
+      absolutePath,
+      url: absolutePath ? attachmentFileUrl(absolutePath) : attachmentResourceUri(noteId, attachment.name),
+      resourceUri: attachmentResourceUri(noteId, attachment.name),
+      hasBytes: Boolean(absolutePath),
+      hasTranscript: Boolean(attachment.extractedText?.trim()),
+      duration: attachment.duration,
+    };
+  }
+
+  /**
+   * The bytes of one attachment, or a typed reason there are none. Size is checked before the
+   * read, so a huge video never turns into a base64 string just to be refused afterwards.
+   */
+  public async readAttachment(noteIdOrTitle: string, filename: string): Promise<AttachmentRead> {
+    const note = await this.getNote(noteIdOrTitle);
+    const attachment = this.findAttachment(note.item, filename);
+    if (!attachment) {
+      const known = note.item.attachments.map((item) => `«${item.name}»`).join(', ');
+      throw new Error(
+        known
+          ? `У заметки «${note.item.title}» нет вложения «${filename}». Есть: ${known}.`
+          : `У заметки «${note.item.title}» нет вложений.`,
+      );
+    }
+
+    const card = await this.describeAttachment(note.item.id, attachment);
+    const noteRef = { id: note.item.id, title: note.item.title, path: note.path };
+
+    if (!card.absolutePath) {
+      return { note: noteRef, attachment: card, payload: { kind: 'no-bytes' } };
+    }
+
+    const stat = await fs.stat(card.absolutePath).catch(() => null);
+    if (!stat) {
+      return { note: noteRef, attachment: card, payload: { kind: 'no-bytes' } };
+    }
+    if (isImageAttachment(attachment)) {
+      if (stat.size > INLINE_ATTACHMENT_LIMIT_BYTES) {
+        return {
+          note: noteRef,
+          attachment: card,
+          payload: { kind: 'too-large', size: stat.size, limit: INLINE_ATTACHMENT_LIMIT_BYTES },
+        };
+      }
+      const bytes = await fs.readFile(card.absolutePath);
+      return {
+        note: noteRef,
+        attachment: card,
+        payload: { kind: 'image', mimeType: card.mimeType, base64: bytes.toString('base64') },
+      };
+    }
+    if (isTextAttachment(attachment)) {
+      if (stat.size > TEXT_ATTACHMENT_LIMIT_BYTES) {
+        return {
+          note: noteRef,
+          attachment: card,
+          payload: { kind: 'too-large', size: stat.size, limit: TEXT_ATTACHMENT_LIMIT_BYTES },
+        };
+      }
+      const text = await fs.readFile(card.absolutePath, 'utf-8');
+      return { note: noteRef, attachment: card, payload: { kind: 'text', text, origin: 'file' } };
+    }
+    if (attachment.extractedText?.trim()) {
+      // An audio note or a scanned pdf: the useful part is the text somebody already extracted.
+      return {
+        note: noteRef,
+        attachment: card,
+        payload: { kind: 'text', text: attachment.extractedText, origin: 'transcript' },
+      };
+    }
+    if (attachment.type === 'audio') {
+      return { note: noteRef, attachment: card, payload: { kind: 'no-transcript' } };
+    }
+    if (stat.size > INLINE_ATTACHMENT_LIMIT_BYTES) {
+      return {
+        note: noteRef,
+        attachment: card,
+        payload: { kind: 'too-large', size: stat.size, limit: INLINE_ATTACHMENT_LIMIT_BYTES },
+      };
+    }
+    const bytes = await fs.readFile(card.absolutePath);
+    return {
+      note: noteRef,
+      attachment: card,
+      payload: { kind: 'binary', mimeType: card.mimeType, base64: bytes.toString('base64') },
+    };
+  }
+
+  /** By file name, then by relative path's last segment: the note and the disk spell it differently. */
+  private findAttachment(item: SlagItem, filename: string): SlagAttachment | undefined {
+    const wanted = filename.trim().replace(/\\/g, '/');
+    if (!wanted) return undefined;
+    const folded = wanted.toLowerCase();
+    const basename = (wanted.split('/').pop() || wanted).toLowerCase();
+
+    const byExact = item.attachments.find(
+      (attachment) => attachment.name === wanted || attachment.relativePath.replace(/\\/g, '/') === wanted,
+    );
+    if (byExact) return byExact;
+
+    const byFolded = item.attachments.find((attachment) => (
+      attachment.name.toLowerCase() === folded ||
+      (attachment.relativePath.replace(/\\/g, '/').split('/').pop() || '').toLowerCase() === folded
+    ));
+    if (byFolded) return byFolded;
+
+    return resolveAttachmentByName(item.attachments, basename);
   }
 
   public async saveNote(params: {
@@ -251,7 +452,6 @@ export class McpVault {
     reminder?: string;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
-    const targetFolder = safeVaultRelativePath(params.folder || DEFAULT_INBOX_FOLDER);
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {
@@ -259,7 +459,8 @@ export class McpVault {
     }
 
     if (existingMatch) {
-      // UPDATE EXISTING NOTE
+      // UPDATE EXISTING NOTE: a patch, not a rebuild. Only the fields the caller sent change,
+      // everything else (type, folder, status, priority, due date, tags) stays as it was.
       const existing = existingMatch.item;
       let finalContent = existing.content;
 
@@ -275,27 +476,20 @@ export class McpVault {
       }
 
       const parsedSubtasks = parseSubtasksFromContent(finalContent);
+      // Moving a note is an explicit act: without `folder` the note stays where it is.
+      const folder = params.folder ? safeVaultRelativePath(params.folder) : safeVaultRelativePath(existing.folder);
 
-      const updatedTitle = params.title?.trim() || existing.title;
-      const updatedItem: SlagItem = {
-        ...existing,
-        title: updatedTitle,
-        content: finalContent,
-        type: params.type || existing.type,
-        folder: targetFolder,
-        tags: params.tags !== undefined ? params.tags : existing.tags,
-        status: params.status !== undefined ? params.status : existing.status,
-        priority: params.priority !== undefined ? params.priority : existing.priority,
-        dueDate: params.dueDate !== undefined ? params.dueDate : existing.dueDate,
-        reminder: params.reminder !== undefined ? params.reminder : existing.reminder,
-        subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : existing.subtasks,
-        updatedAt: Date.now(),
-      };
+      const updatedItem = applyNotePatch(
+        existing,
+        params,
+        { content: finalContent, subtasks: parsedSubtasks, folder },
+        Date.now(),
+      );
 
-      const targetDir = path.join(this.config.notesDir, targetFolder);
+      const targetDir = path.join(this.config.notesDir, folder);
       await fs.mkdir(targetDir, { recursive: true });
 
-      const newFilename = getSafeNoteFilename(updatedTitle, updatedItem.id);
+      const newFilename = getSafeNoteFilename(updatedItem.title, updatedItem.id);
       const newAbsPath = path.join(targetDir, newFilename);
 
       // If location or filename changed, remove old file
@@ -314,7 +508,8 @@ export class McpVault {
       };
     }
 
-    // CREATE NEW NOTE
+    // CREATE NEW NOTE: here the defaults are honest, because there is nothing to keep.
+    const targetFolder = safeVaultRelativePath(params.folder || DEFAULT_INBOX_FOLDER);
     const newTitle = (params.title || 'Новая запись').trim();
     const newId = `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     let initialContent = params.content || '';
