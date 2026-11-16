@@ -153,9 +153,10 @@ export const BaseModal: React.FC<BaseModalProps> = ({
           {children}
         </div>
 
-        {/* Optional Footer */}
+        {/* Optional Footer — same surface as the body: only a hairline separates the actions,
+            not a second panel strip that reads as a header. */}
         {footer && (
-          <div className="px-4 md:px-5 py-3 border-t border-tint-6 bg-panel shrink-0 rounded-b-[15px]">
+          <div className="px-4 md:px-5 py-3 border-t border-tint-8 shrink-0 rounded-b-[15px]">
             {footer}
           </div>
         )}

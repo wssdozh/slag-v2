@@ -202,17 +202,6 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
     </div>
   );
 
-  const footer = (
-    <div className="flex items-center justify-between text-2xs text-fg-muted font-mono">
-      <div className="flex items-center gap-3">
-        <span>↑↓ Навигация</span>
-        <span>↵ Выбрать</span>
-        <span>esc Закрыть</span>
-      </div>
-      <span>Orama Hybrid Engine</span>
-    </div>
-  );
-
   const searchBody = (
     <>
       {/* Filter Pills */}
@@ -398,7 +387,6 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
       isOpen={isSearchOpen}
       onClose={() => setIsSearchOpen(false)}
       customHeader={customHeader}
-      footer={footer}
       className="items-start md:pt-20"
       maxWidth="md:max-w-xl"
       maxHeight="h-full md:h-auto md:max-h-[70vh]"
