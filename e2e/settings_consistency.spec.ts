@@ -26,7 +26,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
       if (tab === 'ui') await expect(scope.getByText('Заголовок заметки или ключевая задача')).toHaveCount(viewport.width < 768 ? 0 : 1);
       if (tab === 'vault') {
         // Autobackup and the restore points sit in the «бэкапы» subsection of the vault tab.
-        await scope.getByTestId('vault-fold-backups').click();
+        await scope.getByTestId('vault-subtab-backups').click();
         const toggle = scope.getByRole('switch', { name: 'Автобэкап раз в сутки' });
         const initial = await toggle.getAttribute('aria-checked');
         await toggle.click();

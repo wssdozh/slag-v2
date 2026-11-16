@@ -1,5 +1,5 @@
 // The settings shell: a rail of tabs, the mobile and desktop frames, and the pinned footer.
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../UI/icons/Icon';
@@ -11,6 +11,7 @@ import { NotificationsSettingsTab } from '../Settings/NotificationsSettingsTab';
 import { IntegrationsSettingsTab } from '../Settings/IntegrationsSettingsTab';
 import { AiSettingsTab } from '../Settings/AiSettingsTab';
 import { VaultSettingsTab } from '../Settings/VaultSettingsTab';
+import { VAULT_SECTIONS, type VaultSection } from '../Settings/vault/sections';
 import { UiSettingsTab } from '../Settings/UiSettingsTab';
 import { ShortcutsSettingsTab } from '../Settings/ShortcutsSettingsTab';
 import { UpdatesSettingsTab } from '../Settings/UpdatesSettingsTab';
@@ -28,6 +29,9 @@ export const SettingsModal: React.FC = () => {
 
   const presence = usePresence(isSettingsOpen);
   const { ref: presenceRef, phase: presencePhase, isPresent: isSettingsPresent, onTransitionEnd: onSettingsTransitionEnd } = presence;
+
+  // Which vault block the rail has open. Kept here, not in the tab, so it survives a detour.
+  const [vaultSection, setVaultSection] = useState<VaultSection>('storage');
 
   // Держим активную вкладку видимой: при возврате в настройки полоса оставалась
   // на прежней позиции, и выбранный раздел оказывался за правым краем.
@@ -55,22 +59,48 @@ export const SettingsModal: React.FC = () => {
     >
       {SETTINGS_TABS.map((tab) => {
         const isActive = activeTab === tab.id;
+        // The vault tab opens into three blocks: on a desktop they hang off their parent in the
+        // rail, the way a folder shows the subfolders it holds. The phone keeps folds in the pane.
+        const showsNested = tab.id === 'vault' && isActive && !isMobile;
         return (
-          <button
-            key={tab.id}
-            type="button"
-            data-tab={tab.id}
-            data-testid={`settings-tab-${tab.id}`}
-            onClick={() => setActiveTab(tab.id)}
-            className={`shrink-0 flex items-center gap-2 md:gap-2.5 px-3 md:px-2.5 py-1.5 md:py-2 rounded-xl md:rounded-lg text-xs text-left whitespace-nowrap cursor-pointer motion-press ${
-              isActive
-                ? 'bg-surface-active text-fg-primary font-medium'
-                : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-            }`}
-          >
-            <Icon name={tab.icon} size="none" tone="inherit" className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
-            <span>{tab.label}</span>
-          </button>
+          <React.Fragment key={tab.id}>
+            <button
+              type="button"
+              data-tab={tab.id}
+              data-testid={`settings-tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 flex items-center gap-2 md:gap-2.5 px-3 md:px-2.5 py-1.5 md:py-2 rounded-xl md:rounded-lg text-xs text-left whitespace-nowrap cursor-pointer motion-press ${
+                isActive
+                  ? 'bg-surface-active text-fg-primary font-medium'
+                  : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
+              }`}
+            >
+              <Icon name={tab.icon} size="none" tone="inherit" className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
+              <span>{tab.label}</span>
+            </button>
+            {showsNested &&
+              VAULT_SECTIONS.map((child) => {
+                const isChildActive = vaultSection === child.id;
+                return (
+                  <button
+                    key={child.id}
+                    type="button"
+                    data-subtab={child.id}
+                    data-testid={`vault-subtab-${child.id}`}
+                    aria-current={isChildActive || undefined}
+                    onClick={() => setVaultSection(child.id)}
+                    className={`shrink-0 flex items-center gap-2 md:ml-5 px-3 md:px-2.5 py-1.5 md:py-1.5 rounded-xl md:rounded-md text-2xs text-left whitespace-nowrap cursor-pointer transition-colors ${
+                      isChildActive
+                        ? 'text-fg-primary bg-surface-active'
+                        : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
+                    }`}
+                  >
+                    <span className="w-1 h-1 rounded-full bg-current opacity-60 shrink-0" />
+                    <span>{child.label}</span>
+                  </button>
+                );
+              })}
+          </React.Fragment>
         );
       })}
     </div>
@@ -87,7 +117,7 @@ export const SettingsModal: React.FC = () => {
       )}
 
       {activeTab === 'vault' && (
-        <VaultSettingsTab />
+        <VaultSettingsTab section={isMobile ? undefined : vaultSection} />
       )}
 
       {activeTab === 'devices' && (
