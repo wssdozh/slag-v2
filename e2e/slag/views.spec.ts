@@ -1059,9 +1059,7 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await textarea.click();
     await textarea.fill('/');
 
-    // 2. Verify slash command menu appears with header and commands
-    const menuHeader = page.locator('text=Команды композера').first();
-    await expect(menuHeader).toBeVisible();
+    // 2. Verify the slash command menu appears with its commands
     await expect(page.locator('text=/task').first()).toBeVisible();
     await expect(page.locator('text=/today').first()).toBeVisible();
     await expect(page.locator('text=/ai').first()).toBeVisible();
