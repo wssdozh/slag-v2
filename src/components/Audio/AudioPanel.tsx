@@ -166,27 +166,8 @@ export const AudioPanel: React.FC = () => {
           {/* A folder change can filter the playing track out; its controls stay put. */}
           {tracks.length === 0 && !isPlaying ? (
             <div className="flex flex-col items-center justify-center text-center py-10 px-4">
-              <div className="w-16 h-16 rounded-full bg-tint-4 border border-tint-8 flex items-center justify-center mb-4">
-                <Icon name="entity.folder" size="none" tone="muted" className="w-7 h-7" />
-              </div>
-              <h3 className="text-sm font-medium text-fg-soft mb-1">В папке нет аудиозаписей</h3>
-              <p className="text-xs text-fg-muted mb-4">
-                В папке «{effectiveFolder}» отсутствуют вложения выбранных типов.
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setScopeMode('active')}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-tint-10 hover:bg-tint-15 text-fg-soft transition-colors cursor-pointer"
-                >
-                  Активная папка
-                </button>
-                <button
-                  onClick={() => setIsPlaylistOpen(true)}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-tint-5 hover:bg-tint-10 text-fg-secondary transition-colors cursor-pointer"
-                >
-                  Очередь и фильтры
-                </button>
-              </div>
+              <Icon name="entity.folder" size="none" tone="muted" className="w-7 h-7 mb-4" />
+              <h3 className="text-sm font-medium text-fg-soft">В папке нет аудиозаписей</h3>
             </div>
           ) : (
             <>
