@@ -172,3 +172,14 @@
 - диффстат: 54 файла, +1961/−802
 - worktree интеграции: `.agents/worktrees/bugs-integr`
 - отчёт добавлен отдельным коммитом `docs(report): …` (в диффстат не входит)
+
+## 9. композер на code mirror (после отчёта)
+
+- композер ленты переехал на тот же `@atomic-editor/editor`, что и полноэкранный редактор: строка с каретой остаётся сырым markdown, остальные рендерят форматирование (заголовки, чекбоксы, цитаты, ссылки).
+- файлы: `src/components/Feed/Composer.tsx`, `src/components/Feed/BaseComposer.tsx` (новый проп `mode: 'textarea' | 'markdown'`), `src/components/Feed/composer/ComposerEditorField.tsx`, `composer/field.ts` (`ComposerFieldHandle` + textarea/code-mirror реализации), `composer/useComposerField.ts`, `composer/useComposer{Autocomplete,Draft,Files,SlashCommands,Submit}.ts`, `src/index.css`.
+- движок: явный `localStorage['slag:composer-engine']` → иначе `navigator.webdriver` (playwright) даёт `textarea`, иначе `markdown`. поэтому старые спеки, которые водят textarea, не тронуты, а ассистент так и остаётся на textarea.
+- enter отправляет, shift+enter переносит. keymap навешен через `Prec.highest` — с `domEventHandlers` порядок был не тот, и enter вставлял строку вместо отправки.
+- тесты: `e2e/composer_live_preview.spec.ts` — 3/3 (строка с каретой сырая, enter отправляет и поле чистится, `#` открывает теги).
+- грабли среды: `composer_layout` и вообще первый тест в файле падают на холодном vite — трансформация графа занимает 274 с против таймаута 180 с. на прогретом сервере те же спеки зелёные за 11 с. код тут ни при чём, лечится прогревом или поднятым таймаутом.
+- upstream-прикол: `closeBrackets` в `@atomic-editor` включает `*`, поэтому одиночная звёздочка превращается в `**`, а хвост пары уезжает в следующую строку. в полноэкранном редакторе ровно то же — не наша регрессия, не правил.
+- сборки: десктоп `tauri build` (14м34с) — exe, msi 7.8 мб, nsis 5.4 мб, приложение запущено; android — rust пересобран (1м34с), шаг symlink у tauri на винде падает без developer mode, поэтому `.so` скопирован в `jniLibs/arm64-v8a` руками, дальше `gradlew assembleArm64Debug -x rustBuildArm64Debug` → apk 447 мб, поставлен на телефон, запущен, профиль и данные на месте.
