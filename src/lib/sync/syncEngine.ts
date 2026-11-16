@@ -166,7 +166,8 @@ export class SyncEngine {
   public importBuffer: {
     items: SlagItem[];
     folders: FolderMeta[];
-    workspace?: WorkspaceState;
+    /** Staged workspace: the field name is the one `importSyncedVaultData` reads. */
+    workspaceState?: WorkspaceState;
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean };
     /** Bundles in this burst. They are ACKed only once the write below lands. */
     bundles: string[];
@@ -543,7 +544,7 @@ export class SyncEngine {
   public stageImport(
     items: SlagItem[],
     folders: FolderMeta[],
-    workspace: WorkspaceState | undefined,
+    workspaceState: WorkspaceState | undefined,
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean },
     bundleId: string
   ): void {
@@ -553,7 +554,7 @@ export class SyncEngine {
     this.importBuffer = {
       items,
       folders,
-      workspace: workspace ?? this.importBuffer?.workspace,
+      workspaceState: workspaceState ?? this.importBuffer?.workspaceState,
       detail: {
         items: detail.items || Boolean(previous?.items),
         folders: detail.folders || Boolean(previous?.folders),
@@ -580,7 +581,14 @@ export class SyncEngine {
     this.importBuffer = null;
     const generation = this.initGeneration;
     try {
-      await vault().importSyncedVaultData(buffered);
+      // The buffer's fields are the import's fields on purpose: it used to hand the staged
+      // workspace over under a name the storage read never looked at, so a profile (and every
+      // other workspace field) from another device never landed.
+      await vault().importSyncedVaultData({
+        items: buffered.items,
+        folders: buffered.folders,
+        workspaceState: buffered.workspaceState,
+      });
     } catch (error) {
       // Nothing reached the disk, so the relay must not be told this burst is done: dropping
       // the ids makes a re-delivery apply again instead of being skipped as "already applied".

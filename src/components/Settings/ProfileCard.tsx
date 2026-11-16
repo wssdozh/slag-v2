@@ -1,5 +1,5 @@
 // The identity block: round photo with its edit menu, name and plan, the same on both screens.
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { storage } from '../../lib/storage';
@@ -52,6 +52,22 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
   const [profile, setProfile] = useState<ProfileInfo>(() => storage.getWorkspaceState().profile ?? { name: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // The name and the photo arrive from another device inside the workspace state, and the block
+  // is already on screen when they do: the card used to keep showing the initials it mounted with.
+  useEffect(() => {
+    const applySyncedProfile = () => {
+      // Never yank the field out from under someone who is mid-word.
+      if (document.activeElement === nameInputRef.current) return;
+      const stored = storage.getWorkspaceState().profile ?? { name: '' };
+      setProfile((prev) => (
+        prev.name === stored.name && (prev.avatar ?? '') === (stored.avatar ?? '') ? prev : stored
+      ));
+    };
+    window.addEventListener('slag-sync-updated', applySyncedProfile);
+    return () => window.removeEventListener('slag-sync-updated', applySyncedProfile);
+  }, []);
 
   const save = (next: ProfileInfo) => {
     setProfile(next);
@@ -139,6 +155,7 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
         <ProfileAvatar profile={profile} className="w-full h-full text-base" />
       </button>
       <input
+        ref={nameInputRef}
         aria-label="Имя профиля"
         placeholder="Как тебя зовут"
         value={profile.name}
