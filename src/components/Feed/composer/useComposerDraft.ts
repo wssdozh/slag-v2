@@ -116,6 +116,19 @@ export const useComposerDraft = ({
   const isApplyingRemoteDraftRef = useRef(false);
   const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
   const lastLocalUserEditTimeRef = useRef<number>(0);
+  /**
+   * The stamp of this window's own last draft write. A draft read back from the queue or
+   * from `localStorage` is that same write, with the attachment bytes already stripped:
+   * adopting it would replace a photo that is still in memory with metadata that has
+   * nothing behind it yet.
+   */
+  const lastLocalDraftWriteAtRef = useRef<number>(0);
+
+  const localDraftStamp = useCallback(() => {
+    const stampedAt = Date.now();
+    lastLocalDraftWriteAtRef.current = stampedAt;
+    return stampedAt;
+  }, []);
 
   useEffect(() => {
     draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence };
@@ -175,6 +188,9 @@ export const useComposerDraft = ({
       }
       const currentStored = storage.getComposerDraft(activeFolder);
       if (currentStored) {
+        // Our own echo is not a remote draft: this window wrote it a moment ago, and it
+        // comes back without the bytes an attachment in the field still carries.
+        if ((currentStored.updatedAt ?? 0) <= lastLocalDraftWriteAtRef.current) return;
         if ((currentStored.updatedAt ?? 0) >= lastAdoptedRemoteDraftUpdatedAtRef.current) {
           isApplyingRemoteDraftRef.current = true;
           lastAdoptedRemoteDraftUpdatedAtRef.current = currentStored.updatedAt ?? 0;
@@ -247,13 +263,13 @@ export const useComposerDraft = ({
           targetFolder: d.targetFolder,
           duration: d.duration,
           recurrence: d.recurrence,
-          updatedAt: Date.now(),
+          updatedAt: localDraftStamp(),
         });
       }
       // Unmount or a folder switch: the text leaves the screen before the throttle window ends.
       storage.flushDrafts();
     };
-  }, [activeFolder, isModal, isActive]);
+  }, [activeFolder, isModal, isActive, localDraftStamp]);
 
   // Debounced autosave while typing
   useEffect(() => {
@@ -283,7 +299,7 @@ export const useComposerDraft = ({
           targetFolder,
           duration,
           recurrence,
-          updatedAt: Date.now(),
+          updatedAt: localDraftStamp(),
         });
       } else if (lastLocalUserEditTimeRef.current > 0) {
         storage.deleteComposerDraft(activeFolder);
@@ -291,7 +307,7 @@ export const useComposerDraft = ({
     }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive]);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive, localDraftStamp]);
 
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
@@ -310,7 +326,7 @@ export const useComposerDraft = ({
           targetFolder: d.targetFolder,
           duration: d.duration,
           recurrence: d.recurrence,
-          updatedAt: Date.now(),
+          updatedAt: localDraftStamp(),
         });
       }
       // `pagehide` follows, but the tab can die between the two; the write must already be on disk.
@@ -318,7 +334,7 @@ export const useComposerDraft = ({
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [activeFolder]);
+  }, [activeFolder, localDraftStamp]);
 
   // Listen to draft changes (typing on another device, quick composer window, or editor sync)
   useEffect(() => {
@@ -354,6 +370,8 @@ export const useComposerDraft = ({
             const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
             const shouldAdopt =
               !isUserActivelyTyping &&
+              // A draft older than this window's own last write is not news, whatever its reader.
+              incomingTs > lastLocalDraftWriteAtRef.current &&
               ((!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
                 incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current);
 
