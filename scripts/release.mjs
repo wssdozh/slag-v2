@@ -14,6 +14,14 @@ import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
 import { CHANNELS, ROLLING_TAGS } from './release-meta.mjs';
 import { makeManifest } from './release-assets.mjs';
+import { compareSemver } from './release-version.mjs';
+import {
+  buildReleaseBody,
+  channelReleaseBody,
+  channelTitle,
+  manifestUrl,
+  releaseTitle,
+} from './release-text.mjs';
 
 const MANIFEST_NAME = 'latest.json';
 
@@ -23,7 +31,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const options = { repo: 'wssdozh/slag-v2', files: [], dryRun: false, key: null, notesFile: null };
+  const options = { repo: 'wssdozh/slag-v2', files: [], dryRun: false, force: false, key: null, notesFile: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     const next = () => {
@@ -37,6 +45,7 @@ function parseArgs(argv) {
     else if (arg === '--repo') options.repo = next();
     else if (arg === '--key') options.key = next();
     else if (arg === '--dry-run') options.dryRun = true;
+    else if (arg === '--force') options.force = true;
     else if (arg.startsWith('--')) fail(`unknown flag ${arg}`);
     else options.files.push(arg);
   }
@@ -73,6 +82,24 @@ function releaseExists(repo, tag) {
   return capture('gh', ['release', 'view', tag, '--repo', repo]).status === 0;
 }
 
+/** `Map(name → digest)` of an existing release, or null when the tag has no release yet. */
+function existingReleaseAssets(repo, tag) {
+  const result = capture('gh', ['api', `repos/${repo}/releases/tags/${tag}`]);
+  if (result.status !== 0) return null;
+  const data = JSON.parse(result.stdout || '{}');
+  return new Map((data.assets ?? []).map((asset) => [asset.name, asset.digest ?? null]));
+}
+
+/** What the channel serves right now, so an older build cannot move it backwards. */
+async function channelVersion(repo, channel) {
+  if (channel === 'release') return null;
+  const url = `${manifestUrl(repo, channel)}?t=${Date.now()}`;
+  const response = await fetch(url, { headers: { 'cache-control': 'no-cache' } }).catch(() => null);
+  if (!response?.ok) return null;
+  const manifest = await response.json().catch(() => null);
+  return manifest?.version ?? null;
+}
+
 function publish({ repo, tag, title, notesFile, prerelease, files }) {
   const flags = ['--repo', repo];
   if (releaseExists(repo, tag)) {
@@ -90,7 +117,26 @@ function publish({ repo, tag, title, notesFile, prerelease, files }) {
   process.stdout.write(`uploaded ${files.length} files to ${tag}\n`);
 }
 
-function main() {
+/**
+ * A tag is a promise: the same version may be re-uploaded only when every byte is the same file.
+ * A rebuild with different bits is a new version, otherwise two machines would run "0.2.5" that
+ * are not the same 0.2.5 and the signature would not tell them apart.
+ */
+function guardVersionNotRebuilt(repo, tag, assets) {
+  const existing = existingReleaseAssets(repo, tag);
+  if (!existing) return 'new';
+  const same = assets.every((asset) => existing.get(asset.name) === `sha256:${asset.sha256}`);
+  if (!same) {
+    fail(
+      `версия ${tag} уже опубликована другими файлами: подними версию, пересобери и запусти снова.\n` +
+        `  было: ${[...existing.keys()].join(', ')}\n  стало: ${assets.map((a) => a.name).join(', ')}`
+    );
+  }
+  return 'same';
+}
+
+
+async function main() {
   const options = parseArgs(process.argv.slice(2));
   const notes = options.notesFile ? readFileSync(options.notesFile, 'utf8').trim() : '';
   const tag = `v${options.version}`;
@@ -119,20 +165,53 @@ function main() {
   writeFileSync(notesFile, notes ? `${notes}\n` : '', 'utf8');
 
   const installable = assets.map((asset) => asset.path);
-  const title = options.channel === 'release' ? options.version : `${options.channel}: ${options.version}`;
   if (options.dryRun) {
     process.stdout.write(`[dry-run] tag ${tag}, channel ${options.channel}, staging ${staging}\n`);
     return;
   }
 
-  publish({
-    repo: options.repo,
-    tag,
-    title,
-    notesFile,
-    prerelease: options.channel !== 'release',
-    files: [...installable, manifestPath],
-  });
+  // Refuse to move the channel backwards: two dispatched runs finish in whatever order the runners
+  // feel like, and the older one arriving last must not become "the newest build".
+  const previous = await channelVersion(options.repo, options.channel);
+  if (previous && !options.force) {
+    const order = compareSemver(options.version, previous);
+    if (order < 0) {
+      fail(
+        `канал ${options.channel} уже раздаёт ${previous}, а эта сборка ${options.version} старше.\n` +
+          '  пересборка старее текущей — ничего не публикую (--force, если это осознанно).'
+      );
+    }
+    if (order === 0) {
+      process.stdout.write(`== ${previous} уже в канале ${options.channel}, обновляю только манифест\n`);
+    }
+  }
+
+  const buildNotes = join(staging, 'build-notes.md');
+  writeFileSync(
+    buildNotes,
+    buildReleaseBody({
+      channel: options.channel,
+      version: options.version,
+      previousVersion: previous,
+      notes,
+      repo: options.repo,
+    }),
+    'utf8'
+  );
+
+  const state = guardVersionNotRebuilt(options.repo, tag, assets);
+  if (state === 'same') {
+    process.stdout.write(`== релиз ${tag} уже опубликован с теми же файлами, пропускаю\n`);
+  } else {
+    publish({
+      repo: options.repo,
+      tag,
+      title: releaseTitle(options.version),
+      notesFile: buildNotes,
+      prerelease: options.channel !== 'release',
+      files: [...installable, manifestPath],
+    });
+  }
 
   // The rolling tag is what a client on that channel actually reads: only the manifest is
   // rewritten there, the artifacts stay in the versioned release above.
@@ -141,14 +220,13 @@ function main() {
     const rollingNotes = join(staging, 'rolling-notes.md');
     writeFileSync(
       rollingNotes,
-      `последняя сборка канала \`${options.channel}\`: **${options.version}**\n\n` +
-        `файлы — в релизе [${tag}](https://github.com/${options.repo}/releases/tag/${tag}).\n\n${notes}\n`,
+      channelReleaseBody({ channel: options.channel, version: options.version, repo: options.repo }),
       'utf8'
     );
     publish({
       repo: options.repo,
       tag: rollingTag,
-      title: `${options.channel} · ${options.version}`,
+      title: channelTitle(options.channel),
       notesFile: rollingNotes,
       prerelease: true,
       files: [manifestPath],
@@ -158,4 +236,7 @@ function main() {
   process.stdout.write(`published ${options.version} (${options.channel}) as ${tag}\n`);
 }
 
-main();
+main().catch((error) => {
+  if (error instanceof Error) fail(error.message);
+  throw error;
+});

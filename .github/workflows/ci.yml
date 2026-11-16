@@ -34,7 +34,7 @@ jobs:
       - run: npm run check
       # The channel rules in scripts/ decide which client sees which build; they are pure
       # functions, so the cheapest place to catch a wrong one is here.
-      - run: node --test scripts/release-meta.test.mjs scripts/release-assets.test.mjs
+      - run: npm run test:scripts
       - run: npm run build
 
   # Everything under `#[cfg(target_os = "linux")]` is invisible to `cargo check` on a windows
