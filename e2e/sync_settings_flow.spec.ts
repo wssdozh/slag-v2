@@ -53,9 +53,19 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
     await expect(settingsModal.getByText('Свой сервер', { exact: true })).toBeVisible();
     await expect(settingsModal.getByText('Кеш', { exact: true })).toBeVisible();
 
-    // 5. Back to sync: status row and manual sync button
+    // 5. Back to sync: the status and the server address share one refresh control.
     await settingsModal.getByTestId('settings-tab-sync').click();
-    await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toBeVisible();
+    await expect(settingsModal.getByTestId('sync-refresh-btn')).toBeVisible();
+    await expect(settingsModal.getByRole('button', { name: 'Синхронизировать', exact: true })).toHaveCount(0);
+    await expect(settingsModal.getByRole('button', { name: 'Проверить', exact: true })).toHaveCount(0);
+    // The key rotation row keeps its title and button; the consequences live in the confirm dialog.
+    await expect(settingsModal.getByText('Все устройства потребуют нового приглашения.')).toHaveCount(0);
+
+    // One refresh button for the whole card.
+    await page.screenshot({
+      path: 'test-results/screenshots/sync-single-refresh.png',
+      fullPage: false,
+    });
 
     // Screenshot of Unified Header Card & Clean Sync Tab
     await page.screenshot({

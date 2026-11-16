@@ -14,7 +14,7 @@ export const SyncSettingsTab: React.FC = () => {
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
-  const [isTestingServer, setIsTestingServer] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const locked = status.authRequired && !accountClient.isAuthenticated();
 
@@ -27,20 +27,32 @@ export const SyncSettingsTab: React.FC = () => {
     void accountClient.detectServer(config.serverUrl);
   }, [config.serverUrl]);
 
-  const handleTestServerConnection = async () => {
-    setIsTestingServer(true);
+  /**
+   * Прощупывает релей по введённому адресу и запоминает его, если он сменился.
+   * Бросает на первом отказе — вызывающий сводит всю проверку к одному тосту.
+   */
+  const checkServerConnection = async (cleanUrl: string): Promise<void> => {
+    const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await accountClient.detectServer(cleanUrl);
+    // updateServerUrl рвёт сокет и чистит bookkeeping, так что только на реальной смене
+    // адреса, а не на каждой проверке.
+    if (cleanUrl !== config.serverUrl) await syncEngine.updateServerUrl(cleanUrl);
+    accountClient.startPolling(cleanUrl);
+  };
+
+  /** Одна кнопка на всю карточку: адрес и статус обновляются вместе, ошибка — одним тостом. */
+  const handleRefresh = async (): Promise<void> => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
     try {
-      const cleanUrl = serverUrlInput.replace(/\/+$/, '');
-      const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(4000) });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      await accountClient.detectServer(cleanUrl);
-      await syncEngine.updateServerUrl(cleanUrl);
-      accountClient.startPolling(cleanUrl);
-      addToast('Сервер синхронизации сохранён', 'success');
+      await checkServerConnection(serverUrlInput.replace(/\/+$/, ''));
+      await syncEngine.pushLocalChanges();
+      addToast('Сервер проверен', 'success');
     } catch (error) {
       addToast(`Не удалось проверить сервер: ${error instanceof Error ? error.message : String(error)}`, 'error');
     } finally {
-      setIsTestingServer(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -55,11 +67,21 @@ export const SyncSettingsTab: React.FC = () => {
             </span>
             {status.error && <span className="text-danger">{status.error}</span>}
           </span>
-        } right={<IconButton size="lg" aria-label="Синхронизировать" title="Синхронизировать" onClick={() => void syncEngine.pushLocalChanges()} disabled={locked || status.state === 'syncing'}><Icon name="action.refresh" size="md" tone="inherit" className={`${status.state === 'syncing' ? 'motion-safe:animate-spin' : ''}`} /></IconButton>} />
-        <SettingsDivider />
-        <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} right={
-          <IconButton size="lg" aria-label="Проверить" title="Проверить соединение с сервером" aria-busy={isTestingServer} onClick={() => void handleTestServerConnection()} disabled={isTestingServer}>{isTestingServer ? <Icon name="action.refresh" size="md" tone="inherit" className="motion-safe:animate-spin" /> : <Icon name="system.connectionTest" size="md" tone="inherit" />}</IconButton>
+        } right={
+          <IconButton
+            size="lg"
+            aria-label="Обновить"
+            title="Проверить сервер и отправить изменения"
+            data-testid="sync-refresh-btn"
+            aria-busy={isRefreshing}
+            disabled={isRefreshing}
+            onClick={() => void handleRefresh()}
+          >
+            <Icon name="action.refresh" size="md" tone="inherit" className={isRefreshing ? 'motion-safe:animate-spin' : ''} />
+          </IconButton>
         } />
+        <SettingsDivider />
+        <SettingsRow label={<input aria-label="Адрес сервера синхронизации" value={serverUrlInput} onChange={(event) => setServerUrlInput(event.target.value)} className="w-full py-1 text-xs font-mono text-fg-primary bg-transparent outline-none truncate" />} />
         <SettingsDivider />
         <SettingsRow label="Синхронизировать при сохранении" right={<SettingsSwitch checked={config.autoSync} onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }} label="Синхронизировать при сохранении" />} />
         <SettingsDivider />
@@ -71,7 +93,7 @@ export const SyncSettingsTab: React.FC = () => {
       </SettingsGroup>
 
       <SettingsGroup title="Безопасность">
-        <SettingsRow label="Смена ключа хранилища" description="Все устройства потребуют нового приглашения." danger right={
+        <SettingsRow label="Смена ключа хранилища" danger right={
           <button type="button" disabled={locked} onClick={async () => {
             if (!await confirmAction({ title: 'Сменить ключ хранилища?', description: 'Остальные устройства потеряют доступ и потребуют нового приглашения. Ключ нельзя вернуть назад.', confirmLabel: 'Сменить ключ', isDestructive: true })) return;
             void syncEngine.rotateVaultKey().then(() => addToast('Ключ хранилища изменён', 'success')).catch((error: unknown) => addToast(`Не удалось сменить ключ: ${error instanceof Error ? error.message : String(error)}`, 'error'));

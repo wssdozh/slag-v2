@@ -46,12 +46,28 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
       if (tab === 'sync') {
         await expect(scope.getByRole('status')).toBeVisible();
         await expect(scope.getByRole('textbox', { name: 'Адрес сервера синхронизации' })).toHaveCSS('font-size', '12px');
-        await expect(scope.getByRole('button', { name: 'Проверить', exact: true })).toHaveText('');
-        await page.route('**/health', route => route.fulfill({ status: 503 }));
-        await scope.getByRole('button', { name: 'Проверить', exact: true }).click();
+        // One icon button rechecks both the status and the relay address; it used to be two.
+        const refreshButton = scope.getByTestId('sync-refresh-btn');
+        await expect(refreshButton).toHaveText('');
+        await expect(refreshButton).toHaveAttribute('aria-busy', 'false');
+        let releaseHealth: () => void = () => {};
+        const healthGate = new Promise<void>((resolve) => { releaseHealth = resolve; });
+        await page.route('**/health', async route => {
+          await healthGate;
+          await route.fulfill({ status: 503 });
+        });
+        await refreshButton.click();
+        await expect(refreshButton).toBeDisabled();
+        await expect(refreshButton).toHaveAttribute('aria-busy', 'true');
+        await expect(refreshButton.locator('svg')).toHaveClass(/motion-safe:animate-spin/);
+        // A second press while the probe runs must not start another check or add a second toast.
+        await refreshButton.click({ force: true });
+        releaseHealth();
         await expect(page.getByTestId('toast').filter({ hasText: 'Не удалось проверить сервер: HTTP 503' })).toBeVisible();
         await expect(scope.getByText(/HTTP 503/)).toHaveCount(0);
         await expect(page.getByTestId('toast').filter({ hasText: 'Не удалось проверить сервер: HTTP 503' })).toHaveCount(1);
+        await expect(refreshButton).toBeEnabled();
+        await expect(refreshButton).toHaveAttribute('aria-busy', 'false');
       }
       if (tab === 'vault') {
         await expect(scope.getByText('Последний снимок', { exact: true })).toBeVisible();
