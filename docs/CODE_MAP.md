@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **543**, строк: **97079**, зон: **48**.
+Модулей: **549**, строк: **97278**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -19,10 +19,10 @@
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 815 | 1 |
 | `src/lib/storage/index.ts` | 758 | 40 |
-| `src/context/AppContext.tsx` | 749 | 68 |
+| `src/context/AppContext.tsx` | 749 | 70 |
 | `src/components/Feed/Composer.tsx` | 735 | 4 |
 | `src/lib/sync/account.ts` | 677 | 29 |
-| `src/types/index.ts` | 641 | 207 |
+| `src/types/index.ts` | 649 | 207 |
 | `src/components/Workspace/useCrossWindowDnd.ts` | 614 | 1 |
 | `src/lib/backupService.ts` | 606 | 1 |
 
@@ -32,7 +32,7 @@
 
 - `src/node/index.ts` (25 строк)
 
-## e2e (playwright) — 115 файлов, 22347 строк
+## e2e (playwright) — 116 файлов, 22411 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -268,7 +268,7 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 446 | 2 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
-## src/components/Settings — 37 файлов, 4679 строк
+## src/components/Settings — 42 файлов, 4806 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -302,13 +302,18 @@
 | `ProfileAvatar.tsx` | 31 | 1 | ProfileAvatar | The one round identity chip: the synced photo when there is one, initials oth… |
 | `ProfileCard.tsx` | 181 | 2 | ProfileCard | The identity block: round photo with its edit menu, name and plan, the same o… |
 | `SecretKeyField.tsx` | 49 | 1 | SecretKeyField | One-line secret input with a per-field reveal toggle and no autocorrect. |
-| `SettingsUI.tsx` | 304 | 27 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 | Settings' shared building blocks: group cards, rows, dividers, switches, sele… |
+| `SettingsUI.tsx` | 304 | 29 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 | Settings' shared building blocks: group cards, rows, dividers, switches, sele… |
 | `ShortcutsSettingsTab.tsx` | 101 | 1 | ShortcutsSettingsTab | The hotkey catalogue, rendered from the same table the keydown handler reads. |
-| `StorageUsageSection.tsx` | 323 | 1 | StorageUsageSection | "Занятое место": the whole store's footprint — local keys, media, snapshots a… |
 | `SyncSettingsTab.tsx` | 84 | 1 | SyncSettingsTab | The sync channel: status, server address, schedule; account and devices sit n… |
 | `UiSettingsTab.tsx` | 102 | 1 | UiSettingsTab | How it looks: accent, fonts, density, panel widths and the mobile dock. |
-| `UpdatesSettingsTab.tsx` | 264 | 1 | UpdatesSettingsTab | The "Обновления" tab: what is installed, what is on GitHub, and the one butto… |
-| `VaultSettingsTab.tsx` | 223 | 1 | VaultSettingsTab | The vault itself: backups, snapshots, export and import, and the folders on d… |
+| `UpdatesSettingsTab.tsx` | 293 | 1 | UpdatesSettingsTab | The "Обновления" tab: what is installed, what is on GitHub, and the one butto… |
+| `vault/BackupSection.tsx` | 129 | 1 | BackupSection | «бэкапы»: the daily autobackup setting and the restore points it produces. |
+| `vault/StorageSection.tsx` | 33 | 1 | StorageSection | «хранилище»: how much the store occupies and where its folders live on disk. |
+| `vault/StorageUsageParts.tsx` | 85 | 1 | UsageRing, UsageLine, EmptyLine | The ring and the one-line rows of «занятое место»: geometry only, the numbers… |
+| `vault/StorageUsageSection.tsx` | 226 | 1 | StorageUsageSection | "Занятое место": the whole store's footprint — local keys, media, snapshots a… |
+| `vault/TransferSection.tsx` | 76 | 1 | TransferSection | «перенос»: the vault leaves as a ZIP or JSON and comes back through the same … |
+| `vault/usageTone.ts` | 20 | 2 | SEGMENT_TONE, toneOf, MEDIA_SEGMENT_IDS | Tones for the storage ring: one token pair per sector, no colour invented in … |
+| `VaultSettingsTab.tsx` | 75 | 1 | VaultSettingsTab | The vault tab: three subsections behind one switch — the disk, the backups, t… |
 
 ## src/components/Sidebar — 2 файлов, 455 строк
 
@@ -329,7 +334,7 @@
 | `DatePickerPopover.tsx` | 234 | 2 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
 | `IconButton.tsx` | 51 | 8 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
-| `icons/Icon.tsx` | 74 | 143 | IconSize, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
+| `icons/Icon.tsx` | 74 | 144 | IconSize, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
 | `icons/icons.ts` | 480 | 16 | GlyphComponent, IconEntry, ICONS, IconName, ICON_TONE_CLASS, +3 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `LightboxTextPanel.tsx` | 151 | 1 | LightboxTextPanelProps, LightboxTextPanel | OCR results beside a photo in the lightbox, with copy and retry when the pass… |
@@ -343,7 +348,7 @@
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput | Stepper input: minus/plus buttons and a typed value, clamped to min/max on bl… |
 | `PriorityBadge.tsx` | 76 | 5 | TaskPriority, LinearSignalBarsProps, LinearSignalBars | Priority as four Linear-style signal bars, plus the matching badge for task r… |
 | `priorityTone.ts` | 47 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Maps a priority to its one colour family; text, dot and chip classes hang off… |
-| `ResponsiveSegmented.tsx` | 245 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
+| `ResponsiveSegmented.tsx` | 245 | 8 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
 | `segmentedVariants.ts` | 56 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Class presets for the segmented strip, so mobile headers share one geometry. |
 | `Select.tsx` | 349 | 11 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
 | `SendButton.tsx` | 48 | 4 | SendButtonProps, SendButton | The round accent arrow that confirms: send, attach or save, one plate for all… |
@@ -408,7 +413,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 749 | 68 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `AppContext.tsx` | 749 | 70 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
 | `appContext.types.ts` | 236 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 90 строк
@@ -596,7 +601,7 @@
 | `settingsStore.ts` | 445 | 1 | SettingsStoreHost, draftsStorageKey, workspaceStateStorageKey, flushDraftWrites, installDraftFlushGuards, +17 | Small settings and drafts: which localStorage keys are kept and how they are … |
 | `syncReconcile.ts` | 160 | 1 | SyncedVaultSnapshot, StagedSyncImport, ReconciledSyncImport, reconcileSyncedVault | A bundle is written from a snapshot: the user keeps typing while it travels t… |
 | `trashStore.ts` | 78 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore and purge happen before … |
-| `usage.ts` | 322 | 1 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: localStorage by key group, media by type, s… |
+| `usage.ts` | 322 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: localStorage by key group, media by type, s… |
 | `vaultFiles.ts` | 508 | 1 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 197 | 1 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, ensureVaultSyncId, +4 | Which vault the app is looking at: the registry kept in localStorage, and the… |
 | `vaultTransfer.ts` | 111 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
@@ -703,9 +708,9 @@
 | `tauri.ts` | 29 | 0 | isTauri, getCurrentWindow, getCurrentWebviewWindow, listen, addPluginListener, +1 | Stubs for the tauri API, swapped in by the headless build. `isTauri()` must a… |
 | `tauriFs.ts` | 38 | 0 | BaseDirectory, mkdir, writeTextFile, readDir, remove, +4 | Logs on disk go through plugin-fs in the browser build. A server writes them … |
 
-## src/types — 2 файлов, 808 строк
+## src/types — 2 файлов, 816 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 641 | 207 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +77 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 649 | 207 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

@@ -1,0 +1,128 @@
+// «бэкапы»: the daily autobackup setting and the restore points it produces.
+import React, { useState } from 'react';
+import { Icon } from '../../UI/icons/Icon';
+import { useApp } from '../../../context/AppContext';
+import { IconButton } from '../../UI/IconButton';
+import {
+  SettingsDivider,
+  SettingsGroup,
+  SettingsRow,
+  SettingsSwitch,
+} from '../SettingsUI';
+
+export const BackupSection: React.FC = () => {
+  const {
+    backupSnapshots,
+    backupSettings,
+    createManualBackup,
+    restoreSnapshot,
+    confirmAction,
+    deleteSnapshot,
+    downloadSnapshot,
+    updateBackupSettings,
+  } = useApp();
+
+  const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleCreateSnapshot = async () => {
+    setIsCreatingSnapshot(true);
+    try {
+      await createManualBackup();
+    } finally {
+      setIsCreatingSnapshot(false);
+    }
+  };
+
+  const handleRestoreSnapshot = async (id: string) => {
+    const confirmed = await confirmAction({
+      title: 'Восстановить из снимка?',
+      description: 'Текущее содержимое хранилища заменится данными снимка. Несохранённые изменения пропадут.',
+      confirmLabel: 'Восстановить',
+      isDestructive: true,
+    });
+    if (!confirmed) return;
+    setIsRestoring(true);
+    try {
+      await restoreSnapshot(id);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SettingsGroup title="Резервное копирование">
+        <SettingsRow
+          label="Автобэкап раз в сутки"
+          description="Хранятся последние 7 снимков"
+          right={<SettingsSwitch checked={backupSettings.autoBackupEnabled} onChange={(checked) => updateBackupSettings({ autoBackupEnabled: checked })} label="Автобэкап раз в сутки" />}
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Последний снимок"
+          description={backupSettings.lastBackupAt ? <span className="font-mono">{new Date(backupSettings.lastBackupAt).toLocaleString('ru-RU')}</span> : 'Ещё не создан'}
+          right={<IconButton size="lg" data-testid="btn-create-snapshot" aria-label="Создать снимок" title="Создать снимок" aria-busy={isCreatingSnapshot} disabled={isCreatingSnapshot} onClick={() => void handleCreateSnapshot()}><Icon name="action.add" size="md" tone="inherit" className={`${isCreatingSnapshot ? 'motion-safe:animate-pulse' : ''}`} /></IconButton>}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup title={`Точки восстановления (${backupSnapshots.length})`}>
+        {backupSnapshots.length === 0 ? (
+          <div className="px-3 py-3 text-center text-xs text-fg-dim">
+            Точек восстановления пока нет. Создайте первый снимок или дождитесь автобэкапа.
+          </div>
+        ) : (
+          <div className="flex flex-col divide-y divide-border-subtle">
+            {backupSnapshots.map((snap) => {
+              const dateStr = new Date(snap.createdAt).toLocaleString('ru-RU', {
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              const sizeKb = Math.round(snap.sizeBytes / 1024);
+              return (
+                <SettingsRow
+                  key={snap.id}
+                  testId={`snapshot-item-${snap.id}`}
+                  icon={<Icon name="action.archive" size="sm" tone="inherit" />}
+                  label={
+                    <span className="flex items-baseline gap-2">
+                      <span className="truncate">{dateStr}</span>
+                      <span className="shrink-0 font-mono text-2xs text-fg-muted">
+                        {snap.trigger === 'auto' ? 'Авто' : 'Ручной'}
+                      </span>
+                    </span>
+                  }
+                  description={<span className="font-mono">{snap.notesCount} зам. · {snap.attachmentsCount} мед. · {sizeKb} КБ</span>}
+                  right={
+                    <span className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        data-testid={`btn-restore-snapshot-${snap.id}`}
+                        onClick={() => handleRestoreSnapshot(snap.id)}
+                        disabled={isRestoring}
+                        className="px-1.5 py-1 rounded-md font-medium text-fg-secondary hover:text-fg-primary hover:bg-surface-hover transition-colors disabled:opacity-50 cursor-pointer"
+                        title="Восстановить хранилище из этого снимка"
+                        aria-label={`Восстановить хранилище из снимка ${dateStr}`}
+                      >
+                        <Icon name="entity.versions" size="md" tone="inherit" className="sm:hidden" />
+                        <span className="hidden text-xs sm:inline">Восстановить</span>
+                      </button>
+                      <IconButton size="lg" aria-label="Скачать ZIP архива" title="Скачать ZIP архива" onClick={() => downloadSnapshot(snap.id)}>
+                        <Icon name="action.download" size="md" tone="inherit" />
+                      </IconButton>
+                      <IconButton size="lg" variant="danger" aria-label="Удалить снимок" title="Удалить снимок" onClick={() => deleteSnapshot(snap.id)}>
+                        <Icon name="action.delete" size="md" tone="inherit" />
+                      </IconButton>
+                    </span>
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
+      </SettingsGroup>
+    </div>
+  );
+};
