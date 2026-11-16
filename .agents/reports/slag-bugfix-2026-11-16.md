@@ -71,7 +71,7 @@
 ### B7 — анимация отправки
 корень: лента сначала мгновенно прыгала к низу (layout-эффект ставил `scrollTop`), а FLIP считал дельту в координатах контента, игнорируя этот скролл. карточки стартовали не с того места, куда их сдвинул скролл (лишний bounce), новая запись появлялась 6px-фейдом, пока список телепортировался; вдобавок второй smooth-scroll гонялся с анимацией.
 что сделано: скролл порта трекается слушателем и подмешивается в дельту только для одиночной записи, добавленной в конец; карточки выше стартуют ровно на старом экранном месте и уезжают вверх на высоту новой; новая стартует на свою высоту+gap ниже слота (из-под композера) с opacity 0 и поднимается. для удаления/реордера оставлена прежняя content-дельта. нижний settle один, в layout-фазе; старый smooth-эффект удалён. при чтении далеко от композера лента не дёргается (нативный scroll anchoring — 0 сдвинувшихся карточек).
-проверка: стартовый offset выживших 72.1px, drift 0.0–0.1px; новая карточка стартует на 72px ниже слота; кадры `b7-send-t040/t090/t150`. reduced-motion — 0 анимаций. `feed`+`composer_layout` 26 passed, `motion.spec` 18 passed; падения — те же, что на базе.
+проверка: стартовый offset выживших 72.1px, drift 0.0–0.1px; новая карточка стартует на 72px ниже слота (за композером). покадровые снимки (`b7-send-t040/t090/t150`) жили в worktree и удалены при уборке; из сохранившегося — `test-results/screenshots/motion_note_from_composer.png`. reduced-motion — 0 анимаций. `feed`+`composer_layout` 26 passed, `motion.spec` 18 passed; падения — те же, что на базе.
 
 ### B8 — пустое состояние аудио
 корень: не общий `EmptyState`, а инлайн-разметка в `AudioPanel.tsx` — поэтому правка не задела заметки/медиа/ссылки.
@@ -150,7 +150,7 @@
   - `motion.spec` «a closing dialog keeps its whole exit…» — у кнопки закрытия настроек (`SettingsModal.tsx:208`) нет accessible name «Закрыть», это не наша правка.
 - новые регресс-спеки: `context_menu_flyout`, `settings_layout`, тесты в `folder_profile`, `editor`, `attach_sheet`, `composer_layout`, `motion`.
 - ещё пре-существующие, не в финальной пачке: `feed.spec` тесты 4 и 13; `assistant_memory` тесты 2, 3, 6, 11 (все воспроизведены на базе).
-- скриншоты собраны в `test-results/screenshots/bugfix/<slug>/` (вне git).
+- скриншоты — `test-results/screenshots/` интеграционной копии (вне git): `context-menu-bottom-edge`, `editor-tags-inline-edit`, `folder-profile-move-dialog`, `folder-profile-dock`, `settings-updates-900/1280`, `markdown-rendered-feed-card`, `motion_note_from_composer`. часть кадров из worktrees задач удалена вместе с копиями при уборке — это только иллюстрации, проверки от них не зависят.
 
 ## 7. риски и хвосты
 
