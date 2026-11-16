@@ -5,6 +5,7 @@ import { storage } from '../storage';
 export const DEFAULT_NOTIFY_PREFS: NotifyPrefs = {
   tasks: true,
   overdue: true,
+  quietEnabled: true,
   quietFrom: '23:00',
   quietTo: '08:00',
   assistantMode: 'off',
@@ -48,6 +49,7 @@ export function getNotifyPrefs(): NotifyPrefs {
   return {
     tasks: stored.tasks ?? DEFAULT_NOTIFY_PREFS.tasks,
     overdue: stored.overdue ?? DEFAULT_NOTIFY_PREFS.overdue,
+    quietEnabled: stored.quietEnabled ?? DEFAULT_NOTIFY_PREFS.quietEnabled,
     quietFrom: stored.quietFrom ?? DEFAULT_NOTIFY_PREFS.quietFrom,
     quietTo: stored.quietTo ?? DEFAULT_NOTIFY_PREFS.quietTo,
     assistantMode: assistantModeOf(stored),

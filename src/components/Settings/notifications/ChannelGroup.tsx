@@ -89,15 +89,6 @@ export const ChannelGroup: React.FC<ChannelGroupProps> = ({
                   ? 'Ждём подтверждения'
                   : 'Добавить получателя'
           }
-          description={
-            channel?.state === 'active'
-              ? 'напоминания приходят в telegram'
-              : channel?.state === 'blocked'
-                ? 'человек отключил бота'
-                : channel?.state === 'pending'
-                  ? 'код живёт 10 минут'
-                  : undefined
-          }
           right={action()}
         />
       </SettingsGroup>
