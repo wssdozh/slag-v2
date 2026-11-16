@@ -9,7 +9,6 @@ import type { Extension } from '@codemirror/state';
 import { undo, redo } from '@codemirror/commands';
 import { Icon } from '../UI/icons/Icon';
 import { SheetPanel } from '../UI/SheetPanel';
-import { TagChip } from '../UI/TagChip';
 import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../../lib/motion';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
@@ -19,6 +18,7 @@ import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
 import { EditorToolbar } from './EditorToolbar';
 import { EditorTaskFields } from './fullscreen/EditorTaskFields';
+import { EditorTagsRow } from './fullscreen/EditorTagsRow';
 import { useEditorAttachments } from './fullscreen/useEditorAttachments';
 import { useEditorAiActions } from './fullscreen/useEditorAiActions';
 import { attachmentEmbeds, syncAttachmentEmbedDeps, type AttachmentEmbedDeps } from './fullscreen/attachmentEmbeds';
@@ -109,7 +109,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   });
 
   const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
-  const [newTagInput, setNewTagInput] = useState('');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
   const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
@@ -259,42 +258,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [handleClose, handleSave, activeMobilePopover, setIsFullWidth, isMobile, isEditorExpanded, paneRect]);
-
-  const tagInputRef = useRef<HTMLInputElement | null>(null);
-
-  const addTagValue = (raw: string) => {
-    const parts = raw.split(/[\s,]+/).map(p => p.trim().replace(/^#/, '')).filter(Boolean);
-    if (parts.length === 0) return;
-    setTags(prev => {
-      const next = [...prev];
-      for (const p of parts) {
-        if (!next.includes(p)) {
-          next.push(p);
-        }
-      }
-      return next;
-    });
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
-      e.preventDefault();
-      if (newTagInput.trim()) {
-        addTagValue(newTagInput);
-        setNewTagInput('');
-      }
-    } else if (e.key === 'Backspace' && !newTagInput && tags.length > 0) {
-      e.preventDefault();
-      setTags(tags.slice(0, -1));
-    }
-  };
-
-  const handleTagBlur = () => {
-    if (newTagInput.trim()) {
-      addTagValue(newTagInput);
-      setNewTagInput('');
-    }
-  };
 
   const insertMarkdown = useCallback((prefix: string, suffix: string = '') => {
     const view = getEditorView();
@@ -518,30 +481,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 <div className="h-px bg-tint-6 w-full" />
               )}
 
-              {/* Tags Ribbon Row - Seamless Flat Textarea-Like Area */}
-              <div
-                onClick={() => tagInputRef.current?.focus()}
-                className="flex items-center gap-1.5 flex-wrap min-h-7 py-0.5 cursor-text text-xs"
-              >
-                {tags.map(t => (
-                  <TagChip
-                    key={t}
-                    tag={t}
-                    variant="pill"
-                    onRemove={() => setTags(tags.filter(tag => tag !== t))}
-                  />
-                ))}
-                <input
-                  ref={tagInputRef}
-                  type="text"
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={handleTagBlur}
-                  placeholder={tags.length === 0 ? 'добавьте теги...' : ''}
-                  className="bg-transparent text-xs font-mono text-fg-tertiary placeholder-fg-dim outline-none min-w-[70px] flex-1 py-0.5"
-                />
-              </div>
+              {/* Tags Ribbon Row: chips are stepped into and renamed, not just appended to. */}
+              <EditorTagsRow tags={tags} onChange={setTags} />
 
               {/* Subtle Divider between Properties/Tags and Content */}
               <div className="h-px bg-tint-6 w-full mt-1" />
