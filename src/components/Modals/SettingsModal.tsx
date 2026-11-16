@@ -18,6 +18,35 @@ import { UpdatesSettingsTab } from '../Settings/UpdatesSettingsTab';
 import { LogsSettingsTab } from '../Settings/LogsSettingsTab';
 import { SETTINGS_TABS, settingsTabLabel } from '../../config/settingsTabs';
 
+interface RailRowProps {
+  isActive: boolean;
+  /** 1 hangs the row off its parent: same indent step the folder tree uses. */
+  depth?: number;
+  onClick: () => void;
+  testId: string;
+  dataTab?: string;
+  dataSubTab?: string;
+  children: React.ReactNode;
+}
+
+/** One row of the settings rail — the palette, indent and hover the folder tree already speaks. */
+const RailRow: React.FC<RailRowProps> = ({ isActive, depth = 0, onClick, testId, dataTab, dataSubTab, children }) => (
+  <button
+    type="button"
+    data-tab={dataTab}
+    data-subtab={dataSubTab}
+    data-testid={testId}
+    aria-current={isActive || undefined}
+    onClick={onClick}
+    style={depth > 0 ? { paddingLeft: `${10 + depth * 14}px` } : undefined}
+    className={`shrink-0 flex items-center gap-2 whitespace-nowrap text-left text-xs transition-colors cursor-pointer motion-press px-3 py-1.5 rounded-xl md:px-2.5 md:py-2 md:rounded-lg ${
+      isActive ? 'bg-tint-8 text-white font-medium' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
+    }`}
+  >
+    {children}
+  </button>
+);
+
 export const SettingsModal: React.FC = () => {
   const {
     isSettingsOpen,
@@ -64,42 +93,29 @@ export const SettingsModal: React.FC = () => {
         const showsNested = tab.id === 'vault' && isActive && !isMobile;
         return (
           <React.Fragment key={tab.id}>
-            <button
-              type="button"
-              data-tab={tab.id}
-              data-testid={`settings-tab-${tab.id}`}
+            <RailRow
+              isActive={isActive}
               onClick={() => setActiveTab(tab.id)}
-              className={`shrink-0 flex items-center gap-2 md:gap-2.5 px-3 md:px-2.5 py-1.5 md:py-2 rounded-xl md:rounded-lg text-xs text-left whitespace-nowrap cursor-pointer motion-press ${
-                isActive
-                  ? 'bg-surface-active text-fg-primary font-medium'
-                  : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-              }`}
+              testId={`settings-tab-${tab.id}`}
+              dataTab={tab.id}
             >
               <Icon name={tab.icon} size="none" tone="inherit" className="w-3.5 h-3.5 md:w-4 md:h-4 text-fg-muted shrink-0" />
               <span>{tab.label}</span>
-            </button>
+            </RailRow>
             {showsNested &&
-              VAULT_SECTIONS.map((child) => {
-                const isChildActive = vaultSection === child.id;
-                return (
-                  <button
-                    key={child.id}
-                    type="button"
-                    data-subtab={child.id}
-                    data-testid={`vault-subtab-${child.id}`}
-                    aria-current={isChildActive || undefined}
-                    onClick={() => setVaultSection(child.id)}
-                    className={`shrink-0 flex items-center gap-2 md:ml-5 px-3 md:px-2.5 py-1.5 md:py-1.5 rounded-xl md:rounded-md text-2xs text-left whitespace-nowrap cursor-pointer transition-colors ${
-                      isChildActive
-                        ? 'text-fg-primary bg-surface-active'
-                        : 'text-fg-muted hover:text-fg-primary hover:bg-surface-hover'
-                    }`}
-                  >
-                    <span className="w-1 h-1 rounded-full bg-current opacity-60 shrink-0" />
-                    <span>{child.label}</span>
-                  </button>
-                );
-              })}
+              VAULT_SECTIONS.map((child) => (
+                <RailRow
+                  key={child.id}
+                  isActive={vaultSection === child.id}
+                  depth={1}
+                  onClick={() => setVaultSection(child.id)}
+                  testId={`vault-subtab-${child.id}`}
+                  dataSubTab={child.id}
+                >
+                  <span className="w-1 h-1 rounded-full bg-current opacity-60 shrink-0" />
+                  <span>{child.label}</span>
+                </RailRow>
+              ))}
           </React.Fragment>
         );
       })}
