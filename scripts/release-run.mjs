@@ -105,7 +105,7 @@ function watch(repo, runId) {
  * The client only believes the manifest, so the check is not "the job is green" but "this url
  * answers with the version we just built".
  */
-async function verifyManifest(repo, channel, version) {
+async function verifyManifest(repo, channel, expected) {
   const base =
     channel === 'release'
       ? `https://github.com/${repo}/releases/latest/download/latest.json`
@@ -114,17 +114,23 @@ async function verifyManifest(repo, channel, version) {
     const response = await fetch(base, { headers: { 'cache-control': 'no-cache' } }).catch(() => null);
     if (response?.ok) {
       const manifest = await response.json().catch(() => null);
-      if (manifest?.version === version) {
+      // elease must match exactly; a prerelease carries a run number we cannot know in advance.
+      const matches = channel === 'release'
+        ? manifest?.version === expected
+        : typeof manifest?.version === 'string' && manifest.version.startsWith(expected);
+      if (matches) {
         process.stdout.write(`== манифест ${channel}: ${manifest.version} ✓\n  ${base}\n`);
         return true;
       }
-      process.stdout.write(`  манифест отдаёт ${manifest?.version ?? '?'}, ждём ${version} (${attempt}/6)\n`);
+      process.stdout.write(
+        `  манифест отдаёт ${manifest?.version ?? '?'}, ждём ${expected}… (${attempt}/6)\n`
+      );
     } else {
       process.stdout.write(`  ${base} → ${response ? response.status : 'нет связи'} (${attempt}/6)\n`);
     }
     await new Promise((done) => setTimeout(done, 15000));
   }
-  process.stderr.write(`== манифест ${channel} так и не показал ${version}\n`);
+  process.stderr.write(`== манифест ${channel} так и не показал ${expected}\n`);
   return false;
 }
 
@@ -139,14 +145,20 @@ async function main() {
 
   const branch = options.ref ?? currentBranch();
   const baseVersion = repoVersion();
+  // The run number (and so the exact dev/beta version) is assigned by GitHub, not by us: the
+  // local preview can only promise the channel and the tag shape, and the manifest tells the rest.
   const meta = resolveRelease({
     ref: options.channel === 'release' ? `refs/tags/v${baseVersion}` : `refs/heads/${branch}`,
     baseVersion,
-    run: 0,
+    run: 1,
     channel: options.channel,
     notes: options.notes,
   });
-  process.stdout.write(`== ${repo} · ветка ${branch} · канал ${meta.channel} · версия ${meta.version}\n`);
+  // `release` names its version exactly; a prerelease carries a run number only GitHub knows.
+  const expected = meta.channel === 'release' ? meta.version : `${baseVersion}-${meta.channel}.`;
+  process.stdout.write(
+    `== ${repo} · ветка ${branch} · канал ${meta.channel} · ожидаемая версия ${expected}\n`
+  );
 
   if (options.push) {
     const dirty = run('git', ['status', '--porcelain'], { capture: true }).stdout;
@@ -187,7 +199,7 @@ async function main() {
 
   const green = watch(repo, options.runId);
   if (!green) process.exit(1);
-  const verified = await verifyManifest(repo, meta.channel, meta.version);
+  const verified = await verifyManifest(repo, meta.channel, expected);
   process.exit(verified ? 0 : 1);
 }
 
