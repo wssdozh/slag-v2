@@ -181,7 +181,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
             folder?.description ? 'text-fg-secondary' : 'text-fg-dim italic'
           }`}
         >
-          {folder?.description || 'Добавить описание для ИИ…'}
+          {folder?.description || 'Описание для ИИ'}
         </button>
       )}
     </div>
