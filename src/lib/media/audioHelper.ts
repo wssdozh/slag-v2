@@ -1,6 +1,7 @@
 // Builds the playable audio library from note attachments: format, duration, cover, voice.
 import type { SlagItem, InboxMode } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { pauseAudio } from './audioSession';
 
 export interface AudioTrack {
   id: string; // track unique id (itemId + attachmentId)
@@ -157,13 +158,15 @@ export function extractAudioTracks(
 
 /**
  * Capture-phase listener that pauses all other <audio> and <video> elements
- * whenever any audio begins playing in the DOM.
+ * whenever any audio begins playing in the DOM. The player's element lives in
+ * audioSession, outside the document, so it is stopped explicitly.
  */
 export function setupAudioCollisionGuard(): () => void {
   const onPlayCapture = (e: Event) => {
     const target = e.target;
     if (!(target instanceof HTMLMediaElement)) return;
 
+    pauseAudio();
     const allMedia = document.querySelectorAll<HTMLMediaElement>('audio, video');
     allMedia.forEach((media) => {
       if (media !== target && !media.paused) {
