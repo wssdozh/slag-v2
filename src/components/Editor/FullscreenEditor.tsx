@@ -85,6 +85,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     setStatus,
     dueDate,
     setDueDate,
+    reminder,
+    setReminder,
     duration,
     setDuration,
     recurrence,
@@ -463,6 +465,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                   setPriority={setPriority}
                   dueDate={dueDate}
                   setDueDate={setDueDate}
+                  reminder={reminder}
+                  setReminder={setReminder}
                   duration={duration}
                   setDuration={setDuration}
                   recurrence={recurrence}

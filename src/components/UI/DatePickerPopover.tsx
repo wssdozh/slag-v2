@@ -17,9 +17,66 @@ export interface DatePickerPopoverProps {
   onChange: (dateIso: string) => void;
   onClear?: () => void;
   onClose: () => void;
+  /** `HH:MM` of the task's reminder, when the caller edits a time at all. */
+  time?: string;
+  onTimeChange?: (time: string | null) => void;
   direction?: 'up' | 'down';
   className?: string;
 }
+
+const CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+/** Typed, not wheeled: the time is four digits, and a field is faster than a wheel for four digits. */
+const TimeField: React.FC<{ value?: string; onChange: (time: string | null) => void }> = ({ value, onChange }) => {
+  const [draft, setDraft] = useState(value ?? '');
+  const [seen, setSeen] = useState(value);
+
+  // A field keeps its own text while being typed; the prop only wins when it actually changed.
+  if (seen !== value) {
+    setSeen(value);
+    setDraft(value ?? '');
+  }
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      onChange(null);
+      return;
+    }
+    if (CLOCK.test(trimmed)) onChange(trimmed.length === 4 ? `0${trimmed}` : trimmed);
+    else setDraft(value ?? '');
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-1">
+      <Icon name="time.time" size="sm" tone="inherit" className="shrink-0 text-fg-muted" />
+      <input
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          commit();
+        }}
+        placeholder="чч:мм"
+        inputMode="numeric"
+        aria-label="время задачи"
+        data-testid="date-popover-time"
+        className="w-14 bg-transparent font-mono text-xs text-fg-soft placeholder-fg-dim outline-none ring-0"
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="ml-auto text-3xs text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
+        >
+          без времени
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
   isOpen = true,
@@ -27,6 +84,8 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
   onChange,
   onClear,
   onClose,
+  time,
+  onTimeChange,
   direction = 'up',
   className = '',
 }) => {
@@ -211,6 +270,14 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
           );
         })}
       </div>
+
+      {/* Time of day lives next to the date it belongs to, not in a second popover. */}
+      {value && onTimeChange && (
+        <>
+          <div className="h-px bg-tint-6 -mx-1" />
+          <TimeField value={time} onChange={onTimeChange} />
+        </>
+      )}
 
       {/* Clear Button (if date is selected) */}
       {value && onClear && (

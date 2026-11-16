@@ -6,7 +6,7 @@ import { formatRecurrenceLabel, RECURRENCE_PRESETS } from '../../../lib/time/rec
 import { Icon } from '../../UI/icons/Icon';
 import { Select } from '../../UI/Select';
 import { DatePickerPopover } from '../../UI/DatePickerPopover';
-import { formatDueDateLabel } from '../../../lib/time/dateUtils';
+import { formatDueDateLabel, getTodayIso } from '../../../lib/time/dateUtils';
 import { PRIORITY_LABELS } from '../../../lib/tasks/taskUtils';
 
 export interface EditorTaskFieldsProps {
@@ -16,6 +16,8 @@ export interface EditorTaskFieldsProps {
   setPriority: React.Dispatch<React.SetStateAction<'none' | 'low' | 'medium' | 'high'>>;
   dueDate: string;
   setDueDate: React.Dispatch<React.SetStateAction<string>>;
+  reminder?: string;
+  setReminder: React.Dispatch<React.SetStateAction<string | undefined>>;
   duration: number | undefined;
   setDuration: React.Dispatch<React.SetStateAction<number | undefined>>;
   recurrence: RecurrenceRule | undefined;
@@ -36,6 +38,8 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
   setPriority,
   dueDate,
   setDueDate,
+  reminder,
+  setReminder,
   duration,
   setDuration,
   recurrence,
@@ -162,12 +166,25 @@ export const EditorTaskFields: React.FC<EditorTaskFieldsProps> = ({
         <DatePickerPopover
           isOpen={isDatePickerOpen}
           value={dueDate}
+          time={reminder ? reminder.slice(11, 16) : undefined}
           onChange={(newDate) => {
             setDueDate(newDate);
+            // The time belongs to the day: moving the deadline moves the reminder with it.
+            if (reminder) setReminder(`${newDate}T${reminder.slice(11, 16)}:00`);
             setIsDatePickerOpen(false);
+          }}
+          onTimeChange={(nextTime) => {
+            if (!nextTime) {
+              setReminder(undefined);
+              return;
+            }
+            const day = dueDate || getTodayIso();
+            if (!dueDate) setDueDate(day);
+            setReminder(`${day}T${nextTime}:00`);
           }}
           onClear={() => {
             setDueDate('');
+            setReminder(undefined);
             setIsDatePickerOpen(false);
           }}
           onClose={() => setIsDatePickerOpen(false)}

@@ -32,6 +32,9 @@ export interface UseFullscreenDraftReturn {
   setStatus: React.Dispatch<React.SetStateAction<SlagItemStatus>>;
   dueDate: string;
   setDueDate: React.Dispatch<React.SetStateAction<string>>;
+  /** ISO date-time of the task's reminder: the day in `dueDate` plus the time of day. */
+  reminder: string | undefined;
+  setReminder: React.Dispatch<React.SetStateAction<string | undefined>>;
   duration: number | undefined;
   setDuration: React.Dispatch<React.SetStateAction<number | undefined>>;
   recurrence: RecurrenceRule | undefined;
@@ -73,6 +76,8 @@ export function useFullscreenDraft({
   const [priority, setPriority] = useState<'none' | 'low' | 'medium' | 'high'>(() => initialDraft?.priority ?? (item.priority || 'none'));
   const [status, setStatus] = useState<SlagItemStatus>(() => initialDraft?.status ?? (item.status || 'todo'));
   const [dueDate, setDueDate] = useState(() => initialDraft?.dueDate ?? (item.dueDate || ''));
+  // The time of day lives in `reminder` — the same field the feed stamps under a task.
+  const [reminder, setReminder] = useState<string | undefined>(() => item.reminder);
   const [duration, setDuration] = useState<number | undefined>(() => initialDraft?.duration ?? item.duration);
   const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(() => initialDraft?.recurrence ?? item.recurrence);
   const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
@@ -106,7 +111,7 @@ export function useFullscreenDraft({
       status: type === 'task' ? status : undefined,
       priority: type === 'task' ? priority : undefined,
       dueDate: type === 'task' ? dueDate : undefined,
-      reminder: type === 'task' ? item.reminder : undefined,
+      reminder: type === 'task' ? reminder : undefined,
       duration: type === 'task' ? duration : undefined,
       recurrence: type === 'task' ? recurrence : undefined,
       subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
@@ -116,7 +121,7 @@ export function useFullscreenDraft({
     storage.saveItem(updated);
     storage.clearFullscreenDraft(item.id);
     setSaveStatus('saved');
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime]);
+  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime]);
 
   // Auto-save in-flight edits to crash-proof draft storage & live autosave for existing notes
   useEffect(() => {
@@ -236,7 +241,7 @@ export function useFullscreenDraft({
       status: type === 'task' ? status : undefined,
       priority: type === 'task' ? priority : undefined,
       dueDate: type === 'task' ? dueDate : undefined,
-      reminder: type === 'task' ? item.reminder : undefined,
+      reminder: type === 'task' ? reminder : undefined,
       duration: type === 'task' ? duration : undefined,
       recurrence: type === 'task' ? recurrence : undefined,
       subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
@@ -265,7 +270,7 @@ export function useFullscreenDraft({
     }
     setSaveStatus('saved');
     onClose();
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, duration, recurrence, readTime, saveItem, updateItem, onSaved, addToast, onClose]);
+  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime, saveItem, updateItem, onSaved, addToast, onClose]);
 
   const handleClose = useCallback(() => {
     if (!item.id.startsWith('draft_')) {
@@ -295,6 +300,8 @@ export function useFullscreenDraft({
     setStatus,
     dueDate,
     setDueDate,
+    reminder,
+    setReminder,
     duration,
     setDuration,
     recurrence,
