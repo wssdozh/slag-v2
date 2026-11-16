@@ -408,6 +408,11 @@ export interface NotifyPrefs {
   tasks: boolean;
   /** A morning ping for tasks whose due date has passed. */
   overdue: boolean;
+  /**
+   * The "не беспокоить" mode: a reminder that falls inside the window waits for its end.
+   * Off means every reminder rings when it falls, and the window below is kept but idle.
+   */
+  quietEnabled: boolean;
   /** Inclusive start of the quiet window, `HH:MM` local. */
   quietFrom: string;
   /** Exclusive end of the quiet window, `HH:MM` local. */

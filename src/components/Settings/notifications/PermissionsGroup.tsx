@@ -38,7 +38,6 @@ export const PermissionsGroup: React.FC = () => {
             {index > 0 && <SettingsDivider />}
             <SettingsRow
               label={row.label}
-              description={row.description}
               testId={`access-${row.target}`}
               value={
                 <span className="font-mono" data-testid={`access-${row.target}-state`}>

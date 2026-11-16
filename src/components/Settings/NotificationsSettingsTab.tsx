@@ -1,4 +1,4 @@
-// уведомления этого устройства: что приходит, тихие часы и проверка системного тоста.
+// уведомления этого устройства: что приходит, режим «не беспокоить» и проверка системного тоста.
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getNotifyPrefs, saveNotifyPrefs } from '../../lib/notify/prefs';
@@ -40,8 +40,10 @@ export const NotificationsSettingsTab: React.FC = () => {
       />
 
       <QuietHoursGroup
+        enabled={prefs.quietEnabled}
         quietFrom={prefs.quietFrom}
         quietTo={prefs.quietTo}
+        onEnabledChange={(value) => patchPrefs({ quietEnabled: value })}
         onQuietFromChange={(value) => patchPrefs({ quietFrom: value })}
         onQuietToChange={(value) => patchPrefs({ quietTo: value })}
       />

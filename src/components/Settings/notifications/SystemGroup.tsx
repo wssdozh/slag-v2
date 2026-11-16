@@ -1,6 +1,6 @@
-// системные уведомления устройства: что это и кнопка проверки.
+// системные уведомления устройства: одна кнопка проверки.
 import React from 'react';
-import { SettingsDivider, SettingsGroup, SettingsRow } from '../SettingsUI';
+import { SettingsGroup, SettingsRow } from '../SettingsUI';
 
 interface SystemGroupProps {
   onTest: () => void;
@@ -9,13 +9,7 @@ interface SystemGroupProps {
 export const SystemGroup: React.FC<SystemGroupProps> = ({ onTest }) => (
   <SettingsGroup title="На этом устройстве">
     <SettingsRow
-      label="Системные напоминания"
-      description="всплывают, только пока канал доставки не подключён: иначе он уже прислал"
-    />
-    <SettingsDivider />
-    <SettingsRow
       label="Проверка"
-      description="покажем тестовое уведомление"
       right={
         <button
           type="button"

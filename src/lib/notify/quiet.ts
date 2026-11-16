@@ -16,6 +16,8 @@ function clockMinutes(value: string): number | null {
 
 /** True when this moment falls inside the quiet window, which may wrap past midnight. */
 export function inQuietHours(timestamp: number, prefs: NotifyPrefs): boolean {
+  // The window is kept while the mode is off, so turning it back on needs no retyping.
+  if (!prefs.quietEnabled) return false;
   const from = clockMinutes(prefs.quietFrom);
   const to = clockMinutes(prefs.quietTo);
   if (from === null || to === null || from === to) return false;

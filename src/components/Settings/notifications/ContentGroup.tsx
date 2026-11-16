@@ -23,7 +23,6 @@ export const ContentGroup: React.FC<ContentGroupProps> = ({
     <SettingsDivider />
     <SettingsRow
       label="Просроченные задачи"
-      description="Раз в день в 10:00, пока не закрыта"
       right={<SettingsSwitch label="Просроченные задачи" checked={overdue} onChange={onOverdueChange} />}
     />
   </SettingsGroup>

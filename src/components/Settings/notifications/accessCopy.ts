@@ -5,25 +5,12 @@ import type { DeviceAccessStatus, DeviceAccessTarget } from '../../../types';
 export interface DeviceAccessRow {
   target: DeviceAccessTarget;
   label: string;
-  description: string;
 }
 
 export const DEVICE_ACCESS_ROWS: DeviceAccessRow[] = [
-  {
-    target: 'overlay',
-    label: 'показ поверх других приложений',
-    description: 'напоминание и будильник всплывают поверх другого приложения, а не ждут в шторке',
-  },
-  {
-    target: 'fullScreen',
-    label: 'будильники поверх экрана',
-    description: 'android 14+: будильник занимает экран целиком, а не строкой в шторке',
-  },
-  {
-    target: 'notifications',
-    label: 'уведомления',
-    description: 'система вообще показывает уведомления этого приложения',
-  },
+  { target: 'overlay', label: 'показ поверх других приложений' },
+  { target: 'fullScreen', label: 'будильники поверх экрана' },
+  { target: 'notifications', label: 'уведомления' },
 ];
 
 /** The status field for a row; null until the first probe answers. */

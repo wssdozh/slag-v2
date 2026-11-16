@@ -1,5 +1,5 @@
 import { test, expect } from './support/selfhostFixture';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 }]) {
   test(`integrations are a list with one open at a time at ${viewport.width}px`, async ({ page }) => {
@@ -64,10 +64,80 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     await expect(scope.getByTestId('system-notify-test')).toBeVisible();
     await expect(scope.getByText(/telegram/i)).toHaveCount(0);
     await expect(scope.getByText('Скрывать текст под спойлером')).toHaveCount(0);
+    // No grey second line under a row: a label and its control, nothing else.
+    await expect(scope.getByText('системные напоминания')).toHaveCount(0);
+    await expect(scope.getByText('покажем тестовое уведомление')).toHaveCount(0);
+    await expect(scope.getByText('Раз в день в 10:00')).toHaveCount(0);
+    // Quiet hours are one mode, not two free-text clocks.
+    await expect(scope.locator('input[type="text"]')).toHaveCount(0);
     await expect(scope.locator('button button')).toHaveCount(0);
     expect(await scope.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     await settle(page);
     await page.screenshot({ path: `test-results/screenshots/settings-notifications-${viewport.width}.png` });
+
+    const quietToggle = scope.getByRole('switch', { name: 'Не беспокоить' });
+    const quietFrom = scope.getByTestId('quiet-hours-from');
+    await expect(quietToggle).toHaveAttribute('aria-checked', 'true');
+    await expect(quietFrom).toHaveText('23:00');
+
+    // Off folds the window away; the stored times are still there when it comes back.
+    await quietToggle.click();
+    await expect(quietFrom).toHaveCount(0);
+    await expect(scope.getByTestId('quiet-hours-to')).toHaveCount(0);
+    await quietToggle.click();
+    await expect(quietFrom).toHaveText('23:00');
+
+    // The row opens a wheel dialog: hours and minutes, snapped one row at a time.
+    await quietFrom.click();
+    const picker = page.getByRole('dialog', { name: 'начало тихих часов' });
+    await expect(picker).toBeVisible();
+    await expect(picker.getByTestId('time-picker-hour')).toHaveCSS('scroll-snap-type', 'y mandatory');
+    await expect(picker.getByTestId('time-picker-hour-23')).toHaveAttribute('aria-selected', 'true');
+    await expect(picker.getByTestId('time-picker-minute-0')).toHaveAttribute('aria-selected', 'true');
+    await settleDialog(picker);
+    await page.screenshot({
+      path: `test-results/screenshots/notify-quiet-${viewport.width < 768 ? 'mobile' : 'desktop'}.png`,
+    });
+
+    // Escape is a cancel: the dialog closes, the settings screen behind it stays, nothing is saved.
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+    await expect(scope.getByTestId('quiet-hours-from')).toHaveText('23:00');
+    await expect(scope).toBeVisible();
+
+    // Only the footer's "готово" writes, and it writes the wheel's row.
+    await scope.getByTestId('quiet-hours-from').click();
+    await expect(picker).toBeVisible();
+    await picker.getByTestId('time-picker-hour-21').click();
+    await picker.getByTestId('time-picker-minute-5').click();
+    await expect(picker.getByTestId('time-picker-hour-21')).toHaveAttribute('aria-selected', 'true');
+    await picker.getByTestId('time-picker-apply').click();
+    await expect(picker).toHaveCount(0);
+    await expect(scope.getByTestId('quiet-hours-from')).toHaveText('21:05');
+
+    // The wheel answers the keyboard: an arrow steps one row, Enter is the same "готово".
+    await scope.getByTestId('quiet-hours-from').click();
+    await expect(picker).toBeVisible();
+    await page.keyboard.press('ArrowUp');
+    await expect(picker.getByTestId('time-picker-hour-20')).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Enter');
+    await expect(picker).toHaveCount(0);
+    await expect(scope.getByTestId('quiet-hours-from')).toHaveText('20:05');
+
+    // "отмена" is the same no-op as Escape.
+    const toPicker = page.getByRole('dialog', { name: 'конец тихих часов' });
+    await scope.getByTestId('quiet-hours-to').click();
+    await expect(toPicker).toBeVisible();
+    await toPicker.getByTestId('time-picker-minute-30').click();
+    await toPicker.getByTestId('time-picker-cancel').click();
+    await expect(scope.getByTestId('quiet-hours-to')).toHaveText('08:00');
+  });
+}
+
+/** Waits out the dialog's own entrance so the screenshot is not a half-transparent frame. */
+async function settleDialog(dialog: Locator): Promise<void> {
+  await dialog.evaluate(async (element) => {
+    await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished));
   });
 }
 
