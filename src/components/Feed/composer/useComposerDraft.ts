@@ -11,6 +11,7 @@ import type {
 import { storage } from '../../../lib/storage';
 import { extractFolderToken } from '../../../lib/time/todoistTaskParser';
 import { UI_DELAYS } from '../../../config';
+import type { ComposerFieldHandle } from './field';
 
 export interface ComposerDraftState {
   content: string;
@@ -34,7 +35,7 @@ export interface UseComposerDraftOptions {
   replyTarget: ReplyTarget | null;
   setReplyTarget: (target: ReplyTarget | null) => void;
   folders: FolderMeta[];
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  field: ComposerFieldHandle;
   isModal?: boolean;
   isActive?: boolean;
   isFullscreenEditorOpen?: boolean;
@@ -63,7 +64,7 @@ export const useComposerDraft = ({
   replyTarget,
   setReplyTarget,
   folders,
-  textareaRef,
+  field,
   isModal = false,
   isActive = true,
   isFullscreenEditorOpen = false,
@@ -161,11 +162,8 @@ export const useComposerDraft = ({
     setDuration(undefined);
     setRecurrence(undefined);
     setReplyTarget(null);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
     onResetExtraRef.current?.();
-  }, [setReplyTarget, textareaRef]);
+  }, [setReplyTarget]);
 
   // Initialize replyTarget from draft on initial mount if available
   useEffect(() => {
@@ -181,7 +179,7 @@ export const useComposerDraft = ({
       if (
         typeof document !== 'undefined' &&
         document.hasFocus() &&
-        textareaRef.current === document.activeElement &&
+        field.isFocused() &&
         Date.now() - lastLocalUserEditTimeRef.current < 800
       ) {
         return;
@@ -232,7 +230,7 @@ export const useComposerDraft = ({
       window.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('focus', syncWithStorage);
     };
-  }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder, textareaRef]);
+  }, [activeFolder, isFullscreenEditorOpen, resetDraftState, setReplyTarget, setTargetFolder, field]);
 
   // Saving from the fullscreen editor consumes the draft: the editor closes with nothing stored,
   // so the field must not keep a copy that would become a duplicate note on the next Enter.
@@ -351,7 +349,7 @@ export const useComposerDraft = ({
             const isUserActivelyTyping =
               typeof document !== 'undefined' &&
               document.hasFocus() &&
-              textareaRef.current === document.activeElement &&
+              field.isFocused() &&
               Date.now() - lastLocalUserEditTimeRef.current < 800;
 
             const isIdentical =
@@ -398,7 +396,7 @@ export const useComposerDraft = ({
       }
     });
     return unsubscribe;
-  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder, textareaRef]);
+  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder, field]);
 
   const notifyUserEdit = useCallback(() => {
     lastLocalUserEditTimeRef.current = Date.now();

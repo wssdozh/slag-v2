@@ -1,16 +1,16 @@
 // What a `/command` does to the draft: swap the type, set a property, start a recorder.
-import type React from 'react';
 import type { SlagItemPriority, SlagItemType } from '../../../types';
 import type { SlashCommand } from '../../../types/slashCommands';
 import { storage } from '../../../lib/storage';
 import { getTodayIso, getTomorrowIso } from '../../../lib/time/dateUtils';
+import type { ComposerFieldHandle } from './field';
 
 type Toast = (text: string, type?: 'info' | 'success' | 'error') => void;
 
 export interface UseComposerSlashCommandsOptions {
   content: string;
   setContent: (content: string) => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  field: ComposerFieldHandle;
   setItemType: (type: SlagItemType) => void;
   setDueDate: (date: string) => void;
   setPriority: (priority: SlagItemPriority) => void;
@@ -33,7 +33,7 @@ export interface UseComposerSlashCommandsOptions {
 export function useComposerSlashCommands({
   content,
   setContent,
-  textareaRef,
+  field,
   setItemType,
   setDueDate,
   setPriority,
@@ -48,8 +48,7 @@ export function useComposerSlashCommands({
   addToast,
 }: UseComposerSlashCommandsOptions) {
   const executeSlashCommand = (cmd: SlashCommand) => {
-    const el = textareaRef.current;
-    const cursorPos = el ? el.selectionStart || content.length : content.length;
+    const cursorPos = field.getSelection().from || content.length;
     const textBefore = content.slice(0, cursorPos);
     const textAfter = content.slice(cursorPos);
     const slashMatch = textBefore.match(/(?:^|\s)\/([a-zA-Zа-яА-ЯёЁ0-9_-]*)$/);
@@ -132,10 +131,8 @@ export function useComposerSlashCommands({
     }
 
     setTimeout(() => {
-      if (el) {
-        el.focus({ preventScroll: true });
-        el.setSelectionRange(newCursor, newCursor);
-      }
+      field.focus();
+      field.setCaret(newCursor);
     }, 10);
   };
 

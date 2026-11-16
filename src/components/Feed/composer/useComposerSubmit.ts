@@ -16,6 +16,7 @@ import { storage } from '../../../lib/storage';
 import { canEnrichAttachments, enrichItemAttachments } from '../../../lib/media/enrichment/dispatch';
 import { categorizeDraft } from '../../../lib/ai/aiService';
 import { resolveComposerFields, type ComposerDismissals } from './composerFields';
+import type { ComposerFieldHandle } from './field';
 
 export interface UseComposerSubmitOptions {
   content: string;
@@ -43,7 +44,7 @@ export interface UseComposerSubmitOptions {
   setRecordMode: (mode: 'idle' | 'holding' | 'locked') => void;
   setLockHint: (hint: 'audio' | 'video' | null) => void;
   resetDraftState: () => void;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  field: ComposerFieldHandle;
   onComplete?: () => void;
 }
 
@@ -78,7 +79,7 @@ export function useComposerSubmit({
   setRecordMode,
   setLockHint,
   resetDraftState,
-  textareaRef,
+  field,
   onComplete,
 }: UseComposerSubmitOptions) {
   // Защита от повторного создания: второй вызов в том же тике видит те же данные
@@ -163,9 +164,8 @@ export function useComposerSubmit({
         // Only reclaim focus if it actually left. Retyping the caret into an
         // already focused field re-opens the keyboard on Android and reads as a
         // second bounce right after the note lands.
-        const field = textareaRef.current;
-        if (field && document.activeElement !== field) {
-          field.focus({ preventScroll: true });
+        if (!field.isFocused()) {
+          field.focus();
         }
       });
     }
