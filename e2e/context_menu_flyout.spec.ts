@@ -46,23 +46,26 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await typeSubmenu.locator('button', { hasText: 'Таска' }).click();
     await expect(page.locator('text=Превращено в: таска')).toBeVisible();
 
-    // 4. Verify "Дополнительно" flyout on the side
+    // 4. Verify the "Файл" flyout on the side: the wiki link moved in here,
+    //    and the entry is gone from the main menu.
     await page.waitForTimeout(400);
     await firstCard.click({ button: 'right' });
     await expect(contextMenu).toBeVisible();
 
-    const moreBtn = contextMenu.locator('button', { hasText: 'Дополнительно' });
-    await expect(moreBtn).toBeVisible();
-    await moreBtn.hover();
+    await expect(contextMenu.locator('button', { hasText: 'Дополнительно' })).toHaveCount(0);
 
-    const moreSubmenu = contextMenu.locator('button', { hasText: 'Копировать [[линк]]' }).locator('..');
-    await expect(moreSubmenu).toBeVisible();
-    await expect(moreSubmenu.locator('button', { hasText: 'Копировать [[линк]]' })).toBeVisible();
+    const fileBtn = contextMenu.getByRole('button', { name: 'Файл', exact: true });
+    await expect(fileBtn).toBeVisible();
+    await fileBtn.hover();
+
+    const fileSubmenu = contextMenu.locator('button', { hasText: 'Копировать [[линк]]' }).locator('..');
+    await expect(fileSubmenu).toBeVisible();
+    await expect(fileSubmenu.locator('button', { hasText: 'Копировать [[линк]]' })).toBeVisible();
     // Duplicate, archive and full link were removed from the menu for good.
-    await expect(moreSubmenu.locator('button', { hasText: 'Дублировать' })).toHaveCount(0);
-    await expect(moreSubmenu.locator('button', { hasText: 'В архив' })).toHaveCount(0);
+    await expect(fileSubmenu.locator('button', { hasText: 'Дублировать' })).toHaveCount(0);
+    await expect(fileSubmenu.locator('button', { hasText: 'В архив' })).toHaveCount(0);
 
-    const moreBox = await moreSubmenu.boundingBox();
+    const moreBox = await fileSubmenu.boundingBox();
     if (mainBox && moreBox) {
       expect(moreBox.x).toBeGreaterThanOrEqual(mainBox.x + mainBox.width - 2);
     }
@@ -89,12 +92,12 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await page.keyboard.press('1');
     await expect(page.locator('text=Превращено в: заметка')).toBeVisible();
 
-    // 7. Verify "Проводник" flyout submenu (Open in Explorer, Copy Full Link, Copy Full Path)
+    // 7. Verify the "Файл" flyout submenu (link, open, paths, ID)
     await page.waitForTimeout(400);
     await firstCard.click({ button: 'right' });
     await expect(contextMenu).toBeVisible();
 
-    const explorerBtn = contextMenu.getByRole('button', { name: 'Проводник', exact: true });
+    const explorerBtn = contextMenu.getByRole('button', { name: 'Файл', exact: true });
     await expect(explorerBtn).toBeVisible();
     await explorerBtn.hover();
 
@@ -104,6 +107,8 @@ test.describe('Context Menu Cascading Flyouts & Quick Type Switcher', () => {
     await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать фулл ссылку' })).toHaveCount(0);
     await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать полный путь' })).toBeVisible();
     await expect(explorerSubmenu.locator('button', { hasText: 'Относительный путь' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Скопировать ID' })).toBeVisible();
+    await expect(explorerSubmenu.locator('button', { hasText: 'Копировать [[линк]]' })).toBeVisible();
 
     // Capture screenshot of side flyout for explorer
     await page.screenshot({
@@ -184,7 +189,7 @@ test.describe('Context Menu viewport fit', () => {
     await page.screenshot({ path: 'test-results/screenshots/context-menu-bottom-edge.png' });
 
     // Flyouts are clamped to the same viewport on both axes.
-    await menu.getByRole('button', { name: 'Проводник', exact: true }).hover();
+    await menu.getByRole('button', { name: 'Файл', exact: true }).hover();
     const explorerFlyout = page.locator('button', { hasText: 'Открыть в проводнике' }).locator('..');
     await expect(explorerFlyout).toBeVisible();
     const flyoutBox = await explorerFlyout.boundingBox();
