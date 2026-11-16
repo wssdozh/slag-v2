@@ -1090,8 +1090,8 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
 
     // 8. Test Escape key dismisses slash command menu
     await textarea.fill('/');
-    await expect(page.locator('text=Команды композера').first()).toBeVisible();
+    await expect(page.locator('text=/task').first()).toBeVisible();
     await textarea.press('Escape');
-    await expect(page.locator('text=Команды композера')).not.toBeVisible();
+    await expect(page.locator('text=/task')).toHaveCount(0);
   });
 });

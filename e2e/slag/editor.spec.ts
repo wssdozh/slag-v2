@@ -473,7 +473,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // Test Slash Command menu in ComposerModal
     await taskInput.fill('/');
     await page.waitForTimeout(150);
-    const slashMenu = page.locator('text=Команды композера');
+    const slashMenu = page.locator('text=/task').first();
     await expect(slashMenu).toBeVisible();
     await page.screenshot({
       path: 'test-results/screenshots/composer-modal-slash-menu.png',
