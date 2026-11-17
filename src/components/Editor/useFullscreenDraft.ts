@@ -4,6 +4,7 @@ import { storage } from '../../lib/storage';
 import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft } from '../../types';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { consumeComposerDraft, restoreComposerDraft } from './fullscreen/composerDraftOwner';
 
 export interface UseFullscreenDraftOptions {
   item: SlagItem;
@@ -185,12 +186,14 @@ export function useFullscreenDraft({
       recurrence: type === 'task' ? recurrence : undefined,
       updatedAt: Date.now(),
     };
-    storage.saveComposerDraft(folder || DEFAULT_INBOX_FOLDER, draftData, 'local');
-    if (folder && folder !== DEFAULT_INBOX_FOLDER) {
-      storage.saveComposerDraft(DEFAULT_INBOX_FOLDER, draftData, 'local');
+    if (!restoreComposerDraft(item, draftData)) {
+      storage.saveComposerDraft(folder || DEFAULT_INBOX_FOLDER, draftData, 'local');
+      if (folder && folder !== DEFAULT_INBOX_FOLDER) {
+        storage.saveComposerDraft(DEFAULT_INBOX_FOLDER, draftData, 'local');
+      }
     }
     storage.clearFullscreenDraft(item.id);
-  }, [item.id, item.replyToId, folder, content, type, priority, dueDate, tags, attachments, duration, recurrence]);
+  }, [item, folder, content, type, priority, dueDate, tags, attachments, duration, recurrence]);
 
   // Flush on unmount if pending or sync back to composer draft. The latest closures live in refs:
   // as a dependency-driven cleanup this ran on every keystroke and wrote the composer draft
@@ -249,22 +252,17 @@ export function useFullscreenDraft({
       updatedAt: Date.now(),
     };
 
-    didSaveRef.current = true;
     if (isNewDraft) {
-      storage.clearFullscreenDraft(item.id);
-      // The composer the draft came from must not keep a copy of what just became a note. Only
-      // when it is that same text: a note opened from a hotkey may sit next to an unrelated draft.
-      const composerDraft = storage.getComposerDraft(folder) ?? storage.getComposerDraft(DEFAULT_INBOX_FOLDER);
-      if (composerDraft?.content.trim() === content.trim()) {
-        storage.deleteComposerDraft(folder);
-        storage.deleteComposerDraft(DEFAULT_INBOX_FOLDER);
-      }
       const saved = saveItem(updated);
+      didSaveRef.current = true;
+      storage.clearFullscreenDraft(item.id);
+      consumeComposerDraft(item);
       onSaved?.(saved);
       addToast?.('Запись создана и сохранена', 'success');
     } else {
       storage.clearFullscreenDraft(item.id);
       updateItem(updated);
+      didSaveRef.current = true;
       onSaved?.(updated);
       addToast?.('Изменения сохранены', 'success');
     }

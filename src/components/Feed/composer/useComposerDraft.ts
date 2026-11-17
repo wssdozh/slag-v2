@@ -269,9 +269,10 @@ export const useComposerDraft = ({
     };
   }, [activeFolder, isModal, isActive, localDraftStamp]);
 
+  // The editor owns edits while expanded; a pending composer write must not replace its snapshot.
   // Debounced autosave while typing
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive || isFullscreenEditorOpen) return;
     const timer = setTimeout(() => {
       // If we just applied an incoming remote draft, skip echoing it back out
       if (isApplyingRemoteDraftRef.current) {
@@ -305,7 +306,7 @@ export const useComposerDraft = ({
     }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive, localDraftStamp]);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive, isFullscreenEditorOpen, localDraftStamp]);
 
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
