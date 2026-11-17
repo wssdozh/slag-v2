@@ -22,12 +22,12 @@ export const KanbanStatusIcon: React.FC<KanbanStatusIconProps> = ({ iconType, ic
 
   switch (iconType) {
     case 'dashed':
-      return <Icon name="status.backlog" size="none" tone="inherit" className={`${className} shrink-0`} />;
+      return <Icon name="status.backlog" size="md" tone="inherit" className={`${className} shrink-0`} />;
     case 'circle':
-      return <Icon name="status.todo" size="none" tone="inherit" className={`${className} shrink-0`} />;
+      return <Icon name="status.todo" size="md" tone="inherit" className={`${className} shrink-0`} />;
     case 'in_progress':
       return <InProgressIcon className={className} />;
     case 'done':
-      return <Icon name="status.done" size="none" tone="inherit" className={`${className} shrink-0`} />;
+      return <Icon name="status.done" size="md" tone="inherit" className={`${className} shrink-0`} />;
   }
 };

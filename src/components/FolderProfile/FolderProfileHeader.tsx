@@ -91,7 +91,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
               aria-label="Сменить иконку папки"
               className={`${iconButtonClass[variant]} shrink-0 flex items-center justify-center text-fg-secondary hover:text-fg-primary hover:bg-tint-6 motion-surface outline-none ring-0 cursor-pointer`}
             >
-              <Icon name={folderIcon} size="none" tone="inherit" className={iconGlyphClass[variant]} />
+              <Icon name={folderIcon} size="md" tone="inherit" className={iconGlyphClass[variant]} />
             </button>
           }
         >
@@ -134,7 +134,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
               <TitleTag className={`${nameClass[variant]} text-fg-primary truncate`}>
                 {folder?.name || path}
               </TitleTag>
-              <Icon name="action.edit" size="xs" tone="dim" className="opacity-0 group-hover/name:opacity-100 transition-opacity shrink-0" />
+              <Icon name="action.edit" size="sm" tone="dim" className="opacity-0 group-hover/name:opacity-100 transition-opacity shrink-0" />
             </button>
           )}
           <span className="text-2xs font-mono text-fg-muted truncate">

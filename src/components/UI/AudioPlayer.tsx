@@ -7,26 +7,6 @@ import { logger } from '../../lib/logger/logger';
 
 const mediaLog = logger.scope('MEDIA');
 
-
-const TelegramTranscribeIcon: React.FC<{ className?: string }> = ({ className = 'w-3.5 h-3.5' }) => (
-  <svg
-    viewBox="0 0 16 16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    {/* Arrow: -> */}
-    <path d="M2 8.5h4.5" />
-    <path d="M4.5 6l2.5 2.5-2.5 2.5" />
-    {/* Capital letter A: */}
-    <path d="M9.5 12l2-7 2 7" />
-    <path d="M10.2 9.7h2.6" />
-  </svg>
-);
-
 interface AudioPlayerProps {
   /** Missing means the bytes never reached this device: the row says so and arms no play. */
   src?: string;
@@ -211,9 +191,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           title={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
         >
           {isPlaying ? (
-            <Icon name="media.pause" size="xs" tone="inherit" className="fill-current" />
+            <Icon name="media.pause" size="sm" tone="inherit" variant="filled" />
           ) : (
-            <Icon name="media.play" size="xs" tone="inherit" className="fill-current ml-0.5" />
+            <Icon name="media.play" size="sm" tone="inherit" variant="filled" className="ml-0.5" />
           )}
         </button>
 
@@ -257,9 +237,9 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       aria-label={src ? (isPlaying ? 'Пауза' : 'Воспроизвести') : 'Файла нет на устройстве'}
     >
       {isPlaying ? (
-        <Icon name="media.pause" size="md" tone="inherit" className="fill-current" />
+        <Icon name="media.pause" size="md" tone="inherit" variant="filled" />
       ) : (
-        <Icon name="media.play" size="md" tone="inherit" className="fill-current ml-0.5" />
+        <Icon name="media.play" size="md" tone="inherit" variant="filled" className="ml-0.5" />
       )}
     </button>
   );
@@ -312,11 +292,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       {enrichmentStatus === 'processing' ? (
         <Icon name="status.loading" size="sm" className="animate-spin" />
       ) : transcript && isExpanded ? (
-        <Icon name="nav.up" size="md" tone="soft" strokeWidth={2.25} />
+        // weight is decided by Icon, not by the call site
+        <Icon name="nav.up" size="md" tone="soft" />
       ) : transcript ? (
-        <Icon name="nav.down" size="md" strokeWidth={2.25} className="hover:text-fg-soft" />
+        // weight is decided by Icon, not by the call site
+        <Icon name="nav.down" size="md" className="hover:text-fg-soft" />
       ) : (
-        <TelegramTranscribeIcon className="w-3.5 h-3.5 text-fg-secondary hover:text-fg-soft" />
+        <Icon name="action.transcribe" size="md" />
       )}
     </button>
   ) : null;

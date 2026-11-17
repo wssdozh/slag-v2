@@ -78,7 +78,7 @@ export const AssistantSearchResults: React.FC<AssistantSearchResultsProps> = ({
                   </span>
                 )}
               </div>
-              <Icon name="nav.open" size="xs" tone="muted" className="group-hover:text-fg-tertiary shrink-0 transition-colors" />
+              <Icon name="nav.open" size="sm" tone="muted" className="group-hover:text-fg-tertiary shrink-0 transition-colors" />
             </button>
           ))}
 
@@ -90,10 +90,10 @@ export const AssistantSearchResults: React.FC<AssistantSearchResultsProps> = ({
               title="Отобразить только эти найденные записи в центральной ленте"
             >
               <div className="flex items-center gap-1.5">
-                <Icon name="action.filter" size="xs" />
+                <Icon name="action.filter" size="sm" />
                 <span>Показать {count} в ленте</span>
               </div>
-              <Icon name="nav.open" size="xs" tone="muted" />
+              <Icon name="nav.open" size="sm" tone="muted" />
             </button>
           )}
         </div>

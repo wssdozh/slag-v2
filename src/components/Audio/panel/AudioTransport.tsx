@@ -57,7 +57,7 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
           title="Предыдущий трек"
           aria-label="Предыдущий трек"
         >
-          <Icon name="media.skipBack" size="lg" tone="inherit" className="fill-current" />
+          <Icon name="media.skipBack" size="lg" tone="inherit" />
         </button>
 
         {/* Central Round Play / Pause */}
@@ -73,9 +73,9 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
           aria-label={isTrackMissing ? 'Файла нет на устройстве' : isPlaying ? 'Пауза' : 'Воспроизведение'}
         >
           {isPlaying ? (
-            <Icon name="media.pause" size="none" tone="inherit" className="w-6 h-6 fill-current" />
+            <Icon name="media.pause" size="xl" tone="inherit" variant="filled" />
           ) : (
-            <Icon name="media.play" size="none" tone="inherit" className="w-6 h-6 fill-current ml-0.5" />
+            <Icon name="media.play" size="xl" tone="inherit" variant="filled" className="ml-0.5" />
           )}
         </button>
 
@@ -86,7 +86,7 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
           title="Следующий трек"
           aria-label="Следующий трек"
         >
-          <Icon name="media.skipForward" size="lg" tone="inherit" className="fill-current" />
+          <Icon name="media.skipForward" size="lg" tone="inherit" />
         </button>
 
         {/* +10s */}

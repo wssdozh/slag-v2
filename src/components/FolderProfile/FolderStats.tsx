@@ -30,7 +30,7 @@ export const FolderStats: React.FC<FolderStatsProps> = ({ mediaData, variant }) 
               className="flex items-center justify-between py-1.5 border-b border-subtle last:border-b-0"
             >
               <span className={`flex items-center gap-2 ${hasItems ? 'text-fg-secondary' : 'text-fg-dim'}`}>
-                <Icon name={icon} size="none" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
+                <Icon name={icon} size="sm" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
                 <span>{label}</span>
               </span>
               <span
@@ -54,7 +54,7 @@ export const FolderStats: React.FC<FolderStatsProps> = ({ mediaData, variant }) 
           const hasItems = value > 0;
           return (
             <div key={key} data-testid={`folder-stat-${key}`} className="flex flex-col items-center gap-0.5 text-center">
-              <Icon name={icon} size="none" tone="inherit" className={`w-3.5 h-3.5 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
+              <Icon name={icon} size="sm" tone="inherit" className={`w-3.5 h-3.5 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
               <span
                 data-testid={`folder-stat-${key}-value`}
                 className={`font-mono text-base font-semibold ${hasItems ? 'text-fg-primary' : 'text-fg-dim'}`}

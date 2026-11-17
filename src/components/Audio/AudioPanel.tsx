@@ -229,7 +229,7 @@ export const AudioPanel: React.FC = () => {
                   : 'Следовать за активной (нажмите, чтобы закрепить)'
               }
             >
-              <Icon name="action.pin" size="sm" tone="inherit" className={`transition-[color,scale] ${scopeMode === 'pinned' ? 'text-fg-soft fill-current scale-105' : 'text-fg-muted group-hover:text-fg-tertiary'}`} />
+              <Icon name="action.pin" size="sm" tone="inherit" variant={scopeMode === 'pinned' ? 'filled' : 'outline'} className={`transition-[color,scale] ${scopeMode === 'pinned' ? 'text-fg-soft scale-105' : 'text-fg-muted group-hover:text-fg-tertiary'}`} />
             </button>
 
             {/* Selecting a folder pins it; the separate pin toggle keeps following active folders. */}

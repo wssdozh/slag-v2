@@ -128,6 +128,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
                   name={tab.icon}
                   size="lg"
                   tone={isActive ? 'primary' : 'secondary'}
+                  variant={isActive ? 'filled' : 'outline'}
                   className="transition-colors duration-150"
                 />
                 {hasDot && (

@@ -28,7 +28,7 @@ const FolderModalDialog: React.FC<FolderModalDialogProps> = ({ parentPath, prese
   const [name, setName] = useState('');
   const [parent, setParent] = useState<string>(parentPath || '');
   const [description, setDescription] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState<string>('Folder');
+  const [selectedIcon, setSelectedIcon] = useState<string>('folder.generic');
 
   const parentOptions = useMemo<SelectOption[]>(() => {
     const targets = folders.filter(folder => folder.path !== DEFAULT_INBOX_FOLDER);

@@ -30,9 +30,6 @@ MyVault/
 │   └── photo_1716034400.png
 ├── .trash/                     # Безопасная корзина удаленных заметок
 │   └── Удаленная заметка.md
-├── .slag/                      # Служебные данные приложения
-│   ├── folders.json            # Иконки и текстовые описания для ИИ-триажа
-│   └── config.json             # Конфигурация интерфейса и API-ключи
 ├── Входящие/                   # Системная папка неразобранного (Inbox)
 │   ├── Быстрая мысль.md
 │   └── Купить кофе.md
@@ -44,6 +41,8 @@ MyVault/
 └── Личное/
     └── Заметки о книгах.md
 ```
+
+Служебные метаданные папок и воркспейса хранятся не внутри хранилища, а в каталоге данных приложения: `vaults/<id>/state.json` (ключ `folders` и объект `workspace`). В корне хранилища лежат только заметки, `.attachments/` и `.trash/`.
 
 ---
 
@@ -157,33 +156,37 @@ export interface SlagItem {
 
 ---
 
-## 6. Метаданные папок (`.slag/folders.json`)
+## 6. Метаданные папок (`state.json`, ключ `folders`)
 
-Папки на диске являются обычными директориями, а расширенные метаданные (иконка, описание для ИИ и персональные настройки Канбана) хранятся в `.slag/folders.json`:
+Папки на диске являются обычными директориями, а расширенные метаданные (иконка, описание для ИИ и персональные настройки Канбана) хранятся не во frontmatter заметок, а в служебном `state.json` каталога данных приложения (`vaults/<id>/state.json`), в массиве под ключом `folders`:
 
 ```json
-[
-  {
-    "path": "Входящие",
-    "name": "Входящие",
-    "description": "Все новые неотсортированные мысли, идеи и задачи.",
-    "icon": "Inbox",
-    "isSystem": true
-  },
-  {
-    "path": "Проекты/SLAG v2",
-    "name": "SLAG v2",
-    "description": "Разработка приложения заметок в стиле Linear на React и Tauri v2.",
-    "icon": "Code2",
-    "showReferenceColumn": true,
-    "kanbanColumns": [
-      { "id": "backlog", "title": "Бэклог", "statusMapping": "todo" },
-      { "id": "dev", "title": "В разработке", "statusMapping": "in_progress" },
-      { "id": "review", "title": "Код-ревью", "statusMapping": "in_progress" },
-      { "id": "released", "title": "Релиз", "statusMapping": "done" }
-    ]
-  }
-]
+{
+  "folders": [
+    {
+      "path": "Входящие",
+      "name": "Входящие",
+      "description": "Все новые неотсортированные мысли, идеи и задачи.",
+      "icon": "entity.inbox",
+      "isSystem": true
+    },
+    {
+      "path": "Проекты/SLAG v2",
+      "name": "SLAG v2",
+      "description": "Разработка приложения заметок в стиле Linear на React и Tauri v2.",
+      "icon": "folder.code",
+      "showReferenceColumn": true,
+      "kanbanColumns": [
+        { "id": "backlog", "title": "Бэклог", "statusMapping": "todo" },
+        { "id": "dev", "title": "В разработке", "statusMapping": "in_progress" },
+        { "id": "review", "title": "Код-ревью", "statusMapping": "in_progress" },
+        { "id": "released", "title": "Релиз", "statusMapping": "done" }
+      ]
+    }
+  ],
+  "workspace": {},
+  "updatedAt": 1716034200000
+}
 ```
 
 Текстовое поле `description` считывает Gemini Flash при проведении автоматического триажа, а массив `kanbanColumns` позволяет каждой папке иметь собственный жизненный цикл задач.

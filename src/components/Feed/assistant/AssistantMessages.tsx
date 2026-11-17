@@ -139,7 +139,7 @@ export const AssistantMessages: React.FC<AssistantMessagesProps> = ({
               <div className="flex items-center gap-1.5 text-2xs text-fg-muted font-mono px-1">
                 {msg.role === 'assistant' ? (
                   <>
-                    <Icon name="system.ai" size="xs" />
+                    <Icon name="system.ai" size="sm" />
                     <span>SLAG</span>
                   </>
                 ) : (

@@ -101,7 +101,7 @@ export const ViewerVideo: React.FC<ViewerVideoProps> = ({ src, isActive, chromeV
           isPlaying && !chromeVisible ? 'pointer-events-none opacity-0' : 'opacity-100'
         }`}
       >
-        {isPlaying ? <Icon name="media.pause" size="none" tone="inherit" className="h-7 w-7 fill-current" /> : <Icon name="media.play" size="none" tone="inherit" className="ml-0.5 h-7 w-7 fill-current" />}
+        {isPlaying ? <Icon name="media.pause" size="xl" tone="inherit" variant="filled" /> : <Icon name="media.play" size="xl" tone="inherit" variant="filled" className="ml-0.5" />}
       </button>
 
       <div

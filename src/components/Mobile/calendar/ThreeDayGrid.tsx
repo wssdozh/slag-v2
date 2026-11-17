@@ -96,7 +96,7 @@ export const ThreeDayGrid: React.FC<ThreeDayGridProps> = ({
                 >
                   <span className="truncate flex-1">{task.title || 'Без названия'}</span>
                   {task.recurrence && (
-                    <Icon name="time.repeat" size="none" tone="warning" className="w-2.5 h-2.5 shrink-0" />
+                    <Icon name="time.repeat" size="xs" tone="warning" className="shrink-0" />
                   )}
                 </div>
               ))}
@@ -152,7 +152,7 @@ export const ThreeDayGrid: React.FC<ThreeDayGridProps> = ({
                             onClick={onCancelAddingSlot}
                             className="text-fg-muted hover:text-white"
                           >
-                            <Icon name="action.close" size="xs" tone="inherit" />
+                            <Icon name="action.close" size="sm" tone="inherit" />
                           </button>
                         </div>
                         <form onSubmit={onSubmitSlot} className="flex flex-col gap-1">
@@ -219,7 +219,7 @@ export const ThreeDayGrid: React.FC<ThreeDayGridProps> = ({
                         {task.title || 'Без названия'}
                       </span>
                       {task.recurrence && (
-                        <Icon name="time.repeat" size="none" tone="warning" className="w-2.5 h-2.5 shrink-0 mt-0.5" />
+                        <Icon name="time.repeat" size="xs" tone="warning" className="shrink-0 mt-0.5" />
                       )}
                     </div>
 

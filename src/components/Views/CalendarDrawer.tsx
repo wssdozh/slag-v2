@@ -144,7 +144,7 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                       }}
                       className="mt-0.5 w-3.5 h-3.5 rounded-full border border-fg-dim hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
                     >
-                      <Icon name="action.check" size="none" tone="accent" className="w-2 h-2 opacity-0 hover:opacity-100" />
+                      <Icon name="action.check" size="xs" tone="accent" className="opacity-0 hover:opacity-100" />
                     </button>
                     <span className="text-xs font-medium text-fg-soft leading-snug line-clamp-2">
                       {task.title || 'Безымянная задача'}
@@ -219,7 +219,7 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
                     }}
                     className="mt-0.5 w-3.5 h-3.5 rounded-full border border-fg-dim hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
                   >
-                    <Icon name="action.check" size="none" tone="accent" className="w-2 h-2 opacity-0 hover:opacity-100" />
+                    <Icon name="action.check" size="xs" tone="accent" className="opacity-0 hover:opacity-100" />
                   </button>
                   <span className="text-xs font-medium text-fg-soft leading-snug line-clamp-2">
                     {task.title || 'Безымянная задача'}

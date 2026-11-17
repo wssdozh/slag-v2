@@ -24,7 +24,7 @@ export const DeviceName: React.FC<DeviceNameProps> = ({ deviceId, name, onRename
 
   if (!isEditing) {
     return (
-      <button type="button" onClick={() => { setDraftName(name); setIsEditing(true); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{name}</span><Icon name="action.rename" size="xs" tone="dim" /></button>
+      <button type="button" onClick={() => { setDraftName(name); setIsEditing(true); }} className="flex items-center gap-1.5 text-xs text-fg-primary cursor-pointer"><span className="truncate">{name}</span><Icon name="action.rename" size="sm" tone="dim" /></button>
     );
   }
 
@@ -131,7 +131,7 @@ export const PairDeviceModal: React.FC<PairDeviceModalProps> = ({ pairing }) => 
               </div>
             )
           ) : guestSasCode ? (
-            <div className="flex flex-col items-center gap-3 py-6"><Icon name="status.loading" size="none" tone="inherit" className="w-6 h-6 text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
+            <div className="flex flex-col items-center gap-3 py-6"><Icon name="status.loading" size="xl" tone="inherit" className="text-success animate-spin" /><span className="text-xs">Код проверки: <strong className="font-mono text-success">{guestSasCode}</strong></span><span className="text-2xs text-fg-muted">Подтвердите подключение на первом устройстве</span></div>
           ) : (
             <div className="flex flex-col gap-3">
               <label className="text-2xs text-fg-secondary">PIN с первого устройства</label>

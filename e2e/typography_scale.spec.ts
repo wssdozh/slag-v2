@@ -86,7 +86,7 @@ test.describe('Typography Modular Scale & Unified Config Suite', () => {
     await page.waitForTimeout(200);
 
     // Close Settings
-    const closeBtn = page.locator('button:has(.lucide-x)').first();
+    const closeBtn = page.locator('button:has([data-icon="action.close"])').first();
     await closeBtn.click();
     await page.waitForTimeout(300);
 

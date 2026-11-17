@@ -43,7 +43,7 @@ export const TagChip: React.FC<TagChipProps> = ({
             className="hover:text-rose-400 transition-colors cursor-pointer ml-0.5 text-fg-muted"
             aria-label={`Удалить тег ${cleanTag}`}
           >
-            <Icon name="action.close" size="xs" tone="inherit" />
+            <Icon name="action.close" size="sm" tone="inherit" />
           </button>
         )}
       </span>
@@ -72,7 +72,7 @@ export const TagChip: React.FC<TagChipProps> = ({
           className="text-fg-muted hover:text-rose-400 transition-colors cursor-pointer p-0.5 leading-none"
           aria-label={`Удалить тег ${cleanTag}`}
         >
-          <Icon name="action.close" size="none" tone="inherit" className="w-2.5 h-2.5" />
+          <Icon name="action.close" size="xs" tone="inherit" />
         </button>
       )}
     </span>

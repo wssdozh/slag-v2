@@ -285,7 +285,7 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
                       </kbd>
                     )}
                     {isSelected && (
-                      <Icon name="system.keyEnter" size="xs" className="hidden [@media(pointer:fine)]:block" />
+                      <Icon name="system.keyEnter" size="sm" className="hidden [@media(pointer:fine)]:block" />
                     )}
                   </div>
                 </div>
@@ -334,9 +334,9 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
                       </span>
                       {matchedAtt && (matchedAtt.summary || matchedAtt.extractedText) && (
                         <span className="inline-flex items-center gap-0.5 text-2xs font-mono px-1.5 py-0.5 rounded bg-tint-6 text-fg-secondary shrink-0">
-                          {matchedAtt.type === 'audio' && <Icon name="media.microphone" size="none" tone="inherit" className="w-2.5 h-2.5" />}
-                          {matchedAtt.type === 'image' && <Icon name="entity.image" size="none" tone="inherit" className="w-2.5 h-2.5" />}
-                          {matchedAtt.type === 'file' && <Icon name="action.attach" size="none" tone="inherit" className="w-2.5 h-2.5" />}
+                          {matchedAtt.type === 'audio' && <Icon name="media.microphone" size="xs" tone="inherit" />}
+                          {matchedAtt.type === 'image' && <Icon name="entity.image" size="xs" tone="inherit" />}
+                          {matchedAtt.type === 'file' && <Icon name="action.attach" size="xs" tone="inherit" />}
                           {matchedAtt.type === 'audio' ? 'аудио' : matchedAtt.type === 'image' ? 'фото' : 'файл'}
                         </span>
                       )}
@@ -349,11 +349,11 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
 
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="flex items-center gap-1 text-2xs font-mono text-fg-muted">
-                    <Icon name="entity.folder" size="xs" tone="inherit" />
+                    <Icon name="entity.folder" size="sm" tone="inherit" />
                     {item.folder}
                   </span>
                   {isSelected && (
-                    <Icon name="system.keyEnter" size="xs" className="hidden [@media(pointer:fine)]:block" />
+                    <Icon name="system.keyEnter" size="sm" className="hidden [@media(pointer:fine)]:block" />
                   )}
                 </div>
               </div>

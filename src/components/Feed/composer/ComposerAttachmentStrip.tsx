@@ -47,7 +47,7 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
                 className="p-1 rounded-full text-fg-secondary hover:text-rose-400 hover:bg-tint-8 transition-colors cursor-pointer"
                 title="Удалить войс"
               >
-                <Icon name="action.close" size="xs" tone="inherit" />
+                <Icon name="action.close" size="sm" tone="inherit" />
               </button>
             </div>
           ) : att.type === 'video' ? (
@@ -59,7 +59,7 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
                 className="absolute -top-1 -right-1 p-1 rounded-full bg-scrim-80 border border-tint-20 text-fg-secondary hover:text-rose-400 transition-colors cursor-pointer shadow-md"
                 title="Удалить видео-кружок"
               >
-                <Icon name="action.close" size="xs" tone="inherit" />
+                <Icon name="action.close" size="sm" tone="inherit" />
               </button>
             </div>
           ) : att.type === 'image' ? (
@@ -88,7 +88,7 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
                 className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-scrim-70 text-fg-tertiary hover:text-white transition-colors cursor-pointer"
                 title="Удалить"
               >
-                <Icon name="action.close" size="xs" tone="inherit" />
+                <Icon name="action.close" size="sm" tone="inherit" />
               </button>
             </div>
           ) : (
@@ -101,7 +101,7 @@ export const ComposerAttachmentStrip: React.FC<ComposerAttachmentStripProps> = (
                 className="p-0.5 rounded text-fg-muted hover:text-rose-400 transition-colors cursor-pointer"
                 title="Удалить"
               >
-                <Icon name="action.close" size="xs" tone="inherit" />
+                <Icon name="action.close" size="sm" tone="inherit" />
               </button>
             </div>
           )}

@@ -188,7 +188,7 @@ export const FolderTree: React.FC = () => {
               >
                 <Icon
                   name="nav.next"
-                  size="none"
+                  size="sm"
                   tone="inherit"
                   className={`w-3.5 h-3.5 transition-transform duration-200 ease-out ${
                     isExpanded ? 'rotate-90 text-fg-tertiary' : 'text-fg-muted'
@@ -199,7 +199,7 @@ export const FolderTree: React.FC = () => {
               <span className="w-3.5 shrink-0" />
             )}
 
-            <Icon name={iconName} size="none" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-fg-soft' : 'text-fg-muted group-hover:text-fg-secondary'}`} />
+            <Icon name={iconName} size="sm" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-fg-soft' : 'text-fg-muted group-hover:text-fg-secondary'}`} />
             <span className="truncate">{node.name}</span>
           </div>
 

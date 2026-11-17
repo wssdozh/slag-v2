@@ -348,7 +348,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
       {/* Drag & Drop Visual Overlay */}
       {isDraggingOver && (
         <div className="fixed inset-4 z-[120] rounded-3xl bg-surface border-2 border-dashed border-accent flex flex-col items-center justify-center gap-3 pointer-events-none select-none motion-fade">
-          <Icon name="action.upload" size="none" tone="accent" className="w-12 h-12 animate-bounce" />
+          <Icon name="action.upload" size="xl" tone="accent" className="animate-bounce" />
           <span className="text-base font-semibold text-white">
             Перетащите медиафайлы сюда
           </span>

@@ -174,7 +174,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
               }`}
               title={`Подзадачи: ${completedSubtasks}/${totalSubtasks}`}
             >
-              <Icon name="entity.task" size="xs" tone="inherit" />
+              <Icon name="entity.task" size="sm" tone="inherit" />
               <span>
                 {completedSubtasks}/{totalSubtasks}
               </span>
@@ -187,7 +187,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
               className="flex items-center gap-1 text-2xs text-fg-secondary"
               title={`Файлы: ${task.attachments.length}`}
             >
-              <Icon name="action.attach" size="xs" tone="inherit" />
+              <Icon name="action.attach" size="sm" tone="inherit" />
               <span>{task.attachments.length}</span>
             </span>
           )}
@@ -201,7 +201,7 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
             }`}
             title={overdue ? 'Просрочено!' : 'Срок выполнения'}
           >
-            <Icon name="time.date" size="xs" tone="inherit" className="shrink-0" />
+            <Icon name="time.date" size="sm" tone="inherit" className="shrink-0" />
             <span>{task.dueDate}</span>
           </span>
         ) : (

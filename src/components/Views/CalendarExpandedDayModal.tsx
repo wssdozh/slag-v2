@@ -131,7 +131,7 @@ export const CalendarExpandedDayModal: React.FC<CalendarExpandedDayModalProps> =
                           : `border-2 ${styling.checkboxBorder} ${styling.checkboxHover} bg-transparent`
                       }`}
                     >
-                      <Icon name="action.check" size="none" tone="inherit" className={`w-2.5 h-2.5 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+                      <Icon name="action.check" size="xs" tone="inherit" className={`w-2.5 h-2.5 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
                     </button>
                     <span
                       className={`text-xs font-medium leading-snug truncate ${

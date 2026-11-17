@@ -134,7 +134,7 @@ export const Sidebar: React.FC = () => {
               <Icon name="entity.vault" size="sm" className="shrink-0" />
               <span className="truncate text-xs font-medium">{getVaultDisplayName(vault, vaults)}</span>
             </div>
-            <Icon name="nav.down" size="xs" tone="muted" className={`shrink-0 ml-1 transition-transform duration-150 ${isVaultDropdownOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
+            <Icon name="nav.down" size="sm" tone="muted" className={`shrink-0 ml-1 transition-transform duration-150 ${isVaultDropdownOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
           </button>
         </div>
 

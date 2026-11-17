@@ -195,7 +195,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                 : 'bg-tint-3 text-fg-secondary hover:text-white'
             }`}
           >
-            <Icon name="time.time" size="xs" tone="warning" />
+            <Icon name="time.time" size="sm" tone="warning" />
             <span>истекают скоро (≤7д)</span>
             {expiringAccounts.length > 0 && (
               <span className="px-1 rounded bg-amber-500/30 text-3xs text-amber-200">
@@ -243,7 +243,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                     onClick={() => setInlineGrantAccountId((prev) => (prev === acc.id ? null : acc.id))}
                     className="px-2.5 py-1 text-2xs font-mono rounded bg-tint-10 hover:bg-tint-15 text-fg-soft flex items-center gap-1 transition-colors cursor-pointer"
                   >
-                    <Icon name="admin.billing" size="xs" tone="success" />
+                    <Icon name="admin.billing" size="sm" tone="success" />
                     <span>{isInlineOpen ? 'скрыть' : '+ подписка'}</span>
                   </button>
 
@@ -343,7 +343,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                       key={v.id}
                       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-tint-3 border border-tint-4"
                     >
-                      <Icon name="entity.folderSynced" size="xs" tone="muted" />
+                      <Icon name="entity.folderSynced" size="sm" tone="muted" />
                       <span className="text-fg-tertiary">{v.name}</span>
                       <span className="text-fg-muted font-mono">({v.grantsCount} девайсов)</span>
                     </span>
@@ -391,7 +391,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({
                             className="text-fg-muted hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-40"
                             title="отозвать доступ"
                           >
-                            <Icon name="action.delete" size="xs" tone="inherit" />
+                            <Icon name="action.delete" size="sm" tone="inherit" />
                           </button>
                         )}
                       </div>

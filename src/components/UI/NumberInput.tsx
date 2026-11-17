@@ -67,7 +67,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         aria-label="Уменьшить"
         className="w-7 h-full flex items-center justify-center text-fg-secondary hover:text-white hover:bg-tint-6 motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
-        <Icon name="action.decrement" size="xs" tone="inherit" />
+        <Icon name="action.decrement" size="md" tone="inherit" />
       </button>
 
       <input
@@ -90,7 +90,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         aria-label="Увеличить"
         className="w-7 h-full flex items-center justify-center text-fg-secondary hover:text-white hover:bg-tint-6 motion-press disabled:opacity-20 disabled:hover:bg-transparent disabled:cursor-not-allowed cursor-pointer"
       >
-        <Icon name="action.add" size="xs" tone="inherit" />
+        <Icon name="action.add" size="md" tone="inherit" />
       </button>
     </div>
   );

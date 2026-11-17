@@ -129,7 +129,7 @@ export const MobileDockSettings: React.FC = () => {
           onClick={() => setMobileDockTabs(DEFAULT_DOCK_TABS)}
           className="flex items-center gap-1 text-2xs font-mono text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
         >
-          <Icon name="action.retry" size="xs" tone="inherit" />
+          <Icon name="action.retry" size="sm" tone="inherit" />
           Сбросить
         </button>
       }

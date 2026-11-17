@@ -80,7 +80,7 @@ export const AllDayTaskPill: React.FC<AllDayTaskPillProps> = ({
         }`}
         title={isDone ? 'Возобновить' : 'Выполнить'}
       >
-        <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+        <Icon name="action.check" size="xs" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
       </button>
 
       <span
@@ -227,7 +227,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               }`}
               title={isDone ? 'Возобновить' : 'Выполнить'}
             >
-              <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+              <Icon name="action.check" size="xs" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
             </button>
 
             <span
@@ -249,7 +249,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               </span>
               {totalSubtasks > 0 && (
                 <span className="flex items-center gap-0.5 text-2xs font-mono">
-                  <Icon name="entity.taskList" size="none" tone="inherit" className="w-2.5 h-2.5" />
+                  <Icon name="entity.taskList" size="sm" tone="inherit" />
                   <span>{completedSubtasks}/{totalSubtasks}</span>
                 </span>
               )}
@@ -274,7 +274,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               }`}
               title={isDone ? 'Возобновить' : 'Выполнить'}
             >
-              <Icon name="action.check" size="none" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
+              <Icon name="action.check" size="xs" tone="inherit" className={`w-2 h-2 stroke-[3] transition-opacity ${isDone ? 'opacity-100 text-white' : 'opacity-0 group-hover/chk:opacity-100'}`} />
             </button>
 
             <span
@@ -291,7 +291,7 @@ export const TimedTaskBlock: React.FC<TimedTaskBlockProps> = ({
               <span className="truncate">{slot.timeLabel}</span>
               {totalSubtasks > 0 && (
                 <span className="flex items-center gap-0.5 shrink-0">
-                  <Icon name="entity.taskList" size="none" tone="inherit" className="w-2.5 h-2.5" />
+                  <Icon name="entity.taskList" size="sm" tone="inherit" />
                   <span>{completedSubtasks}/{totalSubtasks}</span>
                 </span>
               )}

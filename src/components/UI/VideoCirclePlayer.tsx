@@ -106,9 +106,9 @@ export const VideoCirclePlayer: React.FC<VideoCirclePlayerProps> = ({ src, compa
       >
         <div className="w-12 h-12 rounded-full bg-canvas/80 flex items-center justify-center text-white border border-tint-20 shadow-lg motion-press">
           {isPlaying ? (
-            <Icon name="media.pause" size="lg" tone="inherit" className="fill-current" />
+            <Icon name="media.pause" size="lg" tone="inherit" variant="filled" />
           ) : (
-            <Icon name="media.play" size="lg" tone="inherit" className="fill-current ml-0.5" />
+            <Icon name="media.play" size="lg" tone="inherit" variant="filled" className="ml-0.5" />
           )}
         </div>
       </div>

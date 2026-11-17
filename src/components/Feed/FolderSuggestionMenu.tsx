@@ -63,7 +63,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <Icon
                   name={iconName}
-                  size="none"
+                  size="md"
                   tone="inherit"
                   className={`w-4 h-4 shrink-0 transition-colors ${
                     isSelected ? 'text-fg-primary' : 'text-fg-secondary'

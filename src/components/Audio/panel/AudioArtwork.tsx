@@ -46,7 +46,7 @@ export const AudioArtwork: React.FC<AudioArtworkProps> = ({
       {/* The bytes never landed on this device: say so instead of faking a play button. */}
       {isTrackMissing && (
         <div className="mb-1 flex items-center justify-center gap-1.5 text-2xs font-mono text-fg-muted">
-          <Icon name="entity.fileMissing" size="xs" tone="inherit" />
+          <Icon name="entity.fileMissing" size="sm" tone="inherit" />
           файла нет на устройстве
         </div>
       )}

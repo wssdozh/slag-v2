@@ -67,7 +67,7 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
               <div className="flex items-center gap-2.5 min-w-0">
                 <Icon
                   name={cmd.icon}
-                  size="none"
+                  size="md"
                   tone="inherit"
                   className={`w-4 h-4 shrink-0 transition-colors ${
                     isSelected ? 'text-fg-primary' : 'text-fg-secondary'

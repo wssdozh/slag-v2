@@ -307,7 +307,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                   <div key={idx} className="flex items-center gap-1.5 text-xs font-mono">
                     <span className="text-fg-secondary">{md.label}:</span>
                     <span className="text-rose-400/90 line-through">{md.oldValue}</span>
-                    <Icon name="nav.forward" size="xs" tone="dim" className="inline" />
+                    <Icon name="nav.forward" size="sm" tone="dim" className="inline" />
                     <span className="text-emerald-400 font-semibold">{md.newValue}</span>
                   </div>
                 ))}

@@ -31,7 +31,7 @@ export const ChatTaskBlock: React.FC<ChatTaskBlockProps> = ({ title, lines, onWi
                   <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 mt-0.5 select-none ${
                     isDone ? 'bg-tint-15 border-tint-40 text-fg-soft' : 'border-tint-20 bg-tint-3 text-transparent'
                   }`}>
-                    {isDone && <Icon name="action.check" size="none" tone="inherit" className="w-2.5 h-2.5 stroke-[3]" />}
+                    {isDone && <Icon name="action.check" size="xs" tone="inherit" className="stroke-[3]" />}
                   </span>
                   <span className={`flex-1 min-w-0 ${isDone ? 'line-through text-fg-muted' : 'text-fg-soft'}`}>
                     <MarkdownRenderer content={checkMatch[2]} onWikiLinkClick={onWikiLinkClick} inline />

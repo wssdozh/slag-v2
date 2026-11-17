@@ -114,7 +114,7 @@ export const KanbanMaterialsDock: React.FC<KanbanMaterialsDockProps> = ({
                 onClick={() => setMaterialsSearchQuery('')}
                 className="absolute right-5 top-1/2 -translate-y-1/2 text-fg-muted hover:text-fg-tertiary p-0.5"
               >
-                <Icon name="action.close" size="xs" tone="inherit" />
+                <Icon name="action.close" size="sm" tone="inherit" />
               </button>
             )}
           </div>
