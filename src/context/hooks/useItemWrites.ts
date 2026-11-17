@@ -85,7 +85,7 @@ export function useItemWrites(deps: ItemWritesDeps) {
   }, [selectedItem, refreshData, setSelectedItem]);
 
   const deleteItem = useCallback((id: string) => {
-    storage.deleteItem(id);
+    storage.moveToTrash(id);
     if (selectedItem?.id === id) {
       setSelectedItem(null);
     }

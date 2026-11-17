@@ -484,10 +484,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return recoverFromTrash(this, id, origin);
   }
 
-  public deleteItem(id: string, origin: 'local' | 'remote' = 'local'): void {
-    this.moveToTrash(id, origin);
-  }
-
   public moveItem(id: string, targetFolder: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
     const item = this.getItemById(id);
     if (!item) return null;
