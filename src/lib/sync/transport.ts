@@ -236,7 +236,10 @@ export class SyncTransport {
         // only thing left is to run it and report back what it did.
         await this.callbacks.onAssistantAction?.(msg.id, msg.action);
       } else if (msg.type === 'error') {
-        syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
+        // A replayed bundle is not a refusal: the relay already holds that id, which is exactly
+        // what the HTTP fallback wanted, and the duplicate is harmless by design.
+        if (msg.code === 'bundle_replay') syncLog.debug('Relay already has this bundle (bundle_replay)');
+        else syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }
     } catch (e) {
       syncLog.error('Failed to parse incoming message:', e);

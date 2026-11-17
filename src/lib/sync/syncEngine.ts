@@ -72,6 +72,8 @@ import { isPrimaryWindow } from '../platform/windowControls';
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 
 const syncLog = logger.scope('SYNC');
+/** How much older than the tombstone a draft has to be before we call it a clock skew and stay quiet. */
+const DRAFT_REASSERT_MIN_SKEW_MS = 60_000;
 
 /** Cheap identity of an attachment's bytes: reading five megabytes to hash them is not. */
 /** A bundle handed to the relay but not yet confirmed; holds the bookkeeping commit applies. */
@@ -189,6 +191,8 @@ export class SyncEngine {
   private attachmentSyncBlocked = false;
   /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
   private unreadableAttachments = new Set<string>();
+  /** Draft ids whose deletion this device has already announced again for the current connection. */
+  private reassertedDrafts = new Set<string>();
   /** Attachment ids a bundle claimed to deliver but this disk never got. */
   public missingAttachments = new Set<string>();
   /** Files a paired device asked for again: packed even when `sentHashes` calls them delivered. */
@@ -502,6 +506,22 @@ export class SyncEngine {
     });
     syncLog.info(`Asking the room for attachment bytes: "${att.name}" (${Math.round(att.size / 1024)} KB)`);
     this.scheduleDebouncedPush(0);
+  }
+
+  /**
+   * A peer keeps offering a composer draft this vault has already deleted: it never got the
+   * delete, so it replays the stale text on every catch-up. Announcing the delete again — with a
+   * fresh stamp, which every device treats as "newer" — is the only way that copy goes away.
+   * One announcement per draft per connection, and only when the copy is clearly older: a peer
+   * whose clock runs a few seconds behind is not holding a deleted draft.
+   */
+  public reassertDraftDeletion(folder: string, deletedAt: number, staleUpdatedAt: number): void {
+    if (deletedAt - staleUpdatedAt < DRAFT_REASSERT_MIN_SKEW_MS) return;
+    const id = `composer:${folder}`;
+    if (this.reassertedDrafts.has(id)) return;
+    this.reassertedDrafts.add(id);
+    vault().deleteComposerDraft(folder, 'local');
+    syncLog.info(`Re-announced deleted composer draft for "${folder}"`);
   }
 
   /** At most one request per bundle: the answer is a whole file, not a diff. */
@@ -1076,6 +1096,7 @@ export class SyncEngine {
     // not to this socket, and a dropped request only comes back twenty-four hours later.
     this.missingAttachments.clear();
     this.entityHashes.clear();
+    this.reassertedDrafts.clear();
     this.wsSupportsBinary = false;
     this.pushDirty = false;
     for (const pending of this.pendingPushes.values()) {

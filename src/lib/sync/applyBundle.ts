@@ -306,7 +306,10 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             if (ch.action === 'upsert' && ch.payload) {
               const incoming = ch.payload as ComposerDraft;
               if ((incoming.updatedAt ?? 0) <= lastDeletedAt) {
-                syncLog.info(`Ignored stale composer draft for "${folder}" (updatedAt <= deletedAt)`);
+                // The sender still holds a copy this vault deleted: repeating the delete is what
+                // makes it drop the draft instead of replaying it on every catch-up.
+                engine.reassertDraftDeletion(folder, lastDeletedAt, incoming.updatedAt ?? 0);
+                syncLog.debug(`Ignored stale composer draft for "${folder}" (updatedAt <= deletedAt)`);
                 continue;
               }
               const existing = vault().getComposerDraft(folder);

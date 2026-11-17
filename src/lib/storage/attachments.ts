@@ -35,6 +35,8 @@ export class AttachmentStore {
    */
   private dataUrlCache: Map<string, string> = new Map();
   private persistedIds: Set<string> = new Set();
+  /** Attachments already reported as byte-less: the feed re-renders the same broken file on every paint. */
+  private missingBytes: Set<string> = new Set();
   /**
    * IndexedDB writes, one at a time: two puts of the same id land in call order, and the queue
    * gives a caller something to await (`flush`) when the page is about to go away.
@@ -113,6 +115,19 @@ export class AttachmentStore {
   }
 
   /**
+   * One warning per attachment per session. A file whose bytes never arrived is missing on every
+   * paint of the feed, and a hundred identical lines is not more information than one.
+   */
+  private warnMissingBytes(id: string, relativePath: string, mimeType?: string): void {
+    if (this.missingBytes.has(id)) {
+      mediaLog.debug(`Attachment bytes still missing: ${relativePath}`);
+      return;
+    }
+    this.missingBytes.add(id);
+    mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
+  }
+
+  /**
    * Playable url for an attachment. Lives only in memory: a blob: URL inside
    * the item would be dead after restart and would leak into localStorage/sync.
    */
@@ -126,24 +141,25 @@ export class AttachmentStore {
       const stored = await idbGetAttachment(id);
       if (stored?.dataUrl) {
         this.urlCache.set(id, stored.dataUrl);
+        this.missingBytes.delete(id);
         return stored.dataUrl;
       }
-      mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
+      this.warnMissingBytes(id, relativePath, mimeType);
       return undefined;
     }
-
     // Disk first: a blob URL streams and keeps five megabytes out of a JS string.
     const loaded = await this.loadBytes(id, relativePath);
     if (loaded) {
       const type = mimeType || loaded.mimeType || 'application/octet-stream';
       const url = URL.createObjectURL(new Blob([new Uint8Array(loaded.bytes)], { type }));
       this.urlCache.set(id, url);
+      this.missingBytes.delete(id);
       mediaLog.debug(`Attachment url from bytes: ${id} (${Math.round(loaded.bytes.length / 1024)} KB, ${type})`);
       return url;
     }
 
     // The answer that used to be silent: nothing on this device can play this attachment.
-    mediaLog.warn(`Attachment bytes are not on this device: ${relativePath} (${mimeType || 'unknown mime'})`);
+    this.warnMissingBytes(id, relativePath, mimeType);
     return undefined;
   }
 
