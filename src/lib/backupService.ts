@@ -22,6 +22,7 @@ import {
   idbDeleteSnapshot,
 } from './storage/indexedDb';
 import { logger } from './logger/logger';
+import { bytesToBase64, dataUrlToBytes } from './media/byteCodec';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   writeFile,
@@ -58,28 +59,11 @@ export interface SlagManifest {
 }
 
 function dataUrlToUint8Array(dataUrl: string): Uint8Array {
-  try {
-    const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-    const binary = atob(base64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  } catch {
-    return new Uint8Array(0);
-  }
+  return dataUrlToBytes(dataUrl)?.bytes ?? new Uint8Array(0);
 }
 
 function uint8ArrayToDataUrl(bytes: Uint8Array, mimeType: string): string {
-  const CHUNK_SZ = 0x8000;
-  const chunks: string[] = [];
-  for (let i = 0; i < bytes.length; i += CHUNK_SZ) {
-    const sub = bytes.subarray(i, i + CHUNK_SZ);
-    chunks.push(String.fromCharCode.apply(null, sub as unknown as number[]));
-  }
-  return `data:${mimeType};base64,${btoa(chunks.join(''))}`;
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
 }
 
 function guessMimeType(filename: string): string {

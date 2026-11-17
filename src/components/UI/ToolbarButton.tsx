@@ -4,7 +4,7 @@ import React from 'react';
 export interface ToolbarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   size?: 'sm' | 'md';
   active?: boolean;
-  glow?: 'blue' | 'amber' | 'rose' | 'none';
+  glow?: 'blue' | 'none';
   icon?: React.ReactNode;
 }
 
@@ -27,15 +27,9 @@ export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonPr
 
     let activeGlowClass = '';
     if (active) {
-      if (glow === 'blue') {
-        activeGlowClass = 'text-blue-400 hover:text-blue-300 hover:bg-tint-6';
-      } else if (glow === 'amber') {
-        activeGlowClass = 'text-amber-400 hover:text-amber-300 hover:bg-tint-6';
-      } else if (glow === 'rose') {
-        activeGlowClass = 'text-rose-400 hover:text-rose-300 hover:bg-tint-6';
-      } else {
-        activeGlowClass = 'bg-tint-10 text-white';
-      }
+      activeGlowClass = glow === 'blue'
+        ? 'text-blue-400 hover:text-blue-300 hover:bg-tint-6'
+        : 'bg-tint-10 text-white';
     } else {
       activeGlowClass = 'text-fg-secondary hover:text-fg-primary hover:bg-tint-6';
     }

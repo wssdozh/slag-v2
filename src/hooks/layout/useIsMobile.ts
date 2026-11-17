@@ -22,13 +22,8 @@ export function useIsMobile(breakpoint: number = UI_BREAKPOINTS.MOBILE): boolean
 
     update(mql);
 
-    if (mql.addEventListener) {
-      mql.addEventListener('change', update);
-      return () => mql.removeEventListener('change', update);
-    } else {
-      mql.addListener(update);
-      return () => mql.removeListener(update);
-    }
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
   }, [breakpoint]);
 
   return isMobile;

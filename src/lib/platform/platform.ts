@@ -8,8 +8,6 @@ export interface PlatformInfo {
   os: 'linux' | 'windows' | 'macos' | 'unknown' | string;
   sessionType: 'wayland' | 'x11' | 'native' | 'unknown' | string;
   desktopEnvironment: 'gnome' | 'kde' | 'hyprland' | 'sway' | 'other' | 'unknown' | string;
-  isWayland: boolean;
-  isGnome: boolean;
   hotkeyBackend: 'gnome_gsettings' | 'tauri_native' | 'custom_launcher' | string;
   isHotkeyRegistered: boolean;
   executablePath: string;
@@ -28,8 +26,6 @@ export async function getPlatformInfo(): Promise<PlatformInfo | null> {
       os: isMac ? 'macos' : isWin ? 'windows' : 'linux',
       sessionType: 'web',
       desktopEnvironment: 'browser',
-      isWayland: false,
-      isGnome: false,
       hotkeyBackend: 'browser_fallback',
       isHotkeyRegistered: false,
       executablePath: '',

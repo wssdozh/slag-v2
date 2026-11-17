@@ -37,11 +37,10 @@ export const AudioPanel: React.FC = () => {
   const tracks = useMemo(() => {
     return extractAudioTracks(items, {
       folderScope: effectiveFolder,
-      scopeMode,
       typeFilters,
       inboxMode,
     });
-  }, [items, effectiveFolder, scopeMode, typeFilters, inboxMode]);
+  }, [items, effectiveFolder, typeFilters, inboxMode]);
 
   const {
     analyser,

@@ -188,8 +188,3 @@ export function swapScreen(kind: ScreenSwap, update: () => void): void {
   // `finished` settles even when the swap is skipped or the tab is hidden.
   transition.finished.then(release, release);
 }
-
-/** Cross-fade an update through the same snapshot layer, where it exists. */
-export function crossFade(update: () => void): void {
-  swapScreen('tab', update);
-}

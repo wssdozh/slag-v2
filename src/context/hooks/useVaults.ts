@@ -18,7 +18,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
 import { syncEngine } from '../../lib/sync';
 import { accountClient } from '../../lib/sync/account';
-import { crossFade } from '../../lib/motion';
+import { swapScreen } from '../../lib/motion';
 import { openAppFolder } from '../../lib/platform/folderOpener';
 import type { ToastMessage } from '../appContext.types';
 
@@ -68,7 +68,7 @@ export function useVaults(deps: {
 
   const switchVault = (vaultId: string) => {
     // One cross-fade over the whole swap, so the feed does not blink between vaults.
-    crossFade(() => {
+    swapScreen('tab', () => {
       storage.switchVault(vaultId);
       const newWs = storage.getWorkspaceState();
       setCurrentFolder(newWs.currentFolder || DEFAULT_INBOX_FOLDER);

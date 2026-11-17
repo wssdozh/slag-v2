@@ -69,7 +69,6 @@ export function audioTrackLabel(name: string): { title: string; author: string; 
 
 export interface ExtractAudioOptions {
   folderScope: string | null;
-  scopeMode: AudioScopeMode;
   typeFilters: AudioTypeFilter[];
   inboxMode?: InboxMode;
 }

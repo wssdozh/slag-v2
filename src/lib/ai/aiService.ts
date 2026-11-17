@@ -158,19 +158,6 @@ function localMatchFolder(
 }
 
 /**
- * Shared low-level JSON LLM dispatcher across providers (Groq, KIE, Gemini, Relay).
- * Delegates to {@link completeJson}.
- */
-async function callJsonLlm<T>(
-  systemPrompt: string,
-  userPrompt: string,
-  settings: AiSettings,
-  temperature = 0.1
-): Promise<T | null> {
-  return completeJson<T>(settings, { systemPrompt, userPrompt, temperature });
-}
-
-/**
  * Unified Draft Categorization (Pre-save in Composer):
  * Classifies note content into a target folder, taxonomy-based tags, and reasoning.
  */
@@ -206,12 +193,12 @@ export async function categorizeDraft(
   aiLog.info(`Draft classification requested: len=${content.length} chars, folder="${currentFolder}", folders=${eligibleFolders.length}, tags=${tagUsage.length}`);
   const startTime = performance.now();
 
-  const parsed = await callJsonLlm<{
+  const parsed = await completeJson<{
     suggestedTitle?: string;
     targetFolder?: string;
     tags?: string[];
     reason?: string;
-  }>(systemPrompt, userPrompt, settings, 0.2);
+  }>(settings, { systemPrompt, userPrompt, temperature: 0.2 });
 
   const durationMs = Math.round(performance.now() - startTime);
 
@@ -316,9 +303,9 @@ export async function triageInboxItems(
     let chunkResult: TriageSuggestion[] | null = null;
 
     try {
-      const parsed = await callJsonLlm<
+      const parsed = await completeJson<
         Array<{ itemId: string; suggestedTitle?: string; targetFolder: string; tags?: string[]; reason: string }>
-      >(systemPrompt, userPrompt, settings, 0.1);
+      >(settings, { systemPrompt, userPrompt, temperature: 0.1 });
 
       if (Array.isArray(parsed) && parsed.length > 0) {
         chunkResult = chunk.map((item) => {

@@ -1,4 +1,4 @@
-// Everything above the app: modals, lightbox, context menu, toasts, confirm, attach sheet.
+﻿// Everything above the app: modals, lightbox, context menu, toasts, confirm, attach sheet.
 import { useCallback, useRef, useState } from 'react';
 import type {
   ConfirmOptions,
@@ -17,7 +17,7 @@ import { logger } from '../../lib/logger/logger';
  * Everything that lives on top of the app: modals, lightbox, context menu, toasts,
  * the confirm question and the attach sheet.
  *
- * One reason to change — a new surface, or a new rule about layers. Nothing here
+ * One reason to change вЂ” a new surface, or a new rule about layers. Nothing here
  * knows about notes, sync or the feed; when a modal needs vault data, the caller
  * passes it (folder info needs the current folder, that is the whole contract).
  */
@@ -183,9 +183,7 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
 
   return {
     lightboxImages,
-    setLightboxImages,
     activeLightboxIndex,
-    setActiveLightboxIndex,
     openLightbox,
     closeLightbox,
     navigateLightbox,
@@ -229,19 +227,15 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
     openComposerModal,
     closeComposerModal,
     contextMenu,
-    setContextMenu,
     openContextMenu,
     closeContextMenu,
     toasts,
-    setToasts,
     addToast,
     removeToast,
     confirmRequest,
-    setConfirmRequest,
     resolveConfirm,
     confirmAction,
     attachSheet,
-    setAttachSheet,
     openAttachSheet,
     closeAttachSheet,
   };

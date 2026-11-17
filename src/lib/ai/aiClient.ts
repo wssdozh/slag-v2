@@ -4,7 +4,6 @@ import { logger } from '../logger/logger';
 import { resolveChatTarget, type ResolvedAiTarget } from './connections/resolve';
 import { resolveKieEndpoint } from './connections/endpoints';
 
-export type AiResolvedTarget = ResolvedAiTarget;
 export { resolveKieEndpoint, resolveChatTarget };
 
 const aiLog = logger.scope('AI');
@@ -17,7 +16,7 @@ export interface PromptRequest {
 
 export interface PromptResult {
   text: string;
-  target: AiResolvedTarget;
+  target: ResolvedAiTarget;
 }
 
 /**

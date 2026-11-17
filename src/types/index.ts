@@ -289,20 +289,6 @@ export interface MemoryItem {
   deletedAt?: number;
 }
 
-export type MemoryOp = 'remember' | 'forget' | 'recall';
-
-/** One tool, three operations: writing, forgetting and digging. */
-export interface MemoryCommand {
-  op: MemoryOp;
-  text?: string;
-  id?: string;
-  kind?: MemoryKind;
-  tag?: string;
-  importance?: number;
-  /** Id of the fact this one supersedes, if the model spotted a contradiction. */
-  replaces?: string;
-}
-
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';

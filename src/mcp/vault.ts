@@ -24,7 +24,6 @@ import {
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
-export { getSafeNoteFilename } from '../lib/vault/noteFilename';
 
 /** What came out of one attachment: text, raw bytes, or a reason there is nothing to give. */
 export type AttachmentPayload =

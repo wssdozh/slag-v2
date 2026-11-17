@@ -6,7 +6,7 @@ import { MobileTasksView } from './MobileTasksView';
 import { MobileAssistantView } from './MobileAssistantView';
 import { MobileSettingsView } from './MobileSettingsView';
 import { MobileCalendarView } from './MobileCalendarView';
-import { MobileAudioView } from './MobileAudioView';
+import { AudioPanel } from '../Audio/AudioPanel';
 import { MobileFolderInfoView } from './MobileFolderInfoView';
 import { MobileFloatingDock } from './MobileFloatingDock';
 
@@ -99,7 +99,11 @@ export const MobileShell: React.FC = () => {
         {activeMobileTab === 'assistant' && <MobileAssistantView />}
         {activeMobileTab === 'settings' && <MobileSettingsView />}
         {activeMobileTab === 'calendar' && <MobileCalendarView />}
-        {activeMobileTab === 'audio' && <MobileAudioView />}
+        {activeMobileTab === 'audio' && (
+          <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative pt-[max(var(--sat),0px)]">
+            <AudioPanel />
+          </div>
+        )}
       </main>
 
       {/* Floating Linear Island Dock (Smooth presence transition on root views) */}
