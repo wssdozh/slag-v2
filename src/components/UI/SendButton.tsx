@@ -42,7 +42,8 @@ export const SendButton: React.FC<SendButtonProps> = ({
         : 'cursor-pointer bg-accent-strong text-white hover:bg-accent-strong/90'
     } ${className}`}
   >
-    {/* weight is decided by Icon, not by the call site */}
-    <Icon name="action.send" size={size === 'sm' ? 'md' : 'lg'} />
+    {/* `inherit` on purpose: the plate owns the colour (white on accent, dim when disabled),
+        and the icon's default `secondary` tone was painting the arrow grey on blue. */}
+    <Icon name="action.send" size={size === 'sm' ? 'md' : 'lg'} tone="inherit" />
   </button>
 );
