@@ -14,6 +14,7 @@ import {
 } from '../../lib/platform/appUpdate';
 import { openExternalUrl } from '../../lib/platform/openExternal';
 import { readUpdateChannel, writeUpdateChannel } from '../../lib/platform/updateChannel';
+import { isPrimaryWindow } from '../../lib/platform/windowControls';
 import { shouldResumeInstall } from '../../lib/platform/installResume';
 import { logger } from '../../lib/logger/logger';
 import type {
@@ -108,8 +109,9 @@ export function useAppUpdates(
   );
 
   // One silent check per launch, after the first paint: a cold start must not race the feed.
+  // The quick composer mounts this provider too, and two checks in one launch is one too many.
   useEffect(() => {
-    if (!platform) return;
+    if (!platform || !isPrimaryWindow()) return;
     const timer = setTimeout(() => void runCheck(true), CHECK_DELAY_MS);
     return () => clearTimeout(timer);
   }, [platform, runCheck]);

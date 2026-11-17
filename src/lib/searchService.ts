@@ -110,7 +110,21 @@ export const RU_STOPWORDS = new Set([
   'эту', 'я',
 ]);
 
-async function syncIndex(items: SlagItem[]): Promise<void> {
+/**
+ * One document per note. A duplicate id makes `insertMultiple` throw, and the throw takes the
+ * whole index with it: every later search falls back to a linear scan without saying so.
+ */
+function newestById(items: SlagItem[]): SlagItem[] {
+  const byId = new Map<string, SlagItem>();
+  for (const item of items) {
+    const seen = byId.get(item.id);
+    if (!seen || (item.updatedAt ?? 0) > (seen.updatedAt ?? 0)) byId.set(item.id, item);
+  }
+  return [...byId.values()];
+}
+
+async function syncIndex(allItems: SlagItem[]): Promise<void> {
+  const items = newestById(allItems);
   const started = performance.now();
   const { create, insertMultiple, remove } = await loadOrama();
 

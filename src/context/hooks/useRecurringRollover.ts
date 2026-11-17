@@ -3,6 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { evaluateRecurringTasks, getISODateString } from '../../lib/time/recurrenceHelper';
 import { logger } from '../../lib/logger/logger';
 import { storage } from '../../lib/storage';
+import { isPrimaryWindow } from '../../lib/platform/windowControls';
 
 const appLog = logger.scope('APP');
 
@@ -26,6 +27,8 @@ export function useRecurringRollover(refreshData: () => void) {
   // Midnight transition and tab visibility wakeup listener
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Only the main window rolls tasks over: two windows meant two respawns and two pushes.
+    if (!isPrimaryWindow()) return;
     let timerId: number | undefined;
 
     const scheduleMidnightCheck = () => {

@@ -12,7 +12,7 @@ import { storage } from '../lib/storage';
 import { logger } from '../lib/logger/logger';
 import { normalizeAiSettings } from '../lib/ai/connections/settings';
 import { openAppFolder } from '../lib/platform/folderOpener';
-import { listenDesktopEvents } from '../lib/platform/windowControls';
+import { isPrimaryWindow, listenDesktopEvents } from '../lib/platform/windowControls';
 import { syncEngine } from '../lib/sync';
 import { accountClient } from '../lib/sync/account';
 import { useGlobalHotkeys } from '../hooks/ui/useGlobalHotkeys';
@@ -189,6 +189,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Application Startup Log (guarded against React StrictMode double invocation)
   const hasLoggedInitRef = useRef(false);
   useEffect(() => {
+    // One window owns the machine. The quick composer mounts this provider too (its composer
+    // needs the same actions), so without the guard every boot ran two disk scans, armed every
+    // reminder twice, polled the relay twice and wrote the note index from both windows.
+    if (!isPrimaryWindow()) return;
     if (hasLoggedInitRef.current) return;
     hasLoggedInitRef.current = true;
     const currentVault = storage.getCurrentVault();
@@ -231,6 +235,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       onDataChanged: () => {
         refreshData();
+        // The quick window has no engine of its own: its op waits in the shared outbox, and the
+        // window that holds the socket is the one that has to drain it.
+        syncEngine.scheduleDebouncedPush();
       },
     });
 

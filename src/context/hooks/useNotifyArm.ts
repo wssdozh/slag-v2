@@ -7,6 +7,7 @@ import { loadAiSettings } from '../../lib/ai/connections/settings';
 import { answerAssistantQuestion, clearAssistantHistory } from '../../lib/notify/assistant';
 import { reconcileNotifications, runLocalReminders } from '../../lib/notify/plan';
 import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive } from '../../lib/notify/prefs';
+import { isPrimaryWindow } from '../../lib/platform/windowControls';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 
@@ -53,11 +54,16 @@ function armReminders(items: SlagItem[]): void {
  */
 export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
   const vaultId = vault.id;
+  // One window answers questions and arms reminders. The quick composer mounts the same
+  // provider, and two arming loops meant two arm requests per edit, two telegram polls and
+  // two "arming a reminder failed" lines for one broken channel.
+  const isPrimary = isPrimaryWindow();
 
   // The relay forwards a question from the bot; this device is the only thing that can answer.
   // A socket message can be missed while the link is reconnecting, so connecting also asks the
   // relay what is still waiting — one question must not die to a dropped connection.
   useEffect(() => {
+    if (!isPrimary) return;
     const handled = new Set<string>();
     const answer = (
       requestId: string,
@@ -117,14 +123,16 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
       syncEngine.setAssistantClearHandler(null);
       syncEngine.setAssistantReadyProvider(null);
     };
-  }, []);
+  }, [isPrimary]);
 
   useEffect(() => {
+    if (!isPrimary) return;
     const timer = setTimeout(() => armReminders(items), ARM_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [items, vaultId]);
+  }, [isPrimary, items, vaultId]);
 
   useEffect(() => {
+    if (!isPrimary) return;
     void runLocalReminders(items, getNotifyPrefs());
     const timer = setInterval(() => {
       void runLocalReminders(items, getNotifyPrefs());
@@ -133,5 +141,5 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
       armReminders(items);
     }, LOCAL_TICK_MS);
     return () => clearInterval(timer);
-  }, [items]);
+  }, [isPrimary, items]);
 }

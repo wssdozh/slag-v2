@@ -99,6 +99,12 @@ export default defineConfig({
     host: process.env.SLAG_DEV_HOST || '127.0.0.1',
     port: 5173,
     strictPort: true,
+    // Other checkouts live under `.agents/worktrees` and junction the same `node_modules`.
+    // The watcher followed those junctions and spent minutes failing to stat them (`UNKNOWN`
+    // on Windows); a cold start paid that before the first module was even served.
+    watch: {
+      ignored: ['**/.agents/**'],
+    },
     proxy: {
       '/api/groq': {
         target: 'https://api.groq.com/openai/v1',

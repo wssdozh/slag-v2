@@ -173,6 +173,13 @@ export class SyncEngine {
     bundles: string[];
   } | null = null;
   private importTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Imports run one at a time. Two overlaps each read `previous` before the other has written,
+   * so a note that moved folders lands in both: a new file appears and the old one is never
+   * removed, because the second import never saw it. Replaying one day of phone changes as a
+   * burst was enough to leave `item_1794860902957` in both `Входящие` and `Проекты/SLAG`.
+   */
+  private importFlushChain: Promise<void> = Promise.resolve();
   public pendingPushes = new Map<string, PendingPush>();
   public wsSupportsBinary = false;
   public pushDirty = false;
@@ -571,7 +578,13 @@ export class SyncEngine {
     }, 120);
   }
 
-  private async flushStagedImport(): Promise<void> {
+  private flushStagedImport(): Promise<void> {
+    const run = this.importFlushChain.then(() => this.writeStagedImport());
+    this.importFlushChain = run.catch(() => undefined);
+    return run;
+  }
+
+  private async writeStagedImport(): Promise<void> {
     if (this.importTimer) {
       clearTimeout(this.importTimer);
       this.importTimer = null;
