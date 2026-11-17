@@ -59,7 +59,17 @@ export function useAppUpdates(
   const resumedInstall = useRef<string | null>(null);
 
   useEffect(() => {
-    void getAppUpdatePlatform(channel).then(setPlatform);
+    void getAppUpdatePlatform(channel).then((next) => {
+      // The probe answers "what is this build and may it replace itself". A silent null here is
+      // exactly the state where the tab says nothing forever, so the log has to name it.
+      updateLog.info('platform probe', {
+        os: next?.os ?? 'none',
+        form: next?.installForm ?? 'none',
+        canApply: String(next?.canApply ?? false),
+        primary: String(isPrimaryWindow()),
+      });
+      setPlatform(next);
+    });
   }, [channel]);
 
   // The native side narrates every step; mirror it into the app log so a failed update on a phone
