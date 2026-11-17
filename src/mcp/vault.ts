@@ -448,14 +448,17 @@ export class McpVault {
     tags?: string[];
     status?: 'backlog' | 'todo' | 'in_progress' | 'done';
     priority?: 'none' | 'low' | 'medium' | 'high';
-    dueDate?: string;
-    reminder?: string;
+    dueDate?: SlagItem['dueDate'] | null;
+    reminder?: SlagItem['reminder'] | null;
+    duration?: SlagItem['duration'] | null;
+    recurrence?: SlagItem['recurrence'] | null;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {
       existingMatch = await this.findNote(params.id);
+      if (!existingMatch) throw new Error(`Заметка «${params.id}» не найдена.`);
     }
 
     if (existingMatch) {
@@ -548,8 +551,10 @@ export class McpVault {
       updatedAt: Date.now(),
       status: params.status || (params.type === 'task' || params.dueDate ? 'todo' : undefined),
       priority: params.priority || (params.type === 'task' || params.dueDate ? 'none' : undefined),
-      dueDate: params.dueDate,
-      reminder: params.reminder,
+      dueDate: params.dueDate ?? undefined,
+      reminder: params.reminder ?? undefined,
+      duration: params.duration ?? undefined,
+      recurrence: params.recurrence ?? undefined,
       subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
     };
 

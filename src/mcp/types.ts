@@ -1,7 +1,15 @@
 // Zod schemas and vault shapes the MCP tools accept, with their user-facing descriptions.
 import { z } from 'zod';
 import { DEFAULT_INBOX_FOLDER } from '../config';
-import type { SlagItem, FolderMeta } from '../types';
+import type { SlagItem, FolderMeta, RecurrenceRule } from '../types';
+import { parseISODateString } from '../lib/time/recurrenceHelper';
+
+const RecurrenceSchema: z.ZodType<RecurrenceRule> = z.object({
+  freq: z.enum(['daily', 'weekdays', 'weekly', 'monthly', 'yearly']),
+  interval: z.number().int().positive().optional(),
+  weekdays: z.array(z.number().int().min(1).max(7)).optional(),
+  resetSubtasks: z.boolean().optional(),
+});
 
 export interface McpVaultConfig {
   vaultPath: string; // Absolute path to vault (notes dir)
@@ -32,13 +40,15 @@ export const SaveNoteSchema = {
   title: z.string().optional().describe('Заголовок заметки или задачи (обязателен при создании новой).'),
   content: z.string().optional().describe('Основной текст в формате Markdown.'),
   appendContent: z.string().optional().describe('Текст для добавления в конец существующей заметки.'),
-  type: z.enum(['note', 'task', 'article']).optional().describe('Тип записи: note (заметка), task (задача), article (статья). Не указан при создании — note, при обновлении — тип не меняется.'),
-  folder: z.string().optional().describe(`Папка сохранения (например "${DEFAULT_INBOX_FOLDER}" или "Проекты/Дизайн"). Не указана при создании — "${DEFAULT_INBOX_FOLDER}", при обновлении — папка не меняется.`),
+  type: z.enum(['note', 'task', 'article']).optional().describe('Тип записи: note, task, article. При обновлении пропуск сохраняет тип; при создании без срока — note. Для задач укажи task.'),
+  folder: z.string().optional().describe(`Папка сохранения (например "${DEFAULT_INBOX_FOLDER}" или "Проекты/Дизайн"). Пропуск сохраняет папку при обновлении; новая запись — во «${DEFAULT_INBOX_FOLDER}».`),
   tags: z.array(z.string()).optional().describe('Список тегов без знака решетки #.'),
   status: z.enum(['backlog', 'todo', 'in_progress', 'done']).optional().describe('Статус задачи.'),
   priority: z.enum(['none', 'low', 'medium', 'high']).optional().describe('Приоритет задачи.'),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Формат даты должен быть YYYY-MM-DD').optional().describe('Срок выполнения задачи в формате YYYY-MM-DD.'),
-  reminder: z.string().optional().describe('Время напоминания (например, "10:00" или ISO timestamp).'),
+  dueDate: z.string().refine(value => Number.isFinite(parseISODateString(value).getTime()), 'Нужна существующая дата YYYY-MM-DD').nullable().optional().describe('Срок задачи YYYY-MM-DD, не время. null снимает срок; пропуск сохраняет. Относительную дату сначала уточни по дате и часовому поясу пользователя.'),
+  reminder: z.iso.datetime({ offset: true }).nullable().optional().describe('Момент напоминания ISO datetime с часовым поясом (например 2026-11-17T10:00:00+03:00), не просто HH:mm. null снимает напоминание; пропуск сохраняет.'),
+  duration: z.number().positive().nullable().optional().describe('Длительность задачи в минутах, не в секундах. null снимает длительность; пропуск сохраняет.'),
+  recurrence: RecurrenceSchema.nullable().optional().describe('Повтор задачи: {freq, interval?, weekdays?, resetSubtasks?}; interval — положительное целое (по умолчанию 1), weekdays — 1=пн…7=вс для weekly. null снимает повтор; пропуск сохраняет. Это поле recurrence, не repeat и не текст в content.'),
   subtasks: z.array(z.string()).optional().describe('Список подзадач (текст каждого пункта).'),
 };
 

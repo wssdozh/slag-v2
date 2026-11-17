@@ -16,8 +16,10 @@ export interface NotePatch {
   tags?: string[];
   status?: SlagItemStatus;
   priority?: SlagItemPriority;
-  dueDate?: string;
-  reminder?: string;
+  dueDate?: string | null;
+  reminder?: string | null;
+  duration?: SlagItem['duration'] | null;
+  recurrence?: SlagItem['recurrence'] | null;
   subtasks?: string[];
 }
 
@@ -50,8 +52,10 @@ export function applyNotePatch(
     tags: patch.tags ?? existing.tags,
     status: patch.status ?? existing.status,
     priority: patch.priority ?? existing.priority,
-    dueDate: patch.dueDate ?? existing.dueDate,
-    reminder: patch.reminder ?? existing.reminder,
+    dueDate: patch.dueDate !== undefined ? patch.dueDate ?? undefined : existing.dueDate,
+    reminder: patch.reminder !== undefined ? patch.reminder ?? undefined : existing.reminder,
+    duration: patch.duration !== undefined ? patch.duration ?? undefined : existing.duration,
+    recurrence: patch.recurrence !== undefined ? patch.recurrence ?? undefined : existing.recurrence,
     subtasks: resolved.subtasks.length > 0 ? resolved.subtasks : existing.subtasks,
     updatedAt: now,
   };

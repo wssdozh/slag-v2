@@ -59,6 +59,8 @@ export interface NoteCard {
   priority?: SlagItemPriority;
   dueDate?: string;
   reminder?: string;
+  duration?: SlagItem['duration'];
+  recurrence?: SlagItem['recurrence'];
   createdAt: number;
   createdAtIso: string;
   updatedAt: number;
@@ -171,6 +173,8 @@ export function buildNoteCard(input: NoteCardInput): NoteCard {
     priority: item.priority,
     dueDate: item.dueDate,
     reminder: item.reminder,
+    duration: item.duration,
+    recurrence: item.recurrence,
     createdAt: item.createdAt,
     createdAtIso: toIso(item.createdAt),
     updatedAt: item.updatedAt,
@@ -227,6 +231,8 @@ export function renderNoteCard(card: NoteCard): string {
     card.priority && card.priority !== 'none' ? `приоритет: ${card.priority}` : '',
     card.dueDate ? `срок: ${card.dueDate}` : '',
     card.reminder ? `напоминание: ${card.reminder}` : '',
+    card.duration !== undefined ? `длительность: ${card.duration} мин` : '',
+    card.recurrence ? `повтор: ${JSON.stringify(card.recurrence)}` : '',
   ].filter(Boolean);
   if (taskFacts.length > 0) lines.push(taskFacts.join(' · '));
 
