@@ -1,4 +1,4 @@
-// The one icon config: a semantic name per glyph, grouped by meaning.
+﻿// The one icon config: a semantic name per glyph, grouped by meaning.
 // Change a glyph here and every call site follows — nothing else imports an icon set.
 //
 // Lucide carries the set: one stroke family, 24px grid, 2px weight, round caps.
@@ -123,7 +123,6 @@ import {
   Repeat1,
   RotateCcw,
   Search,
-  Send,
   Server,
   Settings,
   Shield,
@@ -212,7 +211,7 @@ export const ICONS = {
   'action.addCircle': CirclePlus,
   'action.decrement': Minus,
   'action.moveDown': ArrowDown,
-  'action.send': Send,
+  'action.send': ArrowUp,
   'action.check': Check,
   'action.delete': Trash,
   'action.edit': Pencil,
