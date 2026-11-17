@@ -353,7 +353,12 @@ impl LinuxDistro {
 
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 pub fn linux_distro() -> LinuxDistro {
-    let text = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
+    linux_distro_from(&std::fs::read_to_string("/etc/os-release").unwrap_or_default())
+}
+
+/// `ID` first, then `ID_LIKE`: a derivative (endeavouros, manjaro, pop) names its family there.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn linux_distro_from(text: &str) -> LinuxDistro {
     let mut id = String::new();
     let mut id_like = String::new();
     for line in text.lines() {
@@ -1217,5 +1222,23 @@ mod tests {
             let url = format!("{}slag-v2/{}", ASSET_PREFIX, channel.as_str());
             assert!(url.starts_with(ASSET_PREFIX));
         }
+    }
+
+    /// The distro decides which file the settings tab offers, so it is read, not guessed.
+    #[test]
+    fn os_release_names_the_package_this_machine_installs() {
+        let ubuntu = "NAME=\"Ubuntu\"\nID=ubuntu\nID_LIKE=debian\nVERSION_ID=\"24.04\"\n";
+        assert_eq!(linux_distro_from(ubuntu), LinuxDistro::Debian);
+        let debian = "ID=debian\n";
+        assert_eq!(linux_distro_from(debian), LinuxDistro::Debian);
+        let arch = "ID=arch\n";
+        assert_eq!(linux_distro_from(arch), LinuxDistro::Arch);
+        // A derivative says "arch" in ID_LIKE and its own name in ID: both have to work.
+        let endeavouros = "ID=endeavouros\nID_LIKE=arch\n";
+        assert_eq!(linux_distro_from(endeavouros), LinuxDistro::Arch);
+        let fedora = "ID=fedora\nID_LIKE=\"rhel centos\"\n";
+        assert_eq!(linux_distro_from(fedora), LinuxDistro::Other);
+        // No os-release at all is "some other distro", not an error.
+        assert_eq!(linux_distro_from(""), LinuxDistro::Other);
     }
 }
