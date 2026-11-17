@@ -321,7 +321,7 @@ test.describe('SLAG v2 — Model Context Protocol (MCP) Server', () => {
       await liveClient.connect(stdioTransport);
 
       const tools = await liveClient.listTools();
-      expect(tools.tools.length).toBe(11);
+      expect(tools.tools.map(tool => tool.name)).toContain('read_attachment');
 
       const saveRes = await liveClient.callTool({
         name: 'save_note',

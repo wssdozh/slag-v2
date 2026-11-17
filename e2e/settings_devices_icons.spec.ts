@@ -69,9 +69,9 @@ test('device rows wear a glyph per form factor and the header pairs a new one', 
     'icons-unknown': 'entity.deviceUnknown',
   };
   for (const [id, icon] of Object.entries(expected)) {
-    await expect(settings.getByTestId(`device-row-${id}`).locator('[data-icon]')).toHaveAttribute('data-icon', icon);
+    await expect(settings.getByTestId(`device-row-${id}`).locator('span[data-icon]').first()).toHaveAttribute('data-icon', icon);
   }
-  const rendered = await settings.locator('[data-icon]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-icon')));
+  const rendered = await settings.locator('[data-testid^="device-row-"] span[data-icon]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-icon')));
   expect(new Set(rendered).size).toBe(6);
 
   await page.screenshot({ path: 'test-results/screenshots/devices-icons.png' });

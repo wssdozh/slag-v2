@@ -39,4 +39,3 @@
 ## после: переезд на lucide
 
 по просьбе через день набор сменили на lucide 1.55. одна штриховая семья, filled-близнецов нет, поэтому `variant="filled"` теперь заливает тот же контур (`fill-current`), а не подменяет глиф. пять имён переименованы в самом пакете: `Trash2` → `Trash`, `Filter` → `ListFilter`, `History` → `ClockArrowLeft`, `Loader2` → `LoaderCircle`, `BarChart3` → `ChartBar`. реестр: 161 ключ, 147 импортов, без `pair()`.
-

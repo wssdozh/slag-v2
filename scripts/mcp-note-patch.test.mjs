@@ -7,6 +7,18 @@ import { applyNotePatch } from '../src/mcp/notePatch.ts';
 
 const NOW = 1_800_000_000_000;
 
+test('расписание: пропуск сохраняет, null очищает, новые значения применяются', () => {
+  const existing = { ...task(), duration: 30, recurrence: { freq: 'weekly', weekdays: [1] } };
+  for (const key of ['dueDate', 'reminder', 'duration', 'recurrence']) {
+    assert.deepEqual(applyNotePatch(existing, {}, resolved(), NOW)[key], existing[key]);
+    assert.equal(applyNotePatch(existing, { [key]: null }, resolved(), NOW)[key], undefined);
+  }
+  const patch = { duration: 45, recurrence: { freq: 'daily', interval: 2 } };
+  const next = applyNotePatch(existing, patch, resolved(), NOW);
+  assert.equal(next.duration, 45);
+  assert.deepEqual(next.recurrence, patch.recurrence);
+});
+
 function task() {
   return {
     id: 'note_1',
