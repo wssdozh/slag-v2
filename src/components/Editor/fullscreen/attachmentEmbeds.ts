@@ -14,7 +14,7 @@ import type { SlagAttachment } from '../../../types';
 import {
   attachmentEmbedSrc,
   findAttachmentEmbeds,
-  resolveAttachmentByName,
+  resolveAttachmentEmbeds,
   type AttachmentEmbed,
 } from '../../../lib/text/attachmentEmbed';
 import { formatBytes } from '../../../lib/text/formatBytes';
@@ -142,6 +142,11 @@ class AttachmentEmbedWidget extends WidgetType {
 function buildDecorations(view: EditorView, deps: AttachmentEmbedDeps): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const { selection } = view.state;
+  // Count the whole document, including tokens hidden by the caret or outside the viewport.
+  const resolved = new Map(
+    resolveAttachmentEmbeds(view.state.doc.toString(), deps.attachments)
+      .map(({ embed, attachment }) => [embed.from, attachment]),
+  );
   for (const visible of view.visibleRanges) {
     const lastLine = view.state.doc.lineAt(visible.to).number;
     for (let number = view.state.doc.lineAt(visible.from).number; number <= lastLine; number += 1) {
@@ -154,7 +159,7 @@ function buildDecorations(view: EditorView, deps: AttachmentEmbedDeps): Decorati
           (range) => range.from <= to && range.to >= from,
         );
         if (isTouched) continue;
-        const attachment = resolveAttachmentByName(deps.attachments, embed.name);
+        const attachment = resolved.get(from);
         const src = attachmentEmbedSrc(attachment, deps.srcs);
         builder.add(
           from,

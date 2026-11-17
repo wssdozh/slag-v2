@@ -43,32 +43,46 @@ export function findAttachmentEmbeds(text: string): AttachmentEmbed[] {
  * alone. Runs before the wiki-link transform: otherwise the inner `[[name]]` would become
  * `![name](wiki:name)`, which is a broken image, not an attachment.
  */
-export function markdownWithAttachmentEmbeds(raw: string): string {
+export function markdownWithAttachmentEmbeds(raw: string, attachments?: SlagAttachment[]): string {
   if (!raw.includes('![[')) return raw;
-  const embeds = findAttachmentEmbeds(raw);
+  const embeds = resolveAttachmentEmbeds(raw, attachments);
   if (embeds.length === 0) return raw;
 
   let out = '';
   let cursor = 0;
-  for (const embed of embeds) {
+  for (const { embed, attachment } of embeds) {
     out += raw.slice(cursor, embed.from);
-    out += `[${embed.label}](${attachmentEmbedHref(embed.name)})`;
+    out += `[${embed.label}](${attachmentEmbedHref(attachment?.id ?? embed.name)})`;
     cursor = embed.to;
   }
   return out + raw.slice(cursor);
 }
 
-/** Exact name first, then case-insensitively: a note may spell the file differently. */
+/** Stable id/path first. Ambiguous legacy names follow attachment order; unique files may repeat. */
 export function resolveAttachmentByName(
   attachments: SlagAttachment[] | undefined,
   name: string,
+  occurrence = 0,
 ): SlagAttachment | undefined {
   const wanted = name.trim();
   if (!wanted || !attachments) return undefined;
-  const exact = attachments.find((attachment) => attachment.name === wanted);
-  if (exact) return exact;
-  const folded = wanted.toLowerCase();
-  return attachments.find((attachment) => attachment.name.toLowerCase() === folded);
+  const stable = attachments.find(attachment => attachment.id === wanted || attachment.relativePath === wanted);
+  if (stable) return stable;
+  const exact = attachments.filter(attachment => attachment.name === wanted);
+  const matches = exact.length ? exact : attachments.filter(attachment => attachment.name.toLowerCase() === wanted.toLowerCase());
+  // Legacy names cannot distinguish intentional repeats from different same-named files.
+  return matches.length ? matches[occurrence % matches.length] : undefined;
+}
+
+/** Resolve in document order, not render/viewport order, including hidden source tokens. */
+export function resolveAttachmentEmbeds(text: string, attachments?: SlagAttachment[]) {
+  const occurrences = new Map<string, number>();
+  return findAttachmentEmbeds(text).map(embed => {
+    const key = embed.name.toLowerCase();
+    const occurrence = occurrences.get(key) ?? 0;
+    occurrences.set(key, occurrence + 1);
+    return { embed, attachment: resolveAttachmentByName(attachments, embed.name, occurrence) };
+  });
 }
 
 /** Bytes live in IndexedDB or `.attachments/`; `dataUrl` is the frame attached a second ago. */
