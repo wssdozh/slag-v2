@@ -189,11 +189,22 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: ndk
+        shell: bash
         run: |
+          set -euo pipefail
           sdk="$ANDROID_HOME"
-          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
-          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.0.12077973"
-          echo "NDK_HOME=$sdk/ndk/27.0.12077973" >> "$GITHUB_ENV"
+          sdkmanager="$sdk/cmdline-tools/latest/bin/sdkmanager"
+          ndk="$sdk/ndk/27.0.12077973"
+          yes | "$sdkmanager" --licenses > /dev/null
+          # Google's CDN hands out a truncated archive now and then ("Archive is not a ZIP
+          # archive"), and one bad download used to cost the whole apk: retry it instead.
+          for attempt in 1 2 3; do
+            [ -d "$ndk" ] && break
+            yes | "$sdkmanager" --install "ndk;27.0.12077973" || echo "ndk attempt $attempt failed"
+            sleep 10
+          done
+          [ -d "$ndk" ] || { echo "::error::NDK 27.0.12077973 не установился"; exit 1; }
+          echo "NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
