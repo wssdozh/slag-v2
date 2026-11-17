@@ -77,7 +77,7 @@ export function useVaults(deps: {
       setActiveTypeFilter(newWs.activeTypeFilter || 'all');
       setActiveTagFilter(newWs.activeTagFilter || null);
       setActiveMobileTab(newWs.activeMobileTab || 'folders');
-      setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
+      setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : false);
       setSortBy(newWs.sortBy || 'createdAt');
       setSortOrder(newWs.sortOrder || 'asc');
       setHideCompletedTasks(newWs.hideCompletedTasks ?? false);
