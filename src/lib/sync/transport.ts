@@ -36,6 +36,12 @@ export interface TransportOptions {
   vaultId: string;
   roomId: string;
   enabled: boolean;
+  /**
+   * Acknowledge over HTTP instead of the socket. Some networks pass a websocket downstream and
+   * drop the upstream half: bundles arrive, acks never do, and the relay re-sends the page
+   * forever. A receive-only node has nothing else to send, so a POST per bundle is cheap.
+   */
+  ackOverHttp?: boolean;
 }
 
 export interface SendAckOptions {
@@ -82,7 +88,8 @@ export class SyncTransport {
   }
 
   public async sendAck(options: SendAckOptions): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    const overSocket = this.currentOptions?.ackOverHttp !== true;
+    if (overSocket && this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type: 'ack', bundleId: options.bundleId }));
       syncLog.info(`ACK sent for bundle ${options.bundleId}`);
       return;
@@ -96,6 +103,7 @@ export class SyncTransport {
       body: JSON.stringify({ deviceId: options.deviceId, bundleIds: [options.bundleId] }),
     });
     if (!response.ok) throw new Error(`Sync ACK failed: HTTP ${response.status}`);
+    syncLog.info(`ACK sent over HTTP for bundle ${options.bundleId}`);
   }
 
   /** True when the live socket already points at this room, so a re-init need not reopen it. */

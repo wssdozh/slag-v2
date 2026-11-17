@@ -21,6 +21,9 @@ export function connectSocket(store: SyncSocketHost): void {
     vaultId: store.usesAccountSync() ? store.getSyncVaultId() : store.currentVaultId,
     roomId: store.activeRoomId || '',
     enabled: store.config.enabled,
+    // A receive-only device never pushes over the socket, so its acks are the only upstream
+    // traffic it has. Sending them over HTTP survives networks that swallow websocket uplink.
+    ackOverHttp: store.config.localSyncMode === 'receive-only',
   });
 }
 
