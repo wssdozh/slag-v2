@@ -125,7 +125,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: версия сборки
         shell: bash
-        run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+        run: |
+          printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+          node scripts/stamp-version.mjs '${{ needs.prepare.outputs.version }}'
       - name: build
         shell: bash
         run: npx tauri build --config "$RUNNER_TEMP/version.json" --bundles nsis
@@ -157,7 +159,9 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
       - run: pnpm install --frozen-lockfile
       - name: версия сборки
-        run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+        run: |
+          printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+          node scripts/stamp-version.mjs '${{ needs.prepare.outputs.version }}'
       - name: build
         run: npx tauri build --config "$RUNNER_TEMP/version.json" --bundles deb,appimage
       - uses: actions/upload-artifact@v4
@@ -217,7 +221,9 @@ jobs:
           targets: aarch64-linux-android
       - run: pnpm install --frozen-lockfile
       - name: версия сборки
-        run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+        run: |
+          printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
+          node scripts/stamp-version.mjs '${{ needs.prepare.outputs.version }}'
       - name: build apk
         run: npx tauri android build --apk --target aarch64 --config "$RUNNER_TEMP/version.json"
       - name: sign apk
