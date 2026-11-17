@@ -228,7 +228,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               } relative z-10 leading-normal py-0 outline-none border-none`}
               style={{
                 minHeight: `${minHeight}px`,
-                maxHeight: `${maxHeight}px`,
+                maxHeight: isMobile ? `min(${maxHeight}px, 25dvh)` : `${maxHeight}px`,
                 // The mirror paints the glyphs; the field keeps the caret, the
                 // selection and the hit area only.
                 ...(highlights.length > 0 ? { color: 'transparent', caretColor: 'var(--color-fg-primary)' } : {}),
@@ -247,7 +247,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         {customControls ? (
           customControls
         ) : (
-          <div className="composer-toolbar relative flex min-w-0 items-end justify-between gap-2">
+          <div className="composer-toolbar relative flex min-w-0 items-end justify-between gap-2 max-[430px]:[&_.composer-record-type_span.truncate]:hidden">
             {leftControls}
 
             <div className="flex shrink-0 items-center gap-1 ml-auto">
