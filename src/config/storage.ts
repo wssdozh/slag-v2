@@ -37,9 +37,7 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   activeTagFilter: null,
   activeMobileTab: 'folders',
   folderMediaTab: 'media',
-  // The board opens on its columns, not on a 256px materials dock: a fresh window should show the
-  // thing the view is for. Opening the dock once is remembered in the saved workspace.
-  isKanbanMaterialsOpen: false,
+  isKanbanMaterialsOpen: true,
   sortBy: 'createdAt',
   sortOrder: 'asc',
   hideCompletedTasks: false,

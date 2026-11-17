@@ -12,6 +12,8 @@ import type {
 } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
+import { isMobilePlatform } from '../../lib/platform/windowControls';
+import { UI_BREAKPOINTS } from '../../config';
 import { selectVisibleItems } from '../feed/feedView';
 
 /**
@@ -42,10 +44,9 @@ export function useFeedView(
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
       return initialWorkspace.isKanbanMaterialsOpen;
     }
-    // Closed by default: the columns are the point of this view, and a 256px dock nobody asked
-    // for pushes them right on the very first open. Whoever wants it opens it once — the choice
-    // is saved with the workspace.
-    return false;
+    const isMobileInitial =
+      typeof window !== 'undefined' && (window.innerWidth < UI_BREAKPOINTS.MOBILE || isMobilePlatform());
+    return !isMobileInitial;
   });
 
   const [folderSettings, setFolderSettings] = useState<Record<string, FolderViewSettings>>(
