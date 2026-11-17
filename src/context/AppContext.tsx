@@ -29,6 +29,7 @@ import { useFolderAdmin } from './hooks/useFolderAdmin';
 import { useVaults } from './hooks/useVaults';
 import { useRecurringRollover } from './hooks/useRecurringRollover';
 import { useNotifyArm } from './hooks/useNotifyArm';
+import { useVaultWatch } from './hooks/useVaultWatch';
 import { useAppUpdates } from './hooks/useAppUpdates';
 import {
   STORAGE_KEYS,
@@ -184,6 +185,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useRecurringRollover(refreshData);
   useNotifyArm(items, vault);
+  // The disk can move without us: the MCP server, an outside editor. The sweep brings those notes
+  // into the feed and reports a note that already changed under an edit about to be saved.
+  useVaultWatch({ vault, addToast });
   const appUpdate = useAppUpdates(addToast, confirmAction);
 
   // Application Startup Log (guarded against React StrictMode double invocation)

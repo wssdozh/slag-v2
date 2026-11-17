@@ -27,6 +27,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 
 import { stripAttachmentData } from './attachmentData';
+import { hasNewerVersionOnDisk } from './writeGuard';
 import { AttachmentStore } from './attachments';
 import { VaultFiles } from './vaultFiles';
 import {
@@ -91,15 +92,23 @@ import {
 
 export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 
+/**
+ * Who wrote the change. `local` is the app's own edit and the only value the sync engine packs
+ * into an operation; `remote` is an incoming bundle; `external` is a file that changed on disk
+ * under us — the MCP server, an outside editor — and is never re-pushed, or the relay would echo
+ * the same note back and the two devices would ping-pong it forever.
+ */
+export type StorageOrigin = 'local' | 'remote' | 'external';
+
 export type StorageChangeEvent =
-  | { kind: 'item'; action: 'upsert' | 'delete'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
-  | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: 'local' | 'remote' }
-  | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: 'local' | 'remote' }
-  | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: 'local' | 'remote' }
-  | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: 'local' | 'remote' }
-  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: 'local' | 'remote' }
+  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; origin?: StorageOrigin }
+  | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: StorageOrigin }
+  | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: StorageOrigin }
+  | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: StorageOrigin }
+  | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: StorageOrigin }
+  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: StorageOrigin }
   // One event per memory write, not per fact: the sync packer reads the list from storage.
-  | { kind: 'memory'; action: 'upsert'; id: string; payload?: undefined; origin?: 'local' | 'remote' };
+  | { kind: 'memory'; action: 'upsert'; id: string; payload?: undefined; origin?: StorageOrigin };
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
@@ -435,11 +444,45 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
     if (isTauri()) {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
-      void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+      // A local edit is the only one that can be stale: a remote bundle is applied state, and a
+      // note without a file behind it has nothing to lose.
+      if (origin === 'local' && oldItem && oldFilename) {
+        void this.flushGuarded(updatedItem, oldItem, oldFilename);
+      } else {
+        void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+      }
     }
 
     this.emitChange({ kind: 'item', action: 'upsert', id: updatedItem.id, payload: updatedItem, origin });
     return updatedItem;
+  }
+
+  /**
+   * Writes a note back unless the file has moved on without us — the MCP server, an outside
+   * editor, a sync that landed between the read and the save. The disk wins and the index is
+   * told, so the person sees the truth instead of watching their edit vanish at the next reload.
+   */
+  private async flushGuarded(item: SlagItem, previous: SlagItem, previousFilename: string): Promise<void> {
+    const seenAt = previous.updatedAt;
+    const target = `${previous.folder || DEFAULT_INBOX_FOLDER}/${previousFilename}`;
+    const onDisk = await this.files.readNoteIdentity(target);
+
+    if (hasNewerVersionOnDisk(onDisk, { id: previous.id, updatedAt: seenAt })) {
+      const { items: reloaded } = await this.files.reloadNotesFromDisk([target]);
+      const diskItem = reloaded[0];
+      if (diskItem) {
+        const items = this.getItems();
+        const index = items.findIndex(candidate => candidate.id === diskItem.id);
+        if (index >= 0) items[index] = diskItem;
+        else items.unshift(diskItem);
+        this.cacheItems(this.getItemsKey(), items);
+        this.emitChange({ kind: 'item', action: 'conflict', id: diskItem.id, payload: diskItem, origin: 'external' });
+        fsLog.warn(`Refused to overwrite "${diskItem.title}" (${diskItem.id}): the file is newer on disk`);
+        return;
+      }
+    }
+
+    await this.files.flushItemToDisk(item, previous.folder, previousFilename);
   }
 
   public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
@@ -470,6 +513,45 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     for (const it of saveMap.values()) {
       this.emitChange({ kind: 'item', action: 'upsert', id: it.id, payload: it, origin });
     }
+  }
+
+  /**
+   * Picks up notes that changed on disk behind the app's back: the MCP server wrote one, someone
+   * edited a file in an outside editor, a script dropped one in. The sweep that noticed hands over
+   * vault-relative paths; a path that no longer reads back is a deletion.
+   *
+   * A rewrite that ends where it started is not a change: the app stamps its own save into the
+   * index before the flush reaches the disk, and re-announcing that would fight the editor.
+   */
+  public async reloadFromDisk(relativePaths: string[]): Promise<{ updated: number; removed: number }> {
+    if (!isTauri() || relativePaths.length === 0) return { updated: 0, removed: 0 };
+    const { items: parsed, missing } = await this.files.reloadNotesFromDisk(relativePaths);
+    const current = this.getItems();
+    const byId = new Map(current.map(item => [item.id, item]));
+    const events: StorageChangeEvent[] = [];
+
+    for (const item of parsed) {
+      const cached = byId.get(item.id);
+      if (cached && cached.updatedAt === item.updatedAt && cached.content === item.content) continue;
+      byId.set(item.id, item);
+      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, origin: 'external' });
+    }
+
+    let removed = 0;
+    for (const relativePath of missing) {
+      const normalized = relativePath.replace(/\\/g, '/');
+      const gone = current.find(item => `${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename ?? ''}` === normalized);
+      if (!gone) continue;
+      byId.delete(gone.id);
+      removed++;
+      events.push({ kind: 'item', action: 'delete', id: gone.id, origin: 'external' });
+    }
+
+    if (events.length === 0) return { updated: 0, removed: 0 };
+    this.cacheItems(this.getItemsKey(), [...byId.values()]);
+    for (const event of events) this.emitChange(event);
+    fsLog.info(`Picked up ${events.length - removed} changed and ${removed} removed notes from disk`);
+    return { updated: events.length - removed, removed };
   }
 
   public getTrashItems(): SlagItem[] {

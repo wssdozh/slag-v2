@@ -291,9 +291,10 @@ export class SyncEngine {
     });
 
     vault().subscribeChanges((event) => {
-      // Remote-origin writes are already applied state; echoing them re-queues a push and
-      // two devices ping-pong the same bundle forever.
-      if (event.origin === 'remote') return;
+      // Remote-origin writes are already applied state, and an external one came from the disk
+      // under us (the MCP server, another editor): pushing it would echo back through the relay
+      // and the two devices would ping-pong the same bundle forever.
+      if (event.origin === 'remote' || event.origin === 'external') return;
       const op = createSyncOpFromStorageEvent(event);
       if (op) {
         syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);

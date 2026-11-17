@@ -187,6 +187,67 @@ export class VaultFiles {
     }
   }
 
+  /**
+   * Reads the notes under these vault-relative paths back into items, without touching the index.
+   * The caller owns the merge: this class knows the on-disk format, not what an index is.
+   *
+   * A path that cannot be read lands in `missing` — a folder of someone else's vault, a file
+   * deleted between the sweep and the read. Deciding that a note is gone is the caller's call.
+   */
+  public async reloadNotesFromDisk(relativePaths: string[]): Promise<{ items: SlagItem[]; missing: string[] }> {
+    const notesBase = this.getVaultNotesPath();
+    const items: SlagItem[] = [];
+    const missing: string[] = [];
+
+    for (const relativePath of relativePaths) {
+      let safe: string;
+      try {
+        safe = safeVaultRelativePath(relativePath);
+      } catch {
+        missing.push(relativePath);
+        continue;
+      }
+      const slash = safe.lastIndexOf('/');
+      const folder = slash >= 0 ? safe.slice(0, slash) : DEFAULT_INBOX_FOLDER;
+      const filename = slash >= 0 ? safe.slice(slash + 1) : safe;
+      try {
+        const content = await readTextFile(`${notesBase}/${safe}`, { baseDir: BaseDirectory.AppData });
+        const parsed = parseMarkdownToItem(content, filename.replace(/\.md$/, ''), folder);
+        parsed.filename = filename;
+        items.push(parsed);
+      } catch {
+        missing.push(relativePath);
+      }
+    }
+
+    return { items, missing };
+  }
+
+  /**
+   * Who the note at this path is and how old it says it is. `updated` comes from the frontmatter,
+   * so this is the one question a write needs to ask before it replaces the file: has somebody
+   * else written here since we last read it.
+   */
+  public async readNoteIdentity(relativePath: string): Promise<{ id: string; updatedAt: number } | null> {
+    if (!isTauri()) return null;
+    let safe: string;
+    try {
+      safe = safeVaultRelativePath(relativePath);
+    } catch {
+      return null;
+    }
+    const slash = safe.lastIndexOf('/');
+    const folder = slash >= 0 ? safe.slice(0, slash) : DEFAULT_INBOX_FOLDER;
+    const filename = slash >= 0 ? safe.slice(slash + 1) : safe;
+    try {
+      const content = await readTextFile(`${this.getVaultNotesPath()}/${safe}`, { baseDir: BaseDirectory.AppData });
+      const parsed = parseMarkdownToItem(content, filename.replace(/\.md$/, ''), folder);
+      return { id: parsed.id, updatedAt: parsed.updatedAt };
+    } catch {
+      return null;
+    }
+  }
+
   // ponytail: in-memory sync cache with async fs flush. ceiling: 5,000 notes. upgrade: worker-thread batch indexing if disk io throttles
   public initTauriFs(): Promise<boolean> {
     if (!isTauri()) return Promise.resolve(false);
