@@ -261,6 +261,52 @@ test.describe('SLAG v2 — Model Context Protocol (MCP) Server', () => {
     expect(prompt.messages[0].content.text).toContain('list_tasks');
   });
 
+  test('schedule fields roundtrip and title-only updates preserve task metadata', async () => {
+    const recurrence = { freq: 'weekly', interval: 2, weekdays: [1, 5], resetSubtasks: false };
+    const schedule = { dueDate: '2026-11-20', reminder: '2026-11-20T10:00:00+03:00', duration: 45, recurrence };
+    const save = await client.callTool({ name: 'save_note', arguments: {
+      title: 'Schedule regression', type: 'task', folder: 'Проекты/MCP', status: 'in_progress', priority: 'high', tags: ['mcp'], ...schedule,
+    } });
+    expect(save.isError).toBeFalsy();
+    const match = await vault.findNote('Schedule regression');
+    expect(match?.item).toMatchObject(schedule);
+    const id = match!.item.id;
+    const update = await client.callTool({ name: 'save_note', arguments: { id, title: 'Schedule renamed' } });
+    expect(update.isError).toBeFalsy();
+    expect((await vault.getNote(id)).item).toMatchObject({ ...schedule, type: 'task', folder: 'Проекты/MCP', status: 'in_progress', priority: 'high', tags: ['mcp'] });
+    const missing = await client.callTool({ name: 'save_note', arguments: { id: 'missing-schedule-id', title: 'Must not create' } });
+    expect(missing.isError).toBe(true);
+    expect(await vault.findNote('Must not create')).toBeNull();
+    const note = await client.callTool({ name: 'get_note', arguments: { idOrTitle: id } });
+    expect(JSON.stringify(note.content)).toContain('recurrence:');
+    for (const name of ['list_notes', 'list_tasks', 'search_notes']) {
+      const result = await client.callTool({ name, arguments: name === 'search_notes' ? { query: 'Schedule renamed' } : { view: 'all' } });
+      const text = JSON.stringify(result.content);
+      expect(text).toContain('recurrence');
+      expect(text).toContain('weekly');
+      expect(text).toContain('duration');
+      expect(text).toContain('45');
+    }
+    const resource = await client.readResource({ uri: 'slag://tasks/pending' });
+    expect(JSON.parse(resource.contents[0].text as string).find((item: { id: string }) => item.id === id)).toMatchObject(schedule);
+    const replacement = { freq: 'daily', interval: 3, resetSubtasks: true };
+    await client.callTool({ name: 'save_note', arguments: { id, duration: 90, recurrence: replacement } });
+    expect((await vault.getNote(id)).item).toMatchObject({ duration: 90, recurrence: replacement });
+    const cleared = await client.callTool({ name: 'save_note', arguments: { id, dueDate: null, reminder: null, duration: null, recurrence: null } });
+    expect(cleared.isError).toBeFalsy();
+    const item = (await vault.getNote(id)).item;
+    expect([item.dueDate, item.reminder, item.duration, item.recurrence]).toEqual([undefined, undefined, undefined, undefined]);
+    for (const invalid of [{ dueDate: '2026-02-30' }, { duration: 0 }, { duration: -1 }, { reminder: '10:00' }, { recurrence: { freq: 'weekly', interval: 0 } }, { recurrence: { freq: 'weekly', weekdays: [0, 8] } }]) {
+      const result = await client.callTool({ name: 'save_note', arguments: { id, ...invalid } });
+      expect(result.isError).toBe(true);
+    }
+    const tools = await client.listTools();
+    const properties = tools.tools.find(tool => tool.name === 'save_note')!.inputSchema.properties!;
+    expect(properties).toHaveProperty('duration');
+    expect(properties).toHaveProperty('recurrence');
+    await vault.deleteNote(id);
+  });
+
   test('10. Live Stdio Subprocess communication test', async () => {
     const liveVaultDir = path.resolve('.tmp/live-stdio-vault');
     await fs.mkdir(liveVaultDir, { recursive: true });

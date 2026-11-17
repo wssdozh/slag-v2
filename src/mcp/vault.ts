@@ -247,16 +247,19 @@ export class McpVault {
     tags?: string[];
     status?: 'backlog' | 'todo' | 'in_progress' | 'done';
     priority?: 'none' | 'low' | 'medium' | 'high';
-    dueDate?: string;
-    reminder?: string;
+    dueDate?: SlagItem['dueDate'] | null;
+    reminder?: SlagItem['reminder'] | null;
+    duration?: SlagItem['duration'] | null;
+    recurrence?: SlagItem['recurrence'] | null;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
-    const targetFolder = safeVaultRelativePath(params.folder || DEFAULT_INBOX_FOLDER);
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {
       existingMatch = await this.findNote(params.id);
+      if (!existingMatch) throw new Error(`Заметка «${params.id}» не найдена.`);
     }
+    const targetFolder = safeVaultRelativePath(params.folder ?? existingMatch?.item.folder ?? DEFAULT_INBOX_FOLDER);
 
     if (existingMatch) {
       // UPDATE EXISTING NOTE
@@ -286,8 +289,10 @@ export class McpVault {
         tags: params.tags !== undefined ? params.tags : existing.tags,
         status: params.status !== undefined ? params.status : existing.status,
         priority: params.priority !== undefined ? params.priority : existing.priority,
-        dueDate: params.dueDate !== undefined ? params.dueDate : existing.dueDate,
-        reminder: params.reminder !== undefined ? params.reminder : existing.reminder,
+        dueDate: params.dueDate !== undefined ? params.dueDate ?? undefined : existing.dueDate,
+        reminder: params.reminder !== undefined ? params.reminder ?? undefined : existing.reminder,
+        duration: params.duration !== undefined ? params.duration ?? undefined : existing.duration,
+        recurrence: params.recurrence !== undefined ? params.recurrence ?? undefined : existing.recurrence,
         subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : existing.subtasks,
         updatedAt: Date.now(),
       };
@@ -353,8 +358,10 @@ export class McpVault {
       updatedAt: Date.now(),
       status: params.status || (params.type === 'task' || params.dueDate ? 'todo' : undefined),
       priority: params.priority || (params.type === 'task' || params.dueDate ? 'none' : undefined),
-      dueDate: params.dueDate,
-      reminder: params.reminder,
+      dueDate: params.dueDate ?? undefined,
+      reminder: params.reminder ?? undefined,
+      duration: params.duration ?? undefined,
+      recurrence: params.recurrence ?? undefined,
       subtasks: parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
     };
 

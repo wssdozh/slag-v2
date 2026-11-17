@@ -1,6 +1,8 @@
 // MCP tools that read and write notes, tasks and folders in a vault over JSON-RPC.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpVault } from './vault';
+import type { SlagItem } from '../types';
+
 import {
   SaveNoteSchema,
   GetNoteSchema,
@@ -12,11 +14,16 @@ import {
   CreateFolderSchema,
 } from './types';
 
+function taskSchedule(item: SlagItem): string {
+  if (item.type !== 'task') return '';
+  return ` | ${JSON.stringify({ dueDate: item.dueDate ?? null, reminder: item.reminder ?? null, duration: item.duration ?? null, recurrence: item.recurrence ?? null })}`;
+}
+
 export function registerMcpTools(server: McpServer, vault: McpVault): void {
   // 1. save_note (Universal Create / Update pattern)
   server.tool(
     'save_note',
-    'Создать новую или обновить существующую заметку, задачу или статью в хранилище SLAG (паттерн save_*). Если id передан — запись обновляется; если не передан — создается новая.',
+    'Создать новую или обновить существующую заметку, задачу или статью. Перед обновлением прочитай get_note, передай id; пропущенные поля сохраняются. Без id создается новая запись. Дату, длительность и повтор передавай в dueDate, duration (минуты), recurrence, а не только в тексте. Не выдумывай расписание: уточни неоднозначные дату/часовой пояс. Для снятия расписания передай null. После изменения проверь get_note. Перед тегами/папкой сверяй list_tags/list_folders.',
     SaveNoteSchema,
     async (args) => {
       try {
@@ -30,7 +37,7 @@ export function registerMcpTools(server: McpServer, vault: McpVault): void {
           content: [
             {
               type: 'text',
-              text: `${typeWord} «${res.item.title}» успешно ${actionWord}.\nID: ${res.item.id}\nПапка: ${res.item.folder}\nФайл: ${res.path}${dueInfo}${priorityInfo}`,
+              text: `${typeWord} «${res.item.title}» успешно ${actionWord}.\nID: ${res.item.id}\nПапка: ${res.item.folder}\nФайл: ${res.path}${dueInfo}${priorityInfo}${taskSchedule(res.item)}`,
             },
           ],
         };
@@ -86,7 +93,7 @@ export function registerMcpTools(server: McpServer, vault: McpVault): void {
           const tagsStr = item.tags.length > 0 ? ` [${item.tags.map(t => `#${t}`).join(' ')}]` : '';
           const statusStr = item.status ? ` (${item.status})` : '';
           const dueStr = item.dueDate ? ` 📅 ${item.dueDate}` : '';
-          return `${idx + 1}. [${item.type.toUpperCase()}] «${item.title}» (id: ${item.id}, папка: ${item.folder})${statusStr}${dueStr}${tagsStr}\n   ${snippet}`;
+          return `${idx + 1}. [${item.type.toUpperCase()}] «${item.title}» (id: ${item.id}, папка: ${item.folder})${statusStr}${dueStr}${tagsStr}${taskSchedule(item)}\n   ${snippet}`;
         });
 
         return {
@@ -149,7 +156,7 @@ export function registerMcpTools(server: McpServer, vault: McpVault): void {
           const dueStr = item.dueDate ? ` | срок: ${item.dueDate}` : '';
           const statusStr = item.status ? ` | статус: ${item.status}` : '';
           const tagsStr = item.tags.length > 0 ? ` | теги: ${item.tags.join(', ')}` : '';
-          return `${idx + 1}. [${item.type}] «${item.title}» (id: ${item.id}, ${item.folder})${statusStr}${dueStr}${tagsStr}`;
+          return `${idx + 1}. [${item.type}] «${item.title}» (id: ${item.id}, ${item.folder})${statusStr}${dueStr}${tagsStr}${taskSchedule(item)}`;
         });
 
         return {
@@ -215,7 +222,7 @@ export function registerMcpTools(server: McpServer, vault: McpVault): void {
             ? ` [Чеклист: ${t.subtasks.filter(s => s.completed).length}/${t.subtasks.length}]`
             : '';
           const statusMark = t.status === 'done' ? '✓ ' : '○ ';
-          return `${idx + 1}. ${statusMark}${priority}«${t.title}» (id: ${t.id}, ${t.folder})${due}${subtaskProgress}`;
+          return `${idx + 1}. ${statusMark}${priority}«${t.title}» (id: ${t.id}, ${t.folder})${due}${subtaskProgress}${taskSchedule(t)}`;
         });
 
         return {
