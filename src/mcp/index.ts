@@ -3,6 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { McpVault } from './vault';
+import { SERVER_INSTRUCTIONS } from './instructions';
 import { registerMcpTools } from './tools';
 import { registerMcpResources } from './resources';
 import { registerMcpPrompts } from './prompts';
@@ -31,10 +32,13 @@ export async function startMcpServer(): Promise<{ server: McpServer; vault: McpV
   console.error(`[SLAG MCP] Initializing vault at: ${vault.config.notesDir}`);
   await vault.init();
 
-  const server = new McpServer({
-    name: 'slag-notes',
-    version: '1.0.0',
-  });
+  const server = new McpServer(
+    {
+      name: 'slag-notes',
+      version: '1.0.0',
+    },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
 
   registerMcpTools(server, vault);
   registerMcpResources(server, vault);
