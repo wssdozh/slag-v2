@@ -34,7 +34,7 @@ arch=('x86_64')
 url="https://github.com/wssdozh/slag-v2"
 license=('MIT')
 depends=('cairo' 'desktop-file-utils' 'gdk-pixbuf2' 'glib2' 'gtk3' 'hicolor-icon-theme'
-         'libsoup' 'pango' 'webkit2gtk-4.1' 'libappindicator-gtk3' 'librsvg')
+         'libsoup3' 'pango' 'webkit2gtk-4.1' 'libayatana-appindicator' 'librsvg')
 options=('!strip' '!debug')
 install=slag.install
 source=('slag.deb')
