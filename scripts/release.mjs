@@ -12,6 +12,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
+import { parseArgs as parseNodeArgs } from 'node:util';
 import { CHANNELS, ROLLING_TAGS } from './release-meta.mjs';
 import { makeManifest } from './release-assets.mjs';
 import { compareSemver } from './release-version.mjs';
@@ -30,25 +31,40 @@ function fail(message) {
   process.exit(1);
 }
 
-function parseArgs(argv) {
-  const options = { repo: 'wssdozh/slag-v2', files: [], dryRun: false, force: false, key: null, notesFile: null };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    const next = () => {
-      index += 1;
-      if (index >= argv.length || argv[index].startsWith('--')) fail(`${arg} needs a value`);
-      return argv[index];
-    };
-    if (arg === '--version') options.version = next();
-    else if (arg === '--channel') options.channel = next();
-    else if (arg === '--notes-file') options.notesFile = next();
-    else if (arg === '--repo') options.repo = next();
-    else if (arg === '--key') options.key = next();
-    else if (arg === '--dry-run') options.dryRun = true;
-    else if (arg === '--force') options.force = true;
-    else if (arg.startsWith('--')) fail(`unknown flag ${arg}`);
-    else options.files.push(arg);
+const CLI_OPTIONS = {
+  version: { type: 'string' },
+  channel: { type: 'string' },
+  'notes-file': { type: 'string' },
+  repo: { type: 'string', default: 'wssdozh/slag-v2' },
+  key: { type: 'string' },
+  'dry-run': { type: 'boolean', default: false },
+  force: { type: 'boolean', default: false },
+};
+
+/** `parseArgs` speaks its own dialect on bad input; this script has always printed these. */
+function parseArgv(argv) {
+  try {
+    return parseNodeArgs({ args: argv, options: CLI_OPTIONS, allowPositionals: true });
+  } catch (error) {
+    const flag = /'([^' ]+)(?: <value>)?'/.exec(error.message)?.[1];
+    if (flag && error.code === 'ERR_PARSE_ARGS_UNKNOWN_OPTION') fail(`unknown flag ${flag}`);
+    if (flag && error.code === 'ERR_PARSE_ARGS_INVALID_OPTION_VALUE') fail(`${flag} needs a value`);
+    throw error;
   }
+}
+
+function parseArgs(argv) {
+  const { values, positionals } = parseArgv(argv);
+  const options = {
+    version: values.version,
+    channel: values.channel,
+    key: values.key ?? null,
+    notesFile: values['notes-file'] ?? null,
+    repo: values.repo,
+    dryRun: values['dry-run'],
+    force: values.force,
+    files: positionals,
+  };
   if (!options.version) fail('--version is required');
   if (!CHANNELS.includes(options.channel)) {
     fail(`--channel must be one of ${CHANNELS.join(', ')}`);
