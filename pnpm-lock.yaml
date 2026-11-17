@@ -14,36 +14,15 @@ importers:
       '@atomic-editor/editor':
         specifier: ^0.6.2
         version: 0.6.2(patch_hash=015f9709be9662e89c42cc682e5026a5f17a4746683fe556fc355c10ca1e7dc0)(@codemirror/autocomplete@6.20.4)(@codemirror/commands@6.11.1)(@codemirror/lang-css@6.3.1)(@codemirror/lang-html@6.4.12)(@codemirror/lang-javascript@6.2.5)(@codemirror/lang-markdown@6.5.2)(@codemirror/language@6.13.1)(@codemirror/search@6.7.2)(@codemirror/state@6.7.6)(@codemirror/view@6.43.15)(@lezer/common@1.5.4)(@lezer/highlight@1.2.5)(@lezer/markdown@1.8.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@codemirror/autocomplete':
-        specifier: ^6.20.4
-        version: 6.20.4
       '@codemirror/commands':
         specifier: ^6.11.1
         version: 6.11.1
-      '@codemirror/lang-markdown':
-        specifier: ^6.5.2
-        version: 6.5.2
-      '@codemirror/language':
-        specifier: ^6.13.1
-        version: 6.13.1
-      '@codemirror/search':
-        specifier: ^6.7.2
-        version: 6.7.2
       '@codemirror/state':
         specifier: ^6.7.6
         version: 6.7.6
       '@codemirror/view':
         specifier: ^6.43.15
         version: 6.43.15
-      '@lezer/common':
-        specifier: ^1.5.4
-        version: 1.5.4
-      '@lezer/highlight':
-        specifier: ^1.2.5
-        version: 1.2.5
-      '@lezer/markdown':
-        specifier: ^1.8.1
-        version: 1.8.1
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.2
         version: 1.32.2(zod@4.6.7)
@@ -776,6 +755,11 @@ packages:
 
   ajv-formats@3.0.1:
     resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
+    peerDependencies:
+      ajv: ^8.0.0
+    peerDependenciesMeta:
+      ajv:
+        optional: true
 
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
@@ -1921,7 +1905,7 @@ snapshots:
     dependencies:
       '@hono/node-server': 2.1.5(hono@4.13.14)
       ajv: 8.20.0
-      ajv-formats: 3.0.1
+      ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
       cors: 2.8.6
       cross-spawn: 7.0.6
@@ -2238,8 +2222,8 @@ snapshots:
       mime-types: 3.0.2
       negotiator: 1.1.0
 
-  ajv-formats@3.0.1:
-    dependencies:
+  ajv-formats@3.0.1(ajv@8.20.0):
+    optionalDependencies:
       ajv: 8.20.0
 
   ajv@8.20.0:
