@@ -104,9 +104,10 @@ jobs:
       # The channel rules decide who gets what; a green pipeline on broken rules is worse than red.
       - run: node --test scripts/release-meta.test.mjs
 
-  # Two jobs instead of one matrix: a dev build ships only the platforms that can self-update,
-  # and the job-level `if` cannot read `matrix` (only `steps.*` can), so the split is the honest
-  # way to say "windows always, linux on releases".
+  # Two jobs instead of one matrix: each platform has its own runner and its own bundle set, and a
+  # job-level `if` cannot read `matrix` (only `steps.*` can). Both run on every channel — a linux
+  # build costs no wall-clock time next to windows, and a dev build without AppImage/deb/pkg means
+  # every linux machine builds from source by hand.
   desktop-windows:
     needs: [prepare, verify]
     runs-on: windows-latest
@@ -138,7 +139,6 @@ jobs:
 
   desktop-linux:
     needs: [prepare, verify]
-    if: needs.prepare.outputs.channel == 'release'
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -225,7 +225,7 @@ jobs:
 
   arch:
     needs: [prepare, verify, desktop-linux]
-    if: needs.prepare.outputs.channel == 'release' && needs.desktop-linux.result == 'success'
+    if: needs.desktop-linux.result == 'success'
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:

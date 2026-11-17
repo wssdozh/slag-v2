@@ -184,7 +184,7 @@ versionCode = major * 1_000_000 + minor * 1_000 + patch
 
 | действие | что получается |
 |---|---|
-| push в `master` | `dev`: версия `<версия из tauri.conf.json>-dev.<run>`, prerelease на теге `dev`, собираются windows + android |
+| push в `master` | `dev`: версия `<версия из tauri.conf.json>-dev.<run>`, prerelease на теге `dev`, собираются windows, linux (deb + AppImage), arch и android — набор одинаков на любом канале |
 | тег `v1.2.3` | `release`: обычный релиз, становится `latest`, собираются windows, linux, android, arch |
 | тег `v1.2.3-beta.4` | `beta`: prerelease, свой релиз плюс перезаписанный `latest.json` на теге `beta` |
 | Actions → release → Run workflow | то же, что push в `master`, но канал можно выбрать (`dev` / `beta`) |
@@ -208,7 +208,7 @@ versionCode = major * 1_000_000 + minor * 1_000 + patch
 
 | запись | заголовок | внутри | зачем |
 |---|---|---|---|
-| сборка | `SLAG 0.2.5-dev.7` | exe, установщик, apk, AppImage + `latest.json` | скачать конкретную версию, история |
+| сборка | `SLAG 0.2.5-dev.7` | exe, установщик, apk, deb, AppImage, `pkg.tar.zst` + `latest.json` | скачать конкретную версию, история |
 | канал (только `beta`/`dev`) | `канал dev` | один `latest.json` | постоянный адрес, который читает клиент |
 
 Заголовки и описания собирает [`scripts/release-text.mjs`](scripts/release-text.mjs) — руками
