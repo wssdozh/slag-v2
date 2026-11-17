@@ -7,8 +7,8 @@ const searchLog = logger.scope('SEARCH');
 
 let dbInstance: Orama<any> | null = null;
 let indexed = new Map<string, number>();
-let isBuilding = false;
-let buildPromise: Promise<void> | null = null;
+// ponytail: one shared index serializes searches; use per-pool indexes if contention matters.
+let queryQueue: Promise<unknown> = Promise.resolve();
 
 type OramaModule = typeof import('@orama/orama');
 
@@ -161,27 +161,33 @@ async function syncIndex(items: SlagItem[]): Promise<void> {
   );
 }
 
-export async function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | null> {
-  if (isBuilding) return dbInstance;
+export function initSearchIndex(items: SlagItem[]): Promise<Orama<any> | null> {
+  const result = queryQueue.then(() => syncSearchIndex(items));
+  queryQueue = result.catch(() => undefined);
+  return result;
+}
 
-  isBuilding = true;
-  const build = (async () => {
-    try {
-      await syncIndex(items);
-    } catch (err) {
-      searchLog.error('Failed to sync Orama search index:', err);
-    } finally {
-      isBuilding = false;
-      buildPromise = null;
-    }
-  })();
-
-  buildPromise = build;
-  await build;
+async function syncSearchIndex(items: SlagItem[]): Promise<Orama<any> | null> {
+  try {
+    await syncIndex(items);
+  } catch (err) {
+    searchLog.error('Failed to sync Orama search index:', err);
+  }
   return dbInstance;
 }
 
-export async function querySearch(
+export function querySearch(
+  queryText: string,
+  allItems: SlagItem[],
+  typeFilter?: string
+): Promise<SlagItem[]> {
+  // The index is shared: keep another pool's sync out of this query's search passes.
+  const result = queryQueue.then(() => runQuerySearch(queryText, allItems, typeFilter));
+  queryQueue = result.catch(() => undefined);
+  return result;
+}
+
+async function runQuerySearch(
   queryText: string,
   allItems: SlagItem[],
   typeFilter?: string
@@ -191,12 +197,9 @@ export async function querySearch(
     return filterByType(allItems, typeFilter).slice(0, SEARCH_LIMITS.RECENT_ITEMS_LIMIT);
   }
 
-  // A query that lands while the index is being built/synced waits for it instead of
-  // returning stale (or empty) results for the note the user just saved. The index is
-  // built lazily, and ⌘K was its only trigger — the materials dock and the assistant
-  // tool searched an empty index until someone happened to open the search modal.
-  if (buildPromise) await buildPromise;
-  else if (!dbInstance) await initSearchIndex(allItems);
+  // All callers share one index, but the materials dock passes only its folder.
+  // Sync this query's pool even when another caller already initialized the index.
+  await syncSearchIndex(allItems);
   if (!dbInstance) return [];
 
   const started = performance.now();
