@@ -8,6 +8,7 @@ import type {
   AppUpdateInstallOutcome,
   AppUpdateLogLine,
   AppUpdateOffer,
+  AppUpdatePackage,
   AppUpdatePlatform,
   AppUpdateProgress,
 } from '../../types';
@@ -99,6 +100,17 @@ export async function installAppUpdate(
   channel: AppUpdateChannel
 ): Promise<AppUpdateInstallOutcome> {
   return invoke<AppUpdateInstallOutcome>('update_install', { channel });
+}
+
+/**
+ * Linux package install. The native side picks the file this distro eats (deb, pkg.tar.zst, or an
+ * AppImage elsewhere), downloads and verifies it, and answers with the command the owner runs —
+ * the app itself never touches apt or pacman.
+ */
+export async function downloadAppUpdatePackage(
+  channel: AppUpdateChannel
+): Promise<AppUpdatePackage> {
+  return invoke<AppUpdatePackage>('update_download_package', { channel });
 }
 
 export async function openInstallPermissionSettings(): Promise<void> {

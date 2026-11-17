@@ -11,11 +11,16 @@ test('every launcher artifact has exactly one slot', () => {
   assert.deepEqual(slotOf('SLAG_0.2.5_amd64.AppImage'), ['linux-x86_64', 'appimage']);
 });
 
-test('packages and other bundles stay release-page attachments', () => {
-  // A deb belongs to apt, an rpm to dnf, the Arch package to pacman: none of them is a slot.
-  assert.equal(slotOf('SLAG_0.2.5_amd64.deb'), null);
-  assert.equal(slotOf('SLAG-0.2.5-1-x86_64.pkg.tar.zst'), null);
+test('each linux distro gets the package it can actually install', () => {
+  // The app never runs apt or pacman, but it has to name the right file: a deb on arch and a
+  // pkg.tar.zst on ubuntu are both a dead end for the owner.
+  assert.deepEqual(slotOf('SLAG_0.2.5_amd64.deb'), ['linux-x86_64', 'deb']);
+  assert.deepEqual(slotOf('slag-0.2.5.dev.23-1-x86_64.pkg.tar.zst'), ['linux-x86_64', 'archpkg']);
+});
+
+test('everything a platform cannot consume stays a release-page attachment', () => {
   assert.equal(slotOf('SLAG_0.2.5_x64_en-US.msi'), null);
+  assert.equal(slotOf('slag-0.2.5-1.x86_64.rpm'), null);
   assert.equal(slotOf('notes.md'), null);
 });
 
@@ -32,6 +37,7 @@ test('the manifest keeps the shape the native reader expects', () => {
       { name: 'SLAG-0.2.5.apk', size: 3, sha256: 'c', signature: 's3' },
       { name: 'SLAG_0.2.5_amd64.AppImage', size: 4, sha256: 'd', signature: 's4' },
       { name: 'SLAG_0.2.5_amd64.deb', size: 5, sha256: 'e', signature: 's5' },
+      { name: 'slag-0.2.5-1-x86_64.pkg.tar.zst', size: 6, sha256: 'f', signature: 's6' },
     ],
   });
   assert.equal(manifest.version, '0.2.5');
@@ -41,9 +47,12 @@ test('the manifest keeps the shape the native reader expects', () => {
     'linux-x86_64',
     'windows-x86_64',
   ]);
-  assert.equal(manifest.platforms['linux-x86_64'].appimage.url,
+  const linux = manifest.platforms['linux-x86_64'];
+  assert.equal(linux.appimage.url,
     'https://github.com/wssdozh/slag-v2/releases/download/v0.2.5/SLAG_0.2.5_amd64.AppImage');
-  assert.equal(manifest.platforms['linux-x86_64'].appimage.sha256, 'd');
-  // The deb is attached to the release but never promised to the updater.
-  assert.equal(JSON.stringify(manifest).includes('deb'), false);
+  assert.equal(linux.appimage.sha256, 'd');
+  assert.equal(linux.deb.sha256, 'e');
+  assert.equal(linux.archpkg.sha256, 'f');
+  // Same platform, three files: the client picks by distro, not by "newest".
+  assert.deepEqual(Object.keys(linux).sort(), ['appimage', 'archpkg', 'deb']);
 });

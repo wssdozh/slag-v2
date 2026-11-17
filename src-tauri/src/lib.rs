@@ -406,6 +406,7 @@ pub fn run() {
             updater::update_platform,
             updater::update_check,
             updater::update_install,
+            updater::update_download_package,
             // Desktop has none of these grants; the commands answer "unknown" so the webview
             // still gets an answer instead of a missing-command error.
             device_access::device_access_status,

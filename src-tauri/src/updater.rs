@@ -46,6 +46,14 @@ pub struct PlatformEntry {
     #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     #[serde(default)]
     pub appimage: Option<Asset>,
+    /// Linux: the distro's own package. The app never installs it — it hands over the right file
+    /// and the command, because apt and pacman need root and a package belongs to them.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[serde(default)]
+    pub deb: Option<Asset>,
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[serde(default, rename = "archpkg")]
+    pub arch_pkg: Option<Asset>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -90,6 +98,9 @@ pub struct PlatformInfo {
     /// Android: `PackageManager.canRequestPackageInstalls()`, i.e. whether the system installer
     /// will accept the apk this app hands it. `None` everywhere else — no such switch exists.
     pub can_install_packages: Option<bool>,
+    /// Linux: `debian` | `arch` | `other`, from `/etc/os-release`. It decides which package the
+    /// settings tab offers. `None` on every other platform.
+    pub distro: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -98,6 +109,18 @@ pub struct InstallOutcome {
     /// `restarting` | `installer_launched` | `permission_required`
     pub status: String,
     pub version: String,
+}
+
+/// A package the app fetched but will not install: apt and pacman need root, and the owner runs
+/// the command. Built on linux only; the settings tab shows the path and copies the command.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageOffer {
+    pub version: String,
+    /// `deb` | `archpkg` | `appimage`
+    pub kind: String,
+    pub path: String,
+    pub command: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -306,6 +329,69 @@ pub fn linux_form() -> LinuxForm {
     LinuxForm::Package
 }
 
+/// Which package this distribution eats. Read from `/etc/os-release` and not from the binary path:
+/// the same vault copy can be moved between machines, and `ID_LIKE` is where a derivative says
+/// that it follows ubuntu or arch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub enum LinuxDistro {
+    Debian,
+    Arch,
+    Other,
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+impl LinuxDistro {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Debian => "debian",
+            Self::Arch => "arch",
+            Self::Other => "other",
+        }
+    }
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn linux_distro() -> LinuxDistro {
+    let text = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
+    let mut id = String::new();
+    let mut id_like = String::new();
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else { continue };
+        let value = value.trim().trim_matches('"').to_ascii_lowercase();
+        match key.trim() {
+            "ID" => id = value,
+            "ID_LIKE" => id_like = value,
+            _ => {}
+        }
+    }
+    let family = |word: &str| id == word || id_like.split_whitespace().any(|part| part == word);
+    if family("debian") || family("ubuntu") {
+        LinuxDistro::Debian
+    } else if family("arch") {
+        LinuxDistro::Arch
+    } else {
+        LinuxDistro::Other
+    }
+}
+
+/// The asset this machine can install with its own package manager. `None` means the manifest has
+/// no such file yet, and the UI falls back to "open the release page".
+#[cfg(target_os = "linux")]
+fn select_package_asset(entry: &PlatformEntry) -> Option<(String, Asset)> {
+    match linux_distro() {
+        LinuxDistro::Debian => entry.deb.clone().map(|asset| ("deb".to_string(), asset)),
+        LinuxDistro::Arch => entry.arch_pkg.clone().map(|asset| ("archpkg".to_string(), asset)),
+        // Anything else has no package we know how to install: an AppImage is a file they can run.
+        LinuxDistro::Other => entry.appimage.clone().map(|asset| ("appimage".to_string(), asset)),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn select_package_asset(_entry: &PlatformEntry) -> Option<(String, Asset)> {
+    None
+}
+
 /// What the UI should call this install when it explains why an update cannot be applied.
 pub fn install_form() -> &'static str {
     #[cfg(target_os = "android")]
@@ -364,10 +450,10 @@ fn select_asset(entry: &PlatformEntry) -> Option<(String, Asset)> {
     #[cfg(target_os = "linux")]
     {
         // Only the AppImage form can take an update: a package-managed install would need root,
-        // and the honest answer there is "update it with your package manager".
+        // and the honest answer there is "run this one command with your package manager".
         match linux_form() {
             LinuxForm::AppImage => entry.appimage.clone().map(|asset| ("appimage".to_string(), asset)),
-            _ => None,
+            _ => select_package_asset(entry),
         }
     }
     #[cfg(not(any(target_os = "windows", target_os = "android", target_os = "linux")))]
@@ -437,13 +523,38 @@ pub async fn update_platform(
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         current_version: current_version(&app),
-        can_apply: cfg!(any(target_os = "windows", target_os = "android")),
+        can_apply: can_apply_here(),
         release_page: RELEASE_PAGE.to_string(),
         channel: channel.as_str().to_string(),
         install_form: install_form().to_string(),
         endpoint: endpoint(channel),
         can_install_packages,
+        distro: distro_name(),
     })
+}
+
+/// The app replaces its own binary only where it owns that file: windows, android, and a linux
+/// AppImage. A deb, an rpm or a pacman package belongs to the manager that installed it.
+fn can_apply_here() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        linux_form() == LinuxForm::AppImage
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        cfg!(any(target_os = "windows", target_os = "android"))
+    }
+}
+
+fn distro_name() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    {
+        Some(linux_distro().as_str().to_string())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
 }
 
 #[tauri::command]
@@ -867,6 +978,86 @@ pub async fn update_install(
 ) -> Result<InstallOutcome, String> {
     let channel = Channel::parse(channel.as_deref())?;
     install(&app, channel).await
+}
+
+/// Fetch the file this distro installs, leave it in Downloads and answer with the one command that
+/// installs it. No root and no polkit here on purpose: apt and pacman own their files, and a gui
+/// app reaching for sudo is how package databases get half-configured.
+#[tauri::command]
+pub async fn update_download_package(
+    app: AppHandle,
+    channel: Option<String>,
+) -> Result<PackageOffer, String> {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (&app, &channel);
+        Err("unsupported".to_string())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let channel = Channel::parse(channel.as_deref())?;
+        let manifest = fetch_manifest(Some(&app), channel).await?;
+        let Some(offer) = offer_from(&app, manifest.clone()) else {
+            return Err("up_to_date".to_string());
+        };
+        let entry = manifest
+            .platforms
+            .get(platform_key())
+            .ok_or_else(|| "no_platform_asset".to_string())?;
+        let (kind, asset) =
+            select_package_asset(entry).ok_or_else(|| "no_platform_asset".to_string())?;
+        // The file name is the one on the release page: the owner sees the same name in the
+        // terminal as in the browser, which is how they know it is the same build.
+        let name = asset
+            .url
+            .rsplit('/')
+            .next()
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| "manifest_invalid".to_string())?
+            .to_string();
+        let destination = downloads_dir(&app)?.join(&name);
+        let _ = std::fs::remove_file(&destination);
+        log_line(
+            Some(&app),
+            "info",
+            "package download begin",
+            format!("{} ({kind})", offer.version),
+        );
+        download(Some(&app), &asset, &destination).await?;
+        verify_asset(Some(&app), &asset, &destination)?;
+        let path = destination.display().to_string();
+        let command = match kind.as_str() {
+            "deb" => format!("sudo apt install '{path}'"),
+            "archpkg" => format!("sudo pacman -U '{path}'"),
+            _ => format!("chmod +x '{path}'"),
+        };
+        log_line(Some(&app), "info", "package ready", path.clone());
+        Ok(PackageOffer {
+            version: offer.version,
+            kind,
+            path,
+            command,
+        })
+    }
+}
+
+/// Where the owner expects a downloaded file: Download, or home when the platform has no such dir.
+#[cfg(target_os = "linux")]
+fn downloads_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().home_dir())
+        .map_err(|error| {
+            log_line(Some(app), "error", "downloads dir failed", error.to_string());
+            "write_failed".to_string()
+        })?;
+    std::fs::create_dir_all(&dir).map_err(|error| {
+        log_line(Some(app), "error", "downloads dir create failed", error.to_string());
+        "write_failed".to_string()
+    })?;
+    Ok(dir)
 }
 
 /// `--update-check`: run the whole pipeline except the swap and print the verdict as JSON. It is

@@ -1,7 +1,7 @@
 // The "Обновления" tab: what is installed, what is on GitHub, and the one button that applies it.
 // Errors and permission questions are toasts/modals (see useAppUpdates), not rows inside the card:
 // a state that needs a decision belongs in a question, not in a paragraph under a button.
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect } from './SettingsUI';
@@ -22,6 +22,13 @@ function installLabel(kind: string | undefined): string {
   // Android and AppImage both replace the file in place: "обновить" is what the owner reads.
   if (kind === 'apk' || kind === 'appimage') return 'обновить';
   return 'скачать и установить';
+}
+
+/** The file each distro installs with its own manager; the app only fetches it. */
+function packageLabel(kind: string | undefined): string {
+  if (kind === 'deb') return 'скачать .deb';
+  if (kind === 'archpkg') return 'скачать пакет arch';
+  return 'скачать AppImage';
 }
 
 /**
@@ -45,13 +52,26 @@ export const UpdatesSettingsTab: React.FC = () => {
     status,
     progress,
     canInstall,
+    canFetchPackage,
+    packageOffer,
     channel,
     setChannel,
     check,
     install,
+    downloadPackage,
     openReleasePage,
     openInstallPermissionSettings,
   } = appUpdate;
+
+  const [copied, setCopied] = useState(false);
+  const copyCommand = useCallback(async (command: string) => {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+    } catch {
+      // A phone webview can refuse the clipboard; the command is selectable on screen.
+    }
+  }, []);
 
   const isBusy = status === 'checking' || status === 'downloading';
   // Android refuses the installer before the download starts when the source is not allowed;
@@ -196,6 +216,16 @@ export const UpdatesSettingsTab: React.FC = () => {
                         >
                           {installLabel(offer.kind)}
                         </Button>
+                      ) : canFetchPackage ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<Icon name="system.update" size="sm" tone="inherit" />}
+                          onClick={() => void downloadPackage()}
+                          data-testid="update-package-btn"
+                        >
+                          {packageLabel(offer.kind)}
+                        </Button>
                       ) : (
                         <Button
                           variant="primary"
@@ -218,6 +248,25 @@ export const UpdatesSettingsTab: React.FC = () => {
                       android не разрешает установку из этого источника — включи переключатель и вернись:
                       кнопка станет «обновить».
                     </span>
+                  )}
+
+                  {packageOffer && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-2xs text-fg-dim" data-testid="update-package-path">
+                        файл: {packageOffer.path}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <code
+                          className="flex-1 overflow-x-auto whitespace-pre text-xs font-mono text-fg-secondary select-all"
+                          data-testid="update-package-command"
+                        >
+                          {packageOffer.command}
+                        </code>
+                        <Button variant="ghost" size="sm" onClick={() => void copyCommand(packageOffer.command)}>
+                          {copied ? 'скопировано' : 'копировать'}
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {offer.kind === 'installer' && (

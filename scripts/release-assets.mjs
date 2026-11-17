@@ -2,18 +2,21 @@
 // mapping lives in its own module and is covered by node --test.
 
 /**
- * `slag-v2.exe` → the portable exe a Windows build can swap itself.
+ * `slag-v2.exe`  → the portable exe a Windows build can swap itself.
  * `*setup.exe`   → the nsis installer, used when the exe folder is not writable.
  * `*.apk`        → the android package.
- * `*.AppImage`   → the only linux form the app may replace on its own.
- * Everything else (deb, AppImage's siblings, rpm, pkg.tar.zst, msi) is a release-page attachment:
- * no platform installs it through the updater.
+ * `*.AppImage`   → the one linux form the app may replace on its own.
+ * `*.deb`        → ubuntu and debian: the app cannot install it, but it must point at the right file.
+ * `*.pkg.tar.zst`→ arch the same way; pacman is the only installer that understands it.
+ * Everything else (rpm, msi, flatpak) stays a release-page attachment: no platform installs it.
  */
 export function slotOf(name) {
   if (name === 'slag-v2.exe') return ['windows-x86_64', 'portable'];
   if (/setup\.exe$/i.test(name)) return ['windows-x86_64', 'installer'];
   if (/\.apk$/i.test(name)) return ['android-aarch64', 'apk'];
   if (/\.AppImage$/i.test(name)) return ['linux-x86_64', 'appimage'];
+  if (/\.deb$/i.test(name)) return ['linux-x86_64', 'deb'];
+  if (/\.pkg\.tar\.zst$/i.test(name)) return ['linux-x86_64', 'archpkg'];
   return null;
 }
 

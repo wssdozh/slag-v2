@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { STORAGE_KEYS } from '../../config';
 import {
   checkAppUpdate,
+  downloadAppUpdatePackage,
   getAppUpdatePlatform,
   installAppUpdate,
   openInstallPermissionSettings,
@@ -20,6 +21,7 @@ import { logger } from '../../lib/logger/logger';
 import type {
   AppUpdateChannel,
   AppUpdateOffer,
+  AppUpdatePackage,
   AppUpdatePlatform,
   AppUpdateProgress,
   AppUpdateState,
@@ -48,6 +50,7 @@ export function useAppUpdates(
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(readDismissedVersion);
+  const [packageOffer, setPackageOffer] = useState<AppUpdatePackage | null>(null);
   const [channel, setChannelState] = useState<AppUpdateChannel>(readUpdateChannel);
   const isBusy = useRef(false);
   /** The offer android refused to install, kept until the system permission changes. */
@@ -238,6 +241,41 @@ export function useAppUpdates(
     [channel]
   );
 
+  /**
+   * Linux package install: fetch the file this distro installs and copy the command that installs
+   * it. The app never runs apt or pacman — that is the owner's terminal, not a gui button.
+   */
+  const downloadPackage = useCallback(async () => {
+    if (!offer || isBusy.current) return;
+    isBusy.current = true;
+    setStatus('downloading');
+    setError(null);
+    setProgress({ downloaded: 0, total: offer.size ?? null });
+    const unlisten = await watchUpdateProgress(setProgress);
+    try {
+      const fetched = await downloadAppUpdatePackage(channel);
+      setPackageOffer(fetched);
+      setStatus('available');
+      updateLog.info('package downloaded', { version: fetched.version, kind: fetched.kind });
+      try {
+        await navigator.clipboard.writeText(fetched.command);
+        addToast('пакет скачан, команда установки в буфере обмена', 'success');
+      } catch {
+        // A webview may refuse the clipboard; the command is on screen and selectable.
+        addToast('пакет скачан — команда ниже, скопируй её в терминал', 'info');
+      }
+    } catch (cause) {
+      const code = updateErrorCode(cause);
+      updateLog.warn('package download failed', { code });
+      setStatus('error');
+      setError(code);
+      addToast(`пакет не скачался: ${updateErrorText(code)}`, 'error');
+    } finally {
+      unlisten?.();
+      isBusy.current = false;
+    }
+  }, [offer, channel, addToast]);
+
   const openReleasePage = useCallback(() => {
     const url = platform?.releasePage;
     if (url) void openExternalUrl(url);
@@ -250,6 +288,8 @@ export function useAppUpdates(
   }, []);
 
   const canInstall = Boolean(platform?.canApply && offer && offer.kind !== 'manual');
+  /** A file exists for this machine, but the app will not install it: hand over the command. */
+  const canFetchPackage = Boolean(offer && offer.kind !== 'manual' && !canInstall);
   const isNoticeVisible = Boolean(
     offer && offer.version !== dismissedVersion && status !== 'installing'
   );
@@ -263,10 +303,13 @@ export function useAppUpdates(
       error,
       isNoticeVisible,
       canInstall,
+      canFetchPackage,
+      packageOffer,
       channel,
       setChannel,
       check,
       install,
+      downloadPackage,
       dismiss,
       openReleasePage,
       openInstallPermissionSettings: requestInstallPermission,
@@ -279,10 +322,13 @@ export function useAppUpdates(
       error,
       isNoticeVisible,
       canInstall,
+      canFetchPackage,
+      packageOffer,
       channel,
       setChannel,
       check,
       install,
+      downloadPackage,
       dismiss,
       openReleasePage,
       requestInstallPermission,

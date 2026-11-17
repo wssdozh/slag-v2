@@ -543,8 +543,23 @@ export interface AppUpdateOffer {
   notes: string | null;
   pubDate: string | null;
   currentVersion: string;
-  kind: 'portable' | 'installer' | 'apk' | 'appimage' | 'manual';
+  /**
+   * Which file this machine would take: `deb` on ubuntu, `archpkg` on arch, `appimage` when the
+   * app owns the file and can swap it. `manual` is "there is nothing here to install".
+   */
+  kind: 'portable' | 'installer' | 'apk' | 'appimage' | 'deb' | 'archpkg' | 'manual';
   size: number | null;
+}
+
+/**
+ * A package the app downloaded but will not install: apt and pacman need root, so the owner runs
+ * the command. `path` is where the file landed, `command` is what to paste into a terminal.
+ */
+export interface AppUpdatePackage {
+  version: string;
+  kind: 'deb' | 'archpkg' | 'appimage';
+  path: string;
+  command: string;
 }
 
 /**
@@ -574,6 +589,8 @@ export interface AppUpdatePlatform {
   endpoint: string;
   /** Android only: `PackageManager.canRequestPackageInstalls()`, null elsewhere or unknown. */
   canInstallPackages: boolean | null;
+  /** Linux only: `debian` | `arch` | `other` — which package this machine installs. */
+  distro: string | null;
 }
 
 /** The Android grants a reminder needs; each one is a switch in system settings, not a dialog. */
@@ -623,11 +640,17 @@ export interface AppUpdateState {
   error: string | null;
   isNoticeVisible: boolean;
   canInstall: boolean;
+  /** A file exists for this machine, but the app will not install it: the owner runs the command. */
+  canFetchPackage: boolean;
+  /** The package fetched for this distro, if the owner asked for it: path plus the command. */
+  packageOffer: AppUpdatePackage | null;
   /** Which stream this install follows; switching re-reads that stream's manifest. */
   channel: AppUpdateChannel;
   setChannel: (channel: AppUpdateChannel) => void;
   check: () => Promise<void>;
   install: () => Promise<void>;
+  /** Linux package install: fetch the deb/pkg.tar.zst and hand over the command. */
+  downloadPackage: () => Promise<void>;
   dismiss: () => void;
   openReleasePage: () => void;
   openInstallPermissionSettings: () => void;
