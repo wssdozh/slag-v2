@@ -86,7 +86,10 @@ export const Icon: React.FC<IconProps> = ({
   const entry = resolveEntry(ICONS[name]);
   const Glyph = variant === 'filled' && entry.filled ? entry.filled : entry.icon;
   const px = SIZE_PX[size];
-  const classes = [ICON_TONE_CLASS[tone], entry.className, className].filter(Boolean).join(' ');
+  // Lucide has no filled twins: a filled glyph is the same outline with its path painted,
+  // which is how an active tab or a pinned note reads solid without a second file.
+  const solidFill = variant === 'filled' && !entry.filled ? 'fill-current' : '';
+  const classes = [ICON_TONE_CLASS[tone], entry.className, solidFill, className].filter(Boolean).join(' ');
 
   // A glyph that carries its own label is content; a bare one is decoration.
   const decorative = rest['aria-label'] === undefined && rest['aria-labelledby'] === undefined;
@@ -97,7 +100,7 @@ export const Icon: React.FC<IconProps> = ({
       data-icon={name}
       width={px || undefined}
       height={px || undefined}
-      strokeWidth={variant === 'filled' ? undefined : px === 24 ? STROKE_XL : STROKE}
+      strokeWidth={px === 24 ? STROKE_XL : STROKE}
       aria-hidden={decorative || undefined}
       {...rest}
     />

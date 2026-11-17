@@ -35,3 +35,8 @@
 - `e2e/motion.spec.ts:353` («a closing dialog keeps its whole exit») красный не из-за иконок: `SettingsModal` рендерит `BaseModal` с `hideHeader`, шапка с кнопкой `aria-label="Закрыть"` не рендерится вовсе, поэтому `getByRole('button', { name: 'Закрыть' })` внутри диалога не находит ничего. ни `BaseModal`, ни спека в этой задаче не менялись; параметр `hideHeader` был и до переезда. чинится либо кнопкой закрытия в настройках, либо селектором по `data-testid`.
 
 
+
+## после: переезд на lucide
+
+по просьбе через день набор сменили на lucide 1.55. одна штриховая семья, filled-близнецов нет, поэтому `variant="filled"` теперь заливает тот же контур (`fill-current`), а не подменяет глиф. пять имён переименованы в самом пакете: `Trash2` → `Trash`, `Filter` → `ListFilter`, `History` → `ClockArrowLeft`, `Loader2` → `LoaderCircle`, `BarChart3` → `ChartBar`. реестр: 161 ключ, 147 импортов, без `pair()`.
+
