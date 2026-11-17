@@ -7,6 +7,19 @@ import type { ComposerFieldHandle } from './field';
 
 type Toast = (text: string, type?: 'info' | 'success' | 'error') => void;
 
+/** The files on a clipboard or drop payload; a text paste has none. */
+function clipboardFiles(items: DataTransferItemList | null): File[] {
+  const files: File[] = [];
+  if (!items) return files;
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    if (item.kind !== 'file') continue;
+    const file = item.getAsFile();
+    if (file) files.push(file);
+  }
+  return files;
+}
+
 interface ComposerFilesOptions {
   addToast: Toast;
   setAttachments: React.Dispatch<React.SetStateAction<SlagAttachment[]>>;
@@ -98,20 +111,13 @@ export function useComposerFiles({ addToast, setAttachments, field, isModal, isA
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
       }
-      const clipboardFiles: File[] = [];
-      if (e.clipboardData?.items) {
-        for (let i = 0; i < e.clipboardData.items.length; i++) {
-          const item = e.clipboardData.items[i];
-          if (item.kind === 'file') {
-            const file = item.getAsFile();
-            if (file) clipboardFiles.push(file);
-          }
-        }
-      }
-      if (clipboardFiles.length > 0) {
-        e.preventDefault();
-        await attachFiles(clipboardFiles);
-      }
+      // A paste inside the composer's own field is already handled there; doing it twice
+      // would attach the same screenshot two times.
+      if (e.target instanceof Element && e.target.closest('[data-composer-editor]')) return;
+      const files = clipboardFiles(e.clipboardData?.items ?? null);
+      if (files.length === 0) return;
+      e.preventDefault();
+      await attachFiles(files);
     };
 
     window.addEventListener('dragover', onWindowDragOver);
@@ -127,22 +133,11 @@ export function useComposerFiles({ addToast, setAttachments, field, isModal, isA
     };
   }, [isModal, isActive, attachFiles]);
 
-  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const clipboardFiles: File[] = [];
-    if (e.clipboardData.items) {
-      for (let i = 0; i < e.clipboardData.items.length; i++) {
-        const item = e.clipboardData.items[i];
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) clipboardFiles.push(file);
-        }
-      }
-    }
-
-    if (clipboardFiles.length > 0) {
-      e.preventDefault();
-      await attachFiles(clipboardFiles);
-    }
+  const handlePaste = async (e: React.ClipboardEvent<HTMLElement>) => {
+    const files = clipboardFiles(e.clipboardData?.items ?? null);
+    if (files.length === 0) return;
+    e.preventDefault();
+    await attachFiles(files);
   };
 
   return {

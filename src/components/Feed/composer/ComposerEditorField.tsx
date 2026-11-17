@@ -29,6 +29,8 @@ export interface ComposerEditorFieldProps {
   onKeyDown: (event: ComposerEditorKeyEvent) => void;
   /** The host element: the field handle resolves the live view from it. */
   containerRef: React.RefObject<HTMLDivElement | null>;
+  /** Files pasted into the field: the clipbord is the platform's, not CodeMirror's. */
+  onPaste?: (event: React.ClipboardEvent<HTMLDivElement>) => void;
   /** Ranges the parser understood: date, tags, priority. Painted, not edited. */
   highlights?: ComposerHighlight[];
 }
@@ -44,6 +46,7 @@ export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
   onKeyDown,
   containerRef,
   highlights = [],
+  onPaste,
 }) => {
   // The keymap extensions are captured once at mount, so they read the latest handlers
   // through this box instead of closing over the first render's props.
@@ -135,6 +138,9 @@ export const ComposerEditorField: React.FC<ComposerEditorFieldProps> = ({
       className="composer-editor-field min-w-0 flex-1"
       style={{ ['--composer-editor-max-height' as string]: `${maxHeight}px` }}
       data-composer-editor=""
+      // CodeMirror pastes text itself and never mentions the file on the clipboard, so the
+      // wrapper looks first: a pasted screenshot becomes an attachment, not nothing.
+      onPasteCapture={onPaste}
     >
       <AtomicCodeMirrorEditor
         markdownSource={value}

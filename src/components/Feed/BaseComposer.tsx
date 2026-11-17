@@ -33,7 +33,7 @@ export interface BaseComposerProps {
   /** Кастомный обработчик keydown (например, для навигации по автокомплиту) */
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Обработчик вставки файлов/изображений */
-  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLElement>) => void;
   /** Блокировка textarea */
   disabled?: boolean;
   /** Заблокирована ли кнопка отправки */
@@ -218,6 +218,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                 isMobile={isMobile}
                 onChange={(text) => onTextChange?.(text)}
                 onKeyDown={(event) => onEditorKeyDown?.(event)}
+                onPaste={onPaste}
                 containerRef={editorContainerRef}
                 highlights={highlights}
               />
