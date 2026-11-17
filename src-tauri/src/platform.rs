@@ -58,6 +58,26 @@ fn parse_gsettings_string_array(raw: &str) -> Vec<String> {
     items
 }
 
+/// Reads the current `custom-keybindings` list as bare schema paths.
+#[cfg(target_os = "linux")]
+fn read_bindings() -> Result<Vec<String>, String> {
+    let output = Command::new("gsettings")
+        .args(["get", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings"])
+        .output()
+        .map_err(|e| format!("Failed to read custom-keybindings: {e}"))?;
+    Ok(parse_gsettings_string_array(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// Renders a binding list back into the GVariant literal `gsettings set` expects.
+#[cfg(target_os = "linux")]
+fn format_bindings(items: &[String]) -> String {
+    if items.is_empty() {
+        "@as []".to_string()
+    } else {
+        format!("[{}]", items.iter().map(|s| format!("'{s}'")).collect::<Vec<_>>().join(", "))
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn detect_linux_session_type() -> String {
     if let Ok(val) = std::env::var("XDG_SESSION_TYPE") {
@@ -158,22 +178,12 @@ pub fn install_gnome_shortcut(binding: Option<&str>) -> Result<(), String> {
     run_cmd("gsettings", &["set", &reloc_schema, "command", &exec_cmd])?;
     run_cmd("gsettings", &["set", &reloc_schema, "binding", key_binding])?;
 
-    let list_output = Command::new("gsettings")
-        .args(["get", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings"])
-        .output()
-        .map_err(|e| format!("Failed to read custom-keybindings: {e}"))?;
-
-    let raw_list = String::from_utf8_lossy(&list_output.stdout);
-    let mut items = parse_gsettings_string_array(&raw_list);
+    let mut items = read_bindings()?;
     if !items.iter().any(|item| item == SLAG_BINDING_PATH) {
         items.push(SLAG_BINDING_PATH.to_string());
     }
 
-    let formatted_list = if items.is_empty() {
-        "@as []".to_string()
-    } else {
-        format!("[{}]", items.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", "))
-    };
+    let formatted_list = format_bindings(&items);
 
     run_cmd("gsettings", &["set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", &formatted_list])?;
 
@@ -187,22 +197,12 @@ pub fn remove_gnome_shortcut() -> Result<(), String> {
     let _ = Command::new("gsettings").args(["reset", &reloc_schema, "command"]).output();
     let _ = Command::new("gsettings").args(["reset", &reloc_schema, "binding"]).output();
 
-    let list_output = Command::new("gsettings")
-        .args(["get", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings"])
-        .output()
-        .map_err(|e| format!("Failed to read custom-keybindings: {e}"))?;
-
-    let raw_list = String::from_utf8_lossy(&list_output.stdout);
-    let items: Vec<String> = parse_gsettings_string_array(&raw_list)
+    let items: Vec<String> = read_bindings()?
         .into_iter()
         .filter(|item| item != SLAG_BINDING_PATH)
         .collect();
 
-    let formatted_list = if items.is_empty() {
-        "@as []".to_string()
-    } else {
-        format!("[{}]", items.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", "))
-    };
+    let formatted_list = format_bindings(&items);
 
     run_cmd("gsettings", &["set", "org.gnome.settings-daemon.plugins.media-keys", "custom-keybindings", &formatted_list])?;
     Ok(())

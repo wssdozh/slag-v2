@@ -14,15 +14,8 @@ pub struct GalleryBridge(pub PluginHandle<tauri::Wry>);
 pub fn init() -> TauriPlugin<tauri::Wry> {
     Builder::new("slag-media")
         .setup(|app, api| {
-            #[cfg(target_os = "android")]
-            {
-                let handle = api.register_android_plugin("com.slag.notes", "MediaGalleryPlugin")?;
-                app.manage(GalleryBridge(handle));
-            }
-            #[cfg(not(target_os = "android"))]
-            {
-                let _ = (app, api);
-            }
+            let handle = api.register_android_plugin("com.slag.notes", "MediaGalleryPlugin")?;
+            app.manage(GalleryBridge(handle));
             Ok(())
         })
         .build()

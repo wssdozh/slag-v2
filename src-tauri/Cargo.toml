@@ -24,7 +24,6 @@ tauri-plugin-window-state = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
-tauri-plugin-autostart = "2"
 # Android content:// file access (SAF trees, pickers, thumbnails). Pinned: its major tracks
 # tauri's major, and a minor drift silently changes the ACL against capabilities/default.json.
 # `protocol-content` serves a content:// URI over `android-fs-content://` with range requests,

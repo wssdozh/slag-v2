@@ -28,7 +28,6 @@
     "dialog:allow-save",
     "notification:default",
     "opener:default",
-    "autostart:default",
     "android-fs:allow-get-name",
     "android-fs:allow-get-metadata",
     "android-fs:allow-get-file-thumbnail-as-data-url",

@@ -7,6 +7,8 @@ use tauri::{
 use tauri::{Emitter, Manager, WindowEvent};
 #[cfg(desktop)]
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+#[cfg(desktop)]
+use tauri_plugin_opener::OpenerExt;
 
 #[cfg(target_os = "windows")]
 #[link(name = "dwmapi")]
@@ -143,16 +145,6 @@ fn configure_window_border(window: &tauri::Window) {
                 std::mem::size_of::<i32>() as u32,
             );
 
-            // DWMWA_BORDER_COLOR = 34
-            // DWMWA_COLOR_NONE = 0xFFFFFFFE (disables window border entirely on Windows 11)
-            let border_color: u32 = 0xFFFFFFFE;
-            let _ = DwmSetWindowAttribute(
-                hwnd.0 as *mut std::ffi::c_void,
-                34,
-                &border_color as *const u32 as *const std::ffi::c_void,
-                std::mem::size_of::<u32>() as u32,
-            );
-
             // DWMWA_WINDOW_CORNER_PREFERENCE = 33
             // DWMWCP_ROUND = 2 (standard Windows 11 rounded corners)
             let corner_preference: u32 = 2;
@@ -269,47 +261,25 @@ fn open_in_folder(app: tauri::AppHandle, target: String) -> Result<String, Strin
         return Err("invalid target".into());
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        let win_path = target_path.to_string_lossy().replace('/', "\\");
-        let mut cmd = std::process::Command::new("explorer");
-        if is_file && target_path.exists() {
-            cmd.arg(format!("/select,{}", win_path));
-        } else {
-            cmd.arg(&win_path);
-        }
-        cmd.spawn().map_err(|e| e.to_string())?;
-        Ok(win_path)
-    }
-    #[cfg(target_os = "macos")]
-    {
-        if is_file && target_path.exists() {
-            std::process::Command::new("open")
-                .arg("-R")
-                .arg(&target_path)
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        } else {
-            std::process::Command::new("open")
-                .arg(&target_path)
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        }
-        Ok(target_path.to_string_lossy().to_string())
-    }
-    #[cfg(target_os = "linux")]
-    {
+    // Both calls go through the opener plugin: it owns the per-OS explorer invocation and
+    // reports a failure instead of a silently spawned child process.
+    if is_file && target_path.exists() {
+        app.opener()
+            .reveal_item_in_dir(&target_path)
+            .map_err(|e| e.to_string())?;
+    } else {
+        // A file that does not exist yet has nothing to select, so its folder opens instead.
         let open_target = if is_file {
             target_path.parent().unwrap_or(&target_path)
         } else {
             &target_path
         };
-        std::process::Command::new("xdg-open")
-            .arg(open_target)
-            .spawn()
+        app.opener()
+            .open_path(open_target.to_string_lossy().to_string(), None::<&str>)
             .map_err(|e| e.to_string())?;
-        Ok(target_path.to_string_lossy().to_string())
     }
+
+    Ok(target_path.to_string_lossy().to_string())
 }
 
 #[cfg(target_os = "linux")]
@@ -350,6 +320,22 @@ fn reveal_main_window(app: &tauri::AppHandle) {
         #[cfg(target_os = "windows")]
         set_webview_memory_level(&window, false);
     }
+}
+
+/// Brings the quick composer forward and asks it to focus its input. Returns `false` when the
+/// window is not in this build's config, so the caller can fall back to the main window.
+#[cfg(desktop)]
+fn show_quick_composer(app: &tauri::AppHandle) -> bool {
+    if let Some(window) = app.get_webview_window("quick-composer") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+        #[cfg(target_os = "windows")]
+        set_webview_memory_level(&window, false);
+        let _ = window.emit("slag://focus-composer", ());
+        return true;
+    }
+    false
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -448,16 +434,8 @@ pub fn run() {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
                 let is_quick = args.iter().any(|arg| arg == "--quick" || arg == "--composer" || arg == "-q");
-                if is_quick {
-                    if let Some(quick_win) = app.get_webview_window("quick-composer") {
-                        let _ = quick_win.show();
-                        let _ = quick_win.unminimize();
-                        let _ = quick_win.set_focus();
-                        #[cfg(target_os = "windows")]
-                        set_webview_memory_level(&quick_win, false);
-                        let _ = quick_win.emit("slag://focus-composer", ());
-                        return;
-                    }
+                if is_quick && show_quick_composer(app) {
+                    return;
                 }
                 reveal_main_window(app);
                 // A second launch is also how the OS delivers a `slag://` link: the argument is
@@ -483,14 +461,7 @@ pub fn run() {
                 tauri_plugin_global_shortcut::Builder::new()
                     .with_handler(move |app, _shortcut, event| {
                         if event.state() == ShortcutState::Pressed {
-                            if let Some(quick_win) = app.get_webview_window("quick-composer") {
-                                let _ = quick_win.show();
-                                let _ = quick_win.unminimize();
-                                let _ = quick_win.set_focus();
-                                #[cfg(target_os = "windows")]
-                                set_webview_memory_level(&quick_win, false);
-                                let _ = quick_win.emit("slag://focus-composer", ());
-                            } else {
+                            if !show_quick_composer(app) {
                                 reveal_main_window(app);
                                 if let Some(window) = app.get_webview_window("main") {
                                     let _ = window.emit("slag://open-composer", ());
@@ -517,14 +488,6 @@ pub fn run() {
             .plugin(deeplink::init())
             .plugin(updater::init())
             .plugin(device_access::init());
-    }
-
-    #[cfg(desktop)]
-    {
-        builder = builder.plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--autostart"]),
-        ));
     }
 
     #[cfg(target_os = "windows")]
@@ -595,12 +558,7 @@ pub fn run() {
                     if let Some(main_win) = app.get_webview_window("main") {
                         let _ = main_win.hide();
                     }
-                    if let Some(quick_win) = app.get_webview_window("quick-composer") {
-                        let _ = quick_win.show();
-                        let _ = quick_win.unminimize();
-                        let _ = quick_win.set_focus();
-                        let _ = quick_win.emit("slag://focus-composer", ());
-                    }
+                    show_quick_composer(app.handle());
                 }
 
                 // Register global hotkey: Ctrl + Shift + Space
@@ -644,14 +602,7 @@ pub fn run() {
                                 reveal_main_window(app);
                             }
                             "quick_note" => {
-                                if let Some(quick_win) = app.get_webview_window("quick-composer") {
-                                    let _ = quick_win.show();
-                                    let _ = quick_win.unminimize();
-                                    let _ = quick_win.set_focus();
-                                    #[cfg(target_os = "windows")]
-                                    set_webview_memory_level(&quick_win, false);
-                                    let _ = quick_win.emit("slag://focus-composer", ());
-                                } else {
+                                if !show_quick_composer(app) {
                                     reveal_main_window(app);
                                     if let Some(window) = app.get_webview_window("main") {
                                         let _ = window.emit("slag://open-composer", ());
