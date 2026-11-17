@@ -5,16 +5,19 @@
 //   npm run mcp:install                     # all clients, vault detected from the app data dir
 //   npm run mcp:install -- --vault <path>   # explicit vault
 //   npm run mcp:install -- --clients dsh,cursor --dry-run
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { homedir, platform } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parse as parseYaml } from 'yaml';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bundlePath = path.join(repoRoot, 'dist', 'mcp', 'index.js');
 const home = homedir();
 export const CLIENT_NAMES = ['claude', 'cursor', 'dsh'];
+/** The DSH profile is the user's own harness config: never touched unless asked for by name. */
+export const DEFAULT_CLIENTS = ['claude', 'cursor'];
 
 /** Where each client keeps its MCP config, relative to home. */
 export function clientConfigPath(client) {
@@ -55,9 +58,9 @@ const DSH_BLOCK = (vaultPath) => `    - id: mcp-slag
         transport: stdio
         command: node
         args:
-          - '${bundlePath.replace(/\\/g, '\\\\')}'
+          - '${bundlePath}'
           - --vault
-          - '${vaultPath.replace(/\\/g, '\\\\')}'
+          - '${vaultPath}'
         toolCallTimeoutMs: 120000`;
 
 /**
@@ -83,8 +86,48 @@ export function mergeDshProfile(existing, vaultPath) {
   return `${head}${DSH_BLOCK(vaultPath)}\n${tail}`;
 }
 
+/** JSON-shaped config, or null when the file on disk is not JSON we dare to rewrite. */
+function renderJsonConfig(current, target, vaultPath) {
+  try {
+    return `${JSON.stringify(mergeJsonConfig(current, vaultPath), null, 2)}\n`;
+  } catch (error) {
+    console.error(`не смогла разобрать ${target} (${error.message}); файл не тронут.`);
+    return null;
+  }
+}
+
+/**
+ * Read our entry back out of the written text and compare it with what we meant to write. Catches
+ * the class of bug that broke a real profile: quotes and escapes that survive the merge but change
+ * the value the client sees.
+ */
+export function verifyWritten(client, text, vaultPath) {
+  const expected = [bundlePath, '--vault', vaultPath];
+  let actual;
+  try {
+    if (client === 'dsh') {
+      const parsed = parseYaml(text);
+      const entry = parsed?.[0]?.insert?.find((item) => item?.id === 'mcp-slag');
+      actual = entry?.config?.args;
+    } else {
+      actual = JSON.parse(text)?.mcpServers?.slag?.args;
+    }
+  } catch (error) {
+    return `результат не разбирается (${error.message})`;
+  }
+  if (!Array.isArray(actual)) return 'запись mcp-slag не читается обратно';
+  if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
+    return `пути в записи разъехались: ${JSON.stringify(actual)}`;
+  }
+  return null;
+}
+
 function writeAtomic(filePath, contents) {
   mkdirSync(path.dirname(filePath), { recursive: true });
+  if (existsSync(filePath)) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    copyFileSync(filePath, `${filePath}.slag-backup-${stamp}`);
+  }
   const temp = `${filePath}.slag-tmp`;
   writeFileSync(temp, contents, 'utf8');
   renameSync(temp, filePath);
@@ -100,7 +143,7 @@ const valueOf = (name) => {
 const dryRun = argv.includes('--dry-run');
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const clients = (valueOf('clients') ?? CLIENT_NAMES.join(',')).split(',').map((name) => name.trim()).filter(Boolean);
+  const clients = (valueOf('clients') ?? DEFAULT_CLIENTS.join(',')).split(',').map((name) => name.trim()).filter(Boolean);
   const unknown = clients.filter((client) => !CLIENT_NAMES.includes(client));
   if (unknown.length > 0) {
     console.error(`неизвестный клиент: ${unknown.join(', ')}. доступны: ${CLIENT_NAMES.join(', ')}`);
@@ -131,29 +174,21 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const client of clients) {
     const target = clientConfigPath(client);
     const current = existsSync(target) ? readFileSync(target, 'utf8') : '';
-    if (client === 'dsh') {
-      const next = mergeDshProfile(current, vaultPath);
-      if (dryRun) {
-        console.log(`--- ${client} (${target}) — ${current.includes('id: mcp-slag') ? 'обновление' : 'добавление'}:\n${next}\n`);
-        continue;
-      }
-      writeAtomic(target, next);
-      console.log(`${client}: ${current.includes('id: mcp-slag') ? 'обновлён' : 'добавлен'} → ${target}`);
-      continue;
-    }
-    let next;
-    try {
-      next = `${JSON.stringify(mergeJsonConfig(current, vaultPath), null, 2)}\n`;
-    } catch (error) {
-      console.error(`${client}: не смогла разобрать ${target} (${error.message}); файл не тронут.`);
+    const next = client === 'dsh' ? mergeDshProfile(current, vaultPath) : renderJsonConfig(current, target, vaultPath);
+    if (!next) continue;
+
+    // A config the client cannot parse leaves it with no servers at all: refuse to write one.
+    const problem = verifyWritten(client, next, vaultPath);
+    if (problem) {
+      console.error(`${client}: ${problem}; ${target} не тронут.`);
       continue;
     }
     if (dryRun) {
-      console.log(`--- ${client} (${target}):\n${next}\n`);
+      console.log(`--- ${client} (${target}) — ${current.includes('mcp-slag') ? 'обновление' : 'добавление'}:\n${next}\n`);
       continue;
     }
     writeAtomic(target, next);
-    console.log(`${client}: записан → ${target}`);
+    console.log(`${client}: ${current.includes('mcp-slag') ? 'обновлён' : 'добавлен'} → ${target}`);
   }
 
   console.log(`\nперезапусти клиент(ы): конфиг читается на старте.`);
