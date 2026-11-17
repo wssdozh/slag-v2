@@ -18,6 +18,27 @@ npm run build:mcp
 
 ## 2. Подключение к клиентам
 
+### Автоматически (рекомендуется)
+
+```bash
+npm run mcp:install
+```
+
+Скрипт сам находит хранилище приложения, при отсутствии `dist/mcp/index.js` собирает бандл и
+прописывает сервер в Claude Code (`~/.claude.json`), Cursor (`~/.cursor/mcp.json`) и DeepSeek
+Harness (`~/.dsh/profiles/web/cordis.patch.yml`). Чужие серверы и остальные настройки в этих
+файлах не трогаются, повторный запуск обновляет только нашу запись.
+
+```bash
+npm run mcp:install -- --vault "D:\мои заметки"   # другое хранилище
+npm run mcp:install -- --clients dsh,cursor       # только нужные клиенты
+npm run mcp:install -- --dry-run                  # показать, что будет записано
+```
+
+После установки клиент нужно перезапустить: конфиг читается на старте.
+
+### Вручную
+
 ### DeepSeek Harness (DSH)
 Добавьте секцию в профиль `~/.dsh/profiles/web/cordis.patch.yml`:
 
