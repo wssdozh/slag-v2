@@ -10,7 +10,7 @@ import { extractFocalContext } from '../../lib/media/enrichment/text';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
-import { findAttachmentEmbeds } from '../../lib/text/attachmentEmbed';
+import { resolveAttachmentEmbeds } from '../../lib/text/attachmentEmbed';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
@@ -285,15 +285,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   // A file the text already shows as `![[name]]` must not also appear in the gallery below:
   // the embed is the file's place on the card, and a second copy reads as two attachments.
-  const embeddedAttachmentNames = useMemo(
-    () => new Set(findAttachmentEmbeds(item.content ?? '').map((embed) => embed.name.toLowerCase())),
-    [item.content]
+  const embeddedAttachmentIds = useMemo(
+    () => new Set(resolveAttachmentEmbeds(item.content ?? '', item.attachments).map(({ attachment }) => attachment?.id)),
+    [item.content, item.attachments]
   );
   const galleryAttachments = useMemo(
     () => (item.attachments ?? []).filter(
-      (attachment) => !embeddedAttachmentNames.has(attachment.name.toLowerCase())
+      (attachment) => !embeddedAttachmentIds.has(attachment.id)
     ),
-    [item.attachments, embeddedAttachmentNames]
+    [item.attachments, embeddedAttachmentIds]
   );
   // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
   const attachmentGroups = useMemo(() => groupItemAttachments(galleryAttachments), [galleryAttachments]);

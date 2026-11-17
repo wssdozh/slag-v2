@@ -180,8 +180,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 }) => {
   // Embeds are pulled out first: the wiki transform would otherwise eat the inner `[[name]]`.
   const transformed = useMemo(
-    () => transformWikiLinks(markdownWithAttachmentEmbeds(content)),
-    [content],
+    () => transformWikiLinks(markdownWithAttachmentEmbeds(content, attachments)),
+    [content, attachments],
   );
 
   const components: Components = useMemo(
