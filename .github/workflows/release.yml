@@ -191,19 +191,26 @@ jobs:
       - name: ndk
         shell: bash
         run: |
-          set -euo pipefail
+          # A truncated download killed the whole apk once ("Archive is not a ZIP archive"), and a
+          # preinstalled NDK is fine too: take whatever ends up under $ANDROID_HOME/ndk. No `set -e`
+          # here — `yes |` dies of SIGPIPE the moment sdkmanager exits, which is not a failure.
+          set -uo pipefail
           sdk="$ANDROID_HOME"
           sdkmanager="$sdk/cmdline-tools/latest/bin/sdkmanager"
-          ndk="$sdk/ndk/27.0.12077973"
-          yes | "$sdkmanager" --licenses > /dev/null
-          # Google's CDN hands out a truncated archive now and then ("Archive is not a ZIP
-          # archive"), and one bad download used to cost the whole apk: retry it instead.
+          ( yes | "$sdkmanager" --licenses > /dev/null ) || true
+          pick_ndk() { ls -d "$sdk"/ndk/* 2>/dev/null | sort -V | tail -n 1; }
+          ndk="$(pick_ndk)"
           for attempt in 1 2 3; do
-            [ -d "$ndk" ] && break
-            yes | "$sdkmanager" --install "ndk;27.0.12077973" || echo "ndk attempt $attempt failed"
+            if [ -n "$ndk" ] && [ -d "$ndk" ]; then break; fi
+            ( yes | "$sdkmanager" --install "ndk;27.0.12077973" ) || echo "ndk attempt $attempt failed"
             sleep 10
+            ndk="$(pick_ndk)"
           done
-          [ -d "$ndk" ] || { echo "::error::NDK 27.0.12077973 не установился"; exit 1; }
+          if [ -z "$ndk" ] || [ ! -d "$ndk" ]; then
+            echo "::error::NDK не установился: $sdk/ndk пуст"
+            exit 1
+          fi
+          echo "using NDK $ndk"
           echo "NDK_HOME=$ndk" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
