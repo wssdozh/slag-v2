@@ -1,8 +1,8 @@
-﻿# Builds and publishes SLAG.
+# Builds and publishes SLAG.
 #
-#   push to master        в†’ dev build: 0.2.6-dev.<run>, published as a prerelease on the `dev` tag
-#   tag v1.2.3            в†’ stable: becomes GitHub's `latest`, which is what a release client reads
-#   tag v1.2.3-beta.4     в†’ beta: its own release plus a rewritten `latest.json` on the `beta` tag
+#   push to master        → dev build: 0.2.6-dev.<run>, published as a prerelease on the `dev` tag
+#   tag v1.2.3            → stable: becomes GitHub's `latest`, which is what a release client reads
+#   tag v1.2.3-beta.4     → beta: its own release plus a rewritten `latest.json` on the `beta` tag
 #
 # The rules themselves live in scripts/release-meta.mjs and are covered by node --test, so this
 # workflow only wires them to the build. A stable client can never see a prerelease: GitHub's
@@ -17,12 +17,12 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: 'РєР°РЅР°Р» РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕР№ СЃР±РѕСЂРєРё (СЃС‚Р°Р±РёР»СЊРЅС‹Р№ СЂРµР»РёР· РІС‹РїСѓСЃРєР°РµС‚СЃСЏ С‚РµРіРѕРј v1.2.3)'
+        description: 'канал предварительной сборки (стабильный релиз выпускается тегом v1.2.3)'
         type: choice
         options: [dev, beta]
         default: dev
       notes:
-        description: 'С‡С‚Рѕ РїРѕРјРµРЅСЏР»РѕСЃСЊ (РїСѓСЃС‚Рѕ вЂ” СЃРѕР±РµСЂС‘Рј РёР· РєРѕРјРјРёС‚РѕРІ)'
+        description: 'что поменялось (пусто — соберём из коммитов)'
         required: false
 
 permissions:
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: РІРµСЂСЃРёСЏ, РєР°РЅР°Р» Рё С‚РµРі
+      - name: версия, канал и тег
         id: meta
         shell: bash
         env:
@@ -122,7 +122,7 @@ jobs:
           cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
-      - name: РІРµСЂСЃРёСЏ СЃР±РѕСЂРєРё
+      - name: версия сборки
         shell: bash
         run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
       - name: build
@@ -156,7 +156,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf rpm
       - run: pnpm install --frozen-lockfile
-      - name: РІРµСЂСЃРёСЏ СЃР±РѕСЂРєРё
+      - name: версия сборки
         run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
       - name: build
         run: npx tauri build --config "$RUNNER_TEMP/version.json" --bundles deb,appimage
@@ -198,7 +198,7 @@ jobs:
         with:
           targets: aarch64-linux-android
       - run: pnpm install --frozen-lockfile
-      - name: РІРµСЂСЃРёСЏ СЃР±РѕСЂРєРё
+      - name: версия сборки
         run: printf '{"version":"%s"}' '${{ needs.prepare.outputs.version }}' > "$RUNNER_TEMP/version.json"
       - name: build apk
         run: npx tauri android build --apk --target aarch64 --config "$RUNNER_TEMP/version.json"
@@ -272,7 +272,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: .artifacts
-      - name: С‡С‚Рѕ РїСѓР±Р»РёРєСѓРµРј
+      - name: что публикуем
         shell: bash
         run: |
           set -euo pipefail
