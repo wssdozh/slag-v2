@@ -40,7 +40,7 @@ export const ComposerTaskControls: React.FC<ComposerTaskControlsProps> = ({
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
+    <div className="contents md:flex md:min-w-0 md:flex-wrap md:items-center md:gap-1">
       {/* Due Date Trigger */}
       <div className="relative shrink-0">
         <ToolbarButton

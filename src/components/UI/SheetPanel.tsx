@@ -213,6 +213,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
       const height = panelRef.current?.parentElement?.clientHeight ?? window.innerHeight;
       const state = physics.current;
       state.height = height;
+      applyBodyCap();
       if (!state.initialized) {
         state.initialized = true;
         state.y = prefersReducedMotion() ? height * options.current.rest : height;
@@ -228,7 +229,7 @@ export const SheetPanel: React.FC<SheetPanelProps> = ({
       cancelAnimationFrame(state.frame);
       window.clearTimeout(state.timer);
     };
-  }, [enabled, expanded, exiting, paint, settle]);
+  }, [applyBodyCap, enabled, expanded, exiting, paint, settle]);
 
   const sheetHeight = useCallback(
     () => panelRef.current?.parentElement?.clientHeight ?? window.innerHeight,
