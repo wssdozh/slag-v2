@@ -1,5 +1,6 @@
 // Turns the vault's own timestamps into a GitHub-style year of activity.
 import type { SlagItem } from '../types';
+import { getISODateString, getMondayOfWeek } from './time/dateUtils';
 
 /** One cell of the grid. `total` is what the colour is chosen by. */
 export interface ActivityDay {
@@ -28,27 +29,13 @@ export interface ActivitySummary {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Russian needs three forms: 1 день, 3 дня, 11 дней. */
-export function pluralRu(count: number, forms: [string, string, string]): string {
-  const tail = count % 100;
-  if (tail >= 11 && tail <= 14) return forms[2];
-  const last = count % 10;
-  if (last === 1) return forms[0];
-  if (last >= 2 && last <= 4) return forms[1];
-  return forms[2];
-}
-
 export function dateKey(timestamp: number): string {
-  const at = new Date(timestamp);
-  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+  return getISODateString(new Date(timestamp));
 }
 
 /** Monday of the week a date belongs to, at local midnight. */
 function startOfWeek(timestamp: number): number {
-  const at = new Date(timestamp);
-  at.setHours(0, 0, 0, 0);
-  const shift = (at.getDay() + 6) % 7;
-  return at.getTime() - shift * DAY_MS;
+  return getMondayOfWeek(new Date(timestamp)).getTime();
 }
 
 function emptyDay(timestamp: number): ActivityDay {

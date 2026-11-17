@@ -1,10 +1,17 @@
-// MCP resources: folder map, pending tasks and notes a client can read without a tool.
+﻿// MCP resources: folder map, pending tasks and notes a client can read without a tool.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { McpVault } from './vault';
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** The one shape a JSON resource answer takes: the uri it was asked for, the value as text. */
+function jsonResource(uri: URL, value: unknown) {
+  return {
+    contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify(value, null, 2) }],
+  };
 }
 
 /**
@@ -31,15 +38,7 @@ export function registerMcpResources(server: McpServer, vault: McpVault): void {
     },
     async (uri) => {
       const folders = await vault.getFolders();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(folders, null, 2),
-          },
-        ],
-      };
+      return jsonResource(uri, folders);
     }
   );
 
@@ -54,15 +53,7 @@ export function registerMcpResources(server: McpServer, vault: McpVault): void {
     async (uri) => {
       const tasks = await vault.listTasks('all');
       const open = tasks.filter(t => t.status !== 'done');
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(open, null, 2),
-          },
-        ],
-      };
+      return jsonResource(uri, open);
     }
   );
 
@@ -76,15 +67,7 @@ export function registerMcpResources(server: McpServer, vault: McpVault): void {
     },
     async (uri) => {
       const tags = await vault.listTags();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(tags, null, 2),
-          },
-        ],
-      };
+      return jsonResource(uri, tags);
     }
   );
 
@@ -98,15 +81,7 @@ export function registerMcpResources(server: McpServer, vault: McpVault): void {
     },
     async (uri) => {
       const stats = await vault.getStats();
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: 'application/json',
-            text: JSON.stringify(stats, null, 2),
-          },
-        ],
-      };
+      return jsonResource(uri, stats);
     }
   );
 
@@ -122,15 +97,7 @@ export function registerMcpResources(server: McpServer, vault: McpVault): void {
       try {
         const idStr = Array.isArray(id) ? id[0] : id;
         const card = await vault.getNoteCard(decodeResourceRef(String(idStr)));
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'application/json',
-              text: JSON.stringify(card, null, 2),
-            },
-          ],
-        };
+        return jsonResource(uri, card);
       } catch (err) {
         return {
           contents: [

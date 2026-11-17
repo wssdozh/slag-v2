@@ -4,6 +4,7 @@ import type { AssistantActionPayload } from '../sync/accountTypes';
 import { DEFAULT_INBOX_FOLDER } from '../../config/storage';
 import { logger } from '../logger/logger';
 import { storage } from '../storage';
+import { readStoredJson } from '../storage/readJson';
 import { accountClient } from '../sync/account';
 import { assistantOrchestrator } from '../ai/orchestrator';
 import { loadAiSettings } from '../ai/connections/settings';
@@ -114,22 +115,16 @@ function historyKey(vaultId: string): string {
 }
 
 function loadHistory(vaultId: string): HistoryEntry[] {
-  try {
-    const raw = localStorage.getItem(historyKey(vaultId));
-    if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+  return readStoredJson<HistoryEntry[]>(historyKey(vaultId), [], (parsed) => {
+    if (!Array.isArray(parsed)) return undefined;
     return parsed
       .filter((entry): entry is HistoryEntry => (
         Boolean(entry) && typeof entry === 'object'
-        && (entry as HistoryEntry).role !== undefined
         && ((entry as HistoryEntry).role === 'user' || (entry as HistoryEntry).role === 'assistant')
         && typeof (entry as HistoryEntry).content === 'string'
       ))
       .slice(-HISTORY_LIMIT);
-  } catch {
-    return [];
-  }
+  });
 }
 
 function saveHistory(vaultId: string, entries: HistoryEntry[]): void {

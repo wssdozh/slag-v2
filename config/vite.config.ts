@@ -56,21 +56,17 @@ function devFolderOpenerPlugin() {
             fs.mkdirSync(targetDir, { recursive: true });
           }
 
+          // Windows explorer wants `/select,<file>` and a bare path for a folder; every other
+          // platform opens the folder and only takes `-R` for a file.
           const platform = os.platform();
-          if (platform === 'win32') {
-            const winTarget = targetDir.replace(/\//g, '\\');
-            const isFile = winTarget.endsWith('.md') && fs.existsSync(winTarget);
-            const args = isFile ? [`/select,${winTarget}`] : [winTarget];
-            spawn('explorer.exe', args, { detached: true, stdio: 'ignore' }).unref();
-          } else if (platform === 'darwin') {
-            const isFile = targetDir.endsWith('.md') && fs.existsSync(targetDir);
-            const args = isFile ? ['-R', targetDir] : [targetDir];
-            spawn('open', args, { detached: true, stdio: 'ignore' }).unref();
-          } else {
-            const isFile = targetDir.endsWith('.md') && fs.existsSync(targetDir);
-            const openPath = isFile ? path.dirname(targetDir) : targetDir;
-            spawn('xdg-open', [openPath], { detached: true, stdio: 'ignore' }).unref();
-          }
+          const winTarget = targetDir.replace(/\//g, '\\');
+          const isFile = fs.existsSync(targetDir) && fs.statSync(targetDir).isFile();
+          const [bin, args] = platform === 'win32'
+            ? ['explorer.exe', isFile ? [`/select,${winTarget}`] : [winTarget]]
+            : platform === 'darwin'
+              ? ['open', isFile ? ['-R', targetDir] : [targetDir]]
+              : ['xdg-open', [isFile ? path.dirname(targetDir) : targetDir]];
+          spawn(bin, args, { detached: true, stdio: 'ignore' }).unref();
 
           res.setHeader('Content-Type', 'application/json');
           res.statusCode = 200;

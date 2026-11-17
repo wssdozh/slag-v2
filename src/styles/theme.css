@@ -125,15 +125,6 @@
   --color-surface-active: rgba(255, 255, 255, 0.08);
 
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.22);
-
-  --text-primary: #f4f4f5;
-  --text-soft: #e4e4e7;
-  --text-tertiary: #d4d4d8;
-  --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
-  --text-dim: #52525b;
 
   --color-accent: #3b82f6;
   --color-accent-subtle: color-mix(in srgb, var(--color-accent) 15%, transparent);
@@ -151,10 +142,7 @@
 
   /* Semantic UI Aliases */
   --bg-main: var(--color-canvas);
-  --bg-sidebar: var(--color-panel);
-  --bg-surface: var(--color-surface);
-  --bg-hover: var(--color-surface-hover);
-  --bg-active: var(--color-surface-active);
+  --text-primary: #f4f4f5;
 
   /* One duration scale for CSS and semantic presets; no duplicate TS config. */
   --slag-motion-instant: 75ms;

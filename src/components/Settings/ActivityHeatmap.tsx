@@ -1,7 +1,7 @@
 // A year of activity as GitHub draws it: one column per week, one square per day.
 import React from 'react';
 import type { ActivitySummary, ActivityDay } from '../../lib/activityStats';
-import { pluralRu } from '../../lib/activityStats';
+import { pluralRu } from '../../lib/time/dateUtils';
 
 const CELL = 7;
 const GAP = 2;
