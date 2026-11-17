@@ -19,6 +19,7 @@ import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import { Icon } from '../UI/icons/Icon';
 import { useComposerDraft } from './composer/useComposerDraft';
+import { rememberComposerDraft } from '../Editor/fullscreen/composerDraftOwner';
 import { useComposerAutocomplete } from './composer/useComposerAutocomplete';
 import { ComposerReplyBanner } from './composer/ComposerReplyBanner';
 import { ComposerAttachmentStrip } from './composer/ComposerAttachmentStrip';
@@ -390,6 +391,10 @@ export const Composer: React.FC<ComposerProps> = ({
       updatedAt: Date.now(),
     };
 
+    rememberComposerDraft(draftItem, activeFolder, {
+      content, itemType, priority, dueDate, tags, attachments, replyTarget,
+      targetFolder, duration, recurrence, updatedAt: Date.now(),
+    });
     setSelectedItem(draftItem);
     setIsFullscreenEditorOpen(true);
   };
