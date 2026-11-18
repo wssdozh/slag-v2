@@ -28,7 +28,6 @@ function write(data: Record<string, string>): void {
 }
 
 const fileBackend: SecretBackend = {
-  mode: 'file',
   get(key) {
     return Promise.resolve(read()[key] ?? null);
   },

@@ -31,20 +31,10 @@ export const SECRET_KEYS = {
  * native runtime, in the webview profile in a browser. `file` — a runtime that installs its own
  * file store (`src/node/secrets.ts`) and brings its own path.
  */
-export type SecretStoreMode = 'os' | 'local' | 'file';
-
 export interface SecretBackend {
-  mode: SecretStoreMode;
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
-}
-
-export class SecretStoreUnavailableError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'SecretStoreUnavailableError';
-  }
 }
 
 const cache = new Map<string, string>();
@@ -71,7 +61,6 @@ function enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
 
 function osBackend(invoke: typeof import('@tauri-apps/api/core').invoke): SecretBackend {
   return {
-    mode: 'os',
     get: (key) => invoke<string | null>('secret_get', { key }),
     set: (key, value) => invoke<void>('secret_set', { key, value }),
     delete: (key) => invoke<void>('secret_delete', { key }),
@@ -80,7 +69,6 @@ function osBackend(invoke: typeof import('@tauri-apps/api/core').invoke): Secret
 
 function encryptedBackend(): SecretBackend {
   return {
-    mode: 'local',
     get: getLocalSecret,
     set: setLocalSecret,
     delete: deleteLocalSecret,
@@ -102,12 +90,12 @@ async function probeOsBackend(): Promise<SecretBackend | null> {
   }
 }
 
-function readStoredMode(): SecretStoreMode | null {
+function readStoredMode(): 'os' | 'local' | null {
   const value = getPref(MODE_PREF);
   return value === 'os' || value === 'local' ? value : null;
 }
 
-function rememberMode(mode: SecretStoreMode): void {
+function rememberMode(mode: 'os' | 'local'): void {
   setPref(MODE_PREF, mode);
 }
 
@@ -219,7 +207,7 @@ async function preload(target: SecretBackend): Promise<void> {
       if (value !== null) cache.set(key, value);
     } catch (error) {
       storeLog.error('Could not preload a sync secret', { key, error });
-      throw new SecretStoreUnavailableError('Не удалось прочитать ключи синхронизации');
+      throw new Error('Не удалось прочитать ключи синхронизации');
     }
   }
 }
@@ -253,7 +241,7 @@ export function getCachedSecret(key: string): string | null {
 
 export async function getSecret(key: string): Promise<string | null> {
   if (!ready) await initSecretStore();
-  if (!backend) throw new SecretStoreUnavailableError('Secret store is not initialized');
+  if (!backend) throw new Error('Secret store is not initialized');
   if (cache.has(key)) return cache.get(key) ?? null;
   const value = await backend.get(key);
   if (value !== null) cache.set(key, value);
@@ -262,7 +250,7 @@ export async function getSecret(key: string): Promise<string | null> {
 
 export async function setSecret(key: string, value: string): Promise<void> {
   if (!ready) await initSecretStore();
-  if (!backend) throw new SecretStoreUnavailableError('Secret store is not initialized');
+  if (!backend) throw new Error('Secret store is not initialized');
   cache.set(key, value);
   const target = backend;
   await enqueue(key, () => target.set(key, value));
@@ -270,7 +258,7 @@ export async function setSecret(key: string, value: string): Promise<void> {
 
 export async function deleteSecret(key: string): Promise<void> {
   if (!ready) await initSecretStore();
-  if (!backend) throw new SecretStoreUnavailableError('Secret store is not initialized');
+  if (!backend) throw new Error('Secret store is not initialized');
   cache.delete(key);
   const target = backend;
   await enqueue(key, () => target.delete(key));
