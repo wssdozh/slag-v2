@@ -14,16 +14,14 @@ import type {
   SortOrder,
   VaultMeta,
 } from '../../types';
-import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
-import { mergeDiscoveredVaults } from '../../lib/storage/vaultDiscovery';
+import { discoverVaults } from '../../lib/storage/vaultRegistry';
 import { syncEngine } from '../../lib/sync';
 import { accountClient } from '../../lib/sync/account';
 import { swapScreen } from '../../lib/motion';
 import { openAppFolder } from '../../lib/platform/folderOpener';
 import { logger } from '../../lib/logger/logger';
-import { isTauri } from '@tauri-apps/api/core';
-import { readDir, BaseDirectory } from '@tauri-apps/plugin-fs';
 import type { ToastMessage } from '../appContext.types';
 
 const fsLog = logger.scope('FS');
@@ -72,27 +70,16 @@ export function useVaults(deps: {
     setChatMessages, setSelectedItem, refreshData, addToast,
   } = deps;
 
-  // A native webview profile can be wiped from the outside, and the registry is the only thing that
-  // knows the vaults: it comes back as a lone `default_vault` while the directories still sit under
-  // `vaults/`. Scan them once on start and add what the registry lost. Nothing is ever dropped from
-  // the list here — deleting a vault is its own flow. The scan is best-effort: on the first run the
-  // directory does not exist yet, and that is not a failure worth stopping the start for.
+  // A wiped native profile costs the registry, not the directories: the scan tells the list what is
+  // actually on disk. It lives in the registry module, with the rest of the filesystem work.
   useEffect(() => {
-    if (!isTauri()) return;
     let cancelled = false;
-    void readDir('vaults', { baseDir: BaseDirectory.AppData })
-      .then((entries) => {
-        if (cancelled) return;
-        const stored = storage.getVaults();
-        const dirs = entries.filter(entry => entry.isDirectory === true).map(entry => entry.name);
-        const merged = mergeDiscoveredVaults(stored, dirs);
-        if (merged.length === stored.length) return;
-        localStorage.setItem(STORAGE_KEYS.VAULTS, JSON.stringify(merged));
-        setVaults(merged);
-        fsLog.info(`Restored ${merged.length - stored.length} vault(s) from disk: ${merged.slice(stored.length).map(entry => entry.id).join(', ')}`);
+    void discoverVaults(storage)
+      .then((merged) => {
+        if (!cancelled) setVaults(merged);
       })
       .catch((error: unknown) => {
-        fsLog.warn('Vault discovery skipped: no vaults directory to scan yet', { error: String(error) });
+        fsLog.warn('Vault discovery failed, the registry stands as it is', { error: String(error) });
       });
     return () => {
       cancelled = true;

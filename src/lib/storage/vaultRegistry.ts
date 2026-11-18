@@ -2,8 +2,9 @@
 import type { VaultMeta } from '../../types';
 import { STORAGE_KEYS, DEFAULT_VAULT_META } from '../../config';
 import { logger } from '../logger/logger';
+import { mergeDiscoveredVaults } from './vaultDiscovery';
 import { isTauri } from '@tauri-apps/api/core';
-import { remove, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { readDir, remove, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 const fsLog = logger.scope('FS');
 
@@ -78,6 +79,31 @@ export function saveVaultMeta(store: VaultRegistryHost, vault: VaultMeta): void 
   const list = getVaults(store).filter(v => v && v.id !== vault.id);
   list.push(vault);
   localStorage.setItem(VAULTS_KEY, JSON.stringify(list));
+}
+
+/**
+ * The registry is the only thing that knows the vaults, and a native webview profile can be wiped
+ * from the outside: it comes back as a lone `default_vault` while the directories sit untouched
+ * under `vaults/`. Read that directory once and add what the list lost. Nothing is dropped here —
+ * deleting a vault is its own flow — and the scan is best-effort: on the first run there is no
+ * directory yet, which is not a failure worth stopping the start for.
+ */
+export async function discoverVaults(store: VaultRegistryHost): Promise<VaultMeta[]> {
+  const stored = getVaults(store);
+  if (!isTauri()) return stored;
+  let dirs: string[] = [];
+  try {
+    const entries = await readDir('vaults', { baseDir: BaseDirectory.AppData });
+    dirs = entries.filter(entry => entry.isDirectory === true).map(entry => entry.name);
+  } catch (err) {
+    fsLog.warn('Vault discovery skipped: no vaults directory to scan yet', { error: String(err) });
+    return stored;
+  }
+  const merged = mergeDiscoveredVaults(stored, dirs);
+  if (merged === stored) return stored;
+  localStorage.setItem(VAULTS_KEY, JSON.stringify(merged));
+  fsLog.info(`Restored ${merged.length - stored.length} vault(s) from disk: ${merged.slice(stored.length).map(entry => entry.id).join(', ')}`);
+  return merged;
 }
 
 export function ensureVaultSyncId(store: VaultRegistryHost, vaultId: string): string {
