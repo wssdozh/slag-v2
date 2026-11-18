@@ -2,12 +2,12 @@ import type { SyncEngine } from './syncEngine';
 import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload, AssistantPromptPayload } from './types';
 import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
-import { loadSentHashes, loadTombstones, saveSentHashes, saveTombstones } from './localBookkeeping';
+import { loadDraftTombstone, loadSentHashes, loadTombstones, saveDraftTombstone, saveSentHashes, saveTombstones } from './localBookkeeping';
 import { attachmentSignature } from './attachmentSignature';
 import { logger } from '../logger/logger';
 import { vault } from '../storage/port';
 import type { ComposerDraft, FolderMeta, FullscreenDraft, MemoryItem, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
-import { DEFAULT_INBOX_FOLDER, SYNC_STORAGE_KEYS } from '../../config';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 
 const syncLog = logger.scope('SYNC');
 
@@ -298,8 +298,9 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             }
           }
         } else if (ch.type === 'draft') {
-          const draftTombKey = `${SYNC_STORAGE_KEYS.DRAFT_TOMB_PREFIX}${engine.currentVaultId}_${ch.id}`;
-          const lastDeletedAt = Number(localStorage.getItem(draftTombKey) || 0);
+          // The stamp of the moment this vault deleted that draft: a peer replaying the old text
+          // must lose it, and a deletion has to outlive the restart that follows it.
+          const lastDeletedAt = loadDraftTombstone(engine.bookkeeping, ch.id);
 
           if (ch.id.startsWith('composer:')) {
             const folder = ch.id.slice('composer:'.length);
@@ -320,7 +321,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
               }
             } else if (ch.action === 'delete') {
               const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
-              localStorage.setItem(draftTombKey, String(deletedAt));
+              saveDraftTombstone(engine.bookkeeping, ch.id, deletedAt);
               vault().deleteComposerDraft(folder, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Deleted remote composer draft for folder "${folder}"`);
@@ -341,7 +342,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
               }
             } else if (ch.action === 'delete') {
               const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
-              localStorage.setItem(draftTombKey, String(deletedAt));
+              saveDraftTombstone(engine.bookkeeping, ch.id, deletedAt);
               vault().clearFullscreenDraft(itemId, 'remote');
               hasDraftsChanged = true;
               syncLog.info(`Cleared remote fullscreen draft for item "${itemId}"`);

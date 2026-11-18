@@ -8,20 +8,21 @@ import {
   loadSentHashes,
   loadCursor,
   saveCursor,
-  cursorKey,
   saveSentHashes,
+  saveSyncedIds,
   seedSyncedIds,
-  stateHashKey,
-  syncedIdsKey,
-  clearTombstones,
-  hydrateTombstones,
+  clearSyncLedgers,
+  hydrateSyncSection,
   saveTombstones,
   SYNC_SECTION,
   loadAttachmentRequests,
   markAttachmentRequestSent as stampAttachmentRequest,
   ATTACHMENT_REQUEST_COOLDOWN_MS,
+  isInitialSyncPending,
+  setInitialSyncPending,
+  saveStateHash,
   type SyncScope,
-  type TombstoneStore,
+  type SyncSectionStore,
 } from './localBookkeeping';
 import { logger } from '../logger/logger';
 // Re-exported for the sync e2e specs, which drive sync through the real store. The headless
@@ -44,6 +45,7 @@ import {
 } from './deviceAdmin';
 import {
   computeSubscription,
+  hydrateConfig,
   loadConfig,
   saveConfig,
   authHeaders,
@@ -69,13 +71,11 @@ import type {
 import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, AssistantMode } from '../../types';
 import {
   SYNC_ATTACHMENT_MAX_BYTES,
-  SYNC_STORAGE_KEYS,
   SYNC_INTERVALS,
 } from '../../config';
 import { isPrimaryWindow } from '../platform/windowControls';
+import { getCachedSecret, getSecret, SECRET_KEYS } from '../platform/secretStore';
 import { isTauri } from '@tauri-apps/api/core';
-
-const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 
 const syncLog = logger.scope('SYNC');
 /** How much older than the tombstone a draft has to be before we call it a clock skew and stay quiet. */
@@ -87,7 +87,6 @@ export interface PendingPush {
   bundleId: string;
   encrypted: EncryptedBundle;
   frame: Uint8Array<ArrayBuffer>;
-  hashKey: string;
   stateHash: string;
   packedHashes: Record<string, string>;
   syncedIds: string[];
@@ -264,7 +263,7 @@ export class SyncEngine {
     this.status = {
       initialSync: {
         vaultId: this.currentVaultId,
-        state: localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending' ? 'loading' : 'idle',
+        state: isInitialSyncPending(this.currentVaultId) ? 'loading' : 'idle',
         processed: 0, rejected: 0,
       },
       state: 'idle',
@@ -289,7 +288,11 @@ export class SyncEngine {
         isExpiringSoon: false,
       },
     };
-    this.config = loadConfig(this, this.currentVaultId);
+    // The cache is a hint here, not the contract: the engine is built at module load, long before
+    // anything can await a keychain, and the headless node reads its config in the same tick (it
+    // checks for a seed phrase before `init` exists). `init`/`switchVault` replace this with the
+    // authoritative `await getSecret(...)` answer.
+    this.config = loadConfig(this, getCachedSecret(SECRET_KEYS.vaultSeed(this.currentVaultId)), this.currentVaultId);
     this.status.subscription = computeSubscription(this);
     accountClient.subscribe((accountState) => {
       this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
@@ -359,7 +362,7 @@ export class SyncEngine {
   }
 
   public getOutbox(): Outbox {
-    return new Outbox(this.currentVaultId);
+    return new Outbox(this.bookkeeping);
   }
 
   /**
@@ -678,17 +681,52 @@ export class SyncEngine {
   }
 
   /**
-   * The tombstones' home on disk. The vault is captured here because the write is queued: a save
-   * that lands after a vault switch would otherwise write this vault's deletes into the file of
-   * the vault that replaced it.
+   * The `sync` section's home on disk. The vault is captured here because the write is queued: a
+   * save that lands after a vault switch would otherwise write this vault's ledgers into the file
+   * of the vault that replaced it.
    */
-  private tombstoneStore(vaultId: string): TombstoneStore {
+  private syncSectionStore(vaultId: string): SyncSectionStore {
     return {
       read: () => storage.files.readStateSection(SYNC_SECTION),
-      write: (section) => (this.currentVaultId === vaultId
-        ? storage.files.writeStateSection(SYNC_SECTION, section)
+      write: (patch) => (this.currentVaultId === vaultId
+        ? storage.files.writeStateSection(SYNC_SECTION, patch)
         : Promise.resolve()),
     };
+  }
+
+  /**
+   * Config and ledgers, once per init. Both come out of the vault's own `state.json`, and the seed
+   * phrase comes out of the secret store — the config in the file never carries it. They are read
+   * before the checks below because "is sync on" and "which room" are fields of that config.
+   *
+   * The web build and the headless node have no disk: `hydrateSyncSection` is not even asked, and
+   * every ledger keeps answering from the storage it answered from before.
+   */
+  private async hydrateSyncState(): Promise<void> {
+    const vaultId = this.currentVaultId;
+    try {
+      const seed = await getSecret(SECRET_KEYS.vaultSeed(vaultId));
+      if (vaultId !== this.currentVaultId) return;
+
+      let section: Record<string, unknown> | null = null;
+      if (isTauri()) {
+        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId));
+        if (outcome.error) {
+          syncLog.warn('The sync ledgers stay in localStorage, state.json did not take them:', outcome.error);
+        }
+        section = outcome.section;
+      }
+      if (vaultId !== this.currentVaultId) return;
+
+      const config = await hydrateConfig(this, vaultId, seed, section);
+      if (vaultId !== this.currentVaultId) return;
+      this.config = config;
+      this.status.subscription = computeSubscription(this);
+    } catch (error) {
+      // A secret store that will not answer is not a crash: the seed check below reports it, and
+      // an empty config falls back to the keys this build used before the file existed.
+      syncLog.error(`Could not read the sync state of vault ${vaultId}:`, error);
+    }
   }
 
   public getCurrentVaultId(): string {
@@ -708,7 +746,7 @@ export class SyncEngine {
   }
 
   public beginInitialSync(vaultId: string): void {
-    localStorage.setItem(`slag_initial_sync_${vaultId}`, 'pending');
+    setInitialSyncPending(vaultId, true);
     this.status.initialSync = { vaultId, state: 'loading', processed: 0, rejected: 0 };
     this.notify();
   }
@@ -733,8 +771,12 @@ export class SyncEngine {
     }
     syncLog.info(`SyncEngine switching to vault: ${vaultId}`);
     this.disconnect();
+    const generation = this.initGeneration;
     this.currentVaultId = vaultId;
-    this.config = loadConfig(this, vaultId);
+    // The new vault's own config and ledgers before anything is told about it: a save that lands
+    // between a switch and its hydration would otherwise write this vault's keys into that file.
+    await this.hydrateSyncState();
+    if (generation !== this.initGeneration) return;
     this.status.subscription = computeSubscription(this);
     this.status.currentRoomId = null;
     this.notify();
@@ -745,9 +787,13 @@ export class SyncEngine {
     if (!isPrimaryWindow()) return;
     this.disconnect();
     const generation = this.initGeneration;
-    const seedPhrase = this.config.seedPhrase;
-    const initial = localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending';
     const startedAt = performance.now();
+    // The vault's own sync state — config, seed, ledgers — before anything decides whether sync
+    // can run at all: `enabled` and the seed phrase are fields of that config.
+    await this.hydrateSyncState();
+    if (generation !== this.initGeneration) return;
+    const seedPhrase = this.config.seedPhrase;
+    const initial = isInitialSyncPending(this.currentVaultId);
     if (initial) syncLog.info('Initial sync started', { vaultId: this.currentVaultId });
     this.status.initialSync = { vaultId: this.currentVaultId, state: initial ? 'loading' : 'idle', processed: 0, rejected: 0 };
     if (!this.config.enabled) {
@@ -817,18 +863,11 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
-      // The deleted ledger comes before the socket, the pull and the push. A pull that starts
-      // without it accepts a stale copy of a note this device deleted, and a push that starts
-      // without it says nothing about that note at all. `switchVault` lands here too, after the
-      // vault id it hydrated from has changed.
-      // ponytail: the ledger is hydrated asynchronously on entry, so there is no sync until the
-      // snapshot is ready. ceiling: a push in the same tick as init still sees the localStorage
-      // answer. upgrade: hydrate before the engine is constructed, from the app boot.
-      if (isTauri()) {
-        await hydrateTombstones(this.bookkeeping, this.tombstoneStore(this.currentVaultId));
-        if (generation !== this.initGeneration) return;
-      }
-
+      // The deleted ledger is in memory by now, from the hydrate at the top of init: a pull that
+      // started without it would accept a stale copy of a note this device deleted, and a push
+      // would say nothing about that note at all. `switchVault` lands here too, after the vault id
+      // it hydrated from has changed.
+      seedSyncedIds(this.bookkeeping, vault().getItems().map((it) => it.id));
       // Presence first. The socket is how every other device and the telegram bot see this one,
       // and the backlog below is a download that can take minutes or die halfway over a tunnel.
       // It used to run before the connect, so a slow backlog left the device invisible for its
@@ -840,14 +879,13 @@ export class SyncEngine {
       if (!this.transport.isOpenFor(roomId)) this.connectWebSocket();
       this.startIntervals();
 
-      seedSyncedIds(this.bookkeeping, vault().getItems().map((it) => it.id));
       this.batchUpdating = initial;
       await this.fetchPendingBundlesHttp();
       if (generation !== this.initGeneration) return;
       this.batchUpdating = false;
       await this.flushStagedImport();
       if (initial) {
-        localStorage.removeItem(`slag_initial_sync_${this.currentVaultId}`);
+        setInitialSyncPending(this.currentVaultId, false);
         this.status.initialSync.state = 'ready';
         syncLog.info('Initial sync queue drained', {
           vaultId: this.currentVaultId, durationMs: Math.round(performance.now() - startedAt),
@@ -869,7 +907,7 @@ export class SyncEngine {
       const msg = err instanceof Error ? err.message : String(err);
       syncLog.error('Sync init error:', msg);
       this.batchUpdating = false;
-      if (initial && localStorage.getItem(`slag_initial_sync_${this.currentVaultId}`) === 'pending') this.status.initialSync.state = 'error';
+      if (initial && isInitialSyncPending(this.currentVaultId)) this.status.initialSync.state = 'error';
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
@@ -886,12 +924,10 @@ export class SyncEngine {
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
     if (newPhrase !== this.config.seedPhrase) {
-      localStorage.removeItem(stateHashKey(this.bookkeeping));
-      localStorage.removeItem(syncedIdsKey(this.bookkeeping));
-      clearTombstones(this.bookkeeping);
-      localStorage.removeItem(cursorKey(this.bookkeeping));
+      // A new phrase is a new room: the checkpoints of the old one mean nothing there, and a stale
+      // state hash would silence the full resend into the room this device is about to join.
+      clearSyncLedgers(this.bookkeeping);
       this.getOutbox().clear();
-      if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
     await setVaultSeedPhrase(this, this.currentVaultId, newPhrase);
     this.disconnect();
@@ -900,9 +936,7 @@ export class SyncEngine {
 
   public async updateServerUrl(url: string): Promise<void> {
     this.saveConfig({ serverUrl: url });
-    localStorage.removeItem(syncedIdsKey(this.bookkeeping));
-    clearTombstones(this.bookkeeping);
-    localStorage.removeItem(cursorKey(this.bookkeeping));
+    clearSyncLedgers(this.bookkeeping);
     this.getOutbox().clear();
     this.disconnect();
     await this.init();
@@ -956,12 +990,9 @@ export class SyncEngine {
     }
     this.pendingPushes.delete(pending.bundleId);
 
-    localStorage.setItem(pending.hashKey, pending.stateHash);
+    saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
-    if (!this.usesAccountSync() && this.currentVaultId === 'default_vault') {
-      localStorage.setItem(LAST_STATE_HASH_KEY, pending.stateHash);
-    }
-    localStorage.setItem(syncedIdsKey(this.bookkeeping), JSON.stringify(pending.syncedIds));
+    saveSyncedIds(this.bookkeeping, pending.syncedIds);
     saveTombstones(this.bookkeeping, pending.tombstones);
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();
@@ -1172,10 +1203,9 @@ export class SyncEngine {
       trustedDevices: [],
     });
     this.disconnect();
-    localStorage.removeItem(stateHashKey(this.bookkeeping));
-    if (this.currentVaultId === 'default_vault') {
-      localStorage.removeItem(LAST_STATE_HASH_KEY);
-    }
+    // The rotation lands this device in a new room, so every checkpoint of the old one goes.
+    clearSyncLedgers(this.bookkeeping);
+    this.getOutbox().clear();
     await this.init();
     return newSeed;
   }
