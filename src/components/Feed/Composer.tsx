@@ -16,6 +16,7 @@ import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
 import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
+import { getPref } from '../../lib/storage/prefs';
 import { Icon } from '../UI/icons/Icon';
 import { useComposerDraft } from './composer/useComposerDraft';
 import { rememberComposerDraft } from '../Editor/fullscreen/composerDraftOwner';
@@ -85,12 +86,8 @@ export const Composer: React.FC<ComposerProps> = ({
   const [engine] = useState<ComposerEngine>(() => {
     // Explicit opt-out wins; automation keeps the plain field so the existing specs, which
     // drive a <textarea>, still describe a real surface. The live-preview spec opts in.
-    try {
-      const stored = localStorage.getItem('slag:composer-engine');
-      if (stored === 'textarea' || stored === 'markdown') return stored;
-    } catch {
-      // private mode: fall through to the default
-    }
+    const stored = getPref('slag:composer-engine');
+    if (stored === 'textarea' || stored === 'markdown') return stored;
     const automated = typeof navigator !== 'undefined' && navigator.webdriver;
     return automated ? 'textarea' : 'markdown';
   });

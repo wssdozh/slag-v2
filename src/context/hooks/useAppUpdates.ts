@@ -17,6 +17,7 @@ import { openExternalUrl } from '../../lib/platform/openExternal';
 import { readUpdateChannel, writeUpdateChannel } from '../../lib/platform/updateChannel';
 import { isPrimaryWindow } from '../../lib/platform/windowControls';
 import { shouldResumeInstall } from '../../lib/platform/installResume';
+import { getPref, setPref } from '../../lib/storage/prefs';
 import { logger } from '../../lib/logger/logger';
 import type {
   AppUpdateChannel,
@@ -32,14 +33,6 @@ import type {
 const updateLog = logger.scope('UPDATE');
 const CHECK_DELAY_MS = 4000;
 
-function readDismissedVersion(): string | null {
-  try {
-    return localStorage.getItem(STORAGE_KEYS.UPDATE_DISMISSED);
-  } catch {
-    return null;
-  }
-}
-
 export function useAppUpdates(
   addToast: (text: string, type?: 'info' | 'success' | 'error') => void,
   confirmAction: (options: ConfirmOptions) => Promise<boolean>
@@ -49,7 +42,9 @@ export function useAppUpdates(
   const [status, setStatus] = useState<AppUpdateStatus>('idle');
   const [progress, setProgress] = useState<AppUpdateProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dismissedVersion, setDismissedVersion] = useState<string | null>(readDismissedVersion);
+  const [dismissedVersion, setDismissedVersion] = useState<string | null>(() =>
+    getPref(STORAGE_KEYS.UPDATE_DISMISSED)
+  );
   const [packageOffer, setPackageOffer] = useState<AppUpdatePackage | null>(null);
   const [channel, setChannelState] = useState<AppUpdateChannel>(readUpdateChannel);
   const isBusy = useRef(false);
@@ -226,11 +221,7 @@ export function useAppUpdates(
     const version = offer?.version;
     if (!version) return;
     setDismissedVersion(version);
-    try {
-      localStorage.setItem(STORAGE_KEYS.UPDATE_DISMISSED, version);
-    } catch {
-      // A blocked localStorage only costs the reminder, not the update itself.
-    }
+    setPref(STORAGE_KEYS.UPDATE_DISMISSED, version);
   }, [offer]);
 
   /**

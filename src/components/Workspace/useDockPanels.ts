@@ -7,6 +7,7 @@ import type {
 } from 'dockview-react';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { sendCrossWindowTab } from '../../lib/platform/windowControls';
+import { getPref, setPref } from '../../lib/storage/prefs';
 import {
   WORKSPACE_LAYOUT_KEY,
   wsLog,
@@ -82,12 +83,8 @@ export function useDockPanels({
 
   const saveLayout = useCallback(() => {
     if (effectiveInitialPanel || !apiRef.current) return;
-    try {
-      const json = apiRef.current.toJSON();
-      localStorage.setItem(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
-    } catch {
-      // Ignore
-    }
+    const json = apiRef.current.toJSON();
+    setPref(WORKSPACE_LAYOUT_KEY, JSON.stringify(json));
   }, [effectiveInitialPanel, apiRef]);
 
   const restoreOrSetInitialLayout = useCallback(
@@ -105,7 +102,7 @@ export function useDockPanels({
       } else {
         let restored = false;
         try {
-          const savedLayout = localStorage.getItem(WORKSPACE_LAYOUT_KEY);
+          const savedLayout = getPref(WORKSPACE_LAYOUT_KEY);
           if (savedLayout) {
             const parsed = JSON.parse(savedLayout);
             if (parsed && typeof parsed === 'object' && parsed.panels && typeof parsed.panels === 'object') {
@@ -148,7 +145,7 @@ export function useDockPanels({
       );
 
       // Dockview fires a layout change on every frame of a window resize, and saving serializes the
-      // whole grid into localStorage; coalesce a burst into one write.
+      // whole grid into the settings file; coalesce a burst into one write.
       let saveTimer: ReturnType<typeof setTimeout> | null = null;
       const saveSoon = () => {
         if (saveTimer) clearTimeout(saveTimer);

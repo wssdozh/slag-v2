@@ -8,6 +8,7 @@ import { BaseModal } from '../Modals/BaseModal';
 import { IconButton } from '../UI/IconButton';
 import { SettingsSwitch } from './SettingsUI';
 import { storage } from '../../lib/storage';
+import { getPref, setPref } from '../../lib/storage/prefs';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 
 export type PromptField = 'prompt' | 'persona';
@@ -41,7 +42,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
   const [initial] = useState(value);
   const [enabled, setEnabled] = useState(() => storage.getWorkspaceState().aiPersonaEnabled === true);
   const [enabledInitial] = useState(enabled);
-  const [wide, setWide] = useState(() => localStorage.getItem(SIZE_KEY) === '1');
+  const [wide, setWide] = useState(() => getPref(SIZE_KEY) === '1');
 
   const save = () => {
     // The timestamp is what lets another device lose an old copy instead of overwriting this one.
@@ -56,7 +57,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
 
   const toggleWide = () => {
     setWide((previous) => {
-      localStorage.setItem(SIZE_KEY, previous ? '0' : '1');
+      setPref(SIZE_KEY, previous ? '0' : '1');
       return !previous;
     });
   };

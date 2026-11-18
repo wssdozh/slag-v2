@@ -1,6 +1,7 @@
 // Which release stream this install follows. The choice is device-local on purpose: a phone may
 // want beta while the laptop stays on release, and it must not travel through sync.
 import { STORAGE_KEYS } from '../../config';
+import { getPref, setPref } from '../storage/prefs';
 import type { AppUpdateChannel } from '../../types';
 
 export const DEFAULT_UPDATE_CHANNEL: AppUpdateChannel = 'release';
@@ -17,18 +18,9 @@ export function normalizeUpdateChannel(value: string | null | undefined): AppUpd
 }
 
 export function readUpdateChannel(): AppUpdateChannel {
-  try {
-    return normalizeUpdateChannel(localStorage.getItem(STORAGE_KEYS.UPDATE_CHANNEL));
-  } catch {
-    return DEFAULT_UPDATE_CHANNEL;
-  }
+  return normalizeUpdateChannel(getPref(STORAGE_KEYS.UPDATE_CHANNEL));
 }
 
 export function writeUpdateChannel(channel: AppUpdateChannel): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.UPDATE_CHANNEL, channel);
-  } catch {
-    // A blocked localStorage costs the persistence, not the switch: this session still reads the
-    // channel the user picked, the next launch falls back to release.
-  }
+  setPref(STORAGE_KEYS.UPDATE_CHANNEL, channel);
 }
