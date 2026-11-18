@@ -38,11 +38,7 @@ const BASELINE = [
   'src/lib/storage/readJson.ts',
   'src/lib/storage/settingsStore.ts',
   'src/lib/storage/usage.ts',
-  'src/lib/sync/applyBundle.ts',
   'src/lib/sync/localBookkeeping.ts',
-  'src/lib/sync/outbox/outbox.ts',
-  'src/lib/sync/pushBundle.ts',
-  'src/lib/sync/syncConfig.ts',
   'src/lib/sync/syncEngine.ts',
 ];
 
