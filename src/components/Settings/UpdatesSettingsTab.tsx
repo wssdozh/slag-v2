@@ -24,6 +24,12 @@ function installLabel(kind: string | undefined): string {
   return 'скачать и установить';
 }
 
+/** A package build with polkit asks for the password itself: one button, no terminal. */
+function packageInstallHint(kind: string | undefined): string {
+  if (kind === 'deb') return 'скачаю .deb и установлю через apt: пароль спросит системное окно. после установки приложение перезапустится само.';
+  return 'скачаю пакет arch и установлю через pacman: пароль спросит системное окно. после установки приложение перезапустится само.';
+}
+
 /** The file each distro installs with its own manager; the app only fetches it. */
 function packageLabel(kind: string | undefined): string {
   if (kind === 'deb') return 'скачать .deb';
@@ -53,12 +59,15 @@ export const UpdatesSettingsTab: React.FC = () => {
     progress,
     canInstall,
     canFetchPackage,
+    canInstallPackage,
     packageOffer,
     channel,
     setChannel,
     check,
     install,
     downloadPackage,
+    installPackage,
+    restartApp,
     openReleasePage,
     openInstallPermissionSettings,
   } = appUpdate;
@@ -189,9 +198,14 @@ export const UpdatesSettingsTab: React.FC = () => {
                   )}
 
                   {status === 'installing' && (
-                    <span className="text-xs text-fg-secondary">
-                      установлено — приложение перезапускается…
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-fg-secondary">
+                        установлено — перезапускаю, чтобы запустилась новая версия…
+                      </span>
+                      <Button variant="ghost" size="sm" onClick={restartApp} data-testid="update-restart-btn">
+                        перезапустить
+                      </Button>
+                    </div>
                   )}
 
                   {status !== 'downloading' && status !== 'installing' && (
@@ -216,6 +230,16 @@ export const UpdatesSettingsTab: React.FC = () => {
                         >
                           {installLabel(offer.kind)}
                         </Button>
+                      ) : canInstallPackage ? (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          icon={<Icon name="system.update" size="sm" tone="inherit" />}
+                          onClick={() => void installPackage()}
+                          data-testid="update-package-install-btn"
+                        >
+                          обновить
+                        </Button>
                       ) : canFetchPackage ? (
                         <Button
                           variant="primary"
@@ -235,6 +259,11 @@ export const UpdatesSettingsTab: React.FC = () => {
                           data-testid="update-release-btn"
                         >
                           скачать со страницы релиза
+                        </Button>
+                      )}
+                      {canInstallPackage && canFetchPackage && (
+                        <Button variant="ghost" size="sm" onClick={() => void downloadPackage()} data-testid="update-package-manual-btn">
+                          вручную
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" onClick={openReleasePage} data-testid="update-release-link">
@@ -269,6 +298,11 @@ export const UpdatesSettingsTab: React.FC = () => {
                     </div>
                   )}
 
+                  {canInstallPackage && (
+                    <span className="text-2xs text-fg-dim" data-testid="update-package-hint">
+                      {packageInstallHint(offer.kind)}
+                    </span>
+                  )}
                   {offer.kind === 'installer' && (
                     <span className="text-2xs text-fg-dim">
                       приложение установлено в папку без прав записи, поэтому обновляет установщик — он

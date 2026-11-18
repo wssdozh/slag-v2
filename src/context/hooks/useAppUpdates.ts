@@ -7,7 +7,9 @@ import {
   downloadAppUpdatePackage,
   getAppUpdatePlatform,
   installAppUpdate,
+  installAppUpdatePackage,
   openInstallPermissionSettings,
+  restartApp,
   updateErrorCode,
   updateErrorText,
   watchUpdateLog,
@@ -282,6 +284,76 @@ export function useAppUpdates(
     if (url) void openExternalUrl(url);
   }, [platform]);
 
+  /**
+   * Linux package install without a terminal: download, then let polkit ask for the password. A
+   * machine with no agent gets the command instead, which is the old hand-off; a dismissed dialog
+   * is a decision, so it is a quiet info toast, not an error.
+   */
+  const installPackage = useCallback(async () => {
+    if (!offer || isBusy.current) return;
+    const proceed = await confirmAction({
+      title: `Обновить до ${offer.version}?`,
+      description:
+        'скачаю пакет и передам его системному менеджеру — он спросит пароль администратора. приложение перезапустится само, чтобы запустилась новая версия.',
+      confirmLabel: 'Обновить',
+    });
+    if (!proceed) return;
+    isBusy.current = true;
+    setStatus('downloading');
+    setError(null);
+    setProgress({ downloaded: 0, total: offer.size ?? null });
+    const unlisten = await watchUpdateProgress(setProgress);
+    try {
+      const outcome = await installAppUpdatePackage(channel);
+      updateLog.info('package install', { status: outcome.status, version: outcome.version });
+      if (outcome.status === 'installed') {
+        setStatus('installing');
+        addToast(`обновлено до ${outcome.version} — перезапускаю`, 'success');
+        // The file on disk is the new build; the process is still the old one. Nothing else picks
+        // the update up, so the app does the restart itself instead of asking for it.
+        setTimeout(() => void restartApp().catch((cause: unknown) => {
+          updateLog.warn('restart failed', { error: String(cause) });
+          addToast('перезапусти приложение вручную: обновление уже установлено', 'info');
+        }), 1200);
+        return;
+      }
+      if (outcome.status === 'cancelled') {
+        setStatus('available');
+        addToast('ввод пароля отменён — обновление не установлено', 'info');
+        return;
+      }
+      if (outcome.status === 'manual') {
+        setPackageOffer({ version: outcome.version, kind: offer.kind as AppUpdatePackage['kind'], path: '', command: outcome.command });
+        setStatus('available');
+        try {
+          await navigator.clipboard.writeText(outcome.command);
+          addToast('пароль спросить не у кого — команда установки в буфере', 'info');
+        } catch {
+          addToast('пароль спросить не у кого — команда ниже', 'info');
+        }
+        return;
+      }
+      setStatus('error');
+      setError('install_failed');
+      addToast(`пакет не установился${outcome.detail ? `: ${outcome.detail}` : ''}`, 'error');
+    } catch (cause) {
+      const code = updateErrorCode(cause);
+      updateLog.warn('package install failed', { code });
+      setStatus('error');
+      setError(code);
+      addToast(`обновление не установилось: ${updateErrorText(code)}`, 'error');
+    } finally {
+      unlisten?.();
+      isBusy.current = false;
+    }
+  }, [offer, confirmAction, addToast, channel]);
+
+  const requestRestart = useCallback(() => {
+    void restartApp().catch((cause: unknown) => {
+      updateLog.warn('restart failed', { error: String(cause) });
+    });
+  }, []);
+
   const requestInstallPermission = useCallback(() => {
     void openInstallPermissionSettings().catch((cause: unknown) => {
       updateLog.warn('install permission screen failed', { error: String(cause) });
@@ -291,6 +363,7 @@ export function useAppUpdates(
   const canInstall = Boolean(platform?.canApply && offer && offer.kind !== 'manual');
   /** A file exists for this machine, but the app will not install it: hand over the command. */
   const canFetchPackage = Boolean(offer && offer.kind !== 'manual' && !canInstall);
+  const canInstallPackage = Boolean(platform?.canInstallPackage && offer && !canInstall);
   const isNoticeVisible = Boolean(
     offer && offer.version !== dismissedVersion && status !== 'installing'
   );
@@ -305,12 +378,15 @@ export function useAppUpdates(
       isNoticeVisible,
       canInstall,
       canFetchPackage,
+      canInstallPackage,
       packageOffer,
       channel,
       setChannel,
       check,
       install,
       downloadPackage,
+      installPackage,
+      restartApp: requestRestart,
       dismiss,
       openReleasePage,
       openInstallPermissionSettings: requestInstallPermission,
@@ -324,12 +400,15 @@ export function useAppUpdates(
       isNoticeVisible,
       canInstall,
       canFetchPackage,
+      canInstallPackage,
       packageOffer,
       channel,
       setChannel,
       check,
       install,
       downloadPackage,
+      installPackage,
+      requestRestart,
       dismiss,
       openReleasePage,
       requestInstallPermission,

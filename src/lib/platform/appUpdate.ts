@@ -9,6 +9,7 @@ import type {
   AppUpdateLogLine,
   AppUpdateOffer,
   AppUpdatePackage,
+  AppUpdatePackageInstall,
   AppUpdatePlatform,
   AppUpdateProgress,
 } from '../../types';
@@ -32,6 +33,7 @@ const KNOWN_CODES = [
   'read_failed',
   'restart_failed',
   'installer_failed',
+  'install_timeout',
   'permission_required',
   'missing_file',
   'install_failed',
@@ -64,6 +66,7 @@ const ERROR_TEXT: Record<string, string> = {
   read_failed: 'файл обновления не читается',
   restart_failed: 'не удалось запустить установку',
   installer_failed: 'установщик не запустился',
+  install_timeout: 'пакетный менеджер не закончил за три минуты',
   permission_required: 'android не разрешает установку из этого источника',
   missing_file: 'файл обновления потерялся',
   install_failed: 'системный установщик отказал',
@@ -111,6 +114,22 @@ export async function downloadAppUpdatePackage(
   channel: AppUpdateChannel
 ): Promise<AppUpdatePackage> {
   return invoke<AppUpdatePackage>('update_download_package', { channel });
+}
+
+/**
+ * The same file, installed by the system: `pkexec` raises the desktop's own password dialog, so the
+ * owner never sees a `sudo` line. `manual` comes back when there is no polkit agent to ask.
+ */
+export async function installAppUpdatePackage(
+  channel: AppUpdateChannel
+): Promise<AppUpdatePackageInstall> {
+  return invoke<AppUpdatePackageInstall>('update_install_package', { channel });
+}
+
+/** Relaunch: a package install puts the new file on disk, not into the running process. */
+export async function restartApp(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke('restart_app');
 }
 
 export async function openInstallPermissionSettings(): Promise<void> {

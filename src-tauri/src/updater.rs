@@ -101,6 +101,9 @@ pub struct PlatformInfo {
     /// Linux: `debian` | `arch` | `other`, from `/etc/os-release`. It decides which package the
     /// settings tab offers. `None` on every other platform.
     pub distro: Option<String>,
+    /// Linux: this build is a package and there is a polkit agent to ask for a password, so the
+    /// settings tab may offer "обновить" instead of a command to paste into a terminal.
+    pub can_install_package: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -121,6 +124,20 @@ pub struct PackageOffer {
     pub kind: String,
     pub path: String,
     pub command: String,
+}
+
+/// What happened when the app asked the system to install the downloaded package. `manual` means
+/// there is no polkit agent to ask for a password, so the command is the whole answer.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageInstallOutcome {
+    /// `installed` | `cancelled` | `manual` | `failed`
+    pub status: String,
+    pub version: String,
+    /// The command for the fallback, or the one that failed.
+    pub command: String,
+    /// Tail of the package manager's own output, when it said something.
+    pub detail: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -535,7 +552,21 @@ pub async fn update_platform(
         endpoint: endpoint(channel),
         can_install_packages,
         distro: distro_name(),
+        can_install_package: can_install_package_here(),
     })
+}
+
+/// Whether a password dialog can be raised at all: on Linux that is `pkexec` plus a polkit agent.
+/// Without one the app must not pretend it can install anything — it hands over the command.
+fn can_install_package_here() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        linux_form() == LinuxForm::Package && find_in_path("pkexec").is_some()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
 }
 
 /// The app replaces its own binary only where it owns that file: windows, android, and a linux
@@ -986,8 +1017,8 @@ pub async fn update_install(
 }
 
 /// Fetch the file this distro installs, leave it in Downloads and answer with the one command that
-/// installs it. No root and no polkit here on purpose: apt and pacman own their files, and a gui
-/// app reaching for sudo is how package databases get half-configured.
+/// installs it. This is the fallback for a machine with no polkit agent; the button next to it asks
+/// for the password instead and calls `update_install_package`.
 #[tauri::command]
 pub async fn update_download_package(
     app: AppHandle,
@@ -1001,49 +1032,254 @@ pub async fn update_download_package(
     #[cfg(target_os = "linux")]
     {
         let channel = Channel::parse(channel.as_deref())?;
-        let manifest = fetch_manifest(Some(&app), channel).await?;
-        let Some(offer) = offer_from(&app, manifest.clone()) else {
-            return Err("up_to_date".to_string());
-        };
-        let entry = manifest
-            .platforms
-            .get(platform_key())
-            .ok_or_else(|| "no_platform_asset".to_string())?;
-        let (kind, asset) =
-            select_package_asset(entry).ok_or_else(|| "no_platform_asset".to_string())?;
-        // The file name is the one on the release page: the owner sees the same name in the
-        // terminal as in the browser, which is how they know it is the same build.
-        let name = asset
-            .url
-            .rsplit('/')
-            .next()
-            .filter(|name| !name.is_empty())
-            .ok_or_else(|| "manifest_invalid".to_string())?
-            .to_string();
-        let destination = downloads_dir(&app)?.join(&name);
-        let _ = std::fs::remove_file(&destination);
-        log_line(
-            Some(&app),
-            "info",
-            "package download begin",
-            format!("{} ({kind})", offer.version),
-        );
-        download(Some(&app), &asset, &destination).await?;
-        verify_asset(Some(&app), &asset, &destination)?;
-        let path = destination.display().to_string();
-        let command = match kind.as_str() {
-            "deb" => format!("sudo apt install '{path}'"),
-            "archpkg" => format!("sudo pacman -U '{path}'"),
-            _ => format!("chmod +x '{path}'"),
-        };
-        log_line(Some(&app), "info", "package ready", path.clone());
+        let artifact = fetch_package(&app, channel).await?;
         Ok(PackageOffer {
-            version: offer.version,
-            kind,
-            path,
-            command,
+            version: artifact.version,
+            command: package_command(&artifact.kind, &artifact.path),
+            kind: artifact.kind,
+            path: artifact.path.display().to_string(),
         })
     }
+}
+
+/// The package this distro installs, verified and on disk. Shared by the hand-off and by the
+/// privileged install: both need the exact same bytes and the exact same checks.
+#[cfg(target_os = "linux")]
+struct PackageArtifact {
+    version: String,
+    kind: String,
+    path: PathBuf,
+}
+
+#[cfg(target_os = "linux")]
+async fn fetch_package(app: &AppHandle, channel: Channel) -> Result<PackageArtifact, String> {
+    let manifest = fetch_manifest(Some(app), channel).await?;
+    let Some(offer) = offer_from(app, manifest.clone()) else {
+        return Err("up_to_date".to_string());
+    };
+    let entry = manifest
+        .platforms
+        .get(platform_key())
+        .ok_or_else(|| "no_platform_asset".to_string())?;
+    let (kind, asset) =
+        select_package_asset(entry).ok_or_else(|| "no_platform_asset".to_string())?;
+    // The file name is the one on the release page: the owner sees the same name in the terminal
+    // as in the browser, which is how they know it is the same build.
+    let name = asset
+        .url
+        .rsplit('/')
+        .next()
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| "manifest_invalid".to_string())?
+        .to_string();
+    let destination = downloads_dir(app)?.join(&name);
+    let _ = std::fs::remove_file(&destination);
+    log_line(
+        Some(app),
+        "info",
+        "package download begin",
+        format!("{} ({kind})", offer.version),
+    );
+    download(Some(app), &asset, &destination).await?;
+    verify_asset(Some(app), &asset, &destination)?;
+    log_line(Some(app), "info", "package ready", destination.display().to_string());
+    Ok(PackageArtifact {
+        version: offer.version,
+        kind,
+        path: destination,
+    })
+}
+
+/// The same text a terminal needs. Kept next to the privileged argv so the two can never drift.
+#[cfg(target_os = "linux")]
+fn package_command(kind: &str, path: &Path) -> String {
+    let path = path.display();
+    match kind {
+        "deb" => format!("sudo apt install '{path}'"),
+        "archpkg" => format!("sudo pacman -U '{path}'"),
+        _ => format!("chmod +x '{path}'"),
+    }
+}
+
+/// `pkexec` hands the argument list to polkit, which raises the password dialog of the desktop and
+/// then runs the manager as root. No shell, so the path needs no quoting and nothing is expanded.
+#[cfg(target_os = "linux")]
+fn privileged_install(kind: &str, path: &Path) -> (&'static str, Vec<std::ffi::OsString>) {
+    let path: std::ffi::OsString = path.into();
+    match kind {
+        "deb" => (
+            "apt-get",
+            vec!["install".into(), "-y".into(), path],
+        ),
+        _ => (
+            "pacman",
+            vec!["-U".into(), "--noconfirm".into(), path],
+        ),
+    }
+}
+
+/// A full upgrade may compile, unpack and run hooks: two minutes is generous and still short of a
+/// progress bar that never ends.
+#[cfg(target_os = "linux")]
+const PACKAGE_INSTALL_TIMEOUT: Duration = Duration::from_secs(180);
+
+#[cfg(target_os = "linux")]
+fn find_in_path(name: &str) -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(name))
+        .find(|candidate| candidate.is_file())
+}
+
+/// Runs the manager and waits, holding its output in a file: on success there is nothing to say,
+/// on failure that tail is the whole diagnosis (a broken keyring, a conflicting file).
+#[cfg(target_os = "linux")]
+fn run_privileged(
+    pkexec: &Path,
+    program: &str,
+    args: Vec<std::ffi::OsString>,
+    log_path: &Path,
+) -> Result<i32, String> {
+    let log = std::fs::File::create(log_path).map_err(|_| "write_failed".to_string())?;
+    let log_for_stderr = log.try_clone().map_err(|_| "write_failed".to_string())?;
+    let mut child = std::process::Command::new(pkexec)
+        .arg(program)
+        .args(&args)
+        .stdout(std::process::Stdio::from(log))
+        .stderr(std::process::Stdio::from(log_for_stderr))
+        .spawn()
+        .map_err(|_| "installer_failed".to_string())?;
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status.code().unwrap_or(-1)),
+            Ok(None) if started.elapsed() > PACKAGE_INSTALL_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("install_timeout".to_string());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(200)),
+            Err(_) => return Err("install_failed".to_string()),
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn output_tail(path: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let bytes = text.as_bytes();
+    let start = bytes.len().saturating_sub(600);
+    Some(String::from_utf8_lossy(&bytes[start..]).trim().to_string())
+}
+
+/// Download the package this distro installs and let polkit put it in place: the password dialog is
+/// the desktop's own, so a person types the same password they would for `pacman -U` and never
+/// copies a command. Exit codes are polkit's: 126 is a dismissed dialog, 127 means "not authorized".
+#[tauri::command]
+pub async fn update_install_package(
+    app: AppHandle,
+    channel: Option<String>,
+) -> Result<PackageInstallOutcome, String> {
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (&app, &channel);
+        Err("unsupported".to_string())
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let channel = Channel::parse(channel.as_deref())?;
+        let artifact = fetch_package(&app, channel).await?;
+        let command = package_command(&artifact.kind, &artifact.path);
+        // An AppImage needs no root at all: the ordinary install path can replace it in place.
+        if artifact.kind != "deb" && artifact.kind != "archpkg" {
+            return Ok(PackageInstallOutcome {
+                status: "manual".to_string(),
+                version: artifact.version,
+                command,
+                detail: None,
+            });
+        }
+        let Some(pkexec) = find_in_path("pkexec") else {
+            log_line(Some(&app), "warn", "polkit unavailable", "no pkexec");
+            return Ok(PackageInstallOutcome {
+                status: "manual".to_string(),
+                version: artifact.version,
+                command,
+                detail: None,
+            });
+        };
+        let (program, args) = privileged_install(&artifact.kind, &artifact.path);
+        log_line(Some(&app), "info", "privileged install begin", command.clone());
+        let log_path = std::env::temp_dir().join("slag-update").join("install.log");
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let blocking_log = log_path.clone();
+        let run = tauri::async_runtime::spawn_blocking(move || {
+            run_privileged(&pkexec, program, args, &blocking_log)
+        })
+        .await
+        .map_err(|_| "install_failed".to_string())?;
+        let detail = output_tail(&log_path);
+        let outcome = match run {
+            Ok(0) => {
+                log_line(Some(&app), "info", "package installed", artifact.version.clone());
+                PackageInstallOutcome {
+                    status: "installed".to_string(),
+                    version: artifact.version,
+                    command,
+                    detail: None,
+                }
+            }
+            // The dialog was closed: not an error, and definitely not something to retry.
+            Ok(126) => {
+                log_line(Some(&app), "warn", "password prompt dismissed", artifact.kind.clone());
+                PackageInstallOutcome {
+                    status: "cancelled".to_string(),
+                    version: artifact.version,
+                    command,
+                    detail: None,
+                }
+            }
+            Ok(code) => {
+                log_line(
+                    Some(&app),
+                    "error",
+                    "package install failed",
+                    format!("exit {code}: {}", detail.clone().unwrap_or_default()),
+                );
+                PackageInstallOutcome {
+                    status: "failed".to_string(),
+                    version: artifact.version,
+                    command,
+                    detail,
+                }
+            }
+            Err(code) => {
+                log_line(Some(&app), "error", "package install failed", code.clone());
+                PackageInstallOutcome {
+                    status: "failed".to_string(),
+                    version: artifact.version,
+                    command,
+                    detail,
+                }
+            }
+        };
+        Ok(outcome)
+    }
+}
+
+/// Relaunch after a package install: the file on disk is the new build while the process in memory
+/// is the old one, so nothing short of a restart picks the update up. This is the click that makes
+/// "нужно перезапустить" unnecessary — the app does it itself.
+#[tauri::command]
+pub fn restart_app(app: AppHandle) {
+    log_line(Some(&app), "info", "restart requested", "");
+    app.restart();
 }
 
 /// Where the owner expects a downloaded file: Download, or home when the platform has no such dir.

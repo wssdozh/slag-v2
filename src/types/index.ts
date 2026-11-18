@@ -590,6 +590,11 @@ export interface AppUpdatePlatform {
   canInstallPackages: boolean | null;
   /** Linux only: `debian` | `arch` | `other` — which package this machine installs. */
   distro: string | null;
+  /**
+   * Linux only: a `.deb`/Arch package build with a polkit agent on the bus, so the app can ask for
+   * the password itself instead of handing over a `sudo` line.
+   */
+  canInstallPackage: boolean;
 }
 
 /** The Android grants a reminder needs; each one is a switch in system settings, not a dialog. */
@@ -630,6 +635,20 @@ export interface AppUpdateInstallOutcome {
   version: string;
 }
 
+/**
+ * What the system did with the package the app downloaded. `manual` means there is no password
+ * dialog to show, so the command is the whole answer; `cancelled` is a dismissed dialog, which is
+ * a decision and not a failure.
+ */
+export interface AppUpdatePackageInstall {
+  status: 'installed' | 'cancelled' | 'manual' | 'failed';
+  version: string;
+  /** The command to paste into a terminal: the fallback, or the one that failed. */
+  command: string;
+  /** Tail of the package manager's own output, when it said anything. */
+  detail: string | null;
+}
+
 /** The update state the settings tab and the sidebar notice read from AppContext. */
 export interface AppUpdateState {
   platform: AppUpdatePlatform | null;
@@ -641,6 +660,8 @@ export interface AppUpdateState {
   canInstall: boolean;
   /** A file exists for this machine, but the app will not install it: the owner runs the command. */
   canFetchPackage: boolean;
+  /** Linux package build with a polkit agent: "обновить" raises the desktop's password dialog. */
+  canInstallPackage: boolean;
   /** The package fetched for this distro, if the owner asked for it: path plus the command. */
   packageOffer: AppUpdatePackage | null;
   /** Which stream this install follows; switching re-reads that stream's manifest. */
@@ -650,6 +671,10 @@ export interface AppUpdateState {
   install: () => Promise<void>;
   /** Linux package install: fetch the deb/pkg.tar.zst and hand over the command. */
   downloadPackage: () => Promise<void>;
+  /** Linux package install through polkit; falls back to the command when there is no agent. */
+  installPackage: () => Promise<void>;
+  /** Relaunch the app: the only way a freshly installed package becomes the running build. */
+  restartApp: () => void;
   dismiss: () => void;
   openReleasePage: () => void;
   openInstallPermissionSettings: () => void;
