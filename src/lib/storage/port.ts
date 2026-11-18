@@ -11,7 +11,7 @@ import type {
   WorkspaceState,
 } from '../../types';
 import type { StorageChangeEvent } from './index';
-import { browserVaultPort } from './browserPort';
+import { storage } from './index';
 
 export type ChangeOrigin = 'local' | 'remote';
 
@@ -38,7 +38,7 @@ export interface VaultPort {
   importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean>;
   getAttachmentDataUrl(attachment: SlagAttachment): Promise<string | undefined>;
   /** Whether this device can actually read the bytes, without base64-ing them. */
-  hasBytes(id: string, relativePath: string): Promise<boolean>;
+  hasAttachmentBytes(id: string, relativePath: string): Promise<boolean>;
 
   // Drafts are per-device and never leave the device that wrote them, so the node returns null.
   getComposerDraft(folderPath: string): ComposerDraft | null;
@@ -58,7 +58,7 @@ export function setVaultPort(port: VaultPort): void {
   registered = port;
 }
 
-/** The browser port is the default so the app cannot boot into "port is missing". */
+/** The app's own store is the default so the app cannot boot into "port is missing". */
 export function vault(): VaultPort {
-  return registered ?? browserVaultPort;
+  return registered ?? storage;
 }
