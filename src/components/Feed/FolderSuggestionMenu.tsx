@@ -53,19 +53,19 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
 
         const label = (
           <span className="flex items-center gap-2 min-w-0">
+            {/* The branch line leads and the icon sits right before the name, so a nested folder
+                reads as "this child" rather than "an icon that happens to be indented". */}
+            {row.prefix && (
+              <span className="text-2xs font-mono text-fg-dim whitespace-pre shrink-0">{row.prefix}</span>
+            )}
             <Icon
               name={iconName}
               size="md"
               tone="inherit"
               className={`w-4 h-4 shrink-0 ${isSelected ? 'text-fg-primary' : 'text-fg-muted'}`}
             />
-            <span className="flex items-baseline gap-1 min-w-0">
-              {row.prefix && (
-                <span className="text-2xs font-mono text-fg-dim whitespace-pre shrink-0">{row.prefix}</span>
-              )}
-              <span className={`truncate text-xs ${isSelected ? 'text-white font-medium' : 'text-fg-tertiary'}`}>
-                {row.name}
-              </span>
+            <span className={`truncate text-xs ${isSelected ? 'text-white font-medium' : 'text-fg-tertiary'}`}>
+              {row.name}
             </span>
           </span>
         );
