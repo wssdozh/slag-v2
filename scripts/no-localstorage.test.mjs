@@ -31,7 +31,6 @@ const ALLOWLIST = new Set([
  */
 const BASELINE = [
   'src/lib/platform/encryptedLocalStore.ts',
-  'src/lib/platform/secretStore.ts',
 ];
 
 /**
