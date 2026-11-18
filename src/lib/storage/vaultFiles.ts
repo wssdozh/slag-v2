@@ -1,4 +1,4 @@
-﻿import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
+import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -441,6 +441,10 @@ export class VaultFiles {
       for (const entry of entries) {
         const subPath = `${dirPath}/${entry.name}`;
         if (entry.isDirectory) {
+          // Dot directories belong to the app: `.trash` holds deleted notes, `.attachments` holds
+          // files. Walking into them would put deleted notes back in the feed — and the folder
+          // list skips them too, so a note from there would land in a folder nothing draws.
+          if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
           const nested = await this.scanNotesDir(subPath);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
