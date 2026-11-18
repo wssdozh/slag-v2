@@ -15,11 +15,13 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = join(ROOT, 'src');
 
 /**
- * Who may reach `localStorage`, and why. Both are browser-only paths: the backend `prefs.ts` picks
- * when there is no Tauri, and the headless runtime's own shim.
+ * Who may reach `localStorage`, and why. All three are browser-only paths, each for a reason:
+ * the backend `prefs.ts` picks when there is no Tauri, the items index falls back to it on a web
+ * build that has no disk, and the headless runtime installs its own shim.
  */
 const ALLOWLIST = new Set([
   'src/lib/storage/prefsBackend.browser.ts',
+  'src/lib/storage/index.ts',
   'src/node/env.ts',
 ]);
 
@@ -33,13 +35,9 @@ const BASELINE = [
   'src/lib/logger/logger.ts',
   'src/lib/platform/encryptedLocalStore.ts',
   'src/lib/platform/secretStore.ts',
-  'src/lib/storage/folderStore.ts',
-  'src/lib/storage/index.ts',
   'src/lib/storage/readJson.ts',
   'src/lib/storage/settingsStore.ts',
   'src/lib/storage/usage.ts',
-  'src/lib/storage/vaultFiles.ts',
-  'src/lib/storage/vaultRegistry.ts',
   'src/lib/sync/applyBundle.ts',
   'src/lib/sync/localBookkeeping.ts',
   'src/lib/sync/outbox/outbox.ts',
