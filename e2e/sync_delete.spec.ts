@@ -7,14 +7,15 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const cryptoMod = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
     const { stateHashKey, syncedIdsKey, tombstonesKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    const { getPref, removePref, setPref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     return withSyncHarness(async ({ engine, push, init }) => {
       await init('synthetic delete seed');
       const scope = engine.bookkeeping;
       // init pushed the empty vault already, and a push whose state hash matches the last
       // checkpoint is skipped before the diff is walked: forget the checkpoint, not the intent.
-      localStorage.removeItem(stateHashKey(scope));
-      localStorage.removeItem('slag_sync_last_state_hash');
-      localStorage.setItem(syncedIdsKey(scope), JSON.stringify(['ghost-note']));
+      removePref(stateHashKey(scope));
+      removePref('slag_sync_last_state_hash');
+      setPref(syncedIdsKey(scope), JSON.stringify(['ghost-note']));
       const key = await cryptoMod.deriveVaultKey('synthetic delete seed');
       let captured: { changes?: Array<{ id: string; type: string; action: string }> } = {};
       window.fetch = async (_url, opts) => {
@@ -27,8 +28,8 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
       const deleteChanges = (captured.changes || []).filter((c) => c.type === 'item' && c.action === 'delete');
       return {
         hasDelete: deleteChanges.some((c) => c.id === 'ghost-note'),
-        syncedIdsUpdated: !JSON.parse(localStorage.getItem(syncedIdsKey(scope)) || '[]').includes('ghost-note'),
-        tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(localStorage.getItem(tombstonesKey(scope)) || '{}'), 'ghost-note'),
+        syncedIdsUpdated: !JSON.parse(getPref(syncedIdsKey(scope)) || '[]').includes('ghost-note'),
+        tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(getPref(tombstonesKey(scope)) || '{}'), 'ghost-note'),
       };
     });
   });

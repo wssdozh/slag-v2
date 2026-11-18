@@ -8,6 +8,7 @@ import { accountClient } from '../lib/sync/account';
 import { getOrCreateDeviceIdentity, decryptVaultKeyForDevice } from '../lib/sync/accountCrypto';
 import { validateMnemonic } from '../lib/sync/crypto';
 import { logger } from '../lib/logger/logger';
+import { initPrefs } from '../lib/storage/prefs';
 import { SYNC_INTERVALS } from '../config';
 import type { AssistantMode } from '../types';
 
@@ -323,6 +324,11 @@ async function run(options: CliOptions, flags: Flags): Promise<void> {
 }
 
 export async function runCli(argv: string[], defaults: CliOptions): Promise<void> {
+  // Settings before the engine: the sync ledgers fall back to `prefs` when the vault's file has no
+  // section, and an uninitialised map would answer "nothing stored" to every ledger read. The
+  // environment is already installed here, so the browser backend resolves to the node's own
+  // file-backed `localStorage`.
+  await initPrefs();
   const { command, positional, flags } = parseFlags(argv);
   const options: CliOptions = { vaultDir: stringFlag(flags, 'vault-dir') ?? defaults.vaultDir };
 

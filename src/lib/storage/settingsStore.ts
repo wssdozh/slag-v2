@@ -30,8 +30,7 @@ import { DEFAULT_WORKSPACE_STATE, STORAGE_KEYS } from '../../config';
 import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
-import { getPref, getPrefJson, removePref, setPref } from './prefs';
-import { readStoredJson } from './readJson';
+import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from './prefs';
 import {
   chatFromSection,
   chatMessagesFrom,
@@ -260,36 +259,38 @@ function emptyLegacySections(): LegacySections {
   return { composer: {}, fullscreen: {}, chat: [], memory: [], workspace: {} };
 }
 
-/** What the keys of an older build still hold for this vault: read once, then never again. */
+/**
+ * What the keys of an older build still hold for this vault: read once, then never again. The
+ * values come through `prefs` like everything else — in a browser build that is the same
+ * `localStorage` an older build wrote; on native `prefs` is `settings.json`, so a blob left in the
+ * webview profile before `state.json` existed is not reachable here (see `.agents/tasks/no-legacy.md`).
+ */
 function readLegacySections(store: SettingsStoreHost): LegacySections {
   const vaultId = store.currentVault.id;
   const fullscreen: FullscreenDraftMap = {};
   const prefix = `${STORAGE_KEYS.FULLSCREEN_DRAFTS_PREFIX}${vaultId}_`;
-  for (const key of legacyFullscreenKeys(prefix)) {
-    const draft = fullscreenDraftsFrom({ [key.slice(prefix.length)]: readStoredJson<unknown>(key, null) });
+  for (const [key, raw] of getPrefEntries()) {
+    if (!key.startsWith(prefix)) continue;
+    const draft = fullscreenDraftsFrom({ [key.slice(prefix.length)]: parseLegacyJson(raw) });
     for (const [itemId, entry] of Object.entries(draft)) fullscreen[itemId] = entry;
   }
   return {
-    composer: composerDraftsFrom(readStoredJson<unknown>(composerDraftsKey(vaultId), null)),
+    composer: composerDraftsFrom(getPrefJson<unknown>(composerDraftsKey(vaultId), null)),
     fullscreen,
-    chat: chatMessagesFrom(readStoredJson<unknown>(assistantKey(vaultId), null)),
-    memory: memoryFrom(readStoredJson<unknown>(memoryKey(vaultId), null)),
+    chat: chatMessagesFrom(getPrefJson<unknown>(assistantKey(vaultId), null)),
+    memory: memoryFrom(getPrefJson<unknown>(memoryKey(vaultId), null)),
     workspace: workspaceFromState(
-      readStoredJson<unknown>(`${STORAGE_KEYS.WORKSPACE_STATE_PREFIX}${vaultId}`, null)
+      getPrefJson<unknown>(`${STORAGE_KEYS.WORKSPACE_STATE_PREFIX}${vaultId}`, null)
     ),
   };
 }
 
-/**
- * Fullscreen drafts are one key per open note, so the only way to find the ones an older build left
- * is the profile's key list. Reading is all this does — no key is written or dropped here.
- */
-function legacyFullscreenKeys(prefix: string): string[] {
+/** A legacy value parsed once: a half-written or foreign one reads as "not there". */
+function parseLegacyJson(raw: string): unknown {
   try {
-    return Object.keys(localStorage).filter((key) => key.startsWith(prefix));
-  } catch (err) {
-    settingsLog.warn('Could not list the legacy fullscreen draft keys:', err);
-    return [];
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
   }
 }
 
@@ -325,10 +326,10 @@ async function persistLegacyMigration(
     await store.files.writeStateSection(MIGRATIONS_SECTION, migrationStampsToSection(stamped));
     merged.migrations = stamped;
     if (writes.length > 0) {
-      settingsLog.info('Moved the drafts, chat, memory and workspace left in localStorage into state.json');
+      settingsLog.info('Moved the legacy drafts, chat, memory and workspace into state.json');
     }
   } catch (err) {
-    settingsLog.warn('Could not move the old localStorage section into state.json, the next start retries:', err);
+    settingsLog.warn('Could not move the legacy settings blob into state.json, the next start retries:', err);
   }
 }
 
@@ -534,7 +535,7 @@ export function readComposerDrafts(store: SettingsStoreHost): ComposerDraftMap {
   const current = snapshotFor(store);
   if (current) return { ...current.composer };
   ensureHydrated(store);
-  return composerDraftsFrom(readJsonAt(composerDraftsKey(store.currentVault.id), null));
+  return composerDraftsFrom(getPrefJson(composerDraftsKey(store.currentVault.id), null));
 }
 
 export function readComposerDraft(store: SettingsStoreHost, folderPath: string): ComposerDraft | null {
@@ -620,7 +621,7 @@ function writeBrowserDraft(store: SettingsStoreHost, folderPath: string, draft: 
     void hydrateSettings(store);
     return false;
   }
-  const all = composerDraftsFrom(readJsonAt(composerDraftsKey(store.currentVault.id), null));
+  const all = composerDraftsFrom(getPrefJson(composerDraftsKey(store.currentVault.id), null));
   if (draft) all[folderPath] = draft;
   else delete all[folderPath];
   writeBrowserJson(composerDraftsKey(store.currentVault.id), all);
@@ -657,7 +658,7 @@ export function readFullscreenDraft(store: SettingsStoreHost, itemId: string): F
   if (current) return current.fullscreen[itemId] ?? null;
   ensureHydrated(store);
   const draft = fullscreenDraftsFrom({
-    [itemId]: readJsonAt(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, null),
+    [itemId]: getPrefJson(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, null),
   });
   return draft[itemId] ?? null;
 }
@@ -727,7 +728,7 @@ export function readAssistantHistory(store: SettingsStoreHost): ChatMessage[] {
   const current = snapshotFor(store);
   if (current) return [...current.chat];
   ensureHydrated(store);
-  return chatMessagesFrom(readJsonAt(assistantKey(store.currentVault.id), null));
+  return chatMessagesFrom(getPrefJson(assistantKey(store.currentVault.id), null));
 }
 
 export function writeAssistantHistory(store: SettingsStoreHost, messages: ChatMessage[]): void {
@@ -762,7 +763,7 @@ export function readTelegramThread(store: SettingsStoreHost, legacyKey: string):
   const current = snapshotFor(store);
   if (!current) {
     ensureHydrated(store);
-    return telegramThreadFrom(readJsonAt(legacyKey, null));
+    return telegramThreadFrom(getPrefJson(legacyKey, null));
   }
   if (current.migrations.telegramAt === 0) migrateTelegramThread(store, current, legacyKey);
   return [...current.telegram];
@@ -801,7 +802,7 @@ function migrateTelegramThread(
   current: SettingsSnapshot,
   legacyKey: string
 ): void {
-  const legacy = telegramThreadFrom(readJsonAt(legacyKey, null));
+  const legacy = telegramThreadFrom(getPrefJson(legacyKey, null));
   if (legacy.length > 0) {
     current.telegram = mergeTelegramThread(current.telegram, legacy);
     markDirty(store, 'chat');
@@ -822,7 +823,7 @@ export function readMemory(store: SettingsStoreHost): MemoryItem[] {
   const current = snapshotFor(store);
   if (current) return [...current.memory];
   ensureHydrated(store);
-  return memoryFrom(readJsonAt(memoryKey(store.currentVault.id), null));
+  return memoryFrom(getPrefJson(memoryKey(store.currentVault.id), null));
 }
 
 /** A file write cannot refuse a fact the way a full quota could: it lands in the snapshot, then on disk. */
@@ -852,7 +853,7 @@ export function readWorkspaceState(store: SettingsStoreHost): WorkspaceState {
   ensureHydrated(store);
   return {
     ...DEFAULT_WORKSPACE_STATE,
-    ...workspaceFromState(readJsonAt(workspaceKey(store.currentVault.id), null)),
+    ...workspaceFromState(getPrefJson(workspaceKey(store.currentVault.id), null)),
   };
 }
 
@@ -897,16 +898,9 @@ export function writeFolderViewSettings(
 // ---------------------------------------------------------------------------------------------
 
 /**
- * A value this module wrote this session is in `prefs` before it reaches the profile, and a value an
- * older build (or a Playwright seed) left is only in the profile: read the first, fall back to the
- * second. Native has no such keys in `prefs`, so it always takes the second.
- */
-function readJsonAt<T>(key: string, fallback: T, revive?: (value: unknown) => T | undefined): T {
-  if (getPref(key) === null) return readStoredJson<T>(key, fallback, revive);
-  return getPrefJson<T>(key, fallback, revive);
-}
-
-function writeBrowserJson(key: string, value: unknown): void {
+ * The browser build has no `state.json`, so there the keys go to the backend `prefs` owns — the same
+ * names and the same strings the Playwright run seeds.
+ */function writeBrowserJson(key: string, value: unknown): void {
   try {
     setPref(key, JSON.stringify(value));
   } catch (err) {

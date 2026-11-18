@@ -14,6 +14,7 @@ test('memory packs as its own change type and deletions ride tombstones', async 
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const cryptoMod = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
     const { stateHashKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    const { removePref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
 
     return withSyncHarness(async ({ engine, push, init }) => {
@@ -35,8 +36,8 @@ test('memory packs as its own change type and deletions ride tombstones', async 
         .map((op: { kind: string }) => op.kind);
 
       // init уже отправил пустое хранилище: снимаем чекпоинт, иначе пуш схлопнется в «ничего не изменилось».
-      localStorage.removeItem(stateHashKey(scope));
-      localStorage.removeItem('slag_sync_last_state_hash');
+      removePref(stateHashKey(scope));
+      removePref('slag_sync_last_state_hash');
 
       let captured: { changes?: Array<{ type: string; action: string; payload?: Record<string, unknown> }> } = {};
       window.fetch = async (_url, opts) => {
@@ -49,7 +50,7 @@ test('memory packs as its own change type and deletions ride tombstones', async 
       const first = (captured.changes || []).filter((change) => change.type === 'memory');
 
       memoryService.forget('не любит созвон-митинги до полудня');
-      localStorage.removeItem(stateHashKey(scope));
+      removePref(stateHashKey(scope));
       await push();
       const second = (captured.changes || []).filter((change) => change.type === 'memory');
 

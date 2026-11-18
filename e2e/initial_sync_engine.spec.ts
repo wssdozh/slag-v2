@@ -103,14 +103,28 @@ async function runInitialSync(page: Page, options: InitialSyncOptions): Promise<
     const publications: Publication[] = [];
 
     const configure = () => {
-      engine.config.enabled = true;
+      // `init` re-reads the config from its own store before it decides whether sync can run, so
+      // a field set on the instance alone is gone by then: persist it the way the UI does.
+      engine.saveConfig({
+        enabled: true,
+        ...(options.receiveOnlySender
+          ? {
+              trustedDevices: [{
+                id: 'source',
+                name: 'source',
+                platform: 'desktop' as const,
+                isCurrent: false,
+                syncMode: 'receive-only' as const,
+                pairedAt: '',
+                lastSeenAt: '',
+              }],
+            }
+          : {}),
+      });
       engine.refreshServerAuth = async () => true;
       engine.usesAccountSync = () => false;
       engine.connectWebSocket = () => {};
       engine.startIntervals = () => {};
-      if (options.receiveOnlySender) {
-        engine.config.trustedDevices = [{ id: 'source', syncMode: 'receive-only' }];
-      }
     };
 
     const snapshot = () => ({

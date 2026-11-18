@@ -712,7 +712,7 @@ export class SyncEngine {
       if (isTauri()) {
         const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId));
         if (outcome.error) {
-          syncLog.warn('The sync ledgers stay in localStorage, state.json did not take them:', outcome.error);
+          syncLog.warn('The sync ledgers stay in the fallback keys, state.json did not take them:', outcome.error);
         }
         section = outcome.section;
       }

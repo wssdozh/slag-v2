@@ -425,40 +425,6 @@ class LoggerEngine {
     this.log('info', 'APP', 'Log buffer cleared');
   }
 
-  public getStorageHealth(): {
-    usedKb: number;
-    totalKeys: number;
-    isNearQuota: boolean;
-    quotaWarning?: string;
-  } {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      return { usedKb: 0, totalKeys: 0, isNearQuota: false };
-    }
-    try {
-      let bytes = 0;
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          bytes += key.length * 2;
-          const val = localStorage.getItem(key);
-          if (val) bytes += val.length * 2;
-        }
-      }
-      const usedKb = Math.round(bytes / 1024);
-      const isNearQuota = usedKb > 4000;
-      return {
-        usedKb,
-        totalKeys: localStorage.length,
-        isNearQuota,
-        quotaWarning: isNearQuota
-          ? `Хранилище заполнено на ${usedKb} KB (~${Math.round((usedKb / 5120) * 100)}% квоты браузера)`
-          : undefined,
-      };
-    } catch {
-      return { usedKb: 0, totalKeys: 0, isNearQuota: false };
-    }
-  }
-
   public subscribe(listener: LogListener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -535,14 +501,12 @@ class LoggerEngine {
     const total = this.buffer.length;
     const errors = this.buffer.filter(e => e.level === 'error').length;
     const warns = this.buffer.filter(e => e.level === 'warn').length;
-    const storageHealth = this.getStorageHealth();
     const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
     const lines: string[] = [
       `# SLAG v2 — Application Diagnostics Report`,
       `**Generated:** ${now}`,
       `**Network Status:** ${isOnline ? 'Online 🟢' : 'Offline 🔴'}`,
-      `**Storage Usage:** ${storageHealth.usedKb} KB (${storageHealth.totalKeys} keys)${storageHealth.isNearQuota ? ' ⚠️ NEAR QUOTA' : ''}`,
       `**User Agent:** ${typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown'}`,
       `**Total Log Entries:** ${total} (${errors} errors, ${warns} warnings)`,
       ``,

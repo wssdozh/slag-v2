@@ -4,7 +4,7 @@
 // never carries the seed phrase — that one lives in `secretStore` and reaches this module as an
 // argument. A caller loads it with `await getSecret(SECRET_KEYS.vaultSeed(vaultId))` and hands it
 // over; nothing here scrapes a warm cache, because the cache is filled from the vault registry and
-// that registry is on its way out of `localStorage`.
+// that registry lives in `prefs`.
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import { apiBase } from './apiBase';
@@ -73,7 +73,7 @@ export function loadConfig(store: SyncConfigHost, seed: string | null, targetVau
 }
 
 /**
- * Reads the config once, on the way into a vault: migrates the old `localStorage` record into
+ * Reads the config once, on the way into a vault: migrates the old per-key record into
  * `state.json.sync.config`, mints a seed phrase if this vault has never had one, and writes the
  * file copy without it. Returns the config the engine keeps.
  */
@@ -186,7 +186,7 @@ function buildConfig(seed: string | null, record: Partial<SyncConfig> | null): S
   return parseStoredConfig(JSON.stringify(record), DEFAULT_SERVER_URL, hasToken, sessionDeviceId, seed ?? undefined);
 }
 
-/** The vault's own copy: the file once it is hydrated, the old `localStorage` record before that. */
+/** The vault's own copy: the file once it is hydrated, the fallback keys before that. */
 function readConfigRecord(vaultId: string): Partial<SyncConfig> | null {
   const fromFile = configFromState(sectionRecord(vaultId, CONFIG_KEY));
   if (Object.keys(fromFile).length > 0) return fromFile;
