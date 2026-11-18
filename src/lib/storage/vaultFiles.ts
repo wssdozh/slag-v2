@@ -264,6 +264,39 @@ export class VaultFiles {
   }
 
   /**
+   * The `sync` section: the one ledger a wipe of the webview profile cannot be allowed to eat.
+   * A missing file, a missing section and a section of the wrong shape all answer "empty".
+   */
+  public async readSyncSection(): Promise<Record<string, unknown>> {
+    try {
+      const state = await this.readStateObject();
+      return asStateObject(state.sync);
+    } catch (err) {
+      fsLog.warn('Failed to read the sync section of state.json:', err);
+      return {};
+    }
+  }
+
+  /**
+   * Writes into the `sync` section and leaves `folders`, `workspace` and the MCP server's keys as
+   * they are. It goes through the same queue as the folder writer: three writers, one file, one
+   * read-merge-write at a time.
+   */
+  public writeSyncSection(patch: Record<string, unknown>): Promise<void> {
+    if (!isTauri()) return Promise.resolve();
+    return this.queueStateWrite(async () => {
+      try {
+        const state = await this.readStateObject();
+        state.sync = { ...asStateObject(state.sync), ...patch };
+        state.updatedAt = Date.now();
+        await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+      } catch (err) {
+        fsLog.warn('Failed to write the sync section of state.json:', err);
+      }
+    });
+  }
+
+  /**
    * `state.json` as it sits on disk: a missing file is an empty state. A broken one is copied aside
    * before anything writes over it — the file holds the MCP server's own keys too, and the next
    * write would otherwise be the last time they existed.
@@ -280,7 +313,7 @@ export class VaultFiles {
       await this.backupBrokenState(statePath, text);
       return {};
     }
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+    return asStateObject(parsed);
   }
 
   private async backupBrokenState(statePath: string, text: string): Promise<void> {
@@ -703,4 +736,9 @@ function isKanbanColumn(value: unknown): value is KanbanColumn {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return typeof record.id === 'string' && typeof record.title === 'string';
+}
+
+/** A section of `state.json` is a plain object or it is nothing: an array would take keys silently. */
+function asStateObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
