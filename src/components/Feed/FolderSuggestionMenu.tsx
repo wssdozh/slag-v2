@@ -17,6 +17,55 @@ interface FolderSuggestionMenuProps {
   isModal?: boolean;
 }
 
+// The tree is drawn, not spelled: a text `╰──` sits on the text baseline, so the line under a
+// nested folder ran below the icon instead of into its middle. A column is 14px, a row starts
+// 10px in (the menu's own padding) and every level adds one column.
+const TREE_INDENT = 14;
+const TREE_PADDING = 10;
+const TREE_LINE = 'bg-tint-15';
+
+const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT}px`;
+const guideLeft = (column: number) => `${TREE_PADDING + column * TREE_INDENT + TREE_INDENT / 2}px`;
+
+/**
+ * The lines of a branch: the guides of the ancestors still running, then the row's own hook —
+ * down from the parent and across to the icon, closing on the last sibling.
+ */
+const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
+  const ownColumn = guideLeft(row.depth - 1);
+  return (
+    <>
+      {row.columns.map((runs, column) =>
+        runs ? (
+          <span
+            key={column}
+            className={`pointer-events-none absolute -top-px -bottom-px w-px ${TREE_LINE}`}
+            style={{ left: guideLeft(column) }}
+          />
+        ) : null
+      )}
+      {row.depth > 0 && (
+        <>
+          <span
+            className={`pointer-events-none absolute -top-px bottom-1/2 w-px ${TREE_LINE}`}
+            style={{ left: ownColumn }}
+          />
+          {!row.isLast && (
+            <span
+              className={`pointer-events-none absolute top-1/2 -bottom-px w-px ${TREE_LINE}`}
+              style={{ left: ownColumn }}
+            />
+          )}
+          <span
+            className={`pointer-events-none absolute top-1/2 h-px ${TREE_LINE}`}
+            style={{ left: ownColumn, width: `${TREE_INDENT / 2 - 2}px` }}
+          />
+        </>
+      )}
+    </>
+  );
+};
+
 /**
  * A filtered folder list still reads as the tree it is: the rows of its branches keep their lines,
  * and a parent shown only to make the branch make sense is a label, not a choice.
@@ -53,11 +102,6 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
 
         const label = (
           <span className="flex items-center gap-2 min-w-0">
-            {/* The branch line leads and the icon sits right before the name, so a nested folder
-                reads as "this child" rather than "an icon that happens to be indented". */}
-            {row.prefix && (
-              <span className="text-2xs font-mono text-fg-dim whitespace-pre shrink-0">{row.prefix}</span>
-            )}
             <Icon
               name={iconName}
               size="md"
@@ -77,9 +121,12 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
             <div
               key={row.path}
               aria-hidden="true"
+              data-depth={row.depth}
               onMouseDown={(e) => e.preventDefault()}
-              className="flex items-center px-2.5 py-1 opacity-45 select-none"
+              className="relative flex items-center pr-2.5 py-1 opacity-45 select-none"
+              style={{ paddingLeft: rowPadding(row.depth) }}
             >
+              <BranchLines row={row} />
               {label}
             </div>
           );
@@ -91,14 +138,18 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
             type="button"
             data-selected={isSelected}
             data-folder-item={row.path}
+            data-depth={row.depth}
+            data-branch={row.isLast ? 'last' : 'middle'}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(row)}
-            className={`flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+            className={`relative flex items-center justify-between gap-3 pr-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
               isSelected
                 ? 'bg-tint-10 text-white font-medium shadow-sm'
                 : 'text-fg-tertiary hover:bg-tint-4'
             }`}
+            style={{ paddingLeft: rowPadding(row.depth) }}
           >
+            <BranchLines row={row} />
             {label}
 
             <div className="flex items-center gap-1.5 shrink-0">

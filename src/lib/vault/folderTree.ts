@@ -17,6 +17,14 @@ export interface FolderTreeRow {
   prefix: string;
   depth: number;
   meta?: FolderMeta;
+  /**
+   * The ancestors above the row's own hook, one per column: `true` where that branch continues
+   * through this row. A drawing surface turns these into vertical guides; the text `prefix` is the
+   * same shape, already spelled out, for the plain pickers.
+   */
+  columns: boolean[];
+  /** True when the row is the last of its siblings — its hook closes the branch. */
+  isLast: boolean;
 }
 
 /** Where a dragged folder lands relative to the row under the pointer. */
@@ -81,18 +89,20 @@ export function buildFolderTree(folders: FolderMeta[]): FolderNode[] {
 export function folderTreeRows(folders: FolderMeta[]): FolderTreeRow[] {
   const rows: FolderTreeRow[] = [];
 
-  const walk = (nodes: FolderNode[], prefix: string, depth: number) => {
+  const walk = (nodes: FolderNode[], prefix: string, columns: boolean[], depth: number) => {
     nodes.forEach((node, index) => {
       const isLast = index === nodes.length - 1;
       const branch = depth === 0 ? '' : `${prefix}${isLast ? '╰── ' : '├── '}`;
-      rows.push({ path: node.path, name: node.name, prefix: branch, depth, meta: node.meta });
+      rows.push({ path: node.path, name: node.name, prefix: branch, depth, meta: node.meta, columns, isLast });
       // A root carries no vertical bar above it, so its children start flush left.
       const childPrefix = depth === 0 ? '' : `${prefix}${isLast ? `${GAP} ` : `│${GAP}`}`;
-      walk(node.children, childPrefix, depth + 1);
+      // Same shape as the text: a closed branch (`╰──`) leaves a gap, an open one keeps running.
+      const childColumns = depth === 0 ? [] : [...columns, !isLast];
+      walk(node.children, childPrefix, childColumns, depth + 1);
     });
   };
 
-  walk(buildFolderTree(folders), '', 0);
+  walk(buildFolderTree(folders), '', [], 0);
   return rows;
 }
 

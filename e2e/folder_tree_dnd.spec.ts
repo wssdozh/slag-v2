@@ -164,7 +164,8 @@ test.describe('Folder tree in the @ menu', () => {
 
     const nested = page.locator('[data-folder-item="Личное/Архив"]');
     await expect(nested).toBeVisible();
-    await expect(nested).toContainText('╰──');
+    await expect(nested).toHaveAttribute('data-depth', '1');
+    await expect(nested).toHaveAttribute('data-branch', 'last');
     await expect(nested).toContainText('Архив');
     // The menu fades in; a screenshot taken mid-transition shows the feed through it.
     await expect(nested).toHaveAttribute('data-selected', /true|false/);
