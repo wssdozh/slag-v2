@@ -26,24 +26,30 @@ function warn(message: string, error: unknown): void {
 /**
  * What a backend has to do, and all of it: read everything once, then apply the keys that changed.
  * `null` is a removal. Two executors, no plan for a third.
- *
- * `read` and `entries` are the browser backend's synchronous window onto the profile. There is no
- * native counterpart on purpose — the Tauri fs is asynchronous, so a native build lives on the
- * snapshot alone — and they exist because the browser build's store *is* `localStorage`: a
- * Playwright seed, another tab and the one-off legacy scans put keys there behind this module's
- * back, and a read that cannot see them would answer "nothing stored" to a profile that has them.
  */
 export interface PrefsBackend {
   load(): Promise<Record<string, string>>;
   save(changes: Record<string, string | null>): Promise<void>;
-  read?(key: string): string | null;
-  entries?(): [string, string][];
+}
+
+/**
+ * The browser backend's synchronous window onto the profile. There is no native counterpart on
+ * purpose — the Tauri fs is asynchronous, so a native build lives on the snapshot alone — and this
+ * exists because the browser build's store *is* `localStorage`: a Playwright seed, another tab and
+ * the one-off legacy scans put keys there behind this module's back, and a read that cannot see
+ * them would answer "nothing stored" to a profile that has them.
+ */
+export interface PrefsProfileBackend extends PrefsBackend {
+  read(key: string): string | null;
+  entries(): [string, string][];
 }
 
 const prefs = new Map<string, string>();
 /** Keys changed since the last flush; `null` says the key was removed. */
 const pending = new Map<string, string | null>();
 let backend: PrefsBackend | null = null;
+/** The browser build's profile, and only it: a native build never has one. */
+let profile: PrefsProfileBackend | null = null;
 let initialization: Promise<void> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let flushQueued = false;
@@ -65,10 +71,13 @@ export function initPrefs(): Promise<void> {
 
 async function loadSnapshot(): Promise<void> {
   try {
-    const { prefsBackend } = isTauri()
-      ? await import('./prefsBackend.native')
-      : await import('./prefsBackend.browser');
-    backend = prefsBackend;
+    if (isTauri()) {
+      backend = (await import('./prefsBackend.native')).prefsBackend;
+    } else {
+      const browserBackend = (await import('./prefsBackend.browser')).prefsBackend;
+      backend = browserBackend;
+      profile = browserBackend;
+    }
     const snapshot = await backend.load();
     for (const [key, value] of Object.entries(snapshot)) {
       // A value set before init wins over the file: it is newer than what was on disk.
@@ -82,14 +91,15 @@ async function loadSnapshot(): Promise<void> {
 
 /**
  * The value of a key: the map's answer wins, a removal this session wins over the profile, and
- * only then may a browser build ask the backend for a key it never loaded (a seed another writer
- * left there). A native build has no `read`, so it answers from the snapshot, exactly as before.
+ * only then may a browser build ask the profile for a key it never loaded (a seed another writer
+ * left there). A native build has no profile behind it, so it answers from the snapshot, exactly
+ * as before.
  */
 export function getPref(key: string): string | null {
   if (pending.has(key)) return pending.get(key) ?? null;
   const value = prefs.get(key);
   if (value !== undefined) return value;
-  return backend?.read?.(key) ?? null;
+  return profile?.read(key) ?? null;
 }
 
 export function setPref(key: string, value: string): void {
@@ -113,7 +123,7 @@ export function removePref(key: string): void {
  * nothing that owns a section may use this as a second read path.
  */
 export function getPrefEntries(): [string, string][] {
-  const merged = new Map<string, string>(backend?.entries?.() ?? prefs);
+  const merged = new Map<string, string>(profile?.entries() ?? prefs);
   for (const [key, value] of prefs) merged.set(key, value);
   for (const [key, value] of pending) {
     if (value === null) merged.delete(key);
