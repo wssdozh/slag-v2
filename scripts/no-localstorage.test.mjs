@@ -15,13 +15,15 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = join(ROOT, 'src');
 
 /**
- * Who may reach `localStorage`, and why. All three are browser-only paths, each for a reason:
+ * Who may reach `localStorage`, and why. Every one is a browser-only path or a one-shot migration:
  * the backend `prefs.ts` picks when there is no Tauri, the items index falls back to it on a web
- * build that has no disk, and the headless runtime installs its own shim.
+ * build that has no disk, the headless runtime installs its own shim, and `legacyProfile` reads the
+ * old profile exactly once, behind a marker, to move it into `settings.json` and `state.json`.
  */
 const ALLOWLIST = new Set([
   'src/lib/storage/prefsBackend.browser.ts',
   'src/lib/storage/index.ts',
+  'src/lib/storage/legacyProfile.ts',
   'src/node/env.ts',
 ]);
 
