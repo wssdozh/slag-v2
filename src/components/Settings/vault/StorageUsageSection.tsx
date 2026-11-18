@@ -28,7 +28,7 @@ const MEDIA_ICON: Record<SlagAttachment['type'], React.ReactNode> = {
 
 const UNIT_FORMS: Record<UsageUnit, [string, string, string]> = {
   'файл': ['файл', 'файла', 'файлов'],
-  'ключ': ['ключ', 'ключа', 'ключей'],
+  'запись': ['запись', 'записи', 'записей'],
   'снимок': ['снимок', 'снимка', 'снимков'],
 };
 
@@ -47,8 +47,9 @@ export const StorageUsageSection: React.FC = () => {
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [stamp, setStamp] = useState(0);
 
-  // The collector walks the whole localStorage index, so a save must not start it: the live
-  // inputs sit in a ref, and only the button's stamp — or another vault — asks for a new count.
+  // The collector stats the settings and state files (or lists the profile a browser build keeps),
+  // so a save must not start it: the live inputs sit in a ref, and only the button's stamp — or
+  // another vault — asks for a new count.
   const sourceRef = useRef({ items, snapshots: backupSnapshots });
   useEffect(() => {
     sourceRef.current = { items, snapshots: backupSnapshots };
@@ -106,7 +107,7 @@ export const StorageUsageSection: React.FC = () => {
   const total = usageTotalBytes({ media, local, snapshots });
   // The ring is the total: media sectors, local data and snapshots, biggest first.
   const segments = collectSegments({ media, local, snapshots });
-  const filledGroups = local.groups.filter((group) => group.keys > 0);
+  const filledGroups = local.groups.filter((group) => group.count > 0);
 
   return (
     <div data-testid="storage-usage" className="flex flex-col gap-3">
@@ -145,7 +146,7 @@ export const StorageUsageSection: React.FC = () => {
         )}
       </SettingsGroup>
 
-      <SettingsGroup title="Локальные данные">
+      <SettingsGroup title="Данные">
         {filledGroups.length === 0 ? (
           <EmptyLine />
         ) : (
@@ -156,7 +157,7 @@ export const StorageUsageSection: React.FC = () => {
                   {group.label}
                 </span>
                 <span className="shrink-0 font-mono text-2xs text-fg-dim">
-                  {countOf(group.keys, 'ключ')}
+                  {countOf(group.count, 'запись')}
                 </span>
                 <span className="w-9 shrink-0 text-right font-mono text-2xs text-fg-dim">
                   {shareOf(group.bytes, total)}

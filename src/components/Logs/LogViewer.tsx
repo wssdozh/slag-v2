@@ -81,8 +81,6 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
     return { total: entries.length, errors, warns, infos };
   }, [entries]);
 
-  const storageHealth = logger.getStorageHealth();
-
   const filteredEntries = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return entries.filter(e => {
@@ -162,16 +160,6 @@ export const LogViewer: React.FC<LogViewerProps> = ({ variant = 'dock', onClose 
             {counts.total}
             {counts.errors > 0 && <span className="text-danger ml-1">· {counts.errors}e</span>}
             {counts.warns > 0 && <span className="text-warning ml-1">· {counts.warns}w</span>}
-          </span>
-          <span
-            className={`text-3xs font-mono px-1.5 py-0.5 rounded ${
-              storageHealth.isNearQuota
-                ? 'text-danger'
-                : 'text-fg-muted'
-            }`}
-            title={`Использование localStorage: ${storageHealth.usedKb} KB (${storageHealth.totalKeys} ключей)`}
-          >
-            {storageHealth.usedKb} KB
           </span>
         </div>
 
