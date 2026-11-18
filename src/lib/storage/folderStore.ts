@@ -1,4 +1,6 @@
 // Writing folders: save, rename with the note cascade, describe, delete and re-route to Inbox.
+// Which folders exist is the disk's answer; what is written here is the cache that draws them
+// before the scan lands, and the metadata `state.json` keeps per path.
 import type { ComposerDraft, FolderMeta, SlagItem, VaultMeta } from '../../types';
 import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
@@ -13,10 +15,11 @@ const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
 export interface FolderStoreHost {
   currentVault: VaultMeta;
   files: {
-    flushStateToDisk(): Promise<void>;
     renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[]): Promise<void>;
     deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void>;
   };
+  /** Writes the list as given: the cache the sidebar draws from, and the metadata on disk. */
+  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): void;
   emitChange(event: StorageChangeEvent): void;
   getItems(folder?: string): SlagItem[];
   cacheItems(key: string, items: SlagItem[]): void;
@@ -29,35 +32,18 @@ export function folderStorageKey(store: FolderStoreHost): string {
   return `${FOLDERS_STORAGE_PREFIX}${store.currentVault.id}`;
 }
 
+/** What the sidebar draws before the disk has answered — and all a browser build ever has. */
 export function readFolders(store: FolderStoreHost): FolderMeta[] {
-  return readStoredJson<FolderMeta[]>(folderStorageKey(store), DEFAULT_FOLDERS, value => {
-    if (!Array.isArray(value)) return undefined;
-    const parsed = value as FolderMeta[];
-    let changed = false;
-    // Ensure inbox always exists
-    if (!parsed.some(f => f.path === DEFAULT_INBOX_FOLDER)) {
-      parsed.unshift(DEFAULT_FOLDERS[0]);
-      changed = true;
-    }
-    if (changed) {
-      try {
-        localStorage.setItem(folderStorageKey(store), JSON.stringify(parsed));
-      } catch {
-        return undefined;
-      }
-    }
-    return parsed;
-  });
+  return readStoredJson<FolderMeta[]>(folderStorageKey(store), DEFAULT_FOLDERS, value =>
+    Array.isArray(value) ? (value as FolderMeta[]) : undefined
+  );
 }
 
 export function writeFolder(store: FolderStoreHost, folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
   const folders = readFolders(store).filter(f => f.path !== folder.path);
   folders.push(folder);
-  localStorage.setItem(folderStorageKey(store), JSON.stringify(folders));
+  store.persistFolders(folders, origin);
   fsLog.info(`Saved folder "${folder.name}" (${folder.path})`);
-  if (isTauri()) {
-    void store.files.flushStateToDisk();
-  }
   store.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: folder, origin });
 }
 
@@ -69,7 +55,7 @@ export function renameFolderTree(
 ): void {
   if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
 
-  // 1. Update folders list
+  // A rename remaps metadata and notes. Whether a folder exists is still the directory's call.
   const folders = readFolders(store).map(f => {
     if (f.path === oldPath) {
       return updatedFolder;
@@ -81,9 +67,9 @@ export function renameFolderTree(
     }
     return f;
   });
-  localStorage.setItem(folderStorageKey(store), JSON.stringify(folders));
+  store.persistFolders(folders, origin);
 
-  // 2. Update items belonging to this folder and its subfolders
+  // Update items belonging to this folder and its subfolders
   const items = store.getItems().map(it => {
     if (it.folder === oldPath) {
       return { ...it, folder: updatedFolder.path, updatedAt: Date.now() };
@@ -117,11 +103,8 @@ export function describeFolder(
     }
     return f;
   });
-  localStorage.setItem(folderStorageKey(store), JSON.stringify(folders));
+  store.persistFolders(folders, origin);
   fsLog.debug(`Updated description for folder "${path}"`);
-  if (isTauri()) {
-    void store.files.flushStateToDisk();
-  }
   if (targetFolder) {
     store.emitChange({ kind: 'folder', action: 'upsert', id: path, payload: targetFolder, origin });
   }
@@ -130,7 +113,7 @@ export function describeFolder(
 export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): void {
   if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
   const folders = readFolders(store).filter(f => f.path !== path && !f.path.startsWith(path + '/'));
-  localStorage.setItem(folderStorageKey(store), JSON.stringify(folders));
+  store.persistFolders(folders, origin);
 
   // Move orphan items to inbox
   const items = store.getItems();
@@ -158,8 +141,8 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
   if (draftsChanged) {
     try {
       localStorage.setItem(store.getDraftsKey(), JSON.stringify(drafts));
-    } catch {
-      // ignore
+    } catch (err) {
+      fsLog.warn(`Failed to drop drafts of the deleted folder "${path}"`, err);
     }
   }
 
