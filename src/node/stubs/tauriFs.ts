@@ -10,6 +10,20 @@ export async function writeTextFile(): Promise<void> {
   // stdio is the log sink on the node.
 }
 
+/** Plugin-fs rename options. The stub never reaches a disk, so nothing reads these fields. */
+interface RenameOptions {
+  oldPathBaseDir?: number;
+  newPathBaseDir?: number;
+}
+
+export async function rename(
+  _oldPath: string,
+  _newPath: string,
+  _options?: RenameOptions,
+): Promise<void> {
+  // Nothing was written, so there is no temp file to move over the real one.
+}
+
 export async function readDir(): Promise<never[]> {
   return [];
 }
