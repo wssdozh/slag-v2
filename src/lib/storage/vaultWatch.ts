@@ -10,8 +10,6 @@ import { logger } from '../logger/logger';
 import { diffFolderPaths } from './folderSource';
 import { diffNoteFiles, type NoteFileStamp, type VaultFileChange } from './vaultWatchDiff';
 
-export type { NoteFileStamp, VaultFileChange } from './vaultWatchDiff';
-
 const watchLog = logger.scope('FS');
 
 export interface VaultWatchOptions {
@@ -36,7 +34,7 @@ export function canWatchVault(): boolean {
 }
 
 /** What one sweep saw: every note as vault-relative path → stamp, plus every directory path. */
-export interface VaultSnapshot {
+interface VaultSnapshot {
   files: Map<string, NoteFileStamp>;
   folders: string[];
 }
@@ -45,7 +43,7 @@ export interface VaultSnapshot {
  * Every note and folder under `notesPath`. Folders ride along on the directory walk itself, so
  * watching them costs no extra pass and no extra stat — the sweep just now remembers them too.
  */
-export async function snapshotVault(notesPath: string): Promise<VaultSnapshot> {
+async function snapshotVault(notesPath: string): Promise<VaultSnapshot> {
   const snapshot: VaultSnapshot = { files: new Map(), folders: [] };
   await walkDirectory(notesPath, '', snapshot);
   return snapshot;

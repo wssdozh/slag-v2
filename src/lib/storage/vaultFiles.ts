@@ -1,4 +1,4 @@
-import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
+﻿import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -35,8 +35,9 @@ export interface VaultFilesDeps {
   getWorkspaceState(): WorkspaceState;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
-  getFoldersKey(): string;
   getTrashKey(): string;
+  /** The one write path for the folder list; `external` came from the disk and writes nothing back. */
+  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote' | 'external'): void;
   attachments: AttachmentStore;
 }
 
@@ -174,9 +175,10 @@ export class VaultFiles {
       }
 
       // After the notes: a note that lands on disk creates its folder, and the list read before that
-      // would leave the note in a folder the sidebar does not show.
+      // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
+      // the list came from the disk, so there is nothing to write back to it.
       const folders = folderMetaFor(await this.listFolderPaths(), await this.readFoldersMeta(), DEFAULT_INBOX_FOLDER);
-      localStorage.setItem(this.deps.getFoldersKey(), JSON.stringify(folders));
+      this.deps.persistFolders(folders, 'external');
       fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
 
       if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) {
@@ -237,21 +239,35 @@ export class VaultFiles {
 
   /**
    * The one thing `state.json` still knows about folders: metadata by path. The directories are
-   * created here too, so what is listed and what exists cannot part ways. Every other key is read
-   * back and written as it was — the MCP server keeps its own there.
+   * created here too, so what is listed and what exists cannot part ways.
+   *
+   * Entries the cache has not seen yet are kept as they are: a folder the MCP server created a
+   * second ago is not in the cache until the next sweep, and writing the cache straight over the
+   * file would throw away the description and icon it just wrote. Every other key is read back and
+   * written as it was — the MCP server keeps its own there.
    */
   public writeFolderMeta(folders: FolderMeta[]): Promise<void> {
     if (!isTauri()) return Promise.resolve();
     return this.queueStateWrite(async () => {
       for (const folder of folders) await this.ensureFolderOnDisk(folder.path);
       const state = await this.readStateObject();
-      state.folders = folders;
+      const byPath = new Map<string, FolderMeta>();
+      for (const entry of Array.isArray(state.folders) ? state.folders : []) {
+        const meta = toFolderMeta(entry);
+        if (meta) byPath.set(meta.path, meta);
+      }
+      for (const folder of folders) byPath.set(folder.path, folder);
+      state.folders = [...byPath.values()];
       state.updatedAt = Date.now();
       await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
     });
   }
 
-  /** `state.json` as it sits on disk: a missing file is an empty state, a broken one is reported. */
+  /**
+   * `state.json` as it sits on disk: a missing file is an empty state. A broken one is copied aside
+   * before anything writes over it — the file holds the MCP server's own keys too, and the next
+   * write would otherwise be the last time they existed.
+   */
   private async readStateObject(): Promise<Record<string, unknown>> {
     const statePath = this.getVaultStatePath();
     if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) return {};
@@ -260,10 +276,19 @@ export class VaultFiles {
     try {
       parsed = JSON.parse(text);
     } catch (err) {
-      fsLog.warn('state.json is not valid JSON, reading it as empty:', err);
+      fsLog.error('state.json is not valid JSON, keeping a copy before the next write:', err);
+      await this.backupBrokenState(statePath, text);
       return {};
     }
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  }
+
+  private async backupBrokenState(statePath: string, text: string): Promise<void> {
+    try {
+      await writeTextFile(`${statePath}.broken`, text, { baseDir: BaseDirectory.AppData });
+    } catch (err) {
+      fsLog.error('Could not keep a copy of the broken state.json:', err);
+    }
   }
 
   /**

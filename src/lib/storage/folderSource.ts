@@ -1,6 +1,7 @@
-// A folder exists because its directory does. This module turns the paths found under `notes/`
+﻿// A folder exists because its directory does. This module turns the paths found under `notes/`
 // and the metadata remembered for them into the list the app draws; being pure, the rule can be
-// checked without a vault.
+// checked without a vault. The inbox name comes in as an argument on purpose: importing the config
+// module would put an extensionless import in the way of running this file under plain node.
 import type { FolderMeta } from '../../types';
 
 function normalizeFolderPath(path: string): string {
@@ -10,10 +11,6 @@ function normalizeFolderPath(path: string): string {
 function lastSegment(path: string): string {
   const slash = path.lastIndexOf('/');
   return slash >= 0 ? path.slice(slash + 1) : path;
-}
-
-function compareFolderPaths(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 /**
@@ -27,7 +24,7 @@ export function folderMetaFor(paths: string[], metadata: FolderMeta[], inbox: st
 
   const folders = [...new Set(paths.map(normalizeFolderPath))]
     .filter(path => path.length > 0)
-    .sort(compareFolderPaths)
+    .sort()
     .map((path): FolderMeta => {
       const meta = byPath.get(path);
       return meta ? { ...meta, path } : { path, name: lastSegment(path), description: '' };
@@ -43,7 +40,7 @@ export function diffFolderPaths(prev: string[], next: string[]): { added: string
   const before = new Set(prev.map(normalizeFolderPath));
   const after = new Set(next.map(normalizeFolderPath));
   return {
-    added: [...after].filter(path => !before.has(path)).sort(compareFolderPaths),
-    removed: [...before].filter(path => !after.has(path)).sort(compareFolderPaths),
+    added: [...after].filter(path => !before.has(path)).sort(),
+    removed: [...before].filter(path => !after.has(path)).sort(),
   };
 }

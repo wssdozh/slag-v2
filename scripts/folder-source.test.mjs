@@ -1,4 +1,4 @@
-// Folders come from the disk now: the two decisions that need no filesystem are the list itself
+﻿// Folders come from the disk now: the two decisions that need no filesystem are the list itself
 // and the delta a sweep reports. The rest of the storage layer reads directories.
 import assert from 'node:assert/strict';
 import test from 'node:test';

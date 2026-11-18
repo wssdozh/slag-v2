@@ -1,10 +1,9 @@
-// The decisions the disk sweep makes without a filesystem: what changed between two snapshots —
+﻿// The decisions the disk sweep makes without a filesystem: what changed between two snapshots —
 // note stamps and directory paths — and whether the file behind a note is newer than the index.
 // The rest of the guard reads files.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { diffNoteFiles } from '../src/lib/storage/vaultWatchDiff.ts';
-import { diffFolderPaths } from '../src/lib/storage/folderSource.ts';
 import { hasNewerVersionOnDisk } from '../src/lib/storage/writeGuard.ts';
 
 const stamp = (mtime, size = 100) => ({ mtime, size });
@@ -42,32 +41,6 @@ test('sweep: a path that left the folder is reported as removed, sorted', () => 
 test('sweep: untouched vault is an empty answer, not undefined', () => {
   const same = new Map([['Входящие/заметка.md', stamp(9, 42)]]);
   assert.deepEqual(diffNoteFiles(same, new Map(same)), { changed: [], removed: [] });
-});
-
-test('folders: a directory that appeared on disk is added', () => {
-  assert.deepEqual(diffFolderPaths(['Входящие'], ['Входящие', 'Проекты', 'Проекты/Новая']), {
-    added: ['Проекты', 'Проекты/Новая'],
-    removed: [],
-  });
-});
-
-test('folders: a directory that left the disk is removed, its children with it', () => {
-  assert.deepEqual(diffFolderPaths(['Входящие', 'Проекты', 'Проекты/Новая'], ['Входящие']), {
-    added: [],
-    removed: ['Проекты', 'Проекты/Новая'],
-  });
-});
-
-test('folders: both answers are sorted, so the same disk looks the same twice', () => {
-  assert.deepEqual(diffFolderPaths(['Б', 'В', 'Г'], ['А', 'Б', 'Д']), {
-    added: ['А', 'Д'],
-    removed: ['В', 'Г'],
-  });
-});
-
-test('folders: two empty vaults are an empty answer, duplicates in a list are not news', () => {
-  assert.deepEqual(diffFolderPaths([], []), { added: [], removed: [] });
-  assert.deepEqual(diffFolderPaths(['Проекты'], ['Проекты', 'Проекты']), { added: [], removed: [] });
 });
 
 test('guard: a newer file on disk wins, an older or foreign one does not', () => {

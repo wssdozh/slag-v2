@@ -1,4 +1,4 @@
-// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
+﻿// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
 // trash, settings and attachments. Everything that touches the disk goes through here.
 import type {
   SlagItem,
@@ -139,8 +139,8 @@ export class StorageService {
     getWorkspaceState: () => this.getWorkspaceState(),
     cacheItems: (key, items) => this.cacheItems(key, items),
     getItemsKey: () => this.getItemsKey(),
-    getFoldersKey: () => this.getFoldersKey(),
     getTrashKey: () => trashStorageKey(this),
+    persistFolders: (folders, origin) => this.persistFolders(folders, origin),
     attachments: this.attachments,
   });
 
@@ -549,10 +549,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * A rewrite that ends where it started is not a change: the app stamps its own save into the
    * index before the flush reaches the disk, and re-announcing that would fight the editor.
    */
-  public async reloadFromDisk(change: VaultDiskChange): Promise<{ updated: number; removed: number; folders: number }> {
-    if (!isTauri()) return { updated: 0, removed: 0, folders: 0 };
+  public async reloadFromDisk(change: VaultDiskChange): Promise<{ updated: number; removed: number }> {
+    if (!isTauri()) return { updated: 0, removed: 0 };
 
-    const folders = this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
+    this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
 
     const { items: parsed, missing } = await this.files.reloadNotesFromDisk(change.changed);
     const current = this.getItems();
@@ -576,11 +576,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       events.push({ kind: 'item', action: 'delete', id: gone.id, origin: 'external' });
     }
 
-    if (events.length === 0) return { updated: 0, removed: 0, folders };
+    if (events.length === 0) return { updated: 0, removed: 0 };
     this.cacheItems(this.getItemsKey(), [...byId.values()]);
     for (const event of events) this.emitChange(event);
     fsLog.info(`Picked up ${events.length - removed} changed and ${removed} removed notes from disk`);
-    return { updated: events.length - removed, removed, folders };
+    return { updated: events.length - removed, removed };
   }
 
   /**
@@ -588,8 +588,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * knows about, so the metadata of a directory that is gone goes with it. Every event is
    * `external`: the disk changed, not the person, and the relay must not hear its own echo.
    */
-  private mergeDiskFolders(added: string[], removed: string[]): number {
-    if (added.length === 0 && removed.length === 0) return 0;
+  private mergeDiskFolders(added: string[], removed: string[]): void {
+    if (added.length === 0 && removed.length === 0) return;
 
     const current = this.getFolders();
     const gone = new Set(removed);
@@ -600,19 +600,14 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
     const before = new Set(current.map(folder => folder.path));
     const after = new Set(folders.map(folder => folder.path));
-    let changes = 0;
     for (const folder of folders) {
       if (before.has(folder.path)) continue;
-      changes++;
       this.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: folder, origin: 'external' });
     }
     for (const folder of current) {
       if (after.has(folder.path)) continue;
-      changes++;
       this.emitChange({ kind: 'folder', action: 'delete', id: folder.path, origin: 'external' });
     }
-    if (changes > 0) fsLog.info(`Picked up ${changes} folder changes from disk`);
-    return changes;
   }
 
   public getTrashItems(): SlagItem[] {
