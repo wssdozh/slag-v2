@@ -1,5 +1,5 @@
 // A vault's own writes: switch, create, delete, pick its folder and reveal it on disk.
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   ChatMessage,
@@ -14,13 +14,19 @@ import type {
   SortOrder,
   VaultMeta,
 } from '../../types';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { storage } from '../../lib/storage';
+import { mergeDiscoveredVaults } from '../../lib/storage/vaultDiscovery';
 import { syncEngine } from '../../lib/sync';
 import { accountClient } from '../../lib/sync/account';
 import { swapScreen } from '../../lib/motion';
 import { openAppFolder } from '../../lib/platform/folderOpener';
+import { logger } from '../../lib/logger/logger';
+import { isTauri } from '@tauri-apps/api/core';
+import { readDir, BaseDirectory } from '@tauri-apps/plugin-fs';
 import type { ToastMessage } from '../appContext.types';
+
+const fsLog = logger.scope('FS');
 
 /**
  * What a vault can do: switch to it, create it, delete it, pick its folder on disk,
@@ -65,6 +71,33 @@ export function useVaults(deps: {
     setSortBy, setSortOrder, setHideCompletedTasks, setFolderSettings,
     setChatMessages, setSelectedItem, refreshData, addToast,
   } = deps;
+
+  // A native webview profile can be wiped from the outside, and the registry is the only thing that
+  // knows the vaults: it comes back as a lone `default_vault` while the directories still sit under
+  // `vaults/`. Scan them once on start and add what the registry lost. Nothing is ever dropped from
+  // the list here — deleting a vault is its own flow. The scan is best-effort: on the first run the
+  // directory does not exist yet, and that is not a failure worth stopping the start for.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let cancelled = false;
+    void readDir('vaults', { baseDir: BaseDirectory.AppData })
+      .then((entries) => {
+        if (cancelled) return;
+        const stored = storage.getVaults();
+        const dirs = entries.filter(entry => entry.isDirectory === true).map(entry => entry.name);
+        const merged = mergeDiscoveredVaults(stored, dirs);
+        if (merged.length === stored.length) return;
+        localStorage.setItem(STORAGE_KEYS.VAULTS, JSON.stringify(merged));
+        setVaults(merged);
+        fsLog.info(`Restored ${merged.length - stored.length} vault(s) from disk: ${merged.slice(stored.length).map(entry => entry.id).join(', ')}`);
+      })
+      .catch((error: unknown) => {
+        fsLog.warn('Vault discovery skipped: no vaults directory to scan yet', { error: String(error) });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setVaults]);
 
   const switchVault = (vaultId: string) => {
     // One cross-fade over the whole swap, so the feed does not blink between vaults.
