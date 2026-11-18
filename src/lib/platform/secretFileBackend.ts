@@ -1,8 +1,8 @@
-﻿/**
+/**
  * Native ciphertext at rest: one flat map of `secretKey → { v, iv, data }` in `<AppData>/secrets.json`.
  *
- * The envelope is the AES-GCM one from `encryptedLocalStore.ts`, unchanged: this module only moves
- * where it sits. The master key stays in IndexedDB and is not extractable, so the file alone opens
+ * The envelope is the AES-GCM one from `secretEnvelope.ts`, unchanged: this module only moves where
+ * it sits. The master key stays in IndexedDB and is not extractable, so the file alone opens
  * nothing — which is why it may travel with a backup or a copied data directory without leaking a
  * seed phrase.
  *
@@ -12,36 +12,15 @@
  */
 import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '../logger/logger';
+import { readEnvelope } from './secretEnvelope';
+import type { SecretEnvelope, SecretEnvelopeStore } from './secretEnvelope';
 import { writeJsonAtomic } from './writeJsonAtomic';
 
 const fsLog = logger.scope('SYNC');
 
 const SECRETS_FILE = 'secrets.json';
 
-/** One AES-GCM envelope, the same shape the browser profile keeps. */
-export interface SecretEnvelope {
-  v: 1;
-  iv: string;
-  data: string;
-}
-
-/** Where the encrypted store keeps its envelopes: the file here, `localStorage` in a browser. */
-export interface SecretEnvelopeStore {
-  get(key: string): Promise<SecretEnvelope | null>;
-  set(key: string, envelope: SecretEnvelope): Promise<void>;
-  delete(key: string): Promise<void>;
-}
-
 type SecretEnvelopeMap = Record<string, SecretEnvelope>;
-
-/** Half an envelope is not one: a missing field reads as "nothing stored under this key". */
-function readEnvelope(value: unknown): SecretEnvelope | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const entry = value as Partial<SecretEnvelope>;
-  return entry.v === 1 && typeof entry.iv === 'string' && typeof entry.data === 'string'
-    ? { v: 1, iv: entry.iv, data: entry.data }
-    : null;
-}
 
 /** The file as it sits on disk. Broken JSON answers empty; an unreadable file throws to the caller. */
 async function readSecrets(): Promise<SecretEnvelopeMap> {

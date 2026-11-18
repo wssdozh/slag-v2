@@ -8,7 +8,8 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import { base64ToBytes, bytesToBase64, toArrayBuffer } from '../media/byteCodec';
-import type { SecretEnvelope, SecretEnvelopeStore } from './secretFileBackend';
+import { readEnvelope } from './secretEnvelope';
+import type { SecretEnvelope, SecretEnvelopeStore } from './secretEnvelope';
 
 const storeLog = logger.scope('SYNC');
 
@@ -87,21 +88,9 @@ function parseEnvelope(raw: string, key: string): SecretEnvelope | null {
     storeLog.warn('Encrypted secret is not valid JSON', { key, error });
     return null;
   }
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    (parsed as SecretEnvelope).v !== 1 ||
-    typeof (parsed as SecretEnvelope).iv !== 'string' ||
-    typeof (parsed as SecretEnvelope).data !== 'string'
-  ) {
-    storeLog.warn('Encrypted secret has an unsupported shape', { key });
-    return null;
-  }
-  return {
-    v: 1,
-    iv: (parsed as SecretEnvelope).iv,
-    data: (parsed as SecretEnvelope).data,
-  };
+  const envelope = readEnvelope(parsed);
+  if (!envelope) storeLog.warn('Encrypted secret has an unsupported shape', { key });
+  return envelope;
 }
 
 /** The browser store: a browser has no file system, and the profile is the only place left. */
