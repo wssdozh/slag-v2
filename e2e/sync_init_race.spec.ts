@@ -9,6 +9,7 @@ test('account rooms isolate legacy routing and checkpoints, and pending access s
     const { SyncEngine, storage, accountClient } = await import(/* @vite-ignore */ enginePath);
     const { deriveRoomId, computeHash, computeStateRootHash } = await import(/* @vite-ignore */ cryptoPath);
     const { stateHashKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    const { getPrefEntries, removePref, setPref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     const originals = { getToken: accountClient.getToken, getSession: accountClient.getSession, refresh: accountClient.refresh, getState: accountClient.getState, subscribe: accountClient.subscribe };
     const vaultId = storage.ensureVaultSyncId(storage.getCurrentVault().id);
     const state = { ...accountClient.getState(), devices: [], vaults: [{ id: vaultId, grants: [{ deviceId: 'synthetic-account-device', mode: 'read-write', status: 'accepted' }] }] };
@@ -35,12 +36,12 @@ test('account rooms isolate legacy routing and checkpoints, and pending access s
       // Only the legacy checkpoints are what this resend must ignore. init has already pushed the
       // vault into the account room and committed its own room-scoped checkpoint, so forget that
       // one and what the room was told already: the legacy keys stay as the probe.
-      localStorage.removeItem(stateHashKey(engine.bookkeeping));
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith('slag_sync_sent_hashes_'))
-        .forEach((key) => localStorage.removeItem(key));
-      localStorage.setItem('slag_sync_last_state_hash', root);
-      localStorage.setItem(`slag_sync_last_state_hash_${engine.getCurrentVaultId()}`, root);
+      removePref(stateHashKey(engine.bookkeeping));
+      for (const [key] of getPrefEntries()) {
+        if (key.startsWith('slag_sync_sent_hashes_')) removePref(key);
+      }
+      setPref('slag_sync_last_state_hash', root);
+      setPref(`slag_sync_last_state_hash_${engine.getCurrentVaultId()}`, root);
       let posts = 0;
       window.fetch = async (_url, opts) => {
         if (!opts || opts.method !== 'POST') return Response.json({ bundles: [] });
@@ -73,6 +74,7 @@ test('latest init owns both key and room when earlier derivation finishes last',
     const cryptoPath = '/src/lib/sync/crypto.ts';
     const { SyncEngine } = await import(/* @vite-ignore */ modulePath);
     const { deriveVaultKey, deriveRoomId } = await import(/* @vite-ignore */ cryptoPath);
+    const { getPref, setPref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     const realDeriveKey = crypto.subtle.deriveKey.bind(crypto.subtle);
     let releaseFirst: () => void;
     let startedFirst: () => void;
@@ -96,8 +98,8 @@ test('latest init owns both key and room when earlier derivation finishes last',
     let cleanedBeforeReinit = false;
     engine.init = async () => {
       if (++initCalls === 2) {
-        cleanedBeforeReinit = localStorage.getItem('slag_sync_last_state_hash_default_vault') === null
-          && localStorage.getItem('slag_sync_last_state_hash') === null;
+        cleanedBeforeReinit = getPref('slag_sync_last_state_hash_default_vault') === null
+          && getPref('slag_sync_last_state_hash') === null;
       }
       await realInit();
     };
@@ -105,8 +107,8 @@ test('latest init owns both key and room when earlier derivation finishes last',
       engine.saveConfig({ enabled: true, seedPhrase: 'old synthetic seed' });
       const oldInit = engine.init();
       await started;
-      localStorage.setItem('slag_sync_last_state_hash_default_vault', 'old-room-hash');
-      localStorage.setItem('slag_sync_last_state_hash', 'old-room-hash');
+      setPref('slag_sync_last_state_hash_default_vault', 'old-room-hash');
+      setPref('slag_sync_last_state_hash', 'old-room-hash');
       await engine.updateSeedPhrase('new synthetic seed');
       releaseFirst();
       await oldInit;

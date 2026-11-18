@@ -1,15 +1,15 @@
 // What this device sent, knows and deleted — read from `state.json`'s `sync` section, written back
-// through one coalescing queue, and migrated out of `localStorage` once per vault.
+// through one coalescing queue, and migrated out of the old per-key blob once per vault.
 //
 // Most of it is a cache: losing the hashes or the cursor costs traffic, not data. Tombstones are
 // not — a deleted note has no file left to compare against, so a lost tombstone means the relay
 // quietly hands the note back. That is why the section is hydrated once per vault, and why the old
-// `localStorage` blob is merged in and only then deleted, after the file demonstrably has it.
+// keys are merged in and only then deleted, after the file demonstrably has it.
 //
 // The *shape* of the section is `syncSection.ts` (pure, read by `node --test` as is); this file is
 // where it lives on a disk. Imports carry their extension so that test can read this file too.
 import { SYNC_STORAGE_KEYS } from '../../config/sync.ts';
-import { readStoredJson } from '../storage/readJson.ts';
+import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from '../storage/prefs.ts';
 import { sanitizeTombstones } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
 import type { SyncOperation } from './entities/types.ts';
@@ -100,38 +100,36 @@ function warn(message: string, error: unknown): void {
 }
 
 /**
- * The browser build, the Playwright run and the headless node still answer from `localStorage`:
- * the section only exists where there is a disk. These five are the whole allowance in this wave —
- * nothing else in the sync modules names the webview profile, and no caller of the ledgers does.
+ * The ledgers when the vault's file has no section: the browser build, the Playwright run and the
+ * headless node. `prefs` is the one door here too, and on the web its backend is the same
+ * `localStorage` with the same keys the specs seed and read — which is how a browser build keeps a
+ * checkpoint across a reload without a `state.json` to put it in.
+ *
+ * These five are the whole allowance in this wave: nothing else in the sync modules names the
+ * webview profile, and no caller of the ledgers does.
  */
 export function readFallbackJson<T>(key: string, fallback: T, revive?: (value: unknown) => T | undefined): T {
-  return readStoredJson<T>(key, fallback, revive);
+  return getPrefJson<T>(key, fallback, revive);
 }
 
 export function writeFallbackJson(key: string, value: unknown): void {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Quota exceeded: the ledger only survives in memory this session, so the next push may resend
-    // one change it already sent. That is traffic, not a lost note.
-  }
+  // A failed write stays in memory for this session: the ledger is a cache, so the next push may
+  // resend one change it already sent. That is traffic, not a lost note.
+  setPref(key, JSON.stringify(value));
 }
 
 /** Plain text, for the keys that were never JSON: a hash, and the initial-sync marker. */
 export function readFallbackText(key: string): string | null {
-  return localStorage.getItem(key);
+  return getPref(key);
 }
 
 export function writeFallbackText(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Same bargain as above: the in-memory copy is still right for this session.
-  }
+  // Same bargain as above: the in-memory copy is still right for this session.
+  setPref(key, value);
 }
 
 export function removeFallbackKey(key: string): void {
-  localStorage.removeItem(key);
+  removePref(key);
 }
 
 function onDisk(vaultId: string): boolean {
@@ -176,8 +174,8 @@ async function flushQueue(): Promise<void> {
 /**
  * The one door to `state.json` logs a failed write and resolves — it is the app's settings file,
  * and a folder rename must not throw into a keystroke. So the only proof the file has a patch is
- * reading it back, and the migration pays for that one read: it deletes the old `localStorage` key
- * only when the file demonstrably holds the new one.
+ * reading it back, and the migration pays for that one read: it deletes the old fallback key only
+ * when the file demonstrably holds the new one.
  */
 export async function writeSyncSectionVerified(patch: Record<string, unknown>): Promise<boolean> {
   const store = sectionStore;
@@ -209,7 +207,7 @@ function sameJson(left: unknown, right: unknown): boolean {
 export interface SectionHydration {
   /** The section as the file has it: the config's hydrate reads its own key out of this. */
   section: Record<string, unknown>;
-  /** False when the file refused the write: the old copy is still in `localStorage`. */
+  /** False when the file refused the write: the old copy is still in the fallback keys. */
   persisted: boolean;
   error: unknown | null;
 }
@@ -261,86 +259,94 @@ function resetSection(): void {
 }
 
 /**
- * The old keys, read once. Every ledger was one `localStorage` entry whose name carried the vault
- * (and usually the room), so the vault id is enough to find them all — the room is derived later,
- * after the seed, and a migration must not wait for it.
+ * The old keys, read once. Every ledger was one entry whose name carried the vault (and usually the
+ * room), so the vault id is enough to find them all — the room is derived later, after the seed, and
+ * a migration must not wait for it.
+ *
+ * Enumeration goes through `prefs` for the same reason every other read here does: it is the only
+ * door, and on the web it holds exactly these keys. On native that means a blob an old build left in
+ * the webview profile is invisible — `prefs` there is `settings.json` — so what this merges now is a
+ * fallback this build wrote itself while the file was unavailable. See `no-legacy.md`.
  */
 function readLegacySection(vaultId: string): { state: SyncSectionState; keys: string[] } {
   const keys: string[] = [];
   const state = emptySection();
-  if (typeof localStorage === 'undefined') return { state, keys };
 
-  for (let index = 0; index < localStorage.length; index++) {
-    const key = localStorage.key(index);
-    if (!key) continue;
+  for (const [key, raw] of getPrefEntries()) {
     if (key === INITIAL_SYNC_PREFIX + vaultId) {
-      state.initialSync = localStorage.getItem(key) === 'pending';
+      state.initialSync = raw === 'pending';
       keys.push(key);
       continue;
     }
     if (key === OUTBOX_PREFIX + vaultId) {
-      state.outbox = sanitizeOutbox(readStoredJson<unknown>(key, []));
+      state.outbox = sanitizeOutbox(parseLegacyJson(raw));
       keys.push(key);
       continue;
     }
     if (key === SYNCED_IDS_PREFIX + vaultId) {
-      state.syncedIds = sanitizeIds(readStoredJson<unknown>(key, []));
+      state.syncedIds = sanitizeIds(parseLegacyJson(raw));
       keys.push(key);
       continue;
     }
     if (key === TOMBSTONES_PREFIX + vaultId) {
-      state.tombstones = sanitizeTombstones(readStoredJson<unknown>(key, {}));
+      state.tombstones = sanitizeTombstones(parseLegacyJson(raw));
       keys.push(key);
       continue;
     }
     // The old checkpoint had two names: the global one, and `<vault>` for a self-hosted room.
     if (key === LAST_STATE_HASH_KEY && vaultId === 'default_vault') {
-      const value = localStorage.getItem(key) || '';
-      if (value) state.stateHash.local = value;
+      if (raw) state.stateHash.local = raw;
       keys.push(key);
       continue;
     }
     if (key === `${LAST_STATE_HASH_KEY}_${vaultId}`) {
-      const value = localStorage.getItem(key) || '';
-      if (value) state.stateHash.local = value;
+      if (raw) state.stateHash.local = raw;
       keys.push(key);
       continue;
     }
     if (key.startsWith(DRAFT_TOMB_PREFIX + vaultId + '_')) {
       const draftId = key.slice((DRAFT_TOMB_PREFIX + vaultId + '_').length);
-      const deletedAt = positiveNumber(localStorage.getItem(key));
+      const deletedAt = positiveNumber(raw);
       if (draftId && deletedAt > 0) state.draftTombstones[draftId] = deletedAt;
       keys.push(key);
       continue;
     }
     const cursor = legacyRoomEntry(key, CURSOR_PREFIX, vaultId);
     if (cursor) {
-      const value = positiveNumber(localStorage.getItem(key));
+      const value = positiveNumber(raw);
       if (value > 0) state.cursor[cursor.room] = value;
       keys.push(key);
       continue;
     }
     const sent = legacyRoomEntry(key, SENT_HASHES_PREFIX, vaultId);
     if (sent) {
-      state.sentHashes[sent.room] = readRecord(readStoredJson<unknown>(key, {}));
+      state.sentHashes[sent.room] = readRecord(parseLegacyJson(raw));
       keys.push(key);
       continue;
     }
     const requests = legacyRoomEntry(key, ATTACHMENT_REQUESTS_PREFIX, vaultId);
     if (requests) {
-      state.attachmentRequests[requests.room] = sanitizeNumbers(readStoredJson<unknown>(key, {}));
+      state.attachmentRequests[requests.room] = sanitizeNumbers(parseLegacyJson(raw));
       keys.push(key);
       continue;
     }
     const hash = legacyRoomEntry(key, `${LAST_STATE_HASH_KEY}_`, vaultId);
     if (hash) {
-      const value = localStorage.getItem(key) || '';
-      if (value) state.stateHash[hash.room] = value;
+      if (raw) state.stateHash[hash.room] = raw;
       keys.push(key);
     }
   }
 
   return { state, keys };
+}
+
+/** A legacy value parsed once: a half-written or foreign one reads as "not there". */
+function parseLegacyJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -388,7 +394,7 @@ export function saveCursor(scope: SyncScope, cursor: number): void {
 
 export function loadSentHashes(scope: SyncScope): Record<string, string> {
   if (onDisk(scope.vaultId)) return { ...(section?.sentHashes[roomOf(scope)] ?? {}) };
-  return readRecord(readStoredJson<unknown>(sentHashesKey(scope), {}));
+  return readRecord(getPrefJson<unknown>(sentHashesKey(scope), {}));
 }
 
 export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>): void {
@@ -403,7 +409,7 @@ export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>)
 
 export function loadSyncedIds(scope: SyncScope): Set<string> {
   if (onDisk(scope.vaultId)) return new Set(section?.syncedIds ?? []);
-  return new Set(sanitizeIds(readStoredJson<unknown>(syncedIdsKey(scope), [])));
+  return new Set(sanitizeIds(getPrefJson<unknown>(syncedIdsKey(scope), [])));
 }
 
 /** First run against a vault that already has notes: treat all of them as known. */
@@ -424,7 +430,7 @@ export function saveSyncedIds(scope: SyncScope, ids: Iterable<string>): void {
 
 export function loadAttachmentRequests(scope: SyncScope): Record<string, number> {
   if (onDisk(scope.vaultId)) return { ...(section?.attachmentRequests[roomOf(scope)] ?? {}) };
-  return sanitizeNumbers(readStoredJson<unknown>(attachmentRequestsKey(scope), {}));
+  return sanitizeNumbers(getPrefJson<unknown>(attachmentRequestsKey(scope), {}));
 }
 
 /**
@@ -511,7 +517,7 @@ export function loadTombstones(scope: SyncScope): TombstoneMap {
   // write it never made. The snapshot belongs to one vault: between a switch and the hydration
   // that follows it, the honest answer is the old storage, not another vault's deletes.
   if (onDisk(scope.vaultId) && section) return { ...section.tombstones };
-  return sanitizeTombstones(readStoredJson<unknown>(tombstonesKey(scope), {}));
+  return sanitizeTombstones(getPrefJson<unknown>(tombstonesKey(scope), {}));
 }
 
 /**
@@ -553,7 +559,7 @@ export function clearSyncLedgers(scope: SyncScope): void {
 
 export function loadOutbox(vaultId: string): SyncOperation[] {
   if (onDisk(vaultId)) return [...(section?.outbox ?? [])];
-  return sanitizeOutbox(readStoredJson<unknown>(OUTBOX_PREFIX + vaultId, []));
+  return sanitizeOutbox(getPrefJson<unknown>(OUTBOX_PREFIX + vaultId, []));
 }
 
 export function saveOutbox(vaultId: string, ops: SyncOperation[]): void {

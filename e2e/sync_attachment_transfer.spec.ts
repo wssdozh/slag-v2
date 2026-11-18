@@ -18,6 +18,7 @@ test('attachment bytes travel as their own change and become playable on the rec
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const { deriveVaultKey, decryptBundle } = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
+    const { getPrefEntries, removePref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
 
     return withSyncHarness(async ({ engine, storage, push, init }) => {
       window.fetch = async (_url, opts) => {
@@ -74,9 +75,9 @@ test('attachment bytes travel as their own change and become playable on the rec
       await sleep(150);
       for (let i = 0; i < 100 && engine.isProcessingSync; i++) await sleep(20);
       // Forget what that push delivered: the pass below has to pack the note and the bytes again.
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith('slag_sync_sent_hashes_'))
-        .forEach((key) => localStorage.removeItem(key));
+      for (const [key] of getPrefEntries()) {
+        if (key.startsWith('slag_sync_sent_hashes_')) removePref(key);
+      }
 
       // Bytes must never be read through a `blob:`/`data:` fetch: a five-megabyte file would be
       // pulled through the network stack twice, and a data: url is not a stable source in WebKit.

@@ -40,6 +40,7 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const { stateHashKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    const { getPref, getPrefEntries, removePref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     return withSyncHarness(async ({ engine, push, init }) => {
       const methods: string[] = [];
       const frames: Array<string | Uint8Array> = [];
@@ -56,9 +57,11 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
       };
       const stateKey = () => stateHashKey(engine.bookkeeping);
       const clear = () => {
-        localStorage.removeItem(stateKey());
-        localStorage.removeItem('slag_sync_last_state_hash');
-        Object.keys(localStorage).filter(k => k.startsWith('slag_sync_sent_hashes_')).forEach(k => localStorage.removeItem(k));
+        removePref(stateKey());
+        removePref('slag_sync_last_state_hash');
+        for (const [key] of getPrefEntries()) {
+          if (key.startsWith('slag_sync_sent_hashes_')) removePref(key);
+        }
       };
 
       // init already pushed whatever it found, and a push with an unchanged state hash is a no-op,
@@ -73,7 +76,7 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
       const textOverSocket = methods.length === 0 && frames.length === 1 && typeof frames[0] === 'string';
       const bundleId = textOverSocket ? JSON.parse(frames[0] as string).bundle.bundleId : '';
       await ack(bundleId);
-      const committedOnAck = localStorage.getItem(stateKey()) !== null;
+      const committedOnAck = getPref(stateKey()) !== null;
 
       // 2. Relay that advertises the binary uplink: a raw frame instead of base64 JSON.
       clear();
@@ -96,14 +99,14 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
       methods.length = 0;
       await push();
       const firstOverHttp = methods.filter(m => m === 'POST').length === 1;
-      const httpCommitted = localStorage.getItem(stateKey()) !== null;
+      const httpCommitted = getPref(stateKey()) !== null;
       clear();
       postStatus = 409;
       methods.length = 0;
       await push();
       const replayAccepted = methods.filter(m => m === 'POST').length === 1
         && engine.status.error === null
-        && localStorage.getItem(stateKey()) !== null;
+        && getPref(stateKey()) !== null;
 
       return { textOverSocket, committedOnAck, binaryFrame, binaryHeader, headerPulledNothing, firstOverHttp, httpCommitted, replayAccepted };
     });

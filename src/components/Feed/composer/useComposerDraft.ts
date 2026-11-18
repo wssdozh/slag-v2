@@ -119,7 +119,7 @@ export const useComposerDraft = ({
   const lastLocalUserEditTimeRef = useRef<number>(0);
   /**
    * The stamp of this window's own last draft write. A draft read back from the queue or
-   * from `localStorage` is that same write, with the attachment bytes already stripped:
+   * from `prefs` is that same write, with the attachment bytes already stripped:
    * adopting it would replace a photo that is still in memory with metadata that has
    * nothing behind it yet.
    */
@@ -280,11 +280,9 @@ export const useComposerDraft = ({
         return;
       }
 
-      // If content is typed locally, remove any leftover deletion tombstone
-      const tombKey = `slag_sync_draft_tomb_${storage.getCurrentVault()?.id || 'default_vault'}_composer:${activeFolder}`;
-      try {
-        localStorage.removeItem(tombKey);
-      } catch {}
+      // A draft's deletion tombstone belongs to the sync ledger, not to the composer: typing here
+      // does not undo a delete that happened elsewhere, and clearing the tombstone would let a
+      // stale copy of the old text come back on the next catch-up.
 
       if (content.trim() || attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
