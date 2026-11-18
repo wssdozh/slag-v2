@@ -32,6 +32,8 @@ let backend: PrefsBackend | null = null;
 let initialization: Promise<void> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let flushQueued = false;
+/** Flushes running right now; a write that lands mid-flush waits for the queue instead. */
+let busyWrites = 0;
 
 /**
  * Reads the snapshot into memory. Called once from `boot()` before the first render; a second call
@@ -106,16 +108,28 @@ export function getPrefJson<T>(
   return revived === undefined ? fallback : revived;
 }
 
-/** One flush in flight at a time: a burst of writes that arrives while it runs waits for the next. */
+/**
+ * One flush in flight at a time, and the first write of a burst runs **now**: a `pagehide` handler
+ * and a test reading the backend in the same tick both have to see it, and the browser backend's
+ * body is synchronous under its promise. The rest coalesce behind the queue.
+ */
 function queueFlush(): void {
   if (!backend || flushQueued) return;
   flushQueued = true;
-  writeQueue = writeQueue.then(flush, flush);
+  if (busyWrites > 0) {
+    writeQueue = writeQueue.then(flush, flush);
+    return;
+  }
+  void flush();
 }
 
 async function flush(): Promise<void> {
   flushQueued = false;
-  if (!backend || pending.size === 0) return;
+  busyWrites += 1;
+  if (!backend || pending.size === 0) {
+    busyWrites -= 1;
+    return;
+  }
   const changes: Record<string, string | null> = {};
   for (const [key, value] of pending) changes[key] = value;
   pending.clear();
@@ -127,5 +141,7 @@ async function flush(): Promise<void> {
       if (!pending.has(key)) pending.set(key, value);
     }
     log.warn('Settings could not be written; they stay in memory:', err);
+  } finally {
+    busyWrites -= 1;
   }
 }

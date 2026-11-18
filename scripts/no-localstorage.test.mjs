@@ -14,18 +14,23 @@ import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SRC = join(ROOT, 'src');
 
-/** The one file allowed to reach `localStorage`: the browser build's backend, and nothing else. */
-const ALLOWLIST = new Set(['src/lib/storage/prefsBackend.browser.ts']);
+/**
+ * Who may reach `localStorage`, and why. Both are browser-only paths: the backend `prefs.ts` picks
+ * when there is no Tauri, and the headless runtime's own shim.
+ */
+const ALLOWLIST = new Set([
+  'src/lib/storage/prefsBackend.browser.ts',
+  'src/node/env.ts',
+]);
 
 /**
  * What the migration has not converted yet, one line per wave: the file is struck from the list
- * when its last `localStorage.` goes. Never add here — new code reads `getPref` from `prefs.ts`.
+ * when its last `localStorage` use goes. Never add here — new code reads `getPref` from `prefs.ts`.
  */
 const BASELINE = [
   'src/components/Feed/composer/useComposerDraft.ts',
-  'src/lib/backupService.ts',
+  'src/components/Logs/LogViewer.tsx',
   'src/lib/logger/logger.ts',
-  'src/lib/notify/assistant.ts',
   'src/lib/platform/encryptedLocalStore.ts',
   'src/lib/platform/secretStore.ts',
   'src/lib/storage/folderStore.ts',
@@ -35,7 +40,6 @@ const BASELINE = [
   'src/lib/storage/usage.ts',
   'src/lib/storage/vaultFiles.ts',
   'src/lib/storage/vaultRegistry.ts',
-  'src/lib/storage/vaultTransfer.ts',
   'src/lib/sync/applyBundle.ts',
   'src/lib/sync/localBookkeeping.ts',
   'src/lib/sync/outbox/outbox.ts',
@@ -43,6 +47,20 @@ const BASELINE = [
   'src/lib/sync/syncConfig.ts',
   'src/lib/sync/syncEngine.ts',
 ];
+
+/**
+ * Prose about the exit is everywhere — docblocks explain what used to live there. Only code counts,
+ * so comments go before the match does. `//` in a url or a scheme survives, which is the one
+ * heuristic this needs.
+ */
+function stripComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+}
+
+/** `localStorage.getItem`, `localStorage[key]`, `Object.keys(localStorage)` — all the same sin. */
+const USES_LOCAL_STORAGE = /\blocalStorage\b/;
 
 function sourceFiles(dir) {
   const files = [];
@@ -55,11 +73,11 @@ function sourceFiles(dir) {
 }
 
 function read(file) {
-  return readFileSync(join(ROOT, file), 'utf8');
+  return stripComments(readFileSync(join(ROOT, file), 'utf8'));
 }
 
 const files = sourceFiles(SRC);
-const referencing = files.filter((file) => /\blocalStorage\./.test(read(file)));
+const referencing = files.filter((file) => USES_LOCAL_STORAGE.test(read(file)));
 
 test('localStorage: nothing outside the browser backend and the baseline', () => {
   const offenders = referencing.filter((file) => !ALLOWLIST.has(file) && !BASELINE.includes(file));
