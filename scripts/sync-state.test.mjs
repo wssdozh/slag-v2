@@ -78,13 +78,11 @@ test('config: absent, empty and junk all read as "nothing was stored"', () => {
 test('migration: the old blob is merged into the file, and a second run changes nothing', () => {
   const file = sectionFromState({
     tombstones: { note_a: 200 },
-    syncedIds: ['note_a'],
     cursor: { room_x: 4 },
     sentHashes: { room_x: { 'item:note_a': 'hash-a' } },
   });
   const legacy = sectionFromState({
     tombstones: { note_a: 100, note_b: 300 },
-    syncedIds: ['note_a', 'note_b'],
     cursor: { room_x: 2 },
     sentHashes: { room_x: { 'item:note_a': 'stale', 'item:note_b': 'hash-b' } },
   });
@@ -92,7 +90,6 @@ test('migration: the old blob is merged into the file, and a second run changes 
   const merged = mergeSectionState(file, legacy);
   assert.deepEqual(Object.keys(merged.tombstones).sort(), ['note_a', 'note_b'], 'neither side loses a delete');
   assert.equal(merged.tombstones.note_a, 200, 'the later stamp wins, so nothing is resurrected');
-  assert.deepEqual(merged.syncedIds, ['note_a', 'note_b'], 'ids add up, once each');
   assert.equal(merged.cursor.room_x, 4, 'a cursor never goes back');
   assert.deepEqual(merged.sentHashes.room_x, { 'item:note_a': 'hash-a', 'item:note_b': 'hash-b' },
     'the file wins per entity, the blob only fills the gaps');
@@ -158,7 +155,7 @@ test('section: one write of the whole section still merges, it does not replace'
 
 test('section: empty, missing and broken all read as empty', () => {
   const empty = {
-    tombstones: {}, cursor: {}, sentHashes: {}, syncedIds: [], attachmentRequests: {},
+    tombstones: {}, cursor: {}, sentHashes: {}, attachmentRequests: {},
     draftTombstones: {}, stateHash: {}, outbox: [], initialSync: false,
   };
   for (const state of [undefined, null, {}, [], 'nope', 42, { tombstones: [], cursor: 'x', outbox: {} }]) {

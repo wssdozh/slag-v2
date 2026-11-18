@@ -9,8 +9,6 @@ import {
   loadCursor,
   saveCursor,
   saveSentHashes,
-  saveSyncedIds,
-  seedSyncedIds,
   clearSyncLedgers,
   hydrateSyncSection,
   saveTombstones,
@@ -89,7 +87,6 @@ export interface PendingPush {
   frame: Uint8Array<ArrayBuffer>;
   stateHash: string;
   packedHashes: Record<string, string>;
-  syncedIds: string[];
   tombstones: Record<string, number>;
   opIds: string[];
   changes: number;
@@ -173,6 +170,12 @@ export class SyncEngine {
   public importBuffer: {
     items: SlagItem[];
     folders: FolderMeta[];
+    /**
+     * Notes this burst deleted, by id. The write takes exactly these off the disk: a bundle carries
+     * changes, and "absent from the list" is not a deletion — that reading once removed every note
+     * the sender never mentioned.
+     */
+    removedIds: string[];
     /** Staged workspace: the field name is the one `importSyncedVaultData` reads. */
     workspaceState?: WorkspaceState;
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean };
@@ -581,6 +584,7 @@ export class SyncEngine {
   public stageImport(
     items: SlagItem[],
     folders: FolderMeta[],
+    removedIds: string[],
     workspaceState: WorkspaceState | undefined,
     detail: { items: boolean; folders: boolean; workspace: boolean; drafts: boolean; memory: boolean },
     bundleId: string
@@ -588,9 +592,14 @@ export class SyncEngine {
     const previous = this.importBuffer?.detail;
     const bundles = this.importBuffer?.bundles ?? [];
     if (!bundles.includes(bundleId)) bundles.push(bundleId);
+    // A burst is one write, so a note deleted by the first bundle and named by the second stays
+    // named: the union is what the write is allowed to take off the disk.
+    const removed = new Set(this.importBuffer?.removedIds ?? []);
+    for (const id of removedIds) removed.add(id);
     this.importBuffer = {
       items,
       folders,
+      removedIds: [...removed],
       workspaceState: workspaceState ?? this.importBuffer?.workspaceState,
       detail: {
         items: detail.items || Boolean(previous?.items),
@@ -630,6 +639,7 @@ export class SyncEngine {
       await vault().importSyncedVaultData({
         items: buffered.items,
         folders: buffered.folders,
+        removedIds: buffered.removedIds,
         workspaceState: buffered.workspaceState,
       });
     } catch (error) {
@@ -863,11 +873,10 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
-      // The deleted ledger is in memory by now, from the hydrate at the top of init: a pull that
-      // started without it would accept a stale copy of a note this device deleted, and a push
-      // would say nothing about that note at all. `switchVault` lands here too, after the vault id
-      // it hydrated from has changed.
-      seedSyncedIds(this.bookkeeping, vault().getItems().map((it) => it.id));
+      // The tombstone ledger is in memory by now, from the hydrate at the top of init: a pull that
+      // started without it would accept a stale copy of a note this device deleted. Nothing is
+      // seeded into it from the index — a note that is merely not loaded yet is not a deletion.
+      // `switchVault` lands here too, after the vault id it hydrated from has changed.
       // Presence first. The socket is how every other device and the telegram bot see this one,
       // and the backlog below is a download that can take minutes or die halfway over a tunnel.
       // It used to run before the connect, so a slow backlog left the device invisible for its
@@ -992,7 +1001,6 @@ export class SyncEngine {
 
     saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
-    saveSyncedIds(this.bookkeeping, pending.syncedIds);
     saveTombstones(this.bookkeeping, pending.tombstones);
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();

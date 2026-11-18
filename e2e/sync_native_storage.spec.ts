@@ -59,7 +59,10 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
       const localPreserved = localInMemory && localOnDisk;
       let unsafeRejected = false;
       try { await storage.importSyncedVaultData({ items: [{ ...note, folder: '../escape' }] }); } catch { unsafeRejected = true; }
-      await storage.importSyncedVaultData({ items: [] });
+      // An import takes off the disk what the bundle named as deleted, and nothing else: an empty
+      // payload alone is a bundle that said nothing, not a vault that lost every note.
+      const staleIds = storage.getItems().map((item) => item.id);
+      await storage.importSyncedVaultData({ items: [], removedIds: staleIds });
       return { restored: { title: restored.title, updatedAt: restored.updatedAt }, rejected, replacementOnDisk, concurrentRejected, localPreserved, localInMemory, localOnDisk, unsafeRejected, trashed: [...files.keys()].some(path => path.includes('/.trash/')), markdownFiles: [...files.keys()].filter(path => path.includes('/notes/') && path.endsWith('.md')).length };
     } finally { delete window.__TAURI_INTERNALS__; delete window.isTauri; }
   });

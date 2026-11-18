@@ -215,14 +215,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       itemsCount: currentItems.length,
       foldersCount: currentFolders.length,
     });
-    void storage.initTauriFs().then((loadedNew) => {
-      if (loadedNew) {
-        refreshData();
-      }
-    });
+    // The disk is read before the engine wakes. A push built from an index that has not loaded yet
+    // says the vault is empty, and the relay believes it: sync used to start from here and race
+    // this scan, and one second of an empty index was enough to empty every device.
+    void storage
+      .initTauriFs()
+      .then((loadedNew) => {
+        if (loadedNew) refreshData();
+      })
+      .finally(() => void syncEngine.init());
 
     accountClient.startPolling(syncEngine.getConfig().serverUrl);
-    void syncEngine.init();
     let wasAuthenticated = accountClient.isAuthenticated();
     const unsubscribeAccount = accountClient.subscribe(() => {
       const isAuthenticated = accountClient.isAuthenticated();

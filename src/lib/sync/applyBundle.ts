@@ -111,6 +111,9 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
 
       const currentItems: SlagItem[] = engine.importBuffer ? [...engine.importBuffer.items] : [...vault().getItems()];
       const currentFolders: FolderMeta[] = engine.importBuffer ? [...engine.importBuffer.folders] : [...vault().getFolders()];
+      // The notes this bundle says are gone. Collected as it goes: the write takes exactly these off
+      // the disk, instead of every note the payload happens not to list.
+      const removedIds: string[] = [];
       const tombstones = loadTombstones(engine.bookkeeping);
       let tombstonesDirty = false;
 
@@ -138,6 +141,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             const idx = currentItems.findIndex((it) => it.id === ch.id);
             if (idx >= 0 && (currentItems[idx].updatedAt ?? 0) <= deletedAt) {
               currentItems.splice(idx, 1);
+              removedIds.push(ch.id);
               hasItemsChanged = true;
             }
             if (deletedAt > (tombstones[ch.id] ?? 0)) {
@@ -368,7 +372,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       if (staged) {
         // The ACK belongs to the write, not to the merge: the flush sends it once the buffer
         // is on disk, so a failed write leaves the bundle pending and the relay re-delivers it.
-        engine.stageImport(currentItems, currentFolders, hasWorkspaceChanged ? workspaceState : undefined, {
+        engine.stageImport(currentItems, currentFolders, removedIds, hasWorkspaceChanged ? workspaceState : undefined, {
           items: hasItemsChanged,
           folders: hasFoldersChanged,
           workspace: hasWorkspaceChanged,

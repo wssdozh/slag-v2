@@ -1,7 +1,8 @@
 import type { PendingPush, SyncEngine } from './syncEngine';
 import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
-import { loadSentHashes, loadSyncedIds, loadStateHash, loadTombstones, saveSentHashes, saveStateHash } from './localBookkeeping';
+import { loadSentHashes, loadStateHash, loadTombstones, saveSentHashes, saveStateHash } from './localBookkeeping';
+import { deletionsFromOutbox } from './itemDeletions';
 import { accountClient } from './account';
 import { vault } from '../storage/port';
 import { stripAttachmentData } from '../storage/attachmentData';
@@ -201,14 +202,13 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         });
       }
 
-      // Pack deletions as explicit tombstones so a stale snapshot cannot resurrect them.
-      const syncedIds = loadSyncedIds(engine.bookkeeping);
-      const currentIds = new Set(items.map((it) => it.id));
+      // Deletions the outbox is holding, and nothing else. A note is gone because something said
+      // so — the trash moved it, the watcher saw the file vanish — never because the list this
+      // moment is short: the index reads empty for the first second of every start, and
+      // `syncedIds` minus that list once sent "eighty-four notes deleted" to every device.
       const tombstones = loadTombstones(engine.bookkeeping);
-      for (const id of syncedIds) {
-        if (currentIds.has(id)) continue;
-        const deletedAt = tombstones[id] ?? Date.now();
-        tombstones[id] = deletedAt;
+      for (const { id, deletedAt } of deletionsFromOutbox(pendingOps)) {
+        if (deletedAt > (tombstones[id] ?? 0)) tombstones[id] = deletedAt;
         changes.push({
           id,
           type: 'item',
@@ -218,7 +218,9 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
           payload: { deletedAt },
         });
       }
-      for (const id of currentIds) {
+      // A note that exists is not deleted, whatever the ledger says: the tombstone only ever guards
+      // a stale copy from coming back.
+      for (const id of items.map((it) => it.id)) {
         delete tombstones[id];
       }
 
@@ -293,7 +295,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         frame: encodeBundleFrame(encrypted),
         stateHash,
         packedHashes,
-        syncedIds: [...currentIds],
         tombstones: { ...tombstones },
         opIds: pendingOps.map((o) => o.opId),
         changes: changes.length,

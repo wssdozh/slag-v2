@@ -13,7 +13,7 @@ import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from '../st
 import { sanitizeTombstones } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
 import type { SyncOperation } from './entities/types.ts';
-import { emptySection, mergeSectionState, sanitizeIds, sanitizeNumbers, sanitizeOutbox, sectionFromState, sectionToPatch } from './syncSection.ts';
+import { emptySection, mergeSectionState, sanitizeNumbers, sanitizeOutbox, sectionFromState, sectionToPatch } from './syncSection.ts';
 import type { SyncSectionState } from './syncSection.ts';
 
 /** The `state.json` section this module owns; the store adapter names it, nothing else does. */
@@ -30,7 +30,6 @@ const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 const DRAFT_TOMB_PREFIX = SYNC_STORAGE_KEYS.DRAFT_TOMB_PREFIX;
 const INITIAL_SYNC_PREFIX = 'slag_initial_sync_';
 const OUTBOX_PREFIX = 'slag_sync_outbox_';
-const SYNCED_IDS_PREFIX = 'slag_sync_synced_ids_';
 const TOMBSTONES_PREFIX = 'slag_sync_tombstones_';
 const CURSOR_PREFIX = 'slag_sync_cursor_';
 const SENT_HASHES_PREFIX = 'slag_sync_sent_hashes_';
@@ -46,10 +45,6 @@ export function stateHashKey(scope: SyncScope, vaultId?: string): string {
   return scope.accountSync && scope.roomId
     ? `${LAST_STATE_HASH_KEY}_${vid}_${scope.roomId}`
     : `${LAST_STATE_HASH_KEY}_${vid}`;
-}
-
-export function syncedIdsKey(scope: SyncScope, vaultId?: string): string {
-  return `${SYNCED_IDS_PREFIX}${vaultId || scope.vaultId}`;
 }
 
 export function tombstonesKey(scope: SyncScope, vaultId?: string): string {
@@ -283,11 +278,6 @@ function readLegacySection(vaultId: string): { state: SyncSectionState; keys: st
       keys.push(key);
       continue;
     }
-    if (key === SYNCED_IDS_PREFIX + vaultId) {
-      state.syncedIds = sanitizeIds(parseLegacyJson(raw));
-      keys.push(key);
-      continue;
-    }
     if (key === TOMBSTONES_PREFIX + vaultId) {
       state.tombstones = sanitizeTombstones(parseLegacyJson(raw));
       keys.push(key);
@@ -407,27 +397,6 @@ export function saveSentHashes(scope: SyncScope, hashes: Record<string, string>)
   writeFallbackJson(sentHashesKey(scope), clean);
 }
 
-export function loadSyncedIds(scope: SyncScope): Set<string> {
-  if (onDisk(scope.vaultId)) return new Set(section?.syncedIds ?? []);
-  return new Set(sanitizeIds(getPrefJson<unknown>(syncedIdsKey(scope), [])));
-}
-
-/** First run against a vault that already has notes: treat all of them as known. */
-export function seedSyncedIds(scope: SyncScope, ids: string[]): void {
-  if (loadSyncedIds(scope).size > 0) return;
-  saveSyncedIds(scope, ids);
-}
-
-export function saveSyncedIds(scope: SyncScope, ids: Iterable<string>): void {
-  const clean = sanitizeIds([...ids]);
-  if (onDisk(scope.vaultId) && section) {
-    section.syncedIds = clean;
-    void writeSyncSection({ syncedIds: clean });
-    return;
-  }
-  writeFallbackJson(syncedIdsKey(scope), clean);
-}
-
 export function loadAttachmentRequests(scope: SyncScope): Record<string, number> {
   if (onDisk(scope.vaultId)) return { ...(section?.attachmentRequests[roomOf(scope)] ?? {}) };
   return sanitizeNumbers(getPrefJson<unknown>(attachmentRequestsKey(scope), {}));
@@ -541,14 +510,12 @@ export function clearSyncLedgers(scope: SyncScope): void {
     section.tombstones = {};
     section.cursor[roomOf(scope)] = 0;
     section.sentHashes[roomOf(scope)] = {};
-    section.syncedIds = [];
     section.stateHash = {};
     section.outbox = [];
     void writeSyncSection(sectionToPatch(section));
     return;
   }
   removeFallbackKey(tombstonesKey(scope));
-  removeFallbackKey(syncedIdsKey(scope));
   removeFallbackKey(cursorKey(scope));
   removeFallbackKey(sentHashesKey(scope));
   removeFallbackKey(stateHashKey(scope));

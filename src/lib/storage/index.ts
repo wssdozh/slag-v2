@@ -82,6 +82,7 @@ import {
   type VaultImportIo,
   type VaultImportPayload,
 } from './vaultTransfer';
+import { notesRemovedByImport } from './noteRemoval';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -735,6 +736,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   public async importSyncedVaultData(data: {
     items?: SlagItem[];
     folders?: FolderMeta[];
+    removedIds?: string[];
     workspaceState?: WorkspaceState;
   }): Promise<void> {
     const vault = this.currentVault;
@@ -778,8 +780,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
           const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
           await this.files.flushItemToDisk(item, old?.folder, oldFilename, vault, true, nextPaths);
         }
-        for (const item of previous) {
-          if (!nextIds.has(item.id) && !nextPaths.has(notePath(item))) await this.files.removeItemFromDisk(item, vault, true);
+        // Only the ids the bundle deleted leave the disk. A note the payload does not list is one
+        // the sender never mentioned, and that is not a deletion: reading it as one is what took
+        // eighty-four files off this disk while the app was still loading its index.
+        for (const item of notesRemovedByImport(previous, nextIds, data.removedIds ?? [])) {
+          await this.files.removeItemFromDisk(item, vault, true);
         }
       }
       const notesPath = this.files.getVaultNotesPath(vault);

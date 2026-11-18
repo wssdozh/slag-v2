@@ -19,6 +19,11 @@ export type ChangeOrigin = 'local' | 'remote';
 export interface SyncedVaultData {
   items?: SlagItem[];
   folders?: FolderMeta[];
+  /**
+   * Notes the bundle deleted. The only ids the write may take off the disk: what a bundle does not
+   * mention is a note it never touched, not one it removed.
+   */
+  removedIds?: string[];
   workspaceState?: WorkspaceState;
 }
 

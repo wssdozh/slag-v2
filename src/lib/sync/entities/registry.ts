@@ -4,8 +4,11 @@ import type { SyncOperation } from './types';
 
 export function createSyncOpFromStorageEvent(event: StorageChangeEvent): SyncOperation | null {
   // Only the app's own edits travel. A bundle that just landed is applied state, and a file that
-  // changed on disk under us came from outside the sync loop altogether.
-  if (event.origin === 'remote' || event.origin === 'external') return null;
+  // changed on disk under us came from outside the sync loop altogether — except a note that
+  // vanished: a deletion is an event whichever door it came through, and without it the relay
+  // hands the note back on the next pull.
+  if (event.origin === 'remote') return null;
+  if (event.origin === 'external' && !(event.kind === 'item' && event.action === 'delete')) return null;
 
   const timestamp = Date.now();
   const opId = `op_${crypto.randomUUID()}`;

@@ -1,21 +1,18 @@
 import { test, expect } from './support/selfhostFixture';
 
-test('push emits delete tombstones for removed ids', async ({ page }) => {
+test('push says nothing about notes until one is actually deleted', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  // Whichever test lands first pays the dev server's cold transform of the whole app, and on a
+  // loaded machine that is a minute, not five seconds.
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     const cryptoMod = await import(/* @vite-ignore */ '/src/lib/sync/crypto.ts');
-    const { stateHashKey, syncedIdsKey, tombstonesKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
-    const { getPref, removePref, setPref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
+    const { stateHashKey, tombstonesKey } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    const { getPref, removePref } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
     return withSyncHarness(async ({ engine, push, init }) => {
       await init('synthetic delete seed');
       const scope = engine.bookkeeping;
-      // init pushed the empty vault already, and a push whose state hash matches the last
-      // checkpoint is skipped before the diff is walked: forget the checkpoint, not the intent.
-      removePref(stateHashKey(scope));
-      removePref('slag_sync_last_state_hash');
-      setPref(syncedIdsKey(scope), JSON.stringify(['ghost-note']));
       const key = await cryptoMod.deriveVaultKey('synthetic delete seed');
       let captured: { changes?: Array<{ id: string; type: string; action: string }> } = {};
       window.fetch = async (_url, opts) => {
@@ -24,21 +21,40 @@ test('push emits delete tombstones for removed ids', async ({ page }) => {
         captured = await cryptoMod.decryptBundle(encrypted, key);
         return new Response('{}', { status: 200 });
       };
+      const itemDeletes = () => (captured.changes || []).filter((c) => c.type === 'item' && c.action === 'delete');
+
+      // The vault this device already sent everything from, read while the index was still empty:
+      // no note was deleted, so the bundle must not claim one was. This is the run that emptied
+      // three devices — the old push walked `syncedIds` minus the items it could see, and when it
+      // could see nothing that difference was the whole vault.
+      removePref(stateHashKey(scope));
+      removePref('slag_sync_last_state_hash');
       await push();
-      const deleteChanges = (captured.changes || []).filter((c) => c.type === 'item' && c.action === 'delete');
+      const quietRun = itemDeletes().length;
+
+      // A note the person deleted leaves an op behind, and the push reads that op.
+      engine.getOutbox().enqueue({
+        opId: 'op_ghost', kind: 'item', id: 'ghost-note', action: 'delete', timestamp: Date.now(),
+      });
+      captured = {};
+      removePref(stateHashKey(scope));
+      await push();
+      const deleteChanges = itemDeletes();
       return {
+        quietRun,
         hasDelete: deleteChanges.some((c) => c.id === 'ghost-note'),
-        syncedIdsUpdated: !JSON.parse(getPref(syncedIdsKey(scope)) || '[]').includes('ghost-note'),
         tombstoneStored: Object.prototype.hasOwnProperty.call(JSON.parse(getPref(tombstonesKey(scope)) || '{}'), 'ghost-note'),
       };
     });
   });
-  expect(result).toEqual({ hasDelete: true, syncedIdsUpdated: true, tombstoneStored: true });
+  expect(result).toEqual({ quietRun: 0, hasDelete: true, tombstoneStored: true });
 });
 
 test('delete wins over stale upsert and restore wins over delete', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  // Whichever test lands first pays the dev server's cold transform of the whole app, and on a
+  // loaded machine that is a minute, not five seconds.
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     return withSyncHarness(async ({ engine, storage, init }) => {
@@ -77,7 +93,9 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
 
 test('folder rename and deletion propagate to folders, nested items, and outbox', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  // Whichever test lands first pays the dev server's cold transform of the whole app, and on a
+  // loaded machine that is a minute, not five seconds.
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
   const result = await page.evaluate(async () => {
     const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
     return withSyncHarness(async ({ engine, storage, init }) => {

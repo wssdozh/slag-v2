@@ -23,8 +23,6 @@ export interface SyncSectionState {
   cursor: Record<string, number>;
   /** Hashes of the last state this device sent, per room. */
   sentHashes: Record<string, Record<string, string>>;
-  /** Ids the relay has seen. A missing one looks like a note this device never had. */
-  syncedIds: string[];
   /** When a file was last asked for, per room. */
   attachmentRequests: Record<string, Record<string, number>>;
   /** When this vault deleted a draft: a peer replaying the text must lose it. */
@@ -45,7 +43,6 @@ export function emptySection(): SyncSectionState {
     tombstones: {},
     cursor: {},
     sentHashes: {},
-    syncedIds: [],
     attachmentRequests: {},
     draftTombstones: {},
     stateHash: {},
@@ -61,7 +58,6 @@ export function sectionFromState(value: unknown): SyncSectionState {
     tombstones: tombstonesFromState(value),
     cursor: sanitizeNumbers(value.cursor),
     sentHashes: sanitizeRoomRecords(value.sentHashes, sanitizeHashRecord),
-    syncedIds: sanitizeIds(value.syncedIds),
     attachmentRequests: sanitizeRoomRecords(value.attachmentRequests, sanitizeNumbers),
     draftTombstones: sanitizeNumbers(value.draftTombstones),
     stateHash: sanitizeRecords(value.stateHash, (entry) => (typeof entry === 'string' && entry ? entry : undefined)),
@@ -80,7 +76,6 @@ export function sectionToPatch(state: SyncSectionState): Record<string, unknown>
     tombstones: state.tombstones,
     cursor: state.cursor,
     sentHashes: state.sentHashes,
-    syncedIds: state.syncedIds,
     attachmentRequests: state.attachmentRequests,
     draftTombstones: state.draftTombstones,
     stateHash: state.stateHash,
@@ -99,7 +94,6 @@ export function mergeSectionState(stored: Partial<SyncSectionState>, legacy: Par
     tombstones: mergeTombstones(stored.tombstones ?? {}, legacy.tombstones ?? {}),
     cursor: mergeNumbers(stored.cursor ?? {}, legacy.cursor ?? {}),
     sentHashes: mergeRoomRecords(stored.sentHashes ?? {}, legacy.sentHashes ?? {}),
-    syncedIds: mergeIds(stored.syncedIds ?? [], legacy.syncedIds ?? []),
     attachmentRequests: mergeRoomRecords(stored.attachmentRequests ?? {}, legacy.attachmentRequests ?? {}),
     draftTombstones: mergeNumbers(stored.draftTombstones ?? {}, legacy.draftTombstones ?? {}),
     stateHash: { ...legacy.stateHash, ...stored.stateHash },
@@ -117,11 +111,6 @@ export function mergeNumbers(stored: Record<string, number>, legacy: Record<stri
   return merged;
 }
 
-/** Ids only add up: a forgotten one would look like a note this device has never heard of. */
-export function mergeIds(stored: string[], legacy: string[]): string[] {
-  return [...new Set([...sanitizeIds(stored), ...sanitizeIds(legacy)])];
-}
-
 /** One op per `opId`: the same unsent change is the same change, whichever copy it came from. */
 export function mergeOutbox(stored: SyncOperation[], legacy: SyncOperation[]): SyncOperation[] {
   const byOpId = new Map(sanitizeOutbox(stored).map((op): [string, SyncOperation] => [op.opId, op]));
@@ -136,19 +125,6 @@ export function sanitizeNumbers(value: unknown): Record<string, number> {
   return sanitizeRecords(value, (entry) => (
     typeof entry === 'number' && Number.isFinite(entry) && entry > 0 ? entry : undefined
   ));
-}
-
-/** Ids only: an empty string or a number is not an id the relay has seen. */
-export function sanitizeIds(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const entry of value) {
-    if (typeof entry !== 'string' || !entry || seen.has(entry)) continue;
-    seen.add(entry);
-    ids.push(entry);
-  }
-  return ids;
 }
 
 /** An op is seven named fields; half an op would be replayed as a change nobody asked for. */
