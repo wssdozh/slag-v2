@@ -49,35 +49,55 @@ test.describe('secrets at rest', () => {
     await expect(page.locator('main').first()).toBeVisible({ timeout: 120_000 });
   });
 
-  test('migrates seed, session and device key out of plaintext localStorage', async ({ page }) => {
-    const state = await page.evaluate(() => {
-      const secure = Object.entries(localStorage).filter(([key]) => key.startsWith('slag_secure_v1:'));
+  // The profile used to be scraped for plaintext session, device key and seed, and everything found
+  // was moved into the AES store. That migration is gone: a key that is not in the store is not a
+  // key, and sync asks for the seed phrase instead of inventing an identity from the leftovers.
+  test('does not adopt the plaintext secrets left in the webview profile', async ({ page }) => {
+    const state = await page.evaluate(async () => {
+      const { accountClient } = await import('/src/lib/sync/account.ts');
+      const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+      const scopes = Object.keys(localStorage).filter((key) => key.startsWith('slag_secure_v1:'));
       return {
-        secureKeys: secure.map(([key]) => key),
-        secureValues: secure.map(([, value]) => value),
-        session: localStorage.getItem('slag_account_session_v1'),
-        deviceKey: localStorage.getItem('slag_account_device_v1:legacy-device'),
-        config: localStorage.getItem('slag_sync_config_v2_default_vault'),
+        session: accountClient.getSession(),
+        isAuthenticated: accountClient.isAuthenticated(),
+        scopeKeys: scopes,
+        seed: syncEngine.getConfig().seedPhrase,
       };
     });
 
     expect(state.session).toBeNull();
-    expect(state.deviceKey).toBeNull();
-    expect(state.config).not.toContain(SEED);
-    expect(state.config).not.toContain('seedPhrase');
-    expect(state.secureKeys).toEqual(expect.arrayContaining([
-      'slag_secure_v1:vault-seed:default_vault',
-      'slag_secure_v1:account-session',
-      'slag_secure_v1:device-key:legacy-device',
-    ]));
-
-    const ciphertext = state.secureValues.join('\n');
-    expect(ciphertext).not.toContain(SEED);
-    expect(ciphertext).not.toContain(TOKEN);
-    expect(ciphertext).not.toContain(PRIVATE_KEY_D);
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.scopeKeys).not.toContain('slag_secure_v1:account-session');
+    expect(state.scopeKeys).not.toContain(`slag_secure_v1:device-key:${DEVICE_ID}`);
+    expect(state.seed).not.toBe(SEED);
   });
 
-  test('is idempotent across reloads and keeps the seed available to sync', async ({ page }) => {
+  test('a seed written through the app goes to the store, never into the config JSON', async ({ page }) => {
+    const nextSeed = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
+    const result = await page.evaluate(async (seed) => {
+      const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+      await syncEngine.setVaultSeedPhrase('default_vault', seed);
+      return {
+        config: localStorage.getItem('slag_sync_config_v2_default_vault'),
+        secure: Object.entries(localStorage)
+          .filter(([key]) => key.startsWith('slag_secure_v1:'))
+          .map(([, value]) => value),
+        seed: syncEngine.getConfig().seedPhrase,
+      };
+    }, nextSeed);
+
+    expect(result.seed).toBe(nextSeed);
+    expect(result.config).not.toContain(nextSeed);
+    expect(result.config).not.toContain('seedPhrase');
+    expect(result.secure.join('\n')).not.toContain(nextSeed);
+  });
+
+  test('keeps the seed in the store across reloads', async ({ page }) => {
+    const seed = 'abandon ability able about above absent absorb abstract absurd abuse access accident';
+    await page.evaluate(async (value) => {
+      const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+      await syncEngine.setVaultSeedPhrase('default_vault', value);
+    }, seed);
     const before = await page.evaluate(() => Object.keys(localStorage)
       .filter((key) => key.startsWith('slag_secure_v1:')).sort());
 
@@ -94,25 +114,8 @@ test.describe('secrets at rest', () => {
     });
 
     expect(after.keys).toEqual(before);
-    expect(after.seed).toBe(SEED);
-    expect(after.storedConfig).not.toContain(SEED);
-  });
-
-  test('new seed writes go to the secure store, never back into the config JSON', async ({ page }) => {
-    const nextSeed = 'legal winner thank year wave sausage worth useful legal winner thank yellow';
-    const result = await page.evaluate(async (seed) => {
-      const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
-      await syncEngine.setVaultSeedPhrase('default_vault', seed);
-      return {
-        config: localStorage.getItem('slag_sync_config_v2_default_vault'),
-        secure: Object.keys(localStorage).filter((key) => key.startsWith('slag_secure_v1:')),
-        seed: syncEngine.getConfig().seedPhrase,
-      };
-    }, nextSeed);
-
-    expect(result.seed).toBe(nextSeed);
-    expect(result.config).not.toContain(nextSeed);
-    expect(result.config).not.toContain('seedPhrase');
-    expect(result.secure).toContain('slag_secure_v1:vault-seed:default_vault');
+    expect(after.keys).toContain('slag_secure_v1:vault-seed:default_vault');
+    expect(after.seed).toBe(seed);
+    expect(after.storedConfig).not.toContain(seed);
   });
 });
