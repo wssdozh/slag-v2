@@ -87,6 +87,8 @@ export interface FolderMeta {
   icon?: string;
   kanbanColumns?: KanbanColumn[];
   showReferenceColumn?: boolean;
+  /** Manual position in the tree; absent while the folder was never dragged. */
+  order?: number;
 }
 
 export interface VaultMeta {

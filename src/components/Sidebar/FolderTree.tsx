@@ -1,20 +1,36 @@
-// Nested folder tree in the sidebar: expand, select, drag items between branches.
-import React, { useState } from 'react';
+// Nested folder tree in the sidebar: expand, select, and drag — a note lands in a folder, a folder
+// lands in a folder or between two rows.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { FolderMeta } from '../../types';
 import { Icon } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
 import { logger } from '../../lib/logger/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { buildFolderTree, type FolderDropMode, type FolderNode } from '../../lib/vault/folderTree';
 
 const uiLog = logger.scope('UI');
 
-interface TreeNode {
-  name: string;
-  fullPath: string;
-  meta?: FolderMeta;
-  children: TreeNode[];
+/** The notes drag as `text/plain`; a folder needs its own type so the two never read each other. */
+const FOLDER_DRAG_TYPE = 'application/x-slag-folder';
+
+type RowDropMode = Exclude<FolderDropMode, 'root-end'>;
+interface DropHint {
+  path: string;
+  mode: RowDropMode;
 }
+
+/** The band of the row the pointer is in decides what a drop means. */
+function modeAt(event: React.DragEvent<HTMLDivElement>): RowDropMode {
+  const rect = event.currentTarget.getBoundingClientRect();
+  if (rect.height <= 0) return 'into';
+  const ratio = (event.clientY - rect.top) / rect.height;
+  if (ratio < 0.3) return 'before';
+  if (ratio > 0.7) return 'after';
+  return 'into';
+}
+
+const carriesFolder = (dataTransfer: DataTransfer): boolean =>
+  Array.from(dataTransfer.types).includes(FOLDER_DRAG_TYPE);
 
 export const FolderTree: React.FC = () => {
   const {
@@ -23,7 +39,8 @@ export const FolderTree: React.FC = () => {
     setCurrentFolder,
     items,
     moveItem,
-    openContextMenu
+    moveFolder,
+    openContextMenu,
   } = useApp();
 
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({
@@ -56,90 +73,135 @@ export const FolderTree: React.FC = () => {
     }
   }
 
-  const [dragOverPath, setDragOverPath] = useState<string | null>(null);
+  const [dropHint, setDropHint] = useState<DropHint | null>(null);
+  const [draggingPath, setDraggingPath] = useState<string | null>(null);
+  const [isRootDrop, setIsRootDrop] = useState(false);
 
-  const buildTree = (): TreeNode[] => {
-    const rootNodes: Record<string, TreeNode> = {};
+  // The tree follows the list order: the inbox is drawn by the sidebar itself, not here.
+  const tree = useMemo(
+    () => buildFolderTree(folders.filter(folder => folder.path !== DEFAULT_INBOX_FOLDER)),
+    [folders]
+  );
 
-    folders.forEach(folder => {
-      if (folder.path === DEFAULT_INBOX_FOLDER) return;
-
-      const parts = folder.path.split('/');
-      let currentPath = '';
-      let parentNode: TreeNode | null = null;
-
-      parts.forEach((part, index) => {
-        currentPath = currentPath ? `${currentPath}/${part}` : part;
-
-        if (index === 0) {
-          if (!rootNodes[part]) {
-            rootNodes[part] = {
-              name: part,
-              fullPath: currentPath,
-              meta: folders.find(f => f.path === currentPath),
-              children: [],
-            };
-          }
-          parentNode = rootNodes[part];
-        } else if (parentNode) {
-          let existingChild = parentNode.children.find(c => c.name === part);
-          if (!existingChild) {
-            existingChild = {
-              name: part,
-              fullPath: currentPath,
-              meta: folders.find(f => f.path === currentPath),
-              children: [],
-            };
-            parentNode.children.push(existingChild);
-          }
-          parentNode = existingChild;
-        }
-      });
-    });
-
-    return Object.values(rootNodes);
-  };
+  const expandFolder = useCallback((path: string) => {
+    setExpandedPaths(prev => (prev[path] ? prev : { ...prev, [path]: true }));
+  }, []);
 
   const toggleExpand = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setExpandedPaths(prev => ({ ...prev, [path]: !prev[path] }));
   };
 
-  const handleDragOver = (e: React.DragEvent, path: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverPath !== path) setDragOverPath(path);
+  const resetDrag = () => {
+    setDropHint(null);
+    setDraggingPath(null);
+    setIsRootDrop(false);
   };
 
-  const handleDragLeave = () => {
-    setDragOverPath(null);
+  // A drag that ends anywhere but on this tree — dropped on the feed, cancelled with Escape — has
+  // no row to tell the hint is over, so the window does it while one is showing.
+  useEffect(() => {
+    if (!dropHint && !draggingPath && !isRootDrop) return;
+    const finish = () => {
+      setDropHint(null);
+      setDraggingPath(null);
+      setIsRootDrop(false);
+    };
+    window.addEventListener('dragend', finish);
+    window.addEventListener('drop', finish);
+    return () => {
+      window.removeEventListener('dragend', finish);
+      window.removeEventListener('drop', finish);
+    };
+  }, [dropHint, draggingPath, isRootDrop]);
+
+  /** A dropped folder: the storage decides, this only unfolds where it landed. */
+  const applyFolderMove = (movedPath: string, targetPath: string, mode: FolderDropMode) => {
+    uiLog.info(`Drag-and-drop: folder "${movedPath}" ${mode} "${targetPath || 'root'}"`);
+    if (moveFolder(movedPath, targetPath, mode) && mode === 'into') expandFolder(targetPath);
   };
 
-  const handleDrop = (e: React.DragEvent, targetPath: string) => {
+  const handleRowDragStart = (e: React.DragEvent<HTMLDivElement>, path: string) => {
+    // The row carries a disclosure and an actions button; a drag that begins on them is not a move.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button')) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData(FOLDER_DRAG_TYPE, path);
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingPath(path);
+  };
+
+  const handleRowDragOver = (e: React.DragEvent<HTMLDivElement>, path: string) => {
+    const isFolderDrag = carriesFolder(e.dataTransfer);
+    const isNoteDrag = Array.from(e.dataTransfer.types).includes('text/plain');
+    if (!isFolderDrag && !isNoteDrag) return;
+
     e.preventDefault();
-    setDragOverPath(null);
-    const itemId = e.dataTransfer.getData('text/plain');
-    if (itemId) {
-      uiLog.info(`Drag-and-drop: Note dropped on folder tree node "${targetPath}"`, {
-        itemId,
-        targetFolder: targetPath,
+    e.stopPropagation();
+    setIsRootDrop(false);
+
+    const forbidden = isFolderDrag && (path === draggingPath || Boolean(draggingPath && path.startsWith(`${draggingPath}/`)));
+    e.dataTransfer.dropEffect = forbidden ? 'none' : 'move';
+
+    // A note only ever lands inside a folder, so its band of the row does not matter.
+    const mode: RowDropMode = forbidden || !isFolderDrag ? 'into' : modeAt(e);
+    setDropHint(previous => (previous?.path === path && previous.mode === mode ? previous : { path, mode }));
+  };
+
+  const handleRowDrop = (e: React.DragEvent<HTMLDivElement>, path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const movedFolder = e.dataTransfer.getData(FOLDER_DRAG_TYPE);
+    const droppedNoteId = e.dataTransfer.getData('text/plain');
+    const mode = movedFolder ? modeAt(e) : 'into';
+    resetDrag();
+
+    if (movedFolder) {
+      applyFolderMove(movedFolder, path, mode);
+      return;
+    }
+    if (droppedNoteId) {
+      uiLog.info(`Drag-and-drop: note dropped on folder tree node "${path}"`, {
+        itemId: droppedNoteId,
+        targetFolder: path,
       });
-      moveItem(itemId, targetPath);
+      moveItem(droppedNoteId, path);
     }
   };
 
-  const tree = buildTree();
+  const handleRootDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (!carriesFolder(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDropHint(null);
+    setIsRootDrop(true);
+  };
 
-  const renderNode = (node: TreeNode, depth: number = 0) => {
-    const isExpanded = !!expandedPaths[node.fullPath];
+  const handleRootDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    const movedFolder = e.dataTransfer.getData(FOLDER_DRAG_TYPE);
+    if (!movedFolder) return;
+    e.preventDefault();
+    resetDrag();
+    applyFolderMove(movedFolder, '', 'root-end');
+  };
+
+  const renderNode = (node: FolderNode, depth: number = 0) => {
+    const isExpanded = !!expandedPaths[node.path];
     const hasChildren = node.children.length > 0;
-    const isSelected = currentFolder === node.fullPath;
-    const isDragTarget = dragOverPath === node.fullPath;
+    const isSelected = currentFolder === node.path;
+    const isDragged = draggingPath === node.path;
+    const isForbidden =
+      draggingPath !== null && (node.path === draggingPath || node.path.startsWith(`${draggingPath}/`));
+    const hint = dropHint?.path === node.path ? dropHint.mode : null;
+    // "After" on an open folder means below its whole subtree, so the line belongs under the last
+    // child rather than under the parent's row where nothing will land.
+    const afterLastChild = hint === 'after' && hasChildren && isExpanded;
     const itemCount = items.filter(
-      i => i.folder === node.fullPath || i.folder.startsWith(node.fullPath + '/')
+      i => i.folder === node.path || i.folder.startsWith(node.path + '/')
     ).length;
 
-    // Resolve folder icon
     const iconName = folderIconName(node.meta?.icon);
 
     const handleContextMenu = (e: React.MouseEvent) => {
@@ -149,39 +211,60 @@ export const FolderTree: React.FC = () => {
         x: e.clientX,
         y: e.clientY,
         type: 'folder',
-        folder: node.meta || { path: node.fullPath, name: node.name, description: '' },
+        folder: node.meta || { path: node.path, name: node.name, description: '' },
       });
     };
 
     return (
-      <div key={node.fullPath} className="flex flex-col select-none">
+      <div key={node.path} className="flex flex-col select-none">
         <div
           data-testid="folder-tree-row"
-          data-folder-path={node.fullPath}
+          data-folder-path={node.path}
+          data-drop-hint={hint ?? undefined}
+          draggable
           onClick={() => {
-            setCurrentFolder(node.fullPath);
+            setCurrentFolder(node.path);
             if (hasChildren && !isExpanded) {
-              setExpandedPaths(prev => ({ ...prev, [node.fullPath]: true }));
+              setExpandedPaths(prev => ({ ...prev, [node.path]: true }));
             }
           }}
+          onDragStart={(e) => handleRowDragStart(e, node.path)}
+          onDragEnd={resetDrag}
+          onDragOver={(e) => handleRowDragOver(e, node.path)}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropHint(null);
+          }}
+          onDrop={(e) => handleRowDrop(e, node.path)}
           onContextMenu={handleContextMenu}
-          onDragOver={(e) => handleDragOver(e, node.fullPath)}
-          onDragLeave={handleDragLeave}
-          onDrop={(e) => handleDrop(e, node.fullPath)}
-          className={`group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
-            isDragTarget
-              ? 'bg-blue-500/20 text-white ring-1 ring-blue-500/40'
+          className={`group relative flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors ${
+            hint === 'into'
+              ? isForbidden
+                ? 'bg-rose-500/10 text-fg-secondary ring-1 ring-rose-500/25'
+                : 'bg-accent-subtle text-white ring-1 ring-accent/40'
               : isSelected
-              ? 'bg-tint-8 text-white font-medium'
-              : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
-          }`}
+                ? 'bg-tint-8 text-white font-medium'
+                : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
+          } ${isDragged ? 'opacity-40' : ''}`}
           style={{ paddingLeft: `${8 + depth * 14}px` }}
         >
+          {hint === 'before' && (
+            <span
+              className="pointer-events-none absolute right-1 -top-px h-px bg-accent"
+              style={{ left: `${8 + depth * 14}px` }}
+            />
+          )}
+          {hint === 'after' && !afterLastChild && (
+            <span
+              className="pointer-events-none absolute right-1 -bottom-px h-px bg-accent"
+              style={{ left: `${8 + depth * 14}px` }}
+            />
+          )}
+
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {hasChildren ? (
               <button
                 type="button"
-                onClick={(e) => toggleExpand(node.fullPath, e)}
+                onClick={(e) => toggleExpand(node.path, e)}
                 aria-expanded={isExpanded}
                 aria-label={isExpanded ? `Свернуть папку ${node.name}` : `Развернуть папку ${node.name}`}
                 className="p-0.5 text-fg-muted hover:text-fg-tertiary transition-colors shrink-0"
@@ -221,7 +304,7 @@ export const FolderTree: React.FC = () => {
                   x: rect.right + 4,
                   y: rect.top,
                   type: 'folder',
-                  folder: node.meta || { path: node.fullPath, name: node.name, description: '' },
+                  folder: node.meta || { path: node.path, name: node.name, description: '' },
                 });
               }}
               title="Действия с папкой"
@@ -238,8 +321,14 @@ export const FolderTree: React.FC = () => {
             data-expanded={isExpanded}
             aria-hidden={!isExpanded}
           >
-            <div className="motion-accordion-inner flex flex-col">
+            <div className="motion-accordion-inner relative flex flex-col">
               {node.children.map(child => renderNode(child, depth + 1))}
+              {afterLastChild && (
+                <span
+                  className="pointer-events-none absolute right-1 bottom-0 h-px bg-accent"
+                  style={{ left: `${8 + (depth + 1) * 14}px` }}
+                />
+              )}
             </div>
           </div>
         )}
@@ -248,7 +337,18 @@ export const FolderTree: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col gap-0.5 py-1">
+    <div
+      data-testid="folder-tree"
+      data-root-drop={isRootDrop ? 'true' : undefined}
+      onDragOver={handleRootDragOver}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsRootDrop(false);
+      }}
+      onDrop={handleRootDrop}
+      className={`flex flex-1 flex-col gap-0.5 py-1 min-h-8 rounded-lg transition-colors ${
+        isRootDrop ? 'bg-tint-2 ring-1 ring-tint-8' : ''
+      }`}
+    >
       {tree.map(node => renderNode(node, 0))}
     </div>
   );

@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import type { SlagItem, FolderMeta } from '../../../types';
 import type { TagMeta } from '../TagSuggestionMenu';
 import { SLASH_COMMANDS } from '../../../types/slashCommands';
+import { folderTreeRows, type FolderTreeRow } from '../../../lib/vault/folderTree';
 import type { ComposerFieldHandle } from './field';
 
 /** The bit of a keyboard event the suggestions need, shared by the textarea and CM surfaces. */
@@ -15,8 +16,6 @@ export interface UseComposerAutocompleteOptions {
   content: string;
   items: SlagItem[];
   folders: FolderMeta[];
-  currentFolder: string;
-  DEFAULT_INBOX_FOLDER: string;
   field: ComposerFieldHandle;
   addToast: (message: string, type: 'info' | 'success' | 'error') => void;
   setTargetFolder: (path: string | null) => void;
@@ -26,8 +25,6 @@ export const useComposerAutocomplete = ({
   content,
   items,
   folders,
-  currentFolder,
-  DEFAULT_INBOX_FOLDER,
   field,
   addToast,
   setTargetFolder,
@@ -85,26 +82,22 @@ export const useComposerAutocomplete = ({
       })
     : [];
 
-  // Folders matching current @ query
-  const matchingFolders = useMemo(() => {
+  // Folders matching current @ query, drawn as the branches they are: a nested folder keeps its
+  // parent in the list so the lines make sense, but only the folders themselves can be picked.
+  const matchingFolders = useMemo<FolderTreeRow[]>(() => {
     if (folderQuery === null) return [];
-    const sorted = [...folders].sort((a, b) => {
-      if (a.path === currentFolder) return -1;
-      if (b.path === currentFolder) return 1;
-      if (a.path === DEFAULT_INBOX_FOLDER) return -1;
-      if (b.path === DEFAULT_INBOX_FOLDER) return 1;
-      return a.path.localeCompare(b.path, 'ru');
-    });
     const q = folderQuery.toLowerCase().trim();
-    if (!q) return sorted;
-    return sorted.filter(
-      (f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q)
-    );
-  }, [folderQuery, folders, currentFolder, DEFAULT_INBOX_FOLDER]);
+    const filtered = q
+      ? folders.filter((f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q))
+      : folders;
+    return folderTreeRows(filtered);
+  }, [folderQuery, folders]);
+
+  const selectableFolders = useMemo(() => matchingFolders.filter((row) => row.meta), [matchingFolders]);
 
   // Transition caches for smooth exit animations
   const [lastFolderQuery, setLastFolderQuery] = useState('');
-  const [lastMatchingFolders, setLastMatchingFolders] = useState<FolderMeta[]>([]);
+  const [lastMatchingFolders, setLastMatchingFolders] = useState<FolderTreeRow[]>([]);
   if (folderQuery !== null) {
     if (folderQuery !== lastFolderQuery) setLastFolderQuery(folderQuery);
     if (matchingFolders !== lastMatchingFolders) setLastMatchingFolders(matchingFolders);
@@ -159,12 +152,12 @@ export const useComposerAutocomplete = ({
     }
   };
 
-  const selectFolder = (folder: FolderMeta) => {
+  const selectFolder = (row: FolderTreeRow) => {
     const { from: cursorPos } = field.getSelection();
     const value = field.getValue() || content;
     const textBefore = value.slice(0, cursorPos);
     const atMatch = textBefore.match(/(?:^|\s)@([a-zA-Zа-яА-ЯёЁ0-9_/-]*)$/);
-    const inserted = `@${folder.name} `;
+    const inserted = `@${row.name} `;
 
     if (atMatch && atMatch.index !== undefined) {
       const isStartOfLine = atMatch[0].startsWith('@');
@@ -177,9 +170,9 @@ export const useComposerAutocomplete = ({
     }
     field.focus();
 
-    setTargetFolder(folder.path);
+    setTargetFolder(row.path);
     setFolderQuery(null);
-    addToast(`Папка «${folder.name}» выбрана`, 'info');
+    addToast(`Папка «${row.name}» выбрана`, 'info');
   };
 
   const updateAutocompleteQueries = (text: string, cursorPos: number) => {
@@ -238,20 +231,21 @@ export const useComposerAutocomplete = ({
         setFolderQuery(null);
         return true;
       }
-      if (matchingFolders.length > 0) {
+      if (selectableFolders.length > 0) {
         if (e.key === 'ArrowDown') {
           e.preventDefault();
-          setFolderSelectedIndex(prev => (prev < matchingFolders.length - 1 ? prev + 1 : 0));
+          setFolderSelectedIndex(prev => (prev < selectableFolders.length - 1 ? prev + 1 : 0));
           return true;
         }
         if (e.key === 'ArrowUp') {
           e.preventDefault();
-          setFolderSelectedIndex(prev => (prev > 0 ? prev - 1 : matchingFolders.length - 1));
+          setFolderSelectedIndex(prev => (prev > 0 ? prev - 1 : selectableFolders.length - 1));
           return true;
         }
         if (e.key === 'Enter' || e.key === 'Tab') {
           e.preventDefault();
-          selectFolder(matchingFolders[folderSelectedIndex]);
+          const row = selectableFolders[Math.min(folderSelectedIndex, selectableFolders.length - 1)];
+          if (row) selectFolder(row);
           return true;
         }
       }

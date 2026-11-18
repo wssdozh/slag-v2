@@ -32,6 +32,7 @@ ConfirmOptions,
 AppUpdateState,
 } from '../types';
 import type { SettingsTabId } from '../config/settingsTabs';
+import type { FolderDropMode } from '../lib/vault/folderTree';
 export interface ToastMessage {
   id: string;
   type: 'info' | 'success' | 'error';
@@ -141,6 +142,8 @@ export interface AppContextType {
   openFolderMoveModal: (folderPath: string) => void;
   closeFolderMoveModal: () => void;
   renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
+  /** Drop a folder onto another one, next to it, or at the root; `true` when the drop stuck. */
+  moveFolder: (path: string, targetPath: string, mode: FolderDropMode) => boolean;
   setIsTriageModalOpen: (open: boolean) => void;
   isComposerModalOpen: boolean;
   composerModalOptions: { type?: SlagItemType; status?: SlagItemStatus; folder?: string; dueDate?: string; reminder?: string } | null;

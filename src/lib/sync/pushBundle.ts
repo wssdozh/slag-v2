@@ -119,7 +119,15 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         });
       }
 
+      // A folder that moved to a new path rides as its rename op below, whole and with its rank.
+      // Packing it as a fresh upsert as well would leave the receiver with two branches at the new
+      // path: the upsert arrives first, the rename then renames the copy that already existed.
+      const renamedPaths = new Set(
+        pendingOps.filter((op) => op.kind === 'folder' && op.action === 'rename').map((op) => op.id)
+      );
+
       for (const folder of folders) {
+        if (renamedPaths.has(folder.path)) continue;
         const folderHash = await computeHash(JSON.stringify(folder));
         pack(`folder:${folder.path}`, folderHash, {
           id: folder.path,

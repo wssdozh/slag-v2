@@ -32,7 +32,7 @@ test('shared menus preserve positioning, selection and formatting', async ({ pag
         React.createElement('div', { id: 'trigger', style: { position: 'fixed', left: 2, top: 20 } },
           React.createElement(ResponsiveSegmented, { compact: true, value, onChange: setValue, ariaLabel: 'test mode', options: [{ value: 'one', label: 'one' }, { value: 'two', label: 'two' }] })),
         React.createElement('div', { style: { position: 'relative', marginTop: 100, width: 300 } },
-          React.createElement(FolderSuggestionMenu, { query: '', folders: [{ path: 'inbox', name: 'inbox', description: '', icon: 'Folder' }], currentFolder: 'inbox', selectedIndex: 0, onSelect: () => {}, placement: 'bottom' })),
+          React.createElement(FolderSuggestionMenu, { query: '', rows: [{ path: 'inbox', name: 'inbox', prefix: '', depth: 0, meta: { path: 'inbox', name: 'inbox', description: '', icon: 'Folder' } }], currentFolder: 'inbox', selectedIndex: 0, onSelect: () => {}, placement: 'bottom' })),
         React.createElement('div', { style: { position: 'relative', marginTop: 250, width: 300 } },
           React.createElement(TagSuggestionMenu, { query: '', tags: [{ tag: 'test', count: 3 }], selectedIndex: 0, onSelect: () => {}, placement: 'bottom' })));
     }

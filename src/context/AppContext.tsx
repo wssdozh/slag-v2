@@ -577,7 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const {
-    saveFolder, updateFolderDescription, renameFolder, deleteFolder,
+    saveFolder, updateFolderDescription, renameFolder, moveFolder, deleteFolder,
     openCreateFolderModal, closeFolderModal,
   } = useFolderAdmin({
     currentFolder, setCurrentFolder, setFolderInfoTarget,
@@ -656,6 +656,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openFolderMoveModal,
         closeFolderMoveModal,
         renameFolder,
+        moveFolder,
         isTriageModalOpen,
         aiSettings,
         toasts,

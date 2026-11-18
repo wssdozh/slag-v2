@@ -190,8 +190,7 @@ test.describe('Keyboard Shortcuts & Command Engine E2E', () => {
     // Type @ sequentially to open folder suggestions menu in transparent area
     await textarea.pressSequentially('@');
     await page.waitForTimeout(300);
-    const suggestionMenu = page.locator('div:has-text("Целевая папка"), div:has-text("не найдена")');
-    await expect(suggestionMenu.first()).toBeVisible();
+    await expect(page.locator('[data-folder-item]').first()).toBeVisible();
 
     // Take screenshot with command menu open above island
     await page.screenshot({ path: 'test-results/screenshots/quick_composer_island_menu.png' });

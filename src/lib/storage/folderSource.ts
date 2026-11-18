@@ -1,4 +1,4 @@
-﻿// A folder exists because its directory does. This module turns the paths found under `notes/`
+// A folder exists because its directory does. This module turns the paths found under `notes/`
 // and the metadata remembered for them into the list the app draws; being pure, the rule can be
 // checked without a vault. The inbox name comes in as an argument on purpose: importing the config
 // module would put an extensionless import in the way of running this file under plain node.
@@ -16,7 +16,8 @@ function lastSegment(path: string): string {
 /**
  * The folders this vault has: every path on disk, in path order, with the metadata that belongs to
  * it. Metadata follows the path and never creates it — an entry left behind by a directory that is
- * gone is dropped, not resurrected.
+ * gone is dropped, not resurrected. A folder someone dragged carries `order` and that wins over the
+ * path order; the sort is stable, so a vault nobody ever re-ordered reads exactly as it did.
  */
 export function folderMetaFor(paths: string[], metadata: FolderMeta[], inbox: string): FolderMeta[] {
   const byPath = new Map<string, FolderMeta>();
@@ -29,6 +30,10 @@ export function folderMetaFor(paths: string[], metadata: FolderMeta[], inbox: st
       const meta = byPath.get(path);
       return meta ? { ...meta, path } : { path, name: lastSegment(path), description: '' };
     });
+
+  const rank = (folder: FolderMeta) =>
+    typeof folder.order === 'number' && Number.isFinite(folder.order) ? folder.order : Number.POSITIVE_INFINITY;
+  folders.sort((a, b) => rank(a) - rank(b));
 
   const inboxIndex = folders.findIndex(folder => folder.path === normalizeFolderPath(inbox));
   if (inboxIndex > 0) folders.unshift(...folders.splice(inboxIndex, 1));

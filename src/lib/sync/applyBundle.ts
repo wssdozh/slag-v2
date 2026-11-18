@@ -154,7 +154,13 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             const incoming = ch.payload as FolderMeta;
             const idx = currentFolders.findIndex((f) => f.path === ch.id);
             if (idx >= 0) {
-              currentFolders[idx] = incoming;
+              // A build that does not know about the manual rank sends the folder without one; the
+              // local order is not something to lose because of that.
+              const local = currentFolders[idx];
+              currentFolders[idx] =
+                incoming.order === undefined && local.order !== undefined
+                  ? { ...incoming, order: local.order }
+                  : incoming;
             } else {
               currentFolders.push(incoming);
             }

@@ -88,7 +88,7 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {/* Folders Section Header */}
-        <div className="pt-2">
+        <div className="pt-2 flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between px-2.5 py-1 text-2xs font-mono font-medium text-fg-muted tracking-wider uppercase">
             <span>Папки</span>
             <button

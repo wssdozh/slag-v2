@@ -1,4 +1,4 @@
-﻿// Folders come from the disk now: the two decisions that need no filesystem are the list itself
+// Folders come from the disk now: the two decisions that need no filesystem are the list itself
 // and the delta a sweep reports. The rest of the storage layer reads directories.
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -33,6 +33,22 @@ test('folder list: inbox is first even when sorting would put it later', () => {
 test('folder list: paths are normalized and deduplicated', () => {
   const folders = folderMetaFor(['Проекты/', 'Проекты', 'Проекты\\SLAG', '', '  '], [], inbox);
   assert.deepEqual(folders.map(folder => folder.path), ['Проекты', 'Проекты/SLAG'], 'пустые и повторы не папки');
+});
+
+test('folder list: a dragged order wins over the path sort, the inbox stays pinned', () => {
+  const ranked = [
+    { path: 'Проекты', name: 'Проекты', description: '', order: 1 },
+    { path: 'Архив', name: 'Архив', description: '', order: 0 },
+  ];
+  const folders = folderMetaFor([inbox, 'Архив', 'Проекты', 'База знаний'], ranked, inbox);
+
+  assert.deepEqual(folders.map(folder => folder.path), [inbox, 'Архив', 'Проекты', 'База знаний'], 'раненые впереди, остаток — по пути');
+});
+
+test('folder list: a vault nobody re-ordered keeps the path order', () => {
+  const folders = folderMetaFor(['Архив', 'Проекты', inbox], [], inbox);
+
+  assert.deepEqual(folders.map(folder => folder.path), [inbox, 'Архив', 'Проекты'], 'без order сортировка та же, что была');
 });
 
 test('delta: folders that appeared and vanished, both sorted', () => {

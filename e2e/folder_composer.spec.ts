@@ -15,7 +15,7 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await textarea.pressSequentially('Тестовая таска @');
 
     // Menu should appear
-    const folderMenuHeader = page.locator('[data-folder-item]');
+    const folderMenuHeader = page.locator('[data-folder-item]').first();
     await expect(folderMenuHeader).toBeVisible();
 
     // Visual screenshot of the open @ folder menu
@@ -72,7 +72,7 @@ test.describe('Composer @ Folder Selection E2E', () => {
     await textarea.fill('@');
 
     // Folder menu should open
-    const folderMenuHeader = page.locator('[data-folder-item]');
+    const folderMenuHeader = page.locator('[data-folder-item]').first();
     await expect(folderMenuHeader).toBeVisible();
 
     // Click on 'Личное' in the suggestion menu list

@@ -17,6 +17,7 @@ export type { VaultStats } from '../vault/stats';
 import { generateDemoItems } from '../vault/demoVault';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { safeVaultRelativePath } from '../vault/safePath';
+import type { FolderDropMode } from '../vault/folderTree';
 export { getSafeNoteFilename } from '../vault/noteFilename';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
@@ -44,8 +45,10 @@ import {
   rememberFolders,
   writeFolder,
   renameFolderTree,
+  moveFolderTree,
   describeFolder,
   eraseFolder,
+  type FolderMoveResult,
 } from './folderStore';
 import { folderMetaFor } from './folderSource';
 import {
@@ -429,6 +432,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
     renameFolderTree(this, oldPath, updatedFolder, origin);
+  }
+
+  public moveFolder(path: string, targetPath: string, mode: FolderDropMode): FolderMoveResult {
+    return moveFolderTree(this, path, targetPath, mode);
   }
 
   public updateFolderDescription(path: string, description: string, origin: 'local' | 'remote' = 'local'): void {

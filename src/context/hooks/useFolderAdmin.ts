@@ -1,9 +1,10 @@
-// A folder's own writes: save, describe, rename, delete and the create modal.
+// A folder's own writes: save, describe, rename, move, delete and the create modal.
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
+import { folderName, type FolderDropMode } from '../../lib/vault/folderTree';
 import type { ToastMessage } from '../appContext.types';
 
 /**
@@ -26,6 +27,7 @@ export function useFolderAdmin(deps: {
   saveFolder: (folder: FolderMeta) => void;
   updateFolderDescription: (path: string, description: string) => void;
   renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
+  moveFolder: (path: string, targetPath: string, mode: FolderDropMode) => boolean;
   deleteFolder: (path: string) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   closeFolderModal: () => void;
@@ -50,22 +52,54 @@ export function useFolderAdmin(deps: {
     addToast('Описание папки обновлено', 'success');
   }, [refreshData, addToast]);
 
-  const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
-    storage.renameFolder(oldPath, updatedFolder);
+  // The profile modal and the phone screen point at the old path; a rename or a move has to take
+  // them, and the open folder, along.
+  const followFolderPath = useCallback((oldPath: string, newPath: string) => {
     const remap = (value: string | null): string | null =>
       value && (value === oldPath || value.startsWith(oldPath + '/'))
-        ? updatedFolder.path + value.slice(oldPath.length)
+        ? newPath + value.slice(oldPath.length)
         : value;
     if (currentFolder === oldPath || currentFolder.startsWith(oldPath + '/')) {
-      const newCurrent = updatedFolder.path + currentFolder.slice(oldPath.length);
-      setCurrentFolder(newCurrent);
+      setCurrentFolder(newPath + currentFolder.slice(oldPath.length));
     }
-    // The profile modal and the phone screen point at the old path; follow the move.
     setFolderInfoTarget(previous => remap(previous));
     remapMobileFolder(remap);
+  }, [currentFolder, setCurrentFolder, setFolderInfoTarget, remapMobileFolder]);
+
+  const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
+    storage.renameFolder(oldPath, updatedFolder);
+    followFolderPath(oldPath, updatedFolder.path);
     refreshData();
     addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
-  }, [currentFolder, refreshData, addToast, setFolderInfoTarget, remapMobileFolder, setCurrentFolder]);
+  }, [followFolderPath, refreshData, addToast]);
+
+  /**
+   * A dropped folder: the storage does the rename, the re-numbering and the announcements; this
+   * only has to follow the open folder and say what happened. `true` means the drop was accepted.
+   */
+  const moveFolder = useCallback((path: string, targetPath: string, mode: FolderDropMode): boolean => {
+    const result = storage.moveFolder(path, targetPath, mode);
+    if (!result.ok) {
+      const name = folderName(path);
+      if (result.reason === 'cycle') addToast(`Папку «${name}» нельзя вложить в себя`, 'error');
+      else if (result.reason === 'exists') {
+        addToast(
+          targetPath
+            ? `В «${folderName(targetPath)}» уже есть папка «${name}»`
+            : `В корне уже есть папка «${name}»`,
+          'error'
+        );
+      } else addToast('Не нашёл, куда перенести папку', 'error');
+      return false;
+    }
+    const nextPath = result.path ?? path;
+    if (nextPath !== path) {
+      followFolderPath(path, nextPath);
+      addToast(`Папка «${folderName(nextPath)}» перемещена`, 'success');
+    }
+    refreshData();
+    return true;
+  }, [addToast, followFolderPath, refreshData]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
@@ -94,6 +128,7 @@ export function useFolderAdmin(deps: {
     saveFolder,
     updateFolderDescription,
     renameFolder,
+    moveFolder,
     deleteFolder,
     openCreateFolderModal,
     closeFolderModal,

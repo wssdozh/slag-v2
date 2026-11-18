@@ -179,8 +179,6 @@ export const Composer: React.FC<ComposerProps> = ({
     content,
     items,
     folders,
-    currentFolder,
-    DEFAULT_INBOX_FOLDER,
     field,
     addToast,
     setTargetFolder,
@@ -510,7 +508,7 @@ export const Composer: React.FC<ComposerProps> = ({
       <FolderSuggestionMenu
         isOpen={folderQuery !== null}
         query={folderQuery ?? lastFolderQuery}
-        folders={folderQuery !== null ? matchingFolders : lastMatchingFolders}
+        rows={folderQuery !== null ? matchingFolders : lastMatchingFolders}
         currentFolder={effectiveDefaultFolder}
         selectedFolder={targetFolder}
         selectedIndex={folderSelectedIndex}

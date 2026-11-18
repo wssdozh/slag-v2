@@ -725,6 +725,7 @@ function toFolderMeta(value: unknown): FolderMeta | undefined {
     description: typeof record.description === 'string' ? record.description : '',
   };
   if (typeof record.icon === 'string') folder.icon = record.icon;
+  if (typeof record.order === 'number' && Number.isFinite(record.order)) folder.order = record.order;
   if (typeof record.showReferenceColumn === 'boolean') folder.showReferenceColumn = record.showReferenceColumn;
   if (Array.isArray(record.kanbanColumns)) folder.kanbanColumns = record.kanbanColumns.filter(isKanbanColumn);
   return folder;
