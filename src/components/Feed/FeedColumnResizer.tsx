@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { UI_LAYOUT } from '../../config/ui';
 import { STORAGE_KEYS } from '../../config/storage';
+import { getPref, setPref } from '../../lib/storage/prefs';
 
 const MIN_WIDTH = UI_LAYOUT.FEED_COLUMN_MIN_WIDTH;
 const MAX_WIDTH = UI_LAYOUT.FEED_COLUMN_MAX_WIDTH;
@@ -11,7 +12,7 @@ const clampWidth = (value: number, max: number = MAX_WIDTH) =>
   Math.min(Math.max(value, MIN_WIDTH), Math.min(max, MAX_WIDTH));
 
 const readSavedWidth = (): number => {
-  const saved = Number(localStorage.getItem(STORAGE_KEYS.FEED_CONTENT_WIDTH));
+  const saved = Number(getPref(STORAGE_KEYS.FEED_CONTENT_WIDTH));
   return Number.isFinite(saved) && saved > 0 ? clampWidth(saved) : DEFAULT_WIDTH;
 };
 
@@ -30,7 +31,7 @@ export const FeedColumnResizer: React.FC = () => {
 
   const commit = useCallback((next: number) => {
     setWidth(next);
-    localStorage.setItem(STORAGE_KEYS.FEED_CONTENT_WIDTH, String(next));
+    setPref(STORAGE_KEYS.FEED_CONTENT_WIDTH, String(next));
   }, []);
 
   const handlePointerDown = (side: 1 | -1) => (event: React.PointerEvent<HTMLDivElement>) => {

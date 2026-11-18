@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { logger } from '../logger/logger';
 import { STORAGE_KEYS } from '../../config';
+import { getPrefJson, setPref } from '../storage/prefs';
 
 const wsLog = logger.scope('WORKSPACE');
 
@@ -69,37 +70,22 @@ export interface SavedDetachedWindow {
   height: number;
 }
 
-export const getSavedDetachedWindows = (): SavedDetachedWindow[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.DETACHED_WINDOWS);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-};
+export const getSavedDetachedWindows = (): SavedDetachedWindow[] =>
+  getPrefJson<SavedDetachedWindow[]>(STORAGE_KEYS.DETACHED_WINDOWS, [], (value) =>
+    Array.isArray(value) ? (value as SavedDetachedWindow[]) : undefined
+  );
 
 export const saveDetachedWindow = (entry: SavedDetachedWindow): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    const list = getSavedDetachedWindows().filter(w => w.label !== entry.label);
-    list.push(entry);
-    localStorage.setItem(STORAGE_KEYS.DETACHED_WINDOWS, JSON.stringify(list));
-    wsLog.debug(`Saved detached window configuration for [${entry.label}]`, entry);
-  } catch (err) {
-    wsLog.error('Failed to save detached window configuration', err);
-  }
+  const list = getSavedDetachedWindows().filter(w => w.label !== entry.label);
+  list.push(entry);
+  setPref(STORAGE_KEYS.DETACHED_WINDOWS, JSON.stringify(list));
+  wsLog.debug(`Saved detached window configuration for [${entry.label}]`, entry);
 };
 
 export const removeDetachedWindow = (label: string): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    const list = getSavedDetachedWindows().filter(w => w.label !== label);
-    localStorage.setItem(STORAGE_KEYS.DETACHED_WINDOWS, JSON.stringify(list));
-    wsLog.info(`Removed detached window [${label}] from registry`);
-  } catch (err) {
-    wsLog.error(`Failed to remove detached window [${label}]`, err);
-  }
+  const list = getSavedDetachedWindows().filter(w => w.label !== label);
+  setPref(STORAGE_KEYS.DETACHED_WINDOWS, JSON.stringify(list));
+  wsLog.info(`Removed detached window [${label}] from registry`);
 };
 
 export const closeWindow = async (): Promise<void> => {
