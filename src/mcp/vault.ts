@@ -512,7 +512,7 @@ export class McpVault {
     // CREATE NEW NOTE: here the defaults are honest, because there is nothing to keep.
     const targetFolder = safeVaultRelativePath(params.folder || DEFAULT_INBOX_FOLDER);
     const newTitle = (params.title || 'Новая запись').trim();
-    const newId = `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newId = `note_${crypto.randomUUID()}`;
     let initialContent = params.content || '';
     if (params.appendContent) {
       initialContent = initialContent ? `${initialContent}\n\n${params.appendContent}` : params.appendContent;

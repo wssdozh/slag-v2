@@ -187,8 +187,8 @@ function clampImportance(raw: unknown, kind: MemoryKind): number {
   return Math.max(bounded, KIND_MIN_IMPORTANCE[kind]);
 }
 
-function newMemoryId(now: number): string {
-  return `m_${now.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+function newMemoryId(): string {
+  return `m_${crypto.randomUUID()}`;
 }
 
 /** Drops the least valuable unpinned rows until the list fits, tombstones first. */
@@ -239,7 +239,7 @@ export function applyRemember(
   }
 
   const created: MemoryItem = {
-    id: newMemoryId(now),
+    id: newMemoryId(),
     text,
     normalized,
     kind,

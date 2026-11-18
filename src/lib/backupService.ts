@@ -470,8 +470,8 @@ export class BackupService {
       if (!bytes || bytes.length === 0) continue;
 
       const filename = key.split('.attachments/').pop() || 'attachment';
-      const idMatch = filename.match(/^(att_[0-9a-z_]+?)_(.+)$/i);
-      const id = idMatch ? idMatch[1] : `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const idMatch = filename.match(/^(att_[0-9a-z_-]+?)_(.+)$/i);
+      const id = idMatch ? idMatch[1] : `att_${crypto.randomUUID()}`;
       const name = idMatch ? idMatch[2] : filename;
       const mimeType = guessMimeType(filename);
 

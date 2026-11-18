@@ -74,7 +74,7 @@ export class AttachmentStore {
         const entries = await readDir(dir, { baseDir: BaseDirectory.AppData });
         this.nameIndex = entries.filter((entry) => entry.isFile).map((entry) => entry.name);
       }
-      const name = basename.replace(/^att_[a-z0-9]+_/i, '');
+      const name = basename.replace(/^att_[a-z0-9-]+_/i, '');
       const candidates = this.nameIndex.filter((file) => file === name || file.endsWith(`_${name}`));
       const sameId = candidates.find((file) => file.startsWith(`att_${id}_`) || file === id);
       if (sameId) return `${dir}/${sameId}`;

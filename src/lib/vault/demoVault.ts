@@ -7,7 +7,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
  */
 export function generateDemoItems(): SlagItem[] {
   const now = Date.now();
-  const uid = (prefix: string) => `${prefix}_${now}_${Math.random().toString(36).slice(2, 6)}`;
+  const uid = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 
   return [
     // Входящие
