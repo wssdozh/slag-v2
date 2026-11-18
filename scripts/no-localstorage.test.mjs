@@ -30,16 +30,8 @@ const ALLOWLIST = new Set([
  * when its last `localStorage` use goes. Never add here — new code reads `getPref` from `prefs.ts`.
  */
 const BASELINE = [
-  'src/components/Feed/composer/useComposerDraft.ts',
-  'src/components/Logs/LogViewer.tsx',
-  'src/lib/logger/logger.ts',
   'src/lib/platform/encryptedLocalStore.ts',
   'src/lib/platform/secretStore.ts',
-  'src/lib/storage/readJson.ts',
-  'src/lib/storage/settingsStore.ts',
-  'src/lib/storage/usage.ts',
-  'src/lib/sync/localBookkeeping.ts',
-  'src/lib/sync/syncEngine.ts',
 ];
 
 /**
