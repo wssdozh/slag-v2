@@ -38,6 +38,7 @@ import {
   DEFAULT_INBOX_FOLDER,
 } from '../config';
 import { evaluateRecurringTasks } from '../lib/time/recurrenceHelper';
+import { setPref } from '../lib/storage/prefs';
 
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
@@ -527,14 +528,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveAiSettings = (newSettings: Partial<AiSettings>) => {
     const updated = normalizeAiSettings({ ...aiSettings, ...newSettings });
     setAiSettings(updated);
-    // Keys never reach localStorage. If the secret store refuses one, the plaintext write is the
-    // fallback: keeping the old behaviour is a smaller evil than losing a key the user pasted.
-    const keepPlaintext = () => localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
+    // Keys never reach the settings file. If the secret store refuses one, the plaintext write is
+    // the fallback: keeping the old behaviour is a smaller evil than losing a key the user pasted.
+    const keepPlaintext = () => setPref(AI_SETTINGS_KEY, JSON.stringify(updated));
     const onSecretFailure = (error: unknown) => {
       uiLog.error('Could not persist an AI provider key in the secret store', { error });
       keepPlaintext();
     };
-    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(stripAiKeys(updated)));
+    setPref(AI_SETTINGS_KEY, JSON.stringify(stripAiKeys(updated)));
     const previousKeys = new Map(aiSettings.connections.map((c) => [c.id, c.apiKey.trim()]));
     for (const connection of updated.connections) {
       const apiKey = connection.apiKey.trim();

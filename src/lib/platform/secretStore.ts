@@ -10,6 +10,7 @@ import {
 } from './encryptedLocalStore';
 import { STORAGE_KEYS, SYNC_STORAGE_KEYS } from '../../config';
 import { aiKeySecretName, splitAiKeys } from '../ai/connections/secrets';
+import { getPrefJson } from '../storage/prefs';
 
 const storeLog = logger.scope('SYNC');
 
@@ -229,11 +230,11 @@ function knownDeviceIds(): Set<string> {
 
 /**
  * Connection ids of the saved AI settings. The settings themselves are the app's business — the
- * store only needs the names to preload, and this is the one place localStorage is read for them.
+ * store only needs the names to preload, so it reads the same `prefs` entry the app writes.
  */
 function aiConnectionIds(): string[] {
-  const parsed = parseJson(localStorage.getItem(STORAGE_KEYS.AI_SETTINGS));
-  const connections = parsed && Array.isArray(parsed.connections) ? parsed.connections : [];
+  const parsed = getPrefJson<{ connections?: unknown }>(STORAGE_KEYS.AI_SETTINGS, {});
+  const connections = Array.isArray(parsed.connections) ? parsed.connections : [];
   const ids: string[] = [];
   for (const entry of connections) {
     if (typeof entry !== 'object' || entry === null) continue;

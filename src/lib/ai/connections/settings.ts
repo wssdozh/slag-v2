@@ -2,6 +2,7 @@
 import type { AiConnection, AiConnectionKind, AiRole, AiSettings, AiWireProtocol } from '../../../types';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, STORAGE_KEYS } from '../../../config';
 import { getCachedSecret } from '../../platform/secretStore';
+import { getPrefJson } from '../../storage/prefs';
 import { PROVIDER_PRESETS, connectionModel, connectionSupports } from './presets';
 import { applyAiKeys } from './secrets';
 
@@ -133,7 +134,7 @@ function hasArray(value: unknown): value is unknown[] {
 }
 
 /**
- * The flat `provider` + one key per provider shape was stored in the same localStorage key.
+ * The flat `provider` + one key per provider shape was stored under the same settings key.
  * It converts into connections on read; nothing is thrown away, and a provider that was
  * merely selected (no key yet) keeps its preset so the user still sees it.
  */
@@ -191,7 +192,7 @@ export function isConnectionReadyFor(connection: AiConnection, role: AiRole): bo
   return isConnectionReady(connection) && connectionSupports(connection, role) && Boolean(connectionModel(connection, role));
 }
 
-/** Accepts anything from localStorage, keeps every known field, never mutates the input. */
+/** Accepts anything from storage, keeps every known field, never mutates the input. */
 export function normalizeAiSettings(raw: unknown): AiSettings {
   if (!raw || typeof raw !== 'object') return cloneDefaults();
   const source = raw as Record<string, unknown>;
@@ -231,17 +232,12 @@ export function normalizeAiSettings(raw: unknown): AiSettings {
 }
 
 /**
- * Synchronous by contract: callers use it to seed state during render. The disk copy has no keys
- * any more, so they come from the secret store's warmed cache — `initSecretStore()` is awaited in
- * `main.tsx` before the first render, which is what makes the sync lookup honest.
+ * Synchronous by contract: callers use it to seed state during render. The settings file has no
+ * keys any more, so they come from the secret store's warmed cache — `initSecretStore()` is awaited
+ * in `main.tsx` before the first render, which is what makes the sync lookup honest.
  */
 export function loadAiSettings(): AiSettings {
-  if (typeof localStorage === 'undefined') return cloneDefaults();
-  try {
-    const saved = localStorage.getItem(STORAGE_KEYS.AI_SETTINGS);
-    if (!saved) return cloneDefaults();
-    return applyAiKeys(normalizeAiSettings(JSON.parse(saved)), getCachedSecret);
-  } catch {
-    return cloneDefaults();
-  }
+  const saved = getPrefJson<unknown>(STORAGE_KEYS.AI_SETTINGS, null);
+  if (saved === null) return cloneDefaults();
+  return applyAiKeys(normalizeAiSettings(saved), getCachedSecret);
 }
