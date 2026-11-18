@@ -20,6 +20,9 @@ import type { TombstoneMap, TombstonesSection } from './tombstones';
 
 const bookkeepingLog = logger.scope('SYNC');
 
+/** The `state.json` section tombstones live in; the store adapter names it, nothing else does. */
+export const SYNC_SECTION = 'sync';
+
 export interface SyncScope {
   vaultId: string;
   /** Account rooms keep their own checkpoint: a new mapping must resend everything. */
@@ -130,8 +133,9 @@ let hydratedVaultId: string | null = null;
 export function loadTombstones(scope: SyncScope): TombstoneMap {
   // Synchronous by contract: pushes and incoming bundles read the ledger inside their own sync
   // paths. A copy goes out, so a caller mutating what it got cannot change the snapshot under a
-  // write it never made.
-  if (tombstoneSnapshot) return { ...tombstoneSnapshot };
+  // write it never made. The snapshot belongs to one vault: between a switch and the hydration
+  // that follows it, the honest answer is the old storage, not another vault's deletes.
+  if (tombstoneSnapshot && hydratedVaultId === scope.vaultId) return { ...tombstoneSnapshot };
   return sanitizeTombstones(readStoredJson<unknown>(tombstonesKey(scope), {}));
 }
 

@@ -264,34 +264,35 @@ export class VaultFiles {
   }
 
   /**
-   * The `sync` section: the one ledger a wipe of the webview profile cannot be allowed to eat.
-   * A missing file, a missing section and a section of the wrong shape all answer "empty".
+   * One section of `state.json`: the one ledger a wipe of the webview profile cannot be allowed to
+   * eat, the drafts, whatever keeps its own corner. A missing file, a missing section and a section
+   * of the wrong shape all answer "empty".
    */
-  public async readSyncSection(): Promise<Record<string, unknown>> {
+  public async readStateSection(name: string): Promise<Record<string, unknown>> {
     try {
       const state = await this.readStateObject();
-      return asStateObject(state.sync);
+      return asStateObject(state[name]);
     } catch (err) {
-      fsLog.warn('Failed to read the sync section of state.json:', err);
+      fsLog.warn(`Failed to read the "${name}" section of state.json:`, err);
       return {};
     }
   }
 
   /**
-   * Writes into the `sync` section and leaves `folders`, `workspace` and the MCP server's keys as
-   * they are. It goes through the same queue as the folder writer: three writers, one file, one
-   * read-merge-write at a time.
+   * Writes into one section and leaves every other one — `folders`, `workspace`, the MCP server's
+   * own keys — as it is. It goes through the same queue as the folder writer: several writers, one
+   * file, one read-merge-write at a time.
    */
-  public writeSyncSection(patch: Record<string, unknown>): Promise<void> {
+  public writeStateSection(name: string, patch: Record<string, unknown>): Promise<void> {
     if (!isTauri()) return Promise.resolve();
     return this.queueStateWrite(async () => {
       try {
         const state = await this.readStateObject();
-        state.sync = { ...asStateObject(state.sync), ...patch };
+        state[name] = { ...asStateObject(state[name]), ...patch };
         state.updatedAt = Date.now();
         await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
       } catch (err) {
-        fsLog.warn('Failed to write the sync section of state.json:', err);
+        fsLog.warn(`Failed to write the "${name}" section of state.json:`, err);
       }
     });
   }

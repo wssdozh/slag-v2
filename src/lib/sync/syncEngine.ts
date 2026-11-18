@@ -16,6 +16,7 @@ import {
   clearTombstones,
   hydrateTombstones,
   saveTombstones,
+  SYNC_SECTION,
   loadAttachmentRequests,
   markAttachmentRequestSent as stampAttachmentRequest,
   ATTACHMENT_REQUEST_COOLDOWN_MS,
@@ -683,9 +684,9 @@ export class SyncEngine {
    */
   private tombstoneStore(vaultId: string): TombstoneStore {
     return {
-      read: () => storage.files.readSyncSection(),
+      read: () => storage.files.readStateSection(SYNC_SECTION),
       write: (section) => (this.currentVaultId === vaultId
-        ? storage.files.writeSyncSection(section)
+        ? storage.files.writeStateSection(SYNC_SECTION, section)
         : Promise.resolve()),
     };
   }
