@@ -144,7 +144,7 @@ export class NodeVault implements VaultPort {
     }
   }
 
-  public async hasBytes(_id: string, relativePath: string): Promise<boolean> {
+  public async hasAttachmentBytes(_id: string, relativePath: string): Promise<boolean> {
     const attachment = { relativePath, id: _id, name: path.basename(relativePath) } as SlagAttachment;
     return fs.existsSync(path.join(this.attachmentsDir, safeAttachmentName(attachment)));
   }

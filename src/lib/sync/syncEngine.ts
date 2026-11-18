@@ -555,7 +555,7 @@ export class SyncEngine {
   }
 
   /**
-   * One full-vault pass per session over files this device holds only as metadata. `hasBytes`
+   * One full-vault pass per session over files this device holds only as metadata. `hasAttachmentBytes`
    * stats the disk, so this is not a per-bundle loop; the per-file cooldown does the rest.
    */
   public async requestMissingAttachments(): Promise<void> {
@@ -564,7 +564,7 @@ export class SyncEngine {
     try {
       for (const item of vault().getItems()) {
         for (const att of item.attachments ?? []) {
-          if (await vault().hasBytes(att.id, att.relativePath)) continue;
+          if (await vault().hasAttachmentBytes(att.id, att.relativePath)) continue;
           this.requestAttachmentBytes(att);
         }
       }

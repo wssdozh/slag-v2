@@ -322,7 +322,7 @@ class LoggerEngine {
     const sanitizedData = data !== undefined ? sanitizeForLog(data) : undefined;
 
     const entry: LogEntry = {
-      id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: `log_${crypto.randomUUID()}`,
       timestamp: Date.now(),
       level,
       scope,

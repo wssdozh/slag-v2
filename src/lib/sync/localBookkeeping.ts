@@ -571,7 +571,3 @@ export function saveOutbox(vaultId: string, ops: SyncOperation[]): void {
   }
   writeFallbackJson(OUTBOX_PREFIX + vaultId, clean);
 }
-
-export function clearOutbox(vaultId: string): void {
-  saveOutbox(vaultId, []);
-}

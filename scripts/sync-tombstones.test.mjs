@@ -8,7 +8,6 @@ import {
   mergeTombstones,
   sanitizeTombstones,
   tombstonesFromState,
-  tombstonesToState,
 } from '../src/lib/sync/tombstones.ts';
 
 test('merge: a record on one side never overwrites the other side', () => {
@@ -25,7 +24,7 @@ test('merge: the older stamp is not allowed to resurrect a deleted note', () => 
 });
 
 test('migration: the localStorage blob is merged into the section, not swapped for it', () => {
-  const section = tombstonesToState({ item_disk: 1_700_000_000_000 });
+  const section = { tombstones: { item_disk: 1_700_000_000_000 } };
   const legacy = { item_legacy: 1_700_000_000_001, item_disk: 1_700_000_000_000 };
 
   const merged = mergeTombstones(tombstonesFromState(section), legacy);
@@ -58,12 +57,6 @@ test('section: only id -> number survives, junk is dropped', () => {
     },
   };
 
-  assert.deepEqual(tombstonesToState(tombstonesFromState(state)), { tombstones: { item_ok: 1_700_000_000_000 } });
+  assert.deepEqual(sanitizeTombstones(tombstonesFromState(state)), { item_ok: 1_700_000_000_000 });
   assert.deepEqual(sanitizeTombstones(null), {}, 'a missing blob is no tombstones');
-});
-
-test('section: what is written is one plain map under one key', () => {
-  assert.deepEqual(tombstonesToState({ item_a: 5, item_b: 6 }), { tombstones: { item_a: 5, item_b: 6 } });
-  assert.deepEqual(Object.keys(tombstonesToState({ item_a: 5 })), ['tombstones']);
-  assert.deepEqual(tombstonesToState({}), { tombstones: {} }, 'clearing keeps the section, empty');
 });

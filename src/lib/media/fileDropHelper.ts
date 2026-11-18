@@ -50,7 +50,7 @@ export async function attachmentFromDataUrl(source: {
   /** The "не сжимать" toggle: store the original bytes, untouched. */
   compress?: boolean;
 }): Promise<SlagAttachment> {
-  const id = 'att_' + Date.now() + Math.random().toString(36).slice(2, 6);
+  const id = 'att_' + crypto.randomUUID();
   const type: SlagAttachment['type'] = source.type
     ?? (source.mimeType.startsWith('image/')
       ? 'image'

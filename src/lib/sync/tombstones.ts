@@ -8,9 +8,6 @@
 // Pure on purpose: no Tauri, no `localStorage`, no config. `node --test` reads this file as is.
 export type TombstoneMap = Record<string, number>;
 
-/** The `sync` section of `state.json`, as far as tombstones are concerned. */
-export type TombstonesSection = { tombstones: TombstoneMap };
-
 /**
  * The tombstones a stored `sync` section holds. A missing key, an array, a string or a section an
  * older build wrote before it knew about them all read as "nothing was deleted yet".
@@ -18,11 +15,6 @@ export type TombstonesSection = { tombstones: TombstoneMap };
 export function tombstonesFromState(state: unknown): TombstoneMap {
   if (!isRecord(state)) return {};
   return sanitizeTombstones(state.tombstones);
-}
-
-/** The section these tombstones are written as: junk stripped, and `{}` stays an empty map. */
-export function tombstonesToState(tombstones: TombstoneMap): TombstonesSection {
-  return { tombstones: sanitizeTombstones(tombstones) };
 }
 
 /**

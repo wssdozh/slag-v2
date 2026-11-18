@@ -8,7 +8,7 @@ export function createSyncOpFromStorageEvent(event: StorageChangeEvent): SyncOpe
   if (event.origin === 'remote' || event.origin === 'external') return null;
 
   const timestamp = Date.now();
-  const opId = `op_${timestamp}_${Math.random().toString(36).slice(2, 7)}`;
+  const opId = `op_${crypto.randomUUID()}`;
 
   // An unsaved note lives under a throwaway `draft_<timestamp>` id that changes on every open.
   // Syncing it streams one entity per keystroke and the queue never drains; it is local crash recovery only.

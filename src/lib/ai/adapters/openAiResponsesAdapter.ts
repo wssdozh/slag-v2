@@ -149,7 +149,7 @@ export class OpenAiResponsesAdapter implements LlmProtocolAdapter {
             args = {};
           }
           toolCalls.push({
-            id: item.call_id || item.id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            id: item.call_id || item.id || `call_${crypto.randomUUID()}`,
             name: item.name,
             args,
           });
@@ -190,7 +190,7 @@ export class OpenAiResponsesAdapter implements LlmProtocolAdapter {
           }
         }
         toolCalls.push({
-          id: `call_dsml_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          id: `call_dsml_${crypto.randomUUID()}`,
           name,
           args,
         });

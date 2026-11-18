@@ -63,7 +63,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
   onDelete,
   onClose,
 }) => {
-  const isSystem = path === DEFAULT_INBOX_FOLDER || folder?.isSystem === true;
+  const isSystem = path === DEFAULT_INBOX_FOLDER;
   const isEditingName = edit.mode === 'name';
   const isEditingDescription = edit.mode === 'description';
 

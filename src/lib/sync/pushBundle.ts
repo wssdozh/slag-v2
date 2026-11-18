@@ -275,7 +275,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       }
 
       const bundle: SyncBundle = {
-        bundleId: `bnd_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        bundleId: `bnd_${crypto.randomUUID()}`,
         roomId: engine.activeRoomId,
         fromDeviceId: engine.config.deviceId,
         sequence: engine.sequence++,

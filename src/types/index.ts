@@ -85,7 +85,6 @@ export interface FolderMeta {
   name: string; // Display name
   description: string; // Detailed description used by AI triage
   icon?: string;
-  isSystem?: boolean; // E.g., true for "Входящие"
   kanbanColumns?: KanbanColumn[];
   showReferenceColumn?: boolean;
 }

@@ -185,7 +185,7 @@ export class OpenAiChatAdapter implements LlmProtocolAdapter {
           args = {};
         }
         toolCalls.push({
-          id: tc.id || `call_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          id: tc.id || `call_${crypto.randomUUID()}`,
           name,
           args,
         });

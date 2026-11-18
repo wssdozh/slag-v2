@@ -2,14 +2,12 @@
 // Which folders exist is the disk's answer. What this module keeps is the list the sidebar draws
 // before the scan lands — in memory, per vault — and the metadata `state.json` remembers by path.
 import type { ComposerDraft, FolderMeta, SlagItem, VaultMeta } from '../../types';
-import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
+import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
-
-const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
 
 /**
  * The list as this session knows it, keyed by vault. Nothing carries it past a reload: the scan
@@ -32,11 +30,6 @@ export interface FolderStoreHost {
   getAllComposerDrafts(): Record<string, ComposerDraft>;
   /** Drops one folder's composer draft; where drafts live is the drafts writer's business. */
   eraseDraft(folderPath: string, origin: 'local' | 'remote'): void;
-}
-
-/** The key older builds drew the list from; the import format still names it, nothing reads it. */
-export function folderStorageKey(store: FolderStoreHost): string {
-  return `${FOLDERS_STORAGE_PREFIX}${store.currentVault.id}`;
 }
 
 /** What the sidebar draws before the disk has answered: memory, or the defaults of a fresh start. */

@@ -251,7 +251,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
           if (request?.attachmentId) {
             // Only a device that still holds the file answers; for everyone else this is noise,
             // so missing bytes are ignored instead of logged on every peer.
-            if (await vault().hasBytes(request.attachmentId, request.relativePath ?? '')) {
+            if (await vault().hasAttachmentBytes(request.attachmentId, request.relativePath ?? '')) {
               engine.forceAttachmentSend(request.attachmentId);
             }
           }

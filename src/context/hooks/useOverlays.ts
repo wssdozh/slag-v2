@@ -158,7 +158,7 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
     type: 'info' | 'success' | 'error' = 'info',
     action?: ToastMessage['action'],
   ) => {
-    const id = 'toast_' + Date.now() + Math.random().toString(36).slice(2, 6);
+    const id = 'toast_' + crypto.randomUUID();
     setToasts((prev) => [...prev.slice(-2), { id, text, type, action }]);
     logger.log(type === 'error' ? 'error' : 'info', 'UI', `Toast: ${text}`);
   }, []);

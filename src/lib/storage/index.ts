@@ -46,7 +46,6 @@ import {
   renameFolderTree,
   describeFolder,
   eraseFolder,
-  folderStorageKey,
 } from './folderStore';
 import { folderMetaFor } from './folderSource';
 import {
@@ -56,7 +55,6 @@ import {
   recoverFromTrash,
 } from './trashStore';
 import {
-  draftsStorageKey,
   readComposerDrafts,
   readComposerDraft,
   writeComposerDraft,
@@ -301,43 +299,23 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   private initCrossWindowDraftSync(): void {
-    if (typeof BroadcastChannel !== 'undefined') {
-      try {
-        this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
-        this.crossWindowDraftChannel.onmessage = (event) => {
-          const data = event.data;
-          if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
-            this.emitChange({
-              kind: 'draft',
-              action: data.action,
-              id: `composer:${data.folderPath}`,
-              payload: data.draft,
-              origin: 'remote',
-            });
-          }
-        };
-      } catch {
-        this.crossWindowDraftChannel = null;
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('storage', (event) => {
-        if (event.key === this.getDraftsKey() && event.newValue !== null) {
-          try {
-            const all = JSON.parse(event.newValue);
-            for (const [folderPath, draft] of Object.entries(all)) {
-              this.emitChange({
-                kind: 'draft',
-                action: 'upsert',
-                id: `composer:${folderPath}`,
-                payload: draft as ComposerDraft,
-                origin: 'remote',
-              });
-            }
-          } catch {}
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
+      this.crossWindowDraftChannel.onmessage = (event) => {
+        const data = event.data;
+        if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
+          this.emitChange({
+            kind: 'draft',
+            action: data.action,
+            id: `composer:${data.folderPath}`,
+            payload: data.draft,
+            origin: 'remote',
+          });
         }
-      });
+      };
+    } catch {
+      this.crossWindowDraftChannel = null;
     }
   }
 
@@ -402,14 +380,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public getTrashKey(): string {
     return trashStorageKey(this);
-  }
-
-  private getFoldersKey(): string {
-    return folderStorageKey(this);
-  }
-
-  public getDraftsKey(): string {
-    return draftsStorageKey(this);
   }
 
   // Folders API
@@ -872,11 +842,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private transferIo(): VaultImportIo {
     return {
-      // Folders are applied by `importVaultData` itself: the key stays for the format's shape,
-      // and nothing reads it back any more.
-      foldersKey: () => this.getFoldersKey(),
       itemsKey: () => this.getItemsKey(),
-      draftsKey: () => this.getDraftsKey(),
       cacheItems: (key, items) => this.cacheItems(key, items),
       saveAssistantHistory: (messages) => this.saveAssistantHistory(messages),
       saveMemory: (items) => {

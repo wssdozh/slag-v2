@@ -10,9 +10,9 @@
  * scan asks (`entries`). That keeps a seed written by the e2e run, or by another tab, visible
  * without a second copy of the settings in memory.
  */
-import type { PrefsBackend } from './prefs';
+import type { PrefsProfileBackend } from './prefs';
 
-export const prefsBackend: PrefsBackend = {
+export const prefsBackend: PrefsProfileBackend = {
   async load() {
     return {};
   },
