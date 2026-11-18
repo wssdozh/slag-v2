@@ -1,5 +1,10 @@
 // Where the sync config lives per vault, how requests are authorized, how a seed phrase is stored.
-import { vault } from '../storage/port';
+//
+// The config is the vault's own: it sits in `state.json`'s `sync` section as one record, and it
+// never carries the seed phrase — that one lives in `secretStore` and reaches this module as an
+// argument. A caller loads it with `await getSecret(SECRET_KEYS.vaultSeed(vaultId))` and hands it
+// over; nothing here scrapes a warm cache, because the cache is filled from the vault registry and
+// that registry is on its way out of `localStorage`.
 import { logger } from '../logger/logger';
 import { accountClient } from './account';
 import { apiBase } from './apiBase';
@@ -9,6 +14,20 @@ import {
   createInitialConfig,
 } from './devices';
 import { generateMnemonic } from './crypto';
+import {
+  configFromState,
+  configToState,
+  mergeConfigState,
+} from './syncSection';
+import {
+  hasSectionStore,
+  readFallbackJson,
+  removeFallbackKey,
+  sectionRecord,
+  writeFallbackJson,
+  writeSyncSection,
+  writeSyncSectionVerified,
+} from './localBookkeeping';
 import type { SyncConfig, SyncStatus } from './types';
 import {
   DEFAULT_SYNC_SERVER_URL,
@@ -19,6 +38,8 @@ import {
 import { getCachedSecret, SECRET_KEYS, setSecret } from '../platform/secretStore';
 
 const SYNC_CONFIG_KEY = SYNC_STORAGE_KEYS.SYNC_CONFIG;
+/** The config's name inside the `sync` section of `state.json`. */
+const CONFIG_KEY = 'config';
 const DEFAULT_SERVER_URL = DEFAULT_SYNC_SERVER_URL;
 
 const syncLog = logger.scope('SYNC');
@@ -40,45 +61,63 @@ export function computeSubscription(store: SyncConfigHost): SyncStatus['subscrip
   );
 }
 
-export function loadConfig(store: SyncConfigHost, targetVaultId?: string): SyncConfig {
-  const vid = targetVaultId || vault().getCurrentVault()?.id || 'default_vault';
+/**
+ * The config as this device holds it, built from whatever the vault's own copy has. Synchronous
+ * and write-free on purpose: the engine is constructed before any of this can be read from the
+ * disk, and this is the answer it gets until `hydrateConfig` has the real one.
+ */
+export function loadConfig(store: SyncConfigHost, seed: string | null, targetVaultId?: string): SyncConfig {
+  const vid = targetVaultId || store.currentVaultId || 'default_vault';
   store.currentVaultId = vid;
-  const key = `${SYNC_CONFIG_KEY}_${vid}`;
-  const secret = getCachedSecret(SECRET_KEYS.vaultSeed(vid));
-  try {
-    let raw = localStorage.getItem(key);
-    if (!raw && vid === 'default_vault') {
-      raw = localStorage.getItem(SYNC_CONFIG_KEY);
+  return buildConfig(seed, readConfigRecord(vid));
+}
+
+/**
+ * Reads the config once, on the way into a vault: migrates the old `localStorage` record into
+ * `state.json.sync.config`, mints a seed phrase if this vault has never had one, and writes the
+ * file copy without it. Returns the config the engine keeps.
+ */
+export async function hydrateConfig(
+  store: SyncConfigHost,
+  vaultId: string,
+  seed: string | null,
+  section: Record<string, unknown> | null
+): Promise<SyncConfig> {
+  store.currentVaultId = vaultId;
+  const fromFile = configFromState(section?.[CONFIG_KEY]);
+  const legacyKeys = fallbackConfigKeys(vaultId);
+  const fromLegacy = readLegacyConfigRecord(legacyKeys);
+  const stored = mergeConfigState(fromFile, fromLegacy ?? {});
+  const config = buildConfig(seed, Object.keys(stored).length > 0 ? stored : null);
+
+  if (!config.seedPhrase) {
+    // The only place a key is ever minted. It goes to the secret store before the config exists,
+    // so a write that fails below cannot leave a vault that believes it has a key it does not.
+    config.seedPhrase = generateMnemonic(12);
+    try {
+      await setSecret(SECRET_KEYS.vaultSeed(vaultId), config.seedPhrase);
+    } catch (error) {
+      syncLog.error('Failed to persist a new vault seed', error);
     }
-    if (raw) {
-      return parseStoredConfig(
-        raw,
-        DEFAULT_SERVER_URL,
-        accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-        accountClient.getSession()?.deviceId,
-        secret ?? undefined
-      );
-    }
-  } catch {
-    // fallback
   }
 
-  const seed = secret ?? generateMnemonic(12);
-  const baseRaw = localStorage.getItem(SYNC_CONFIG_KEY) || localStorage.getItem(`${SYNC_CONFIG_KEY}_default_vault`);
-  const initial = createInitialConfig(
-    DEFAULT_SERVER_URL,
-    baseRaw,
-    accountClient.getToken(DEFAULT_SERVER_URL) !== null,
-    accountClient.getSession()?.deviceId,
-    seed
-  );
-  saveConfig(store, initial);
-  if (!secret) {
-    void setSecret(SECRET_KEYS.vaultSeed(vid), seed).catch((error: unknown) => {
-      syncLog.error('Failed to persist a new vault seed', error);
-    });
+  const record = configToState(config);
+  const deviceIdChanged = config.deviceId !== fromFile.deviceId;
+  const needsFile = Object.keys(fromFile).length === 0 || deviceIdChanged || fromLegacy !== null;
+
+  if (!hasSectionStore()) {
+    // No disk: the browser build keeps the exact keys and the exact strings it kept before.
+    if (Object.keys(fromFile).length === 0 || deviceIdChanged) {
+      for (const key of legacyKeys) writeFallbackJson(key, record);
+    }
+    return config;
   }
-  return initial;
+
+  if (needsFile && (await writeSyncSectionVerified({ [CONFIG_KEY]: record }))) {
+    // The old plaintext is dropped only now, when the file demonstrably holds the new record.
+    for (const key of legacyKeys) removeFallbackKey(key);
+  }
+  return config;
 }
 
 export function saveConfig(store: SyncConfigHost, newConfig: Partial<SyncConfig>): void {
@@ -90,17 +129,7 @@ export function saveConfig(store: SyncConfigHost, newConfig: Partial<SyncConfig>
       syncLog.error('Failed to persist the vault seed', error);
     });
   }
-  try {
-    const key = `${SYNC_CONFIG_KEY}_${store.currentVaultId}`;
-    const persisted: Partial<SyncConfig> = { ...store.config };
-    delete persisted.seedPhrase;
-    localStorage.setItem(key, JSON.stringify(persisted));
-    if (store.currentVaultId === 'default_vault') {
-      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(persisted));
-    }
-  } catch (e) {
-    syncLog.error('Failed to save sync config:', e);
-  }
+  persistConfig(store);
   if (store.status) {
     store.status.subscription = computeSubscription(store);
     store.notify();
@@ -133,35 +162,58 @@ export async function refreshServerAuth(store: SyncConfigHost): Promise<boolean>
 
 export function getVaultSeedPhrase(store: SyncConfigHost, vaultId: string): string | null {
   if (vaultId === store.currentVaultId) return store.config.seedPhrase || null;
-  const cached = getCachedSecret(SECRET_KEYS.vaultSeed(vaultId));
-  if (cached) return cached;
-  try {
-    const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return typeof parsed.seedPhrase === 'string' && parsed.seedPhrase ? parsed.seedPhrase : null;
-  } catch {
-    return null;
-  }
+  // Another vault's key is in the secret store, and the store is the only place it can be: the
+  // config never carried one, and the old plaintext was moved out of `localStorage` at boot.
+  return getCachedSecret(SECRET_KEYS.vaultSeed(vaultId));
 }
 
 export async function setVaultSeedPhrase(store: SyncConfigHost, vaultId: string, seedPhrase: string): Promise<void> {
   await setSecret(SECRET_KEYS.vaultSeed(vaultId), seedPhrase);
-  if (vaultId === store.currentVaultId) {
-    store.config = { ...store.config, seedPhrase };
-    saveConfig(store, {});
+  if (vaultId !== store.currentVaultId) return;
+  store.config = { ...store.config, seedPhrase };
+  saveConfig(store, {});
+}
+
+/** The config the file and the old blob add up to; `null` means this vault has never been set up. */
+function buildConfig(seed: string | null, record: Partial<SyncConfig> | null): SyncConfig {
+  const hasToken = accountClient.getToken(DEFAULT_SERVER_URL) !== null;
+  const sessionDeviceId = accountClient.getSession()?.deviceId;
+  if (!record) {
+    // An empty string, not a fresh mnemonic: minting a key is `hydrateConfig`'s decision, and a
+    // config that quietly generated one here would overwrite a real key it could not see yet.
+    return createInitialConfig(DEFAULT_SERVER_URL, null, hasToken, sessionDeviceId, seed ?? '');
+  }
+  return parseStoredConfig(JSON.stringify(record), DEFAULT_SERVER_URL, hasToken, sessionDeviceId, seed ?? undefined);
+}
+
+/** The vault's own copy: the file once it is hydrated, the old `localStorage` record before that. */
+function readConfigRecord(vaultId: string): Partial<SyncConfig> | null {
+  const fromFile = configFromState(sectionRecord(vaultId, CONFIG_KEY));
+  if (Object.keys(fromFile).length > 0) return fromFile;
+  return readLegacyConfigRecord(fallbackConfigKeys(vaultId));
+}
+
+function fallbackConfigKeys(vaultId: string): string[] {
+  return vaultId === 'default_vault'
+    ? [`${SYNC_CONFIG_KEY}_${vaultId}`, SYNC_CONFIG_KEY]
+    : [`${SYNC_CONFIG_KEY}_${vaultId}`];
+}
+
+/** Read once, by the migration: after it the file is the only copy of the config. */
+function readLegacyConfigRecord(keys: string[]): Partial<SyncConfig> | null {
+  for (const key of keys) {
+    const record = configFromState(readFallbackJson<unknown>(key, null));
+    if (Object.keys(record).length > 0) return record;
+  }
+  return null;
+}
+
+/** One writer for one config: the section when there is a disk, the old keys when there is not. */
+function persistConfig(store: SyncConfigHost): void {
+  const record = configToState(store.config);
+  if (hasSectionStore()) {
+    void writeSyncSection({ [CONFIG_KEY]: record });
     return;
   }
-
-  // Keep device/server metadata in that vault's config, but never write the seed back there.
-  const raw = localStorage.getItem(`${SYNC_CONFIG_KEY}_${vaultId}`);
-  const base = raw ? JSON.parse(raw) : store.config;
-  const persisted: Partial<SyncConfig> = {
-    ...base,
-    deviceId: store.config.deviceId,
-    deviceName: store.config.deviceName,
-    serverUrl: store.config.serverUrl,
-  };
-  delete persisted.seedPhrase;
-  localStorage.setItem(`${SYNC_CONFIG_KEY}_${vaultId}`, JSON.stringify(persisted));
+  for (const key of fallbackConfigKeys(store.currentVaultId)) writeFallbackJson(key, record);
 }

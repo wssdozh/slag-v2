@@ -1,15 +1,14 @@
 import type { PendingPush, SyncEngine } from './syncEngine';
 import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
-import { loadSentHashes, loadSyncedIds, loadTombstones, saveSentHashes, stateHashKey } from './localBookkeeping';
+import { loadSentHashes, loadSyncedIds, loadStateHash, loadTombstones, saveSentHashes, saveStateHash } from './localBookkeeping';
 import { accountClient } from './account';
 import { vault } from '../storage/port';
 import { stripAttachmentData } from '../storage/attachmentData';
-import { SYNC_INTERVALS, SYNC_STORAGE_KEYS } from '../../config';
+import { SYNC_INTERVALS } from '../../config';
 import { logger } from '../logger/logger';
 
 const syncLog = logger.scope('SYNC');
-const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 
 /**
  * Packing the local state into an outgoing bundle: what is dirty, what was already
@@ -38,7 +37,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
     engine.isProcessingSync = true;
     const generation = engine.initGeneration;
     const vaultKey = engine.activeVaultKey;
-    const hashKey = stateHashKey(engine.bookkeeping);
 
     try {
       // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
@@ -50,9 +48,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
 
       const stateHash = await computeStateRootHash(items, folders);
       if (generation !== engine.initGeneration) return;
-      const lastSyncedHash =
-        localStorage.getItem(hashKey) ||
-        (!engine.usesAccountSync() && engine.currentVaultId === 'default_vault' ? localStorage.getItem(LAST_STATE_HASH_KEY) : null);
+      const lastSyncedHash = loadStateHash(engine.bookkeeping);
 
       // An attachment pass has nothing to do with the note state hash: it must get past the
       // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
@@ -272,7 +268,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       if (changes.length === 0) {
         // Only outbox noise that changed nothing on disk: nothing to send.
         syncLog.debug('Push skipped: no entity changed since the last bundle');
-        localStorage.setItem(hashKey, stateHash);
+        saveStateHash(engine.bookkeeping, stateHash);
         engine.getOutbox().markSynced(pendingOps.map((o) => o.opId));
         engine.status.state = engine.ws && engine.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
         return;
@@ -295,7 +291,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         bundleId: bundle.bundleId,
         encrypted,
         frame: encodeBundleFrame(encrypted),
-        hashKey,
         stateHash,
         packedHashes,
         syncedIds: [...currentIds],
