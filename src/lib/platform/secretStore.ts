@@ -354,9 +354,11 @@ async function doInitSecretStore(): Promise<void> {
   const os = await probeOsBackend();
 
   if (storedMode === 'os' && !os) {
-    throw new SecretStoreUnavailableError(
-      'Системное хранилище ключей недоступно. Разблокируйте связку ключей и повторите.'
-    );
+    // A wiped keychain or a data directory copied to another machine. Same answer as on Android:
+    // fall back to the encrypted local store instead of blocking sync for the whole session.
+    storeLog.warn('OS credential store was in use but is gone, falling back to the encrypted local store');
+    storedMode = null;
+    localStorage.removeItem(MODE_KEY);
   }
 
   if (os && (storedMode === null || storedMode === 'local')) {
