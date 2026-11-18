@@ -1,4 +1,4 @@
-﻿// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
+// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
 // trash, settings and attachments. Everything that touches the disk goes through here.
 import type {
   SlagItem,
@@ -39,7 +39,9 @@ import {
   pickVaultDirectory,
 } from './vaultRegistry';
 import {
+  forgetVaultFolders,
   readFolders,
+  rememberFolders,
   writeFolder,
   renameFolderTree,
   describeFolder,
@@ -48,7 +50,6 @@ import {
 } from './folderStore';
 import { folderMetaFor } from './folderSource';
 import {
-  trashStorageKey,
   readTrash,
   trashItem,
   recoverFromTrash,
@@ -135,11 +136,9 @@ export class StorageService {
   public files: VaultFiles = new VaultFiles({
     getVault: () => this.currentVault,
     getItems: (folder) => this.getItems(folder),
-    getTrashItems: () => this.getTrashItems(),
     getWorkspaceState: () => this.getWorkspaceState(),
     cacheItems: (key, items) => this.cacheItems(key, items),
     getItemsKey: () => this.getItemsKey(),
-    getTrashKey: () => trashStorageKey(this),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
     attachments: this.attachments,
   });
@@ -169,48 +168,23 @@ export class StorageService {
   }
 
   /**
-   * The note index, parsed once per stored value.
-   *
-   * One keystroke used to parse the same key three times: `saveItem` reads the whole list,
-   * rewrites it, and the UI reads it straight back. The raw string is kept next to the parse,
-   * so a write from another window or from the sync engine invalidates this copy the moment
-   * the bytes differ — the cache can never outlive the value it mirrors.
+   * The note index, in memory and nowhere else. It is rebuilt by the disk scan on start — the
+   * directories are the source of truth — and every write updates it here, per vault, so switching
+   * back to a vault this session already visited does not wait for another scan.
    */
-  private itemsIndexCache: { key: string; raw: string; items: SlagItem[] } | null = null;
+  private itemsIndex: Map<string, SlagItem[]> = new Map();
 
   private readItemsIndex(key: string): SlagItem[] {
-    const raw = localStorage.getItem(key) ?? '';
-    const cached = this.itemsIndexCache;
-    if (cached && cached.key === key && cached.raw === raw) return cached.items;
-    let parsed: SlagItem[] = [];
-    if (raw) {
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = [];
-      }
-    }
-    this.itemsIndexCache = { key, raw, items: parsed };
-    return parsed;
+    return this.itemsIndex.get(key) ?? [];
   }
 
   /**
-   * The index is a cache, never the source of truth: a note that does not fit here still has to
-   * reach the disk. So a quota miss is a warning, not an exception.
+   * The index is a cache of what the disk says, never a second source of truth. The bytes of an
+   * attachment stay in `.attachments/` and IndexedDB; the index keeps their metadata, as it did
+   * when it had a quota to respect.
    */
   public cacheItems(key: string, items: SlagItem[]): void {
-    try {
-      const stored = stripAttachmentData(items);
-      const raw = JSON.stringify(stored);
-      localStorage.setItem(key, raw);
-      if (key === this.getItemsKey()) this.itemsIndexCache = { key, raw, items: stored };
-    } catch (err) {
-      fsLog.warn('Storage index write failed, notes keep landing on disk', {
-        key,
-        itemCount: items.length,
-        error: err,
-      });
-    }
+    this.itemsIndex.set(key, stripAttachmentData(items));
   }
 
   public subscribeChanges(listener: StorageChangeListener): () => void {
@@ -258,7 +232,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   constructor() {
     this.currentVault = initCurrentVault(this);
-    this.initDefaultsIfNeeded();
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
@@ -359,7 +332,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public deleteVault(vaultId: string): boolean {
-    return deleteVault(this, vaultId);
+    const deleted = deleteVault(this, vaultId);
+    if (deleted) {
+      // The vault is gone from the registry and the disk; what this session still remembered of
+      // it must not become the content of a new vault that later reuses the id.
+      forgetVaultFolders(vaultId);
+      this.itemsIndex.delete(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
+      this.itemsIndex.delete(`${STORAGE_KEYS.TRASH_PREFIX}${vaultId}`);
+    }
+    return deleted;
   }
 
   public async pickDirectory(): Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null> {
@@ -378,36 +359,18 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return draftsStorageKey(this);
   }
 
-  public initDefaultsIfNeeded(): void {
-    const foldersKey = this.getFoldersKey();
-    if (!localStorage.getItem(foldersKey)) {
-      localStorage.setItem(foldersKey, JSON.stringify(DEFAULT_FOLDERS));
-    }
-
-    const itemsKey = this.getItemsKey();
-    if (!localStorage.getItem(itemsKey)) {
-      const initialItems = this.currentVault.id === 'default_vault' ? generateDemoItems() : [];
-      this.cacheItems(itemsKey, initialItems);
-    }
-  }
-
   // Folders API
   public getFolders(): FolderMeta[] {
     return readFolders(this);
   }
 
   /**
-   * The one write path for the folder list. The cache is what the sidebar draws before the scan
-   * answers and the only store a browser build has; `state.json` takes the metadata by path, never
-   * a verdict on what exists. An `external` change came from the disk itself, so there is nothing
-   * to tell the disk back.
+   * The one write path for the folder list. Memory is what the sidebar draws before the scan
+   * answers; `state.json` takes the metadata by path, never a verdict on what exists. An
+   * `external` change came from the disk itself, so there is nothing to tell the disk back.
    */
   public persistFolders(folders: FolderMeta[], origin: StorageOrigin): void {
-    try {
-      localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-    } catch (err) {
-      fsLog.warn('Folder cache write failed, the list keeps coming from the disk', { error: String(err) });
-    }
+    rememberFolders(this, folders);
     if (isTauri() && origin !== 'external') {
       void this.files.writeFolderMeta(folders).catch((err: unknown) => {
         fsLog.warn('Failed to write folder metadata to state.json', { error: String(err) });
@@ -661,6 +624,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     eraseComposerDraft(this, folderPath, origin);
   }
 
+  /** What a deleted folder takes with it: its drafts, and those of its subfolders. */
+  public eraseDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
+    this.deleteComposerDraft(folderPath, origin);
+  }
+
   public getFullscreenDraft(itemId: string): FullscreenDraft | null {
     return readFullscreenDraft(this, itemId);
   }
@@ -842,6 +810,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private transferIo(): VaultImportIo {
     return {
+      // Folders are applied by `importVaultData` itself: the key stays for the format's shape,
+      // and nothing reads it back any more.
       foldersKey: () => this.getFoldersKey(),
       itemsKey: () => this.getItemsKey(),
       draftsKey: () => this.getDraftsKey(),
@@ -872,7 +842,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       fsLog.warn('Rejected vault import with unsafe path', err);
       return false;
     }
-    return importVaultPayload(data, this.transferIo());
+    // An imported folder list lands the way a made one does: in memory, and in `state.json`'s
+    // metadata. The rest of the payload keeps its own door.
+    const { folders, ...rest } = data;
+    if (Array.isArray(folders) && folders.length > 0) this.persistFolders(folders, 'remote');
+    return importVaultPayload(rest, this.transferIo());
   }
 
   public importVaultFromJson(jsonString: string): boolean {

@@ -1,16 +1,21 @@
 // Writing folders: save, rename with the note cascade, describe, delete and re-route to Inbox.
-// Which folders exist is the disk's answer; what is written here is the cache that draws them
-// before the scan lands, and the metadata `state.json` keeps per path.
+// Which folders exist is the disk's answer. What this module keeps is the list the sidebar draws
+// before the scan lands — in memory, per vault — and the metadata `state.json` remembers by path.
 import type { ComposerDraft, FolderMeta, SlagItem, VaultMeta } from '../../types';
 import { DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
-import { readStoredJson } from './readJson';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
 
 const FOLDERS_STORAGE_PREFIX = STORAGE_KEYS.FOLDERS_PREFIX;
+
+/**
+ * The list as this session knows it, keyed by vault. Nothing carries it past a reload: the scan
+ * rebuilds it from the directories, and `state.json` keeps only the metadata.
+ */
+const foldersInMemory = new Map<string, FolderMeta[]>();
 
 export interface FolderStoreHost {
   currentVault: VaultMeta;
@@ -18,25 +23,36 @@ export interface FolderStoreHost {
     renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[]): Promise<void>;
     deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void>;
   };
-  /** Writes the list as given: the cache the sidebar draws from, and the metadata on disk. */
+  /** Remembers the list and hands its metadata to `state.json`. */
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): void;
   emitChange(event: StorageChangeEvent): void;
   getItems(folder?: string): SlagItem[];
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
-  getDraftsKey(): string;
   getAllComposerDrafts(): Record<string, ComposerDraft>;
+  /** Drops one folder's composer draft; where drafts live is the drafts writer's business. */
+  eraseDraft(folderPath: string, origin: 'local' | 'remote'): void;
 }
 
+/** The key older builds drew the list from; the import format still names it, nothing reads it. */
 export function folderStorageKey(store: FolderStoreHost): string {
   return `${FOLDERS_STORAGE_PREFIX}${store.currentVault.id}`;
 }
 
-/** What the sidebar draws before the disk has answered — and all a browser build ever has. */
+/** What the sidebar draws before the disk has answered: memory, or the defaults of a fresh start. */
 export function readFolders(store: FolderStoreHost): FolderMeta[] {
-  return readStoredJson<FolderMeta[]>(folderStorageKey(store), DEFAULT_FOLDERS, value =>
-    Array.isArray(value) ? (value as FolderMeta[]) : undefined
-  );
+  const folders = foldersInMemory.get(store.currentVault.id) ?? DEFAULT_FOLDERS;
+  return folders.map(folder => ({ ...folder }));
+}
+
+/** The one writer of that memory: the service calls it for every list it persists. */
+export function rememberFolders(store: FolderStoreHost, folders: FolderMeta[]): void {
+  foldersInMemory.set(store.currentVault.id, folders);
+}
+
+/** A vault that is gone takes its list with it: a later vault may be created with the same id. */
+export function forgetVaultFolders(vaultId: string): void {
+  foldersInMemory.delete(vaultId);
 }
 
 export function writeFolder(store: FolderStoreHost, folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
@@ -130,19 +146,9 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
   store.cacheItems(store.getItemsKey(), updatedItems);
 
   // Clean up drafts for deleted folder and any subfolders
-  const drafts = store.getAllComposerDrafts();
-  let draftsChanged = false;
-  for (const key of Object.keys(drafts)) {
-    if (key === path || key.startsWith(path + '/')) {
-      delete drafts[key];
-      draftsChanged = true;
-    }
-  }
-  if (draftsChanged) {
-    try {
-      localStorage.setItem(store.getDraftsKey(), JSON.stringify(drafts));
-    } catch (err) {
-      fsLog.warn(`Failed to drop drafts of the deleted folder "${path}"`, err);
+  for (const draftFolder of Object.keys(store.getAllComposerDrafts())) {
+    if (draftFolder === path || draftFolder.startsWith(path + '/')) {
+      store.eraseDraft(draftFolder, origin);
     }
   }
 

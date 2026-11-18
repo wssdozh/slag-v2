@@ -1,4 +1,4 @@
-import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
+import type { FolderMeta, KanbanColumn, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -11,15 +11,13 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
-import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
-import { idbSaveAttachment } from './indexedDb';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
 import { folderMetaFor } from './folderSource';
 import type { AttachmentStore } from './attachments';
 
 const fsLog = logger.scope('FS');
-const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
 
 /**
  * The vault as files on disk: where they live, how a name is claimed, how a note is
@@ -31,11 +29,9 @@ const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
 export interface VaultFilesDeps {
   getVault(): VaultMeta;
   getItems(folder?: string): SlagItem[];
-  getTrashItems(): SlagItem[];
   getWorkspaceState(): WorkspaceState;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
-  getTrashKey(): string;
   /** The one write path for the folder list; `external` came from the disk and writes nothing back. */
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote' | 'external'): void;
   attachments: AttachmentStore;
@@ -391,44 +387,9 @@ export class VaultFiles {
     if (!isTauri()) return Promise.resolve(false);
     if (!this.tauriInitialization) {
       this.tauriInitialization = this.migrateLegacyNotesToVaults()
-        .then(() => this.syncCurrentVaultFs())
-        .then((ready) => this.compactLocalStorage().then(() => ready));
+        .then(() => this.syncCurrentVaultFs());
     }
     return this.tauriInitialization;
-  }
-
-  /**
-   * One-off pass over what older builds left in localStorage: attachment bytes and note bodies
-   * with data URLs inside. The bytes move to IndexedDB (where `getAttachmentUrl` looks first),
-   * the keys are dropped, and the note index is rewritten as metadata only. This is what frees
-   * the quota that used to reject every save with an attachment in it.
-   */
-  private async compactLocalStorage(): Promise<void> {
-    try {
-      const staleKeys: string[] = [];
-      for (let index = 0; index < localStorage.length; index++) {
-        const key = localStorage.key(index);
-        if (key?.startsWith(ATTACHMENTS_STORAGE_PREFIX)) staleKeys.push(key);
-      }
-      for (const key of staleKeys) {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          try {
-            await idbSaveAttachment(JSON.parse(raw) as SlagAttachment);
-          } catch {
-            // Unreadable leftovers are exactly what we came here to delete.
-          }
-        }
-        localStorage.removeItem(key);
-      }
-      this.deps.cacheItems(this.deps.getItemsKey(), this.deps.getItems());
-      this.deps.cacheItems(this.deps.getTrashKey(), this.deps.getTrashItems());
-      if (staleKeys.length > 0) {
-        fsLog.info(`Dropped ${staleKeys.length} attachment entries from localStorage (bytes live in IndexedDB)`);
-      }
-    } catch (err) {
-      fsLog.warn('localStorage compaction failed', err);
-    }
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
