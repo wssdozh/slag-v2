@@ -119,26 +119,16 @@ export function mergeNumbers(stored: Record<string, number>, legacy: Record<stri
 
 /** Ids only add up: a forgotten one would look like a note this device has never heard of. */
 export function mergeIds(stored: string[], legacy: string[]): string[] {
-  const merged = sanitizeIds(stored);
-  const seen = new Set(merged);
-  for (const id of sanitizeIds(legacy)) {
-    if (seen.has(id)) continue;
-    seen.add(id);
-    merged.push(id);
-  }
-  return merged;
+  return [...new Set([...sanitizeIds(stored), ...sanitizeIds(legacy)])];
 }
 
 /** One op per `opId`: the same unsent change is the same change, whichever copy it came from. */
 export function mergeOutbox(stored: SyncOperation[], legacy: SyncOperation[]): SyncOperation[] {
-  const merged = sanitizeOutbox(stored);
-  const seen = new Set(merged.map((op) => op.opId));
+  const byOpId = new Map(sanitizeOutbox(stored).map((op): [string, SyncOperation] => [op.opId, op]));
   for (const op of sanitizeOutbox(legacy)) {
-    if (seen.has(op.opId)) continue;
-    seen.add(op.opId);
-    merged.push(op);
+    if (!byOpId.has(op.opId)) byOpId.set(op.opId, op);
   }
-  return merged;
+  return [...byOpId.values()];
 }
 
 /** Only what a number can be here: a finite positive stamp or a cursor. Junk is dropped. */
