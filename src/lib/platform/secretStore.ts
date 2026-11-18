@@ -9,6 +9,7 @@ import {
   setLocalSecret,
 } from './encryptedLocalStore';
 import { STORAGE_KEYS, SYNC_STORAGE_KEYS } from '../../config';
+import { aiKeySecretName, splitAiKeys } from '../ai/connections/secrets';
 
 const storeLog = logger.scope('SYNC');
 
@@ -19,6 +20,8 @@ export const SECRET_KEYS = {
   accountSession: 'account-session',
   vaultSeed: (vaultId: string) => `vault-seed:${vaultId}`,
   deviceKey: (deviceId: string) => `device-key:${deviceId}`,
+  /** Provider API key of one AI connection; the name lives in the ai domain, the store only holds it. */
+  aiKey: (connectionId: string) => aiKeySecretName(connectionId),
 } as const;
 
 export type SecretStoreMode = 'os' | 'local' | 'file';
@@ -224,6 +227,55 @@ function knownDeviceIds(): Set<string> {
   return ids;
 }
 
+/**
+ * Connection ids of the saved AI settings. The settings themselves are the app's business — the
+ * store only needs the names to preload, and this is the one place localStorage is read for them.
+ */
+function aiConnectionIds(): string[] {
+  const parsed = parseJson(localStorage.getItem(STORAGE_KEYS.AI_SETTINGS));
+  const connections = parsed && Array.isArray(parsed.connections) ? parsed.connections : [];
+  const ids: string[] = [];
+  for (const entry of connections) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const id = (entry as { id?: unknown }).id;
+    if (typeof id === 'string' && id) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * The old shape kept provider keys in the settings JSON in plain text. Move them into the store,
+ * then rewrite the settings without them — everything that is not a key is left as it was. Once
+ * the plaintext is gone this does nothing, so a second boot writes nothing.
+ */
+async function migrateAiKeys(target: SecretBackend): Promise<void> {
+  if (typeof localStorage === 'undefined') return;
+  const raw = localStorage.getItem(STORAGE_KEYS.AI_SETTINGS);
+  if (!raw) return;
+  const { keys, settings } = splitAiKeys(parseJson(raw));
+  if (!keys.length || !settings) return;
+
+  const failed: string[] = [];
+  for (const entry of keys) {
+    try {
+      const existing = await target.get(entry.key);
+      if (existing === null) await target.set(entry.key, entry.value);
+      cache.set(entry.key, existing ?? entry.value);
+    } catch (error) {
+      storeLog.error('Could not move an AI provider key into the secret store', { key: entry.key, error });
+      failed.push(entry.key);
+    }
+  }
+
+  // Rewriting the settings while a key is still only in the plaintext would lose it, so keep
+  // the old plaintext and let the next boot try again.
+  if (failed.length) {
+    storeLog.warn('AI provider keys stayed in the settings: the secret store refused them', { keys: failed });
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.AI_SETTINGS, JSON.stringify(settings));
+}
+
 async function migrateEncryptedLocalToOs(target: SecretBackend): Promise<boolean> {
   const entries: Array<{ key: string; value: string }> = [];
   for (let index = 0; index < localStorage.length; index++) {
@@ -271,6 +323,7 @@ async function preload(target: SecretBackend): Promise<void> {
   const keys = new Set<string>([SECRET_KEYS.accountSession]);
   for (const vaultId of knownVaultIds()) keys.add(SECRET_KEYS.vaultSeed(vaultId));
   for (const deviceId of knownDeviceIds()) keys.add(SECRET_KEYS.deviceKey(deviceId));
+  for (const connectionId of aiConnectionIds()) keys.add(SECRET_KEYS.aiKey(connectionId));
 
   for (const key of keys) {
     try {
@@ -287,6 +340,7 @@ async function doInitSecretStore(): Promise<void> {
   if (override) {
     backend = override;
     await migrateLegacy(backend);
+    await migrateAiKeys(backend);
     await preload(backend);
     ready = true;
     return;
@@ -322,6 +376,7 @@ async function doInitSecretStore(): Promise<void> {
   }
 
   await migrateLegacy(backend);
+  await migrateAiKeys(backend);
   await preload(backend);
   ready = true;
 }

@@ -1,7 +1,9 @@
 // Default settings, readiness rules and the one legacy → connections migration.
 import type { AiConnection, AiConnectionKind, AiRole, AiSettings, AiWireProtocol } from '../../../types';
 import { AI_ENDPOINTS, DEFAULT_AI_MODELS, STORAGE_KEYS } from '../../../config';
+import { getCachedSecret } from '../../platform/secretStore';
 import { PROVIDER_PRESETS, connectionModel, connectionSupports } from './presets';
+import { applyAiKeys } from './secrets';
 
 const AI_ROLES: AiRole[] = ['chat', 'vision', 'stt'];
 const CONNECTION_KINDS = Object.keys(PROVIDER_PRESETS) as AiConnectionKind[];
@@ -228,11 +230,17 @@ export function normalizeAiSettings(raw: unknown): AiSettings {
   };
 }
 
+/**
+ * Synchronous by contract: callers use it to seed state during render. The disk copy has no keys
+ * any more, so they come from the secret store's warmed cache — `initSecretStore()` is awaited in
+ * `main.tsx` before the first render, which is what makes the sync lookup honest.
+ */
 export function loadAiSettings(): AiSettings {
   if (typeof localStorage === 'undefined') return cloneDefaults();
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.AI_SETTINGS);
-    return saved ? normalizeAiSettings(JSON.parse(saved)) : cloneDefaults();
+    if (!saved) return cloneDefaults();
+    return applyAiKeys(normalizeAiSettings(JSON.parse(saved)), getCachedSecret);
   } catch {
     return cloneDefaults();
   }
