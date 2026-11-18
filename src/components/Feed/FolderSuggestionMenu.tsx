@@ -18,15 +18,15 @@ interface FolderSuggestionMenuProps {
 }
 
 // The tree is drawn, not spelled: a text `╰──` sits on the text baseline, so the line under a
-// nested folder ran below the icon instead of into its middle. The hook of a row is square —
-// the vertical half of the row and the horizontal reach to the icon are both one indent, 14px.
-const TREE_INDENT = 14;
-// Left inset before the first column: 4 + half an indent keeps a root icon where it used to be.
-const TREE_PADDING = 4;
+// nested folder ran below the icon instead of into its middle. The grid is the menu's own: one
+// level = 16px, the hook is a square half level (8px) and the first icon starts 8px in.
+const TREE_INDENT = 16;
+const TREE_PADDING = 8;
+const TREE_HOOK = TREE_INDENT / 2;
 const TREE_LINE = 'bg-tint-15';
 
-const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT + TREE_INDENT / 2}px`;
-const guideLeft = (column: number) => `${TREE_PADDING + column * TREE_INDENT + TREE_INDENT / 2}px`;
+const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT}px`;
+const guideLeft = (column: number) => `${TREE_PADDING + column * TREE_INDENT + TREE_HOOK}px`;
 
 /**
  * The lines of a branch: the guides of the ancestors still running, then the row's own hook —
@@ -47,10 +47,10 @@ const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
       )}
       {row.depth > 0 && (
         <>
-          {/* The hook is square: one indent up, one indent across to the icon. */}
+          {/* The hook is square: half a level up, half a level across to the icon. */}
           <span
             className={`pointer-events-none absolute w-px ${TREE_LINE}`}
-            style={{ left: ownColumn, top: `calc(50% - ${TREE_INDENT}px)`, height: `${TREE_INDENT}px` }}
+            style={{ left: ownColumn, top: `calc(50% - ${TREE_HOOK}px)`, height: `${TREE_HOOK}px` }}
           />
           {!row.isLast && (
             <span
@@ -60,7 +60,7 @@ const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
           )}
           <span
             className={`pointer-events-none absolute top-1/2 h-px ${TREE_LINE}`}
-            style={{ left: ownColumn, width: `${TREE_INDENT}px` }}
+            style={{ left: ownColumn, width: `${TREE_HOOK}px` }}
           />
         </>
       )}
@@ -125,7 +125,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
               aria-hidden="true"
               data-depth={row.depth}
               onMouseDown={(e) => e.preventDefault()}
-              className="relative flex items-center pr-2.5 py-1.5 opacity-45 select-none"
+              className="relative flex h-7 items-center pr-2 opacity-45 select-none"
               style={{ paddingLeft: rowPadding(row.depth) }}
             >
               <BranchLines row={row} />
@@ -144,7 +144,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
             data-branch={row.isLast ? 'last' : 'middle'}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => onSelect(row)}
-            className={`relative flex items-center justify-between gap-3 pr-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+            className={`relative flex h-7 items-center justify-between gap-3 pr-2 rounded-md text-left transition-colors cursor-pointer ${
               isSelected
                 ? 'bg-tint-10 text-white font-medium shadow-sm'
                 : 'text-fg-tertiary hover:bg-tint-4'
