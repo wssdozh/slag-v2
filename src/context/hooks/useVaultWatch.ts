@@ -48,8 +48,10 @@ export function useVaultWatch({ vault, addToast }: UseVaultWatchOptions): void {
       notesPath: storage.getVaultNotesPath(),
       onChanged: (change) => {
         if (cancelled) return;
+        // Folders travel with the same call: the sweep is the only thing that sees a directory
+        // the MCP server made, and a reload without them would leave the sidebar stale.
         void storage
-          .reloadFromDisk([...change.changed, ...change.removed])
+          .reloadFromDisk(change)
           .then(({ removed }) => {
             if (cancelled || removed === 0) return;
             // Updates land silently: an outside editor saves on every keystroke, and a toast per
