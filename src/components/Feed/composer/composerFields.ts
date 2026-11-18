@@ -7,8 +7,8 @@ import type {
   SlagSubtask,
 } from '../../../types';
 import {
-  extractAndStripTags,
   extractFolderToken,
+  parseComposerMentions,
   parseTodoistInput,
 } from '../../../lib/time/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../../lib/tasks/taskUtils';
@@ -77,11 +77,10 @@ export function resolveComposerFields({
   recurrence,
   dismissals,
 }: ComposerFieldSources): ComposerFields {
-  // `@Папка` and `#тег` are composer syntax: both are stripped before saving.
+  // `@Папка` and `#тег` are composer syntax: both are stripped before saving, by one parser.
   const parsed = parseTodoistInput(content);
-  const { cleanContent: withoutFolder, folder } = extractFolderToken(content, folders);
-  const { cleanContent, tags: extractedTags } = extractAndStripTags(withoutFolder);
-  const baseContent = (cleanContent || withoutFolder || content).trim();
+  const { cleanContent, folder, tags: extractedTags } = parseComposerMentions(content, folders);
+  const baseContent = (cleanContent || content).trim();
 
   const isTask = itemType === 'task';
   // A task's first line is its title, and the parser already removed the date, time,

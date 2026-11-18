@@ -371,23 +371,58 @@ export function extractAndStripTags(text: string): { cleanContent: string; tags:
   };
 }
 
+const escapeForRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The tokens that can name a folder: the full path and the bare name, longest first. Order matters
+ * — `@Проекты/медиа` has to be read as one folder, not as `@Проекты` with `/медиа` left in the body.
+ * Two folders may share a name; the first in the tree wins, the path token stays unambiguous.
+ */
+function folderMentions<T extends { name: string; path: string }>(folders: T[]): { token: string; folder: T }[] {
+  const mentions: { token: string; folder: T }[] = [];
+  const seen = new Set<string>();
+  for (const folder of folders) {
+    for (const raw of [folder.path, folder.name]) {
+      const token = raw.trim();
+      const key = token.toLowerCase();
+      if (!token || seen.has(key)) continue;
+      seen.add(key);
+      mentions.push({ token: escapeForRegExp(token), folder });
+    }
+  }
+  return mentions.sort((a, b) => b.token.length - a.token.length);
+}
+
 /**
  * `@Папка` is composer syntax for the destination folder, the same way `#tag`
  * is for tags: it is resolved on send and never written into the note body.
  * Names may contain spaces, so the token is matched against the known folders
- * instead of a character class.
+ * instead of a character class. Every mention goes, not just the first.
  */
 export function extractFolderToken<T extends { name: string; path: string }>(
   text: string,
   folders: T[]
 ): { cleanContent: string; folder: T | null } {
   if (!text) return { cleanContent: '', folder: null };
-  const byLongestName = [...folders].sort((a, b) => b.name.length - a.name.length);
-  for (const folder of byLongestName) {
-    const name = folder.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const token = new RegExp(`(^|\\s)@${name}(?=\\s|$)`, 'i');
+  for (const mention of folderMentions(folders)) {
+    // One space goes with the mention, so cutting it out does not leave a gap behind.
+    const token = new RegExp(`(^|[ \\t])@${mention.token}(?=[ \\t]|\\n|$)[ \\t]?`, 'gi');
     if (!token.test(text)) continue;
-    return { cleanContent: text.replace(token, '$1').trim(), folder };
+    return { cleanContent: text.replace(token, '$1').trim(), folder: mention.folder };
   }
   return { cleanContent: text, folder: null };
+}
+
+/**
+ * All the composer syntax in one pass: `@папка` picks the destination, `#тег` adds a tag, and
+ * neither is written into the body. One entry point, so the send path, the draft's folder chip and
+ * the fullscreen editor cannot disagree about what is syntax and what is prose.
+ */
+export function parseComposerMentions<T extends { name: string; path: string }>(
+  text: string,
+  folders: T[]
+): { cleanContent: string; folder: T | null; tags: string[] } {
+  const { cleanContent: withoutMentions, folder } = extractFolderToken(text, folders);
+  const { cleanContent, tags } = extractAndStripTags(withoutMentions);
+  return { cleanContent, folder, tags };
 }
