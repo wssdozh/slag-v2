@@ -7,15 +7,13 @@
  * A missing or broken file is an empty snapshot — settings fall back to their defaults — and a
  * failed read is a warning, never a reason to keep the app from opening.
  */
-import { BaseDirectory, exists, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '../logger/logger';
+import { writeJsonAtomic } from '../platform/writeJsonAtomic';
 import type { PrefsBackend } from './prefs';
 
 const fsLog = logger.scope('FS');
 const SETTINGS_FILE = 'settings.json';
-// The next snapshot is written here first and renamed over the real file: a crash mid-write leaves
-// the previous settings whole. The name is fixed, so a failed write cannot pile up temp files.
-const SETTINGS_TEMP = 'settings.json.tmp';
 
 /** The file as it sits on disk. Broken JSON answers empty; an unreadable file throws to the caller. */
 async function readSettings(): Promise<Record<string, string>> {
@@ -34,14 +32,6 @@ async function readSettings(): Promise<Record<string, string>> {
     if (typeof value === 'string') snapshot[key] = value;
   }
   return snapshot;
-}
-
-async function writeSettings(snapshot: Record<string, string>): Promise<void> {
-  await writeTextFile(SETTINGS_TEMP, JSON.stringify(snapshot, null, 2), { baseDir: BaseDirectory.AppData });
-  await rename(SETTINGS_TEMP, SETTINGS_FILE, {
-    oldPathBaseDir: BaseDirectory.AppData,
-    newPathBaseDir: BaseDirectory.AppData,
-  });
 }
 
 export const prefsBackend: PrefsBackend = {
@@ -64,6 +54,6 @@ export const prefsBackend: PrefsBackend = {
       if (value === null) delete snapshot[key];
       else snapshot[key] = value;
     }
-    await writeSettings(snapshot);
+    await writeJsonAtomic(SETTINGS_FILE, snapshot);
   },
 };

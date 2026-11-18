@@ -3,8 +3,8 @@
 // merge rules, never where the file is.
 //
 // Pure on purpose: no Tauri, no `localStorage`, no config. `scripts/state-sections.test.mjs` reads
-// it as is and holds it to these rules. The section names are the writer's business, so they are
-// not here either — a stored section is just an unknown value until it is clean.
+// it as is and holds it to these rules. A stored section is just an unknown value until it is
+// clean; the names it sits under are `STATE_SECTIONS`, spelled once for every writer.
 import type {
   ChatMessage,
   ChatToolCall,
@@ -27,6 +27,19 @@ const ITEM_TYPES: readonly SlagItemType[] = ['note', 'article', 'task'];
 const PRIORITIES: readonly SlagItemPriority[] = ['none', 'low', 'medium', 'high'];
 const STATUSES: readonly SlagItemStatus[] = ['backlog', 'todo', 'in_progress', 'done'];
 const MEMORY_KINDS: readonly MemoryKind[] = ['rule', 'pref', 'fact', 'event', 'note'];
+
+/**
+ * The names `state.json` keeps its sections under. One spelling for every writer: a section that
+ * two modules name differently is two sections, and one of them is silently never read.
+ */
+export const STATE_SECTIONS = {
+  drafts: 'drafts',
+  chat: 'chat',
+  memory: 'memory',
+  migrations: 'migrations',
+  workspace: 'workspace',
+  sync: 'sync',
+} as const;
 
 /** Composer drafts by folder path: one unsaved text per folder, keyed the way the UI keys it. */
 export type ComposerDraftMap = Record<string, ComposerDraft>;

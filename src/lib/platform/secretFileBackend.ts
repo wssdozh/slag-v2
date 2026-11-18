@@ -1,49 +1,26 @@
 /**
  * Native ciphertext at rest: one flat map of `secretKey → { v, iv, data }` in `<AppData>/secrets.json`.
  *
- * The envelope is the AES-GCM one from `encryptedLocalStore.ts`, unchanged: this module only moves
- * where it sits. The master key stays in IndexedDB and is not extractable, so the file alone opens
+ * The envelope is the AES-GCM one from `secretEnvelope.ts`, unchanged: this module only moves where
+ * it sits. The master key stays in IndexedDB and is not extractable, so the file alone opens
  * nothing — which is why it may travel with a backup or a copied data directory without leaking a
  * seed phrase.
  *
  * A browser build never reaches this: there the profile is the store. A missing or broken file is an
- * empty store and a warning, never a reason to keep the app from opening. Writing is
- * write-then-rename, like `prefsBackend.native.ts`: a crash mid-write leaves the previous file whole.
+ * empty store and a warning, never a reason to keep the app from opening. Writing is the same
+ * write-then-rename `prefsBackend.native.ts` uses, through `writeJsonAtomic`.
  */
-import { BaseDirectory, exists, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '../logger/logger';
+import { readEnvelope } from './secretEnvelope';
+import type { SecretEnvelope, SecretEnvelopeStore } from './secretEnvelope';
+import { writeJsonAtomic } from './writeJsonAtomic';
 
 const fsLog = logger.scope('SYNC');
 
 const SECRETS_FILE = 'secrets.json';
-// The next snapshot is written here first and renamed over the real file. The name is fixed, so a
-// failed write cannot pile up temp files.
-const SECRETS_TEMP = 'secrets.json.tmp';
-
-/** One AES-GCM envelope, the same shape the browser profile keeps. */
-export interface SecretEnvelope {
-  v: 1;
-  iv: string;
-  data: string;
-}
-
-/** Where the encrypted store keeps its envelopes: the file here, `localStorage` in a browser. */
-export interface SecretEnvelopeStore {
-  get(key: string): Promise<SecretEnvelope | null>;
-  set(key: string, envelope: SecretEnvelope): Promise<void>;
-  delete(key: string): Promise<void>;
-}
 
 type SecretEnvelopeMap = Record<string, SecretEnvelope>;
-
-/** Half an envelope is not one: a missing field reads as "nothing stored under this key". */
-function readEnvelope(value: unknown): SecretEnvelope | null {
-  if (typeof value !== 'object' || value === null) return null;
-  const entry = value as Partial<SecretEnvelope>;
-  return entry.v === 1 && typeof entry.iv === 'string' && typeof entry.data === 'string'
-    ? { v: 1, iv: entry.iv, data: entry.data }
-    : null;
-}
 
 /** The file as it sits on disk. Broken JSON answers empty; an unreadable file throws to the caller. */
 async function readSecrets(): Promise<SecretEnvelopeMap> {
@@ -63,14 +40,6 @@ async function readSecrets(): Promise<SecretEnvelopeMap> {
     if (envelope) envelopes[key] = envelope;
   }
   return envelopes;
-}
-
-async function writeSecrets(envelopes: SecretEnvelopeMap): Promise<void> {
-  await writeTextFile(SECRETS_TEMP, JSON.stringify(envelopes, null, 2), { baseDir: BaseDirectory.AppData });
-  await rename(SECRETS_TEMP, SECRETS_FILE, {
-    oldPathBaseDir: BaseDirectory.AppData,
-    newPathBaseDir: BaseDirectory.AppData,
-  });
 }
 
 /**
@@ -106,14 +75,14 @@ export function fileEnvelopeStore(): SecretEnvelopeStore {
     async set(key, envelope) {
       const envelopes = await readSecrets();
       envelopes[key] = envelope;
-      await writeSecrets(envelopes);
+      await writeJsonAtomic(SECRETS_FILE, envelopes);
     },
 
     async delete(key) {
       const envelopes = await readSecrets();
       if (!(key in envelopes)) return;
       delete envelopes[key];
-      await writeSecrets(envelopes);
+      await writeJsonAtomic(SECRETS_FILE, envelopes);
     },
   };
 }

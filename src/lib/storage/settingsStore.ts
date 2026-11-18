@@ -31,7 +31,9 @@ import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
 import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from './prefs';
+import { parseLegacyJson } from './legacyJson';
 import {
+  STATE_SECTIONS,
   chatFromSection,
   chatMessagesFrom,
   chatToSection,
@@ -61,13 +63,6 @@ import {
 import type { StorageChangeEvent } from '.';
 
 const settingsLog = logger.scope('FS');
-
-/** Sections `state.json` keeps for this module. `folders`, `workspace` and `sync` have other writers. */
-const DRAFTS_SECTION = 'drafts';
-const CHAT_SECTION = 'chat';
-const MEMORY_SECTION = 'memory';
-const MIGRATIONS_SECTION = 'migrations';
-const WORKSPACE_SECTION = 'workspace';
 
 /**
  * A draft is the only thing saved on every keystroke, and every save is a `state.json` rewrite now.
@@ -197,11 +192,11 @@ export function hydrateSettings(store: SettingsStoreHost): Promise<void> {
 
 async function loadSections(store: SettingsStoreHost, vaultId: string): Promise<void> {
   const [drafts, chat, memory, workspace, migrations] = await Promise.all([
-    store.files.readStateSection(DRAFTS_SECTION),
-    store.files.readStateSection(CHAT_SECTION),
-    store.files.readStateSection(MEMORY_SECTION),
-    store.files.readStateSection(WORKSPACE_SECTION),
-    store.files.readStateSection(MIGRATIONS_SECTION),
+    store.files.readStateSection(STATE_SECTIONS.drafts),
+    store.files.readStateSection(STATE_SECTIONS.chat),
+    store.files.readStateSection(STATE_SECTIONS.memory),
+    store.files.readStateSection(STATE_SECTIONS.workspace),
+    store.files.readStateSection(STATE_SECTIONS.migrations),
   ]);
   // A switch while the file was being read: this answer belongs to a vault nobody is looking at.
   if (store.currentVault.id !== vaultId) return;
@@ -285,15 +280,6 @@ function readLegacySections(store: SettingsStoreHost): LegacySections {
   };
 }
 
-/** A legacy value parsed once: a half-written or foreign one reads as "not there". */
-function parseLegacyJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * The file first, the old keys second, and only then the stamp that says the move happened. A crash
  * between the two leaves the stamp unwritten and the next start merges again — nothing is lost, and
@@ -308,22 +294,22 @@ async function persistLegacyMigration(
   if (Object.keys(legacy.composer).length > 0 || Object.keys(legacy.fullscreen).length > 0) {
     writes.push(
       store.files.writeStateSection(
-        DRAFTS_SECTION,
+        STATE_SECTIONS.drafts,
         draftsToSection({ composer: merged.composer, fullscreen: merged.fullscreen })
       )
     );
   }
   if (legacy.chat.length > 0) {
-    writes.push(store.files.writeStateSection(CHAT_SECTION, chatToSection({ messages: merged.chat, telegram: merged.telegram })));
+    writes.push(store.files.writeStateSection(STATE_SECTIONS.chat, chatToSection({ messages: merged.chat, telegram: merged.telegram })));
   }
   if (legacy.memory.length > 0) {
-    writes.push(store.files.writeStateSection(MEMORY_SECTION, memoryToSection(merged.memory)));
+    writes.push(store.files.writeStateSection(STATE_SECTIONS.memory, memoryToSection(merged.memory)));
   }
   if (Object.keys(legacy.workspace).length > 0) writes.push(store.files.flushStateToDisk());
   try {
     await Promise.all(writes);
     const stamped = stampMigration(merged.migrations, 'legacy', Date.now());
-    await store.files.writeStateSection(MIGRATIONS_SECTION, migrationStampsToSection(stamped));
+    await store.files.writeStateSection(STATE_SECTIONS.migrations, migrationStampsToSection(stamped));
     merged.migrations = stamped;
     if (writes.length > 0) {
       settingsLog.info('Moved the legacy drafts, chat, memory and workspace into state.json');
@@ -428,12 +414,12 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
       // touched, and the whole map is what lands in the section. A restore is the one exception.
       const onDisk = replaceDrafts
         ? { composer: {}, fullscreen: {} }
-        : draftsFromSection(await store.files.readStateSection(DRAFTS_SECTION));
+        : draftsFromSection(await store.files.readStateSection(STATE_SECTIONS.drafts));
       const composer = mergeComposerDrafts(onDisk.composer, current.composer);
       for (const folderPath of erasedComposer) delete composer[folderPath];
       const fullscreen = mergeFullscreenDrafts(onDisk.fullscreen, current.fullscreen);
       for (const itemId of erasedFullscreen) delete fullscreen[itemId];
-      await store.files.writeStateSection(DRAFTS_SECTION, draftsToSection({ composer, fullscreen }));
+      await store.files.writeStateSection(STATE_SECTIONS.drafts, draftsToSection({ composer, fullscreen }));
       for (const event of events) {
         store.emitChange({
           kind: 'draft',
@@ -460,7 +446,7 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
   if (sections.has('chat')) {
     try {
       const chat = chatToSection({ messages: current.chat, telegram: current.telegram });
-      await store.files.writeStateSection(CHAT_SECTION, chat);
+      await store.files.writeStateSection(STATE_SECTIONS.chat, chat);
     } catch (err) {
       failed('chat', err);
     }
@@ -468,7 +454,7 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
 
   if (sections.has('memory')) {
     try {
-      await store.files.writeStateSection(MEMORY_SECTION, memoryToSection(current.memory));
+      await store.files.writeStateSection(STATE_SECTIONS.memory, memoryToSection(current.memory));
     } catch (err) {
       failed('memory', err);
     }
@@ -486,7 +472,7 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
 
   if (sections.has('migrations')) {
     try {
-      await store.files.writeStateSection(MIGRATIONS_SECTION, migrationStampsToSection(current.migrations));
+      await store.files.writeStateSection(STATE_SECTIONS.migrations, migrationStampsToSection(current.migrations));
     } catch (err) {
       failed('migrations', err);
     }

@@ -100,6 +100,18 @@ test('migration: the old blob is merged into the file, and a second run changes 
   assert.deepEqual(mergeSectionState(merged, legacy), merged, 'a retried migration adds nothing');
 });
 
+test('migration: the outbox merges by opId, the file copy first and the order kept', () => {
+  const op = (opId, id) => ({ opId, kind: 'folder', id, action: 'delete', timestamp: 1_700_000_000_000 });
+  const stored = [op('op_1', 'a'), op('op_2', 'b')];
+  const legacy = [op('op_2', 'b-from-the-blob'), op('op_3', 'c')];
+
+  assert.deepEqual(
+    mergeSectionState({ outbox: stored }, { outbox: legacy }).outbox,
+    [op('op_1', 'a'), op('op_2', 'b'), op('op_3', 'c')],
+    'one op per id, the file copy wins, and nothing is reordered',
+  );
+});
+
 test('outbox: an op written to the file survives it, and half an op is dropped', () => {
   const op = { opId: 'op_1', kind: 'folder', id: 'Проекты/Старое', action: 'delete', timestamp: 1_700_000_000_000 };
   assert.deepEqual(sanitizeOutbox([op]), [op]);
