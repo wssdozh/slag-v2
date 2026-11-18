@@ -13,16 +13,20 @@ import {
   seedSyncedIds,
   stateHashKey,
   syncedIdsKey,
-  tombstonesKey,
+  clearTombstones,
+  hydrateTombstones,
+  saveTombstones,
   loadAttachmentRequests,
   markAttachmentRequestSent as stampAttachmentRequest,
   ATTACHMENT_REQUEST_COOLDOWN_MS,
   type SyncScope,
+  type TombstoneStore,
 } from './localBookkeeping';
 import { logger } from '../logger/logger';
 // Re-exported for the sync e2e specs, which drive sync through the real store. The headless
 // build swaps this module out (config/vite.node.config.ts), so nothing here reaches the node.
-export { storage } from '../storage';
+import { storage } from '../storage';
+export { storage };
 import { accountClient } from './account';
 export { accountClient };
 import { Outbox } from './outbox/outbox';
@@ -68,6 +72,7 @@ import {
   SYNC_INTERVALS,
 } from '../../config';
 import { isPrimaryWindow } from '../platform/windowControls';
+import { isTauri } from '@tauri-apps/api/core';
 
 const LAST_STATE_HASH_KEY = SYNC_STORAGE_KEYS.LAST_STATE_HASH;
 
@@ -671,6 +676,20 @@ export class SyncEngine {
     };
   }
 
+  /**
+   * The tombstones' home on disk. The vault is captured here because the write is queued: a save
+   * that lands after a vault switch would otherwise write this vault's deletes into the file of
+   * the vault that replaced it.
+   */
+  private tombstoneStore(vaultId: string): TombstoneStore {
+    return {
+      read: () => storage.files.readSyncSection(),
+      write: (section) => (this.currentVaultId === vaultId
+        ? storage.files.writeSyncSection(section)
+        : Promise.resolve()),
+    };
+  }
+
   public getCurrentVaultId(): string {
     return this.currentVaultId;
   }
@@ -797,6 +816,18 @@ export class SyncEngine {
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
 
+      // The deleted ledger comes before the socket, the pull and the push. A pull that starts
+      // without it accepts a stale copy of a note this device deleted, and a push that starts
+      // without it says nothing about that note at all. `switchVault` lands here too, after the
+      // vault id it hydrated from has changed.
+      // ponytail: the ledger is hydrated asynchronously on entry, so there is no sync until the
+      // snapshot is ready. ceiling: a push in the same tick as init still sees the localStorage
+      // answer. upgrade: hydrate before the engine is constructed, from the app boot.
+      if (isTauri()) {
+        await hydrateTombstones(this.bookkeeping, this.tombstoneStore(this.currentVaultId));
+        if (generation !== this.initGeneration) return;
+      }
+
       // Presence first. The socket is how every other device and the telegram bot see this one,
       // and the backlog below is a download that can take minutes or die halfway over a tunnel.
       // It used to run before the connect, so a slow backlog left the device invisible for its
@@ -856,8 +887,8 @@ export class SyncEngine {
     if (newPhrase !== this.config.seedPhrase) {
       localStorage.removeItem(stateHashKey(this.bookkeeping));
       localStorage.removeItem(syncedIdsKey(this.bookkeeping));
-      localStorage.removeItem(tombstonesKey(this.bookkeeping));
-  localStorage.removeItem(cursorKey(this.bookkeeping));
+      clearTombstones(this.bookkeeping);
+      localStorage.removeItem(cursorKey(this.bookkeeping));
       this.getOutbox().clear();
       if (this.currentVaultId === 'default_vault') localStorage.removeItem(LAST_STATE_HASH_KEY);
     }
@@ -869,8 +900,8 @@ export class SyncEngine {
   public async updateServerUrl(url: string): Promise<void> {
     this.saveConfig({ serverUrl: url });
     localStorage.removeItem(syncedIdsKey(this.bookkeeping));
-    localStorage.removeItem(tombstonesKey(this.bookkeeping));
-  localStorage.removeItem(cursorKey(this.bookkeeping));
+    clearTombstones(this.bookkeeping);
+    localStorage.removeItem(cursorKey(this.bookkeeping));
     this.getOutbox().clear();
     this.disconnect();
     await this.init();
@@ -930,7 +961,7 @@ export class SyncEngine {
       localStorage.setItem(LAST_STATE_HASH_KEY, pending.stateHash);
     }
     localStorage.setItem(syncedIdsKey(this.bookkeeping), JSON.stringify(pending.syncedIds));
-    localStorage.setItem(tombstonesKey(this.bookkeeping), JSON.stringify(pending.tombstones));
+    saveTombstones(this.bookkeeping, pending.tombstones);
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();
     this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
