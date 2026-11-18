@@ -520,7 +520,6 @@ export class BackupService {
           path: f,
           name: f.split('/').pop() || f,
           description: '',
-          isSystem: f === DEFAULT_INBOX_FOLDER,
         }));
       }
     }

@@ -150,7 +150,6 @@ export class McpVault {
         name: DEFAULT_INBOX_FOLDER,
         description: 'Все новые неотсортированные заметки, идеи, быстрые мысли и задачи.',
         icon: 'Inbox',
-        isSystem: true,
       });
     }
 

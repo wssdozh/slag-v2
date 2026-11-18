@@ -50,7 +50,6 @@ export const DEFAULT_FOLDERS: FolderMeta[] = [
     name: DEFAULT_INBOX_FOLDER,
     description: 'Все новые неотсортированные заметки, идеи, быстрые мысли и задачи для дальнейшего распределения.',
     icon: 'Inbox',
-    isSystem: true,
   },
   {
     path: 'Карьера',
