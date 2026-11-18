@@ -1,4 +1,4 @@
-import type { FolderMeta, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
+import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -15,6 +15,7 @@ import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
 import { idbSaveAttachment } from './indexedDb';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
+import { folderMetaFor } from './folderSource';
 import type { AttachmentStore } from './attachments';
 
 const fsLog = logger.scope('FS');
@@ -30,7 +31,6 @@ const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
 export interface VaultFilesDeps {
   getVault(): VaultMeta;
   getItems(folder?: string): SlagItem[];
-  getFolders(): FolderMeta[];
   getTrashItems(): SlagItem[];
   getWorkspaceState(): WorkspaceState;
   cacheItems(key: string, items: SlagItem[]): void;
@@ -43,9 +43,17 @@ export interface VaultFilesDeps {
 export class VaultFiles {
   private deps: VaultFilesDeps;
   private tauriInitialization: Promise<boolean> | null = null;
+  // `state.json` has two writers now — folder metadata and the workspace — and both read before
+  // they write. One queue per file keeps a slower write from putting its stale copy back.
+  private stateWrite: Promise<void> = Promise.resolve();
 
   constructor(deps: VaultFilesDeps) {
     this.deps = deps;
+  }
+
+  private queueStateWrite(write: () => Promise<void>): Promise<void> {
+    this.stateWrite = this.stateWrite.then(write, write);
+    return this.stateWrite;
   }
 
   private get vault(): VaultMeta {
@@ -150,10 +158,9 @@ export class VaultFiles {
       const statePath = this.getVaultStatePath();
 
       await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
-      const folders = this.deps.getFolders();
-      for (const f of folders) {
-        await mkdir(`${notesPath}/${f.path}`, { baseDir: BaseDirectory.AppData, recursive: true });
-      }
+      // The inbox comes first: it is where a note without a folder goes, and folders are read back
+      // from these directories.
+      await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
 
       const loadedItems = await this.scanNotesDir(notesPath);
       if (loadedItems.length > 0) {
@@ -166,18 +173,13 @@ export class VaultFiles {
         }
       }
 
-      const hasState = await exists(statePath, { baseDir: BaseDirectory.AppData });
-      if (hasState) {
-        const stateStr = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
-        try {
-          const parsed = JSON.parse(stateStr);
-          if (Array.isArray(parsed.folders)) {
-            localStorage.setItem(this.deps.getFoldersKey(), JSON.stringify(parsed.folders));
-          }
-        } catch {
-          // ignore
-        }
-      } else {
+      // After the notes: a note that lands on disk creates its folder, and the list read before that
+      // would leave the note in a folder the sidebar does not show.
+      const folders = folderMetaFor(await this.listFolderPaths(), await this.readFoldersMeta(), DEFAULT_INBOX_FOLDER);
+      localStorage.setItem(this.deps.getFoldersKey(), JSON.stringify(folders));
+      fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
+
+      if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) {
         await this.flushStateToDisk();
       }
       return true;
@@ -185,6 +187,83 @@ export class VaultFiles {
       fsLog.error(`Failed to sync vault "${this.vault.name}" in AppData:`, err);
       return false;
     }
+  }
+
+  /**
+   * Every directory under `notes/` is a folder, by vault-relative path. A dot directory is one of
+   * the app's own and a `node_modules` is a package dump somebody dropped in: neither is a folder
+   * a person made.
+   */
+  public async listFolderPaths(): Promise<string[]> {
+    if (!isTauri()) return [];
+    const paths: string[] = [];
+    await this.collectFolderPaths(this.getVaultNotesPath(), '', paths);
+    return paths.sort();
+  }
+
+  private async collectFolderPaths(dirPath: string, relativePath: string, out: string[]): Promise<void> {
+    try {
+      const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
+      for (const entry of entries) {
+        if (!entry.isDirectory) continue;
+        if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        const path = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+        out.push(path);
+        await this.collectFolderPaths(`${dirPath}/${entry.name}`, path, out);
+      }
+    } catch (err) {
+      fsLog.warn(`Failed to list folders under ${dirPath}:`, err);
+    }
+  }
+
+  /** A folder exists because its directory does, so creating one is creating the directory. */
+  public async ensureFolderOnDisk(path: string): Promise<void> {
+    if (!isTauri()) return;
+    const safe = safeVaultRelativePath(path);
+    await mkdir(`${this.getVaultNotesPath()}/${safe}`, { baseDir: BaseDirectory.AppData, recursive: true });
+  }
+
+  /** The folder metadata `state.json` holds. Absent, broken or junk answers "none". */
+  public async readFoldersMeta(): Promise<FolderMeta[]> {
+    const state = await this.readStateObject();
+    if (!Array.isArray(state.folders)) return [];
+    const folders: FolderMeta[] = [];
+    for (const entry of state.folders) {
+      const folder = toFolderMeta(entry);
+      if (folder) folders.push(folder);
+    }
+    return folders;
+  }
+
+  /**
+   * The one thing `state.json` still knows about folders: metadata by path. The directories are
+   * created here too, so what is listed and what exists cannot part ways. Every other key is read
+   * back and written as it was — the MCP server keeps its own there.
+   */
+  public writeFolderMeta(folders: FolderMeta[]): Promise<void> {
+    if (!isTauri()) return Promise.resolve();
+    return this.queueStateWrite(async () => {
+      for (const folder of folders) await this.ensureFolderOnDisk(folder.path);
+      const state = await this.readStateObject();
+      state.folders = folders;
+      state.updatedAt = Date.now();
+      await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+    });
+  }
+
+  /** `state.json` as it sits on disk: a missing file is an empty state, a broken one is reported. */
+  private async readStateObject(): Promise<Record<string, unknown>> {
+    const statePath = this.getVaultStatePath();
+    if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) return {};
+    const text = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (err) {
+      fsLog.warn('state.json is not valid JSON, reading it as empty:', err);
+      return {};
+    }
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
   }
 
   /**
@@ -501,19 +580,22 @@ export class VaultFiles {
     }
   }
 
-  public async flushStateToDisk(): Promise<void> {
-    if (!isTauri()) return;
-    try {
-      const statePath = this.getVaultStatePath();
-      const state = {
-        folders: this.deps.getFolders(),
-        workspace: this.deps.getWorkspaceState(),
-        updatedAt: Date.now(),
-      };
-      await writeTextFile(statePath, JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
-    } catch (err) {
-      fsLog.warn(`Failed to flush state.json to disk:`, err);
-    }
+  /**
+   * `state.json` keeps what the disk cannot say: the workspace. Folders are directories now, so
+   * this must never put a list of them over one the MCP server wrote.
+   */
+  public flushStateToDisk(): Promise<void> {
+    if (!isTauri()) return Promise.resolve();
+    return this.queueStateWrite(async () => {
+      try {
+        const state = await this.readStateObject();
+        state.workspace = this.deps.getWorkspaceState();
+        state.updatedAt = Date.now();
+        await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+      } catch (err) {
+        fsLog.warn(`Failed to flush state.json to disk:`, err);
+      }
+    });
   }
 
   public async deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void> {
@@ -565,4 +647,31 @@ export class VaultFiles {
     }
   }
 
+}
+
+/**
+ * `state.json` is a file people and older builds write too. An entry counts as folder metadata only
+ * when the path is there; the rest of the fields fall back to what the folder would be without them.
+ */
+function toFolderMeta(value: unknown): FolderMeta | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof record.path !== 'string' || record.path.length === 0) return undefined;
+
+  const folder: FolderMeta = {
+    path: record.path,
+    name: typeof record.name === 'string' && record.name.length > 0 ? record.name : record.path,
+    description: typeof record.description === 'string' ? record.description : '',
+  };
+  if (typeof record.icon === 'string') folder.icon = record.icon;
+  if (typeof record.isSystem === 'boolean') folder.isSystem = record.isSystem;
+  if (typeof record.showReferenceColumn === 'boolean') folder.showReferenceColumn = record.showReferenceColumn;
+  if (Array.isArray(record.kanbanColumns)) folder.kanbanColumns = record.kanbanColumns.filter(isKanbanColumn);
+  return folder;
+}
+
+function isKanbanColumn(value: unknown): value is KanbanColumn {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string' && typeof record.title === 'string';
 }

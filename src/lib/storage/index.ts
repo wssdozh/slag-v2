@@ -21,7 +21,6 @@ export { getSafeNoteFilename } from '../vault/noteFilename';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
-  writeTextFile,
   mkdir,
   BaseDirectory,
 } from '@tauri-apps/plugin-fs';
@@ -47,6 +46,7 @@ import {
   eraseFolder,
   folderStorageKey,
 } from './folderStore';
+import { folderMetaFor } from './folderSource';
 import {
   trashStorageKey,
   readTrash,
@@ -112,6 +112,14 @@ export type StorageChangeEvent =
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
+/** What a sweep of `notes/` reports: note paths that changed or went, folders that came or left. */
+export interface VaultDiskChange {
+  changed: string[];
+  removed: string[];
+  foldersAdded?: string[];
+  foldersRemoved?: string[];
+}
+
 const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
@@ -127,7 +135,6 @@ export class StorageService {
   public files: VaultFiles = new VaultFiles({
     getVault: () => this.currentVault,
     getItems: (folder) => this.getItems(folder),
-    getFolders: () => this.getFolders(),
     getTrashItems: () => this.getTrashItems(),
     getWorkspaceState: () => this.getWorkspaceState(),
     cacheItems: (key, items) => this.cacheItems(key, items),
@@ -389,6 +396,25 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readFolders(this);
   }
 
+  /**
+   * The one write path for the folder list. The cache is what the sidebar draws before the scan
+   * answers and the only store a browser build has; `state.json` takes the metadata by path, never
+   * a verdict on what exists. An `external` change came from the disk itself, so there is nothing
+   * to tell the disk back.
+   */
+  public persistFolders(folders: FolderMeta[], origin: StorageOrigin): void {
+    try {
+      localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
+    } catch (err) {
+      fsLog.warn('Folder cache write failed, the list keeps coming from the disk', { error: String(err) });
+    }
+    if (isTauri() && origin !== 'external') {
+      void this.files.writeFolderMeta(folders).catch((err: unknown) => {
+        fsLog.warn('Failed to write folder metadata to state.json', { error: String(err) });
+      });
+    }
+  }
+
   public saveFolder(folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
     writeFolder(this, folder, origin);
   }
@@ -516,16 +542,19 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   /**
-   * Picks up notes that changed on disk behind the app's back: the MCP server wrote one, someone
-   * edited a file in an outside editor, a script dropped one in. The sweep that noticed hands over
-   * vault-relative paths; a path that no longer reads back is a deletion.
+   * Picks up notes and folders that changed on disk behind the app's back: the MCP server wrote one,
+   * someone edited a file in an outside editor, a script dropped a folder in. The sweep that noticed
+   * hands over vault-relative paths; a note path that no longer reads back is a deletion.
    *
    * A rewrite that ends where it started is not a change: the app stamps its own save into the
    * index before the flush reaches the disk, and re-announcing that would fight the editor.
    */
-  public async reloadFromDisk(relativePaths: string[]): Promise<{ updated: number; removed: number }> {
-    if (!isTauri() || relativePaths.length === 0) return { updated: 0, removed: 0 };
-    const { items: parsed, missing } = await this.files.reloadNotesFromDisk(relativePaths);
+  public async reloadFromDisk(change: VaultDiskChange): Promise<{ updated: number; removed: number; folders: number }> {
+    if (!isTauri()) return { updated: 0, removed: 0, folders: 0 };
+
+    const folders = this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
+
+    const { items: parsed, missing } = await this.files.reloadNotesFromDisk(change.changed);
     const current = this.getItems();
     const byId = new Map(current.map(item => [item.id, item]));
     const events: StorageChangeEvent[] = [];
@@ -547,11 +576,43 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       events.push({ kind: 'item', action: 'delete', id: gone.id, origin: 'external' });
     }
 
-    if (events.length === 0) return { updated: 0, removed: 0 };
+    if (events.length === 0) return { updated: 0, removed: 0, folders };
     this.cacheItems(this.getItemsKey(), [...byId.values()]);
     for (const event of events) this.emitChange(event);
     fsLog.info(`Picked up ${events.length - removed} changed and ${removed} removed notes from disk`);
-    return { updated: events.length - removed, removed };
+    return { updated: events.length - removed, removed, folders };
+  }
+
+  /**
+   * A folder appeared or vanished under `notes/`. The list is rebuilt from the paths this sweep now
+   * knows about, so the metadata of a directory that is gone goes with it. Every event is
+   * `external`: the disk changed, not the person, and the relay must not hear its own echo.
+   */
+  private mergeDiskFolders(added: string[], removed: string[]): number {
+    if (added.length === 0 && removed.length === 0) return 0;
+
+    const current = this.getFolders();
+    const gone = new Set(removed);
+    const paths = current.map(folder => folder.path).filter(path => !gone.has(path));
+    paths.push(...added);
+    const folders = folderMetaFor(paths, current, DEFAULT_INBOX_FOLDER);
+    this.persistFolders(folders, 'external');
+
+    const before = new Set(current.map(folder => folder.path));
+    const after = new Set(folders.map(folder => folder.path));
+    let changes = 0;
+    for (const folder of folders) {
+      if (before.has(folder.path)) continue;
+      changes++;
+      this.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: folder, origin: 'external' });
+    }
+    for (const folder of current) {
+      if (after.has(folder.path)) continue;
+      changes++;
+      this.emitChange({ kind: 'folder', action: 'delete', id: folder.path, origin: 'external' });
+    }
+    if (changes > 0) fsLog.info(`Picked up ${changes} folder changes from disk`);
+    return changes;
   }
 
   public getTrashItems(): SlagItem[] {
@@ -689,7 +750,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     };
     const previous = base.items;
     const folders = data.folders ?? base.folders;
-    const workspace = { ...base.workspace, ...data.workspaceState };
     for (const folder of folders) {      safeVaultRelativePath(folder.path);
     }
     for (const item of data.items ?? []) {
@@ -729,9 +789,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       }
       const notesPath = this.files.getVaultNotesPath(vault);
       await mkdir(notesPath, { baseDir: BaseDirectory.AppData, recursive: true });
-      for (const folder of folders) {
-        await mkdir(`${notesPath}/${folder.path}`, { baseDir: BaseDirectory.AppData, recursive: true });
-      }
       if (data.folders) {
         const nextFolderPaths = new Set(folders.map(f => f.path));
         for (const oldF of base.folders) {
@@ -740,7 +797,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
           }
         }
       }
-      await writeTextFile(this.files.getVaultStatePath(vault), JSON.stringify({ folders, workspace, updatedAt: Date.now() }), { baseDir: BaseDirectory.AppData });
+      // A synced folder lands the way one made here does: a directory, then its metadata.
+      this.persistFolders(folders, 'remote');
     }
     if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
 
