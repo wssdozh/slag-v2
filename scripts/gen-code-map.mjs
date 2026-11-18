@@ -192,7 +192,9 @@ for (const file of files) {
 
 // --- group -----------------------------------------------------------------
 
-const ENTRY_POINTS = new Set(['src/main.tsx', 'src/mcp/index.ts', 'src/App.tsx']);
+// The bundler entries: nothing imports them, and deleting one takes a whole build with it.
+// One per vite config — index.html, the MCP bundle, the headless node.
+const ENTRY_POINTS = new Set(['src/main.tsx', 'src/mcp/index.ts', 'src/App.tsx', 'src/node/index.ts']);
 
 function zoneOf(path) {
   const parts = path.split('/');
