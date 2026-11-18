@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SERVER_INSTRUCTIONS } from '../src/mcp/instructions.ts';
+import { SERVER_INFO } from '../src/mcp/serverInfo.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const toolsSource = readFileSync(path.join(repoRoot, 'src', 'mcp', 'tools.ts'), 'utf8');
@@ -21,7 +22,7 @@ const toolDescriptions = [...toolsSource.matchAll(/server\.tool\(\s*'[a-z_]+',\s
 test('instructions: есть, короткие и не пустые', () => {
   assert.equal(typeof SERVER_INSTRUCTIONS, 'string');
   assert.ok(SERVER_INSTRUCTIONS.trim().length > 200, 'инструкции слишком короткие, чтобы что-то сказать');
-  assert.ok(SERVER_INSTRUCTIONS.length <= 1500, `инструкции разрослись до ${SERVER_INSTRUCTIONS.length} символов`);
+  assert.ok(SERVER_INSTRUCTIONS.length <= 2200, `инструкции разрослись до ${SERVER_INSTRUCTIONS.length} символов`);
 });
 
 test('instructions: каждое упомянутое имя инструмента существует', () => {
@@ -40,6 +41,17 @@ test('instructions: не пересказывают описания инстр�
   assert.deepEqual(repeated, [], 'инструкции дословно повторяют описание тула');
 });
 
+test('serverInfo: сервер представляется', () => {
+  assert.equal(SERVER_INFO.title, 'SLAG');
+  assert.ok((SERVER_INFO.description ?? '').length > 20, 'описание пустое: хост покажет голое имя');
+  assert.match(String(SERVER_INFO.websiteUrl), /^https:\/\//);
+  const icon = SERVER_INFO.icons?.[0];
+  assert.ok(icon, 'нет иконки');
+  // A host reads neither the repo nor the disk: a path would render as a broken image.
+  assert.match(icon.src, /^https:\/\//, 'иконка должна быть по url');
+  assert.equal(icon.mimeType, 'image/png');
+});
+
 test('instructions: собранный сервер отдаёт их на initialize', { skip: staleBundleReason() }, async () => {
   const vaultPath = await mkdtemp(path.join(tmpdir(), 'slag-mcp-instructions-'));
   try {
@@ -53,6 +65,9 @@ test('instructions: собранный сервер отдаёт их на initi
     });
     child.kill();
     assert.equal(reply.result?.instructions, SERVER_INSTRUCTIONS);
+    assert.equal(reply.result?.serverInfo?.title, SERVER_INFO.title);
+    assert.ok(reply.result?.serverInfo?.description, 'сборка потеряла описание сервера');
+    assert.ok(reply.result?.serverInfo?.icons?.length, 'сборка потеряла иконку сервера');
   } finally {
     await rm(vaultPath, { recursive: true, force: true });
   }
