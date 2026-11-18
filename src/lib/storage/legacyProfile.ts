@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The one-off move off the webview profile.
  *
  * An older build kept the interface settings and the vault's own drafts, assistant chat, memory,
@@ -17,6 +17,7 @@ import { DEFAULT_VAULT_META, DEFAULT_WORKSPACE_STATE, STORAGE_KEYS } from '../..
 import { SYNC_STORAGE_KEYS } from '../../config/sync.ts';
 import type { VaultMeta } from '../../types';
 import {
+  STATE_SECTIONS,
   chatFromSection,
   chatMessagesFrom,
   chatToSection,
@@ -141,10 +142,6 @@ function isDropped(key: string): boolean {
 // ---------------------------------------------------------------------------------------------
 
 const LEGACY_MARKER_KEY = 'legacy_profile_imported';
-const DRAFTS_SECTION = 'drafts';
-const CHAT_SECTION = 'chat';
-const MEMORY_SECTION = 'memory';
-const WORKSPACE_SECTION = 'workspace';
 
 /** The slice of `VaultFiles` this module needs, the same contract `settingsStore` writes through. */
 interface StateSectionFiles {
@@ -322,7 +319,7 @@ async function draftsPatch(
     composer = mergeComposerDrafts(composer, composerDraftsFrom(parseProfileJson(raw)));
   }
   if (Object.keys(composer).length === 0 && Object.keys(fullscreen).length === 0) return null;
-  const stored = draftsFromSection(await files.readStateSection(DRAFTS_SECTION));
+  const stored = draftsFromSection(await files.readStateSection(STATE_SECTIONS.drafts));
   return draftsToSection({
     composer: mergeComposerDrafts(stored.composer, composer),
     fullscreen: mergeFullscreenDrafts(stored.fullscreen, fullscreen),
@@ -341,7 +338,7 @@ async function chatPatch(
     legacy = mergeChatMessages(legacy, chatMessagesFrom(parseProfileJson(raw)));
   }
   if (legacy.length === 0) return null;
-  const stored = chatFromSection(await files.readStateSection(CHAT_SECTION));
+  const stored = chatFromSection(await files.readStateSection(STATE_SECTIONS.chat));
   return chatToSection({ messages: mergeChatMessages(stored.messages, legacy), telegram: stored.telegram });
 }
 
@@ -357,7 +354,7 @@ async function memoryPatch(
     legacy = mergeMemory(legacy, memoryFrom(parseProfileJson(raw)));
   }
   if (legacy.length === 0) return null;
-  const stored = memoryFromSection(await files.readStateSection(MEMORY_SECTION));
+  const stored = memoryFromSection(await files.readStateSection(STATE_SECTIONS.memory));
   return memoryToSection(mergeMemory(stored, legacy));
 }
 
@@ -373,7 +370,7 @@ async function workspacePatch(
     legacy = mergeWorkspaceState(legacy, parseProfileJson(raw));
   }
   if (Object.keys(legacy).length === 0) return null;
-  const stored = workspaceFromState(await files.readStateSection(WORKSPACE_SECTION));
+  const stored = workspaceFromState(await files.readStateSection(STATE_SECTIONS.workspace));
   return { ...mergeWorkspaceState(stored, legacy) };
 }
 
