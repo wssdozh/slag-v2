@@ -1,4 +1,4 @@
-import type { FolderMeta, KanbanColumn, SlagAttachment, SlagItem, VaultMeta, WorkspaceState } from '../../types';
+import type { FolderMeta, KanbanColumn, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import {
@@ -11,15 +11,13 @@ import {
   writeTextFile,
 } from '@tauri-apps/plugin-fs';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
-import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS } from '../../config';
-import { idbSaveAttachment } from './indexedDb';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
 import { folderMetaFor } from './folderSource';
 import type { AttachmentStore } from './attachments';
 
 const fsLog = logger.scope('FS');
-const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
 
 /**
  * The vault as files on disk: where they live, how a name is claimed, how a note is
@@ -31,7 +29,6 @@ const ATTACHMENTS_STORAGE_PREFIX = STORAGE_KEYS.ATTACHMENTS_PREFIX;
 export interface VaultFilesDeps {
   getVault(): VaultMeta;
   getItems(folder?: string): SlagItem[];
-  getTrashItems(): SlagItem[];
   getWorkspaceState(): WorkspaceState;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
@@ -173,6 +170,12 @@ export class VaultFiles {
           await this.flushItemToDisk(item);
         }
       }
+
+      // The trash list is the `.trash/` snapshot, exactly as the notes list is the `notes/` one:
+      // a note deleted in an earlier session still has to be restorable.
+      const trashedItems = await this.scanTrashDir();
+      this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
+      fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
 
       // After the notes: a note that lands on disk creates its folder, and the list read before that
       // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
@@ -391,44 +394,42 @@ export class VaultFiles {
     if (!isTauri()) return Promise.resolve(false);
     if (!this.tauriInitialization) {
       this.tauriInitialization = this.migrateLegacyNotesToVaults()
-        .then(() => this.syncCurrentVaultFs())
-        .then((ready) => this.compactLocalStorage().then(() => ready));
+        .then(() => this.syncCurrentVaultFs());
     }
     return this.tauriInitialization;
   }
 
   /**
-   * One-off pass over what older builds left in localStorage: attachment bytes and note bodies
-   * with data URLs inside. The bytes move to IndexedDB (where `getAttachmentUrl` looks first),
-   * the keys are dropped, and the note index is rewritten as metadata only. This is what frees
-   * the quota that used to reject every save with an attachment in it.
+   * The trashed notes, newest first. `.trash/` is flat — `removeItemFromDisk` writes one file per
+   * note and never nests — and a note keeps its frontmatter, so its folder survives the trip and
+   * a restore knows where to put it back. A missing or unreadable directory is an empty trash.
    */
-  private async compactLocalStorage(): Promise<void> {
+  public async scanTrashDir(): Promise<SlagItem[]> {
+    const trashPath = this.getVaultTrashPath();
+    let entries: Awaited<ReturnType<typeof readDir>>;
     try {
-      const staleKeys: string[] = [];
-      for (let index = 0; index < localStorage.length; index++) {
-        const key = localStorage.key(index);
-        if (key?.startsWith(ATTACHMENTS_STORAGE_PREFIX)) staleKeys.push(key);
-      }
-      for (const key of staleKeys) {
-        const raw = localStorage.getItem(key);
-        if (raw) {
-          try {
-            await idbSaveAttachment(JSON.parse(raw) as SlagAttachment);
-          } catch {
-            // Unreadable leftovers are exactly what we came here to delete.
-          }
-        }
-        localStorage.removeItem(key);
-      }
-      this.deps.cacheItems(this.deps.getItemsKey(), this.deps.getItems());
-      this.deps.cacheItems(this.deps.getTrashKey(), this.deps.getTrashItems());
-      if (staleKeys.length > 0) {
-        fsLog.info(`Dropped ${staleKeys.length} attachment entries from localStorage (bytes live in IndexedDB)`);
-      }
+      entries = await readDir(trashPath, { baseDir: BaseDirectory.AppData });
     } catch (err) {
-      fsLog.warn('localStorage compaction failed', err);
+      fsLog.warn(`No trash directory to scan for vault "${this.vault.name}"`, { error: String(err) });
+      return [];
     }
+
+    const items: SlagItem[] = [];
+    for (const entry of entries) {
+      if (entry.isDirectory || !entry.name.endsWith('.md')) continue;
+      const subPath = `${trashPath}/${entry.name}`;
+      try {
+        const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
+        // The folder comes from the frontmatter; the inbox is only a fallback for a file written
+        // before a folder was part of the format.
+        const parsed = parseMarkdownToItem(content, entry.name.replace(/\.md$/, ''), DEFAULT_INBOX_FOLDER);
+        parsed.filename = entry.name;
+        items.push(parsed);
+      } catch (err) {
+        fsLog.warn(`Failed to read trashed note ${subPath}:`, err);
+      }
+    }
+    return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {

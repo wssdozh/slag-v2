@@ -1,4 +1,4 @@
-﻿// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
+// The one door to the vault: notes, cache and change events, and delegation to disk, folders,
 // trash, settings and attachments. Everything that touches the disk goes through here.
 import type {
   SlagItem,
@@ -39,7 +39,9 @@ import {
   pickVaultDirectory,
 } from './vaultRegistry';
 import {
+  forgetVaultFolders,
   readFolders,
+  rememberFolders,
   writeFolder,
   renameFolderTree,
   describeFolder,
@@ -135,11 +137,10 @@ export class StorageService {
   public files: VaultFiles = new VaultFiles({
     getVault: () => this.currentVault,
     getItems: (folder) => this.getItems(folder),
-    getTrashItems: () => this.getTrashItems(),
     getWorkspaceState: () => this.getWorkspaceState(),
     cacheItems: (key, items) => this.cacheItems(key, items),
     getItemsKey: () => this.getItemsKey(),
-    getTrashKey: () => trashStorageKey(this),
+    getTrashKey: () => this.getTrashKey(),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
     attachments: this.attachments,
   });
@@ -169,45 +170,53 @@ export class StorageService {
   }
 
   /**
-   * The note index, parsed once per stored value.
+   * The note index, in memory and nowhere else on native. It is rebuilt by the disk scan on start
+   * — the directories are the source of truth — and every write updates it here, per vault, so
+   * switching back to a vault this session already visited does not wait for another scan.
    *
-   * One keystroke used to parse the same key three times: `saveItem` reads the whole list,
-   * rewrites it, and the UI reads it straight back. The raw string is kept next to the parse,
-   * so a write from another window or from the sync engine invalidates this copy the moment
-   * the bytes differ — the cache can never outlive the value it mirrors.
+   * A browser build has no disk at all: there `localStorage` *is* its storage, so the index is
+   * mirrored into it and read back after a reload. A native build never takes either of those
+   * branches — `isTauri()` is false exactly where the webview profile is the only vault.
    */
-  private itemsIndexCache: { key: string; raw: string; items: SlagItem[] } | null = null;
+  private itemsIndex: Map<string, SlagItem[]> = new Map();
 
   private readItemsIndex(key: string): SlagItem[] {
-    const raw = localStorage.getItem(key) ?? '';
-    const cached = this.itemsIndexCache;
-    if (cached && cached.key === key && cached.raw === raw) return cached.items;
-    let parsed: SlagItem[] = [];
-    if (raw) {
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = [];
+    const cached = this.itemsIndex.get(key);
+    if (cached) return cached;
+    if (!isTauri()) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            this.itemsIndex.set(key, parsed as SlagItem[]);
+            return parsed as SlagItem[];
+          }
+        } catch {
+          // A half-written value is no index: the browser build starts from an empty vault.
+        }
       }
     }
-    this.itemsIndexCache = { key, raw, items: parsed };
-    return parsed;
+    return [];
   }
 
   /**
-   * The index is a cache, never the source of truth: a note that does not fit here still has to
-   * reach the disk. So a quota miss is a warning, not an exception.
+   * The index is a cache of what the disk says, never a second source of truth. The bytes of an
+   * attachment stay in `.attachments/` and IndexedDB; the index keeps their metadata, as it did
+   * when it had a quota to respect.
    */
   public cacheItems(key: string, items: SlagItem[]): void {
+    const stored = stripAttachmentData(items);
+    this.itemsIndex.set(key, stored);
+    if (isTauri()) return;
+    // Browser build without a disk: localStorage is its storage, not a cache. Native keeps the
+    // index in memory only — a wiped webview profile there loses nothing the scan cannot rebuild.
     try {
-      const stored = stripAttachmentData(items);
-      const raw = JSON.stringify(stored);
-      localStorage.setItem(key, raw);
-      if (key === this.getItemsKey()) this.itemsIndexCache = { key, raw, items: stored };
+      localStorage.setItem(key, JSON.stringify(stored));
     } catch (err) {
-      fsLog.warn('Storage index write failed, notes keep landing on disk', {
+      fsLog.warn('Browser storage refused the index write; it stays in memory', {
         key,
-        itemCount: items.length,
+        itemCount: stored.length,
         error: err,
       });
     }
@@ -258,12 +267,25 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   constructor() {
     this.currentVault = initCurrentVault(this);
-    this.initDefaultsIfNeeded();
+    this.seedBrowserVault();
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
       void this.files.initTauriFs();
     }
+  }
+
+  /**
+   * A browser build has no disk to scan, so a first load would draw an empty vault: the demo notes
+   * are its starting point, exactly what the "generate demo" button makes. Native never seeds —
+   * its index comes from `scanNotesDir`, and an empty installation is an empty vault by design.
+   * An existing key wins, even an empty list: a spec or an import already decided the contents.
+   */
+  private seedBrowserVault(): void {
+    if (isTauri()) return;
+    const itemsKey = this.getItemsKey();
+    if (this.itemsIndex.has(itemsKey) || localStorage.getItem(itemsKey) !== null) return;
+    this.cacheItems(itemsKey, this.currentVault.id === 'default_vault' ? generateDemoItems() : []);
   }
 
   /**
@@ -359,7 +381,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public deleteVault(vaultId: string): boolean {
-    return deleteVault(this, vaultId);
+    const deleted = deleteVault(this, vaultId);
+    if (deleted) {
+      // The vault is gone from the registry and the disk; what this session still remembered of
+      // it must not become the content of a new vault that later reuses the id.
+      forgetVaultFolders(vaultId);
+      this.itemsIndex.delete(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
+      this.itemsIndex.delete(`${STORAGE_KEYS.TRASH_PREFIX}${vaultId}`);
+    }
+    return deleted;
   }
 
   public async pickDirectory(): Promise<{ name: string; path?: string; mode: 'tauri' | 'fsa' } | null> {
@@ -370,6 +400,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return `${ITEMS_STORAGE_PREFIX}${this.currentVault.id}`;
   }
 
+  public getTrashKey(): string {
+    return trashStorageKey(this);
+  }
+
   private getFoldersKey(): string {
     return folderStorageKey(this);
   }
@@ -378,36 +412,18 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return draftsStorageKey(this);
   }
 
-  public initDefaultsIfNeeded(): void {
-    const foldersKey = this.getFoldersKey();
-    if (!localStorage.getItem(foldersKey)) {
-      localStorage.setItem(foldersKey, JSON.stringify(DEFAULT_FOLDERS));
-    }
-
-    const itemsKey = this.getItemsKey();
-    if (!localStorage.getItem(itemsKey)) {
-      const initialItems = this.currentVault.id === 'default_vault' ? generateDemoItems() : [];
-      this.cacheItems(itemsKey, initialItems);
-    }
-  }
-
   // Folders API
   public getFolders(): FolderMeta[] {
     return readFolders(this);
   }
 
   /**
-   * The one write path for the folder list. The cache is what the sidebar draws before the scan
-   * answers and the only store a browser build has; `state.json` takes the metadata by path, never
-   * a verdict on what exists. An `external` change came from the disk itself, so there is nothing
-   * to tell the disk back.
+   * The one write path for the folder list. Memory is what the sidebar draws before the scan
+   * answers; `state.json` takes the metadata by path, never a verdict on what exists. An
+   * `external` change came from the disk itself, so there is nothing to tell the disk back.
    */
   public persistFolders(folders: FolderMeta[], origin: StorageOrigin): void {
-    try {
-      localStorage.setItem(this.getFoldersKey(), JSON.stringify(folders));
-    } catch (err) {
-      fsLog.warn('Folder cache write failed, the list keeps coming from the disk', { error: String(err) });
-    }
+    rememberFolders(this, folders);
     if (isTauri() && origin !== 'external') {
       void this.files.writeFolderMeta(folders).catch((err: unknown) => {
         fsLog.warn('Failed to write folder metadata to state.json', { error: String(err) });
@@ -614,6 +630,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readTrash(this);
   }
 
+  /** The trash list the scan and the writes keep: the same snapshot door as `.trash/` itself. */
+  public readTrashIndex(): SlagItem[] {
+    return this.readItemsIndex(this.getTrashKey());
+  }
+
+  public cacheTrash(items: SlagItem[]): void {
+    this.cacheItems(this.getTrashKey(), items);
+  }
+
   public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {
     trashItem(this, id, origin);
   }
@@ -659,6 +684,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
     eraseComposerDraft(this, folderPath, origin);
+  }
+
+  /** What a deleted folder takes with it: its drafts, and those of its subfolders. */
+  public eraseDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
+    this.deleteComposerDraft(folderPath, origin);
   }
 
   public getFullscreenDraft(itemId: string): FullscreenDraft | null {
@@ -842,6 +872,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private transferIo(): VaultImportIo {
     return {
+      // Folders are applied by `importVaultData` itself: the key stays for the format's shape,
+      // and nothing reads it back any more.
       foldersKey: () => this.getFoldersKey(),
       itemsKey: () => this.getItemsKey(),
       draftsKey: () => this.getDraftsKey(),
@@ -872,7 +904,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       fsLog.warn('Rejected vault import with unsafe path', err);
       return false;
     }
-    return importVaultPayload(data, this.transferIo());
+    // An imported folder list lands the way a made one does: in memory, and in `state.json`'s
+    // metadata. The rest of the payload keeps its own door.
+    const { folders, ...rest } = data;
+    if (Array.isArray(folders) && folders.length > 0) this.persistFolders(folders, 'remote');
+    return importVaultPayload(rest, this.transferIo());
   }
 
   public importVaultFromJson(jsonString: string): boolean {
