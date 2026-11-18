@@ -32,6 +32,7 @@ export interface VaultFilesDeps {
   getWorkspaceState(): WorkspaceState;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
+  getTrashKey(): string;
   /** The one write path for the folder list; `external` came from the disk and writes nothing back. */
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote' | 'external'): void;
   attachments: AttachmentStore;
@@ -169,6 +170,12 @@ export class VaultFiles {
           await this.flushItemToDisk(item);
         }
       }
+
+      // The trash list is the `.trash/` snapshot, exactly as the notes list is the `notes/` one:
+      // a note deleted in an earlier session still has to be restorable.
+      const trashedItems = await this.scanTrashDir();
+      this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
+      fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
 
       // After the notes: a note that lands on disk creates its folder, and the list read before that
       // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
@@ -390,6 +397,39 @@ export class VaultFiles {
         .then(() => this.syncCurrentVaultFs());
     }
     return this.tauriInitialization;
+  }
+
+  /**
+   * The trashed notes, newest first. `.trash/` is flat — `removeItemFromDisk` writes one file per
+   * note and never nests — and a note keeps its frontmatter, so its folder survives the trip and
+   * a restore knows where to put it back. A missing or unreadable directory is an empty trash.
+   */
+  public async scanTrashDir(): Promise<SlagItem[]> {
+    const trashPath = this.getVaultTrashPath();
+    let entries: Awaited<ReturnType<typeof readDir>>;
+    try {
+      entries = await readDir(trashPath, { baseDir: BaseDirectory.AppData });
+    } catch (err) {
+      fsLog.warn(`No trash directory to scan for vault "${this.vault.name}"`, { error: String(err) });
+      return [];
+    }
+
+    const items: SlagItem[] = [];
+    for (const entry of entries) {
+      if (entry.isDirectory || !entry.name.endsWith('.md')) continue;
+      const subPath = `${trashPath}/${entry.name}`;
+      try {
+        const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
+        // The folder comes from the frontmatter; the inbox is only a fallback for a file written
+        // before a folder was part of the format.
+        const parsed = parseMarkdownToItem(content, entry.name.replace(/\.md$/, ''), DEFAULT_INBOX_FOLDER);
+        parsed.filename = entry.name;
+        items.push(parsed);
+      } catch (err) {
+        fsLog.warn(`Failed to read trashed note ${subPath}:`, err);
+      }
+    }
+    return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
   private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {

@@ -50,6 +50,7 @@ import {
 } from './folderStore';
 import { folderMetaFor } from './folderSource';
 import {
+  trashStorageKey,
   readTrash,
   trashItem,
   recoverFromTrash,
@@ -139,6 +140,7 @@ export class StorageService {
     getWorkspaceState: () => this.getWorkspaceState(),
     cacheItems: (key, items) => this.cacheItems(key, items),
     getItemsKey: () => this.getItemsKey(),
+    getTrashKey: () => this.getTrashKey(),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
     attachments: this.attachments,
   });
@@ -168,14 +170,34 @@ export class StorageService {
   }
 
   /**
-   * The note index, in memory and nowhere else. It is rebuilt by the disk scan on start — the
-   * directories are the source of truth — and every write updates it here, per vault, so switching
-   * back to a vault this session already visited does not wait for another scan.
+   * The note index, in memory and nowhere else on native. It is rebuilt by the disk scan on start
+   * — the directories are the source of truth — and every write updates it here, per vault, so
+   * switching back to a vault this session already visited does not wait for another scan.
+   *
+   * A browser build has no disk at all: there `localStorage` *is* its storage, so the index is
+   * mirrored into it and read back after a reload. A native build never takes either of those
+   * branches — `isTauri()` is false exactly where the webview profile is the only vault.
    */
   private itemsIndex: Map<string, SlagItem[]> = new Map();
 
   private readItemsIndex(key: string): SlagItem[] {
-    return this.itemsIndex.get(key) ?? [];
+    const cached = this.itemsIndex.get(key);
+    if (cached) return cached;
+    if (!isTauri()) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          const parsed: unknown = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            this.itemsIndex.set(key, parsed as SlagItem[]);
+            return parsed as SlagItem[];
+          }
+        } catch {
+          // A half-written value is no index: the browser build starts from an empty vault.
+        }
+      }
+    }
+    return [];
   }
 
   /**
@@ -184,7 +206,20 @@ export class StorageService {
    * when it had a quota to respect.
    */
   public cacheItems(key: string, items: SlagItem[]): void {
-    this.itemsIndex.set(key, stripAttachmentData(items));
+    const stored = stripAttachmentData(items);
+    this.itemsIndex.set(key, stored);
+    if (isTauri()) return;
+    // Browser build without a disk: localStorage is its storage, not a cache. Native keeps the
+    // index in memory only — a wiped webview profile there loses nothing the scan cannot rebuild.
+    try {
+      localStorage.setItem(key, JSON.stringify(stored));
+    } catch (err) {
+      fsLog.warn('Browser storage refused the index write; it stays in memory', {
+        key,
+        itemCount: stored.length,
+        error: err,
+      });
+    }
   }
 
   public subscribeChanges(listener: StorageChangeListener): () => void {
@@ -232,11 +267,25 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   constructor() {
     this.currentVault = initCurrentVault(this);
+    this.seedBrowserVault();
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
       void this.files.initTauriFs();
     }
+  }
+
+  /**
+   * A browser build has no disk to scan, so a first load would draw an empty vault: the demo notes
+   * are its starting point, exactly what the "generate demo" button makes. Native never seeds —
+   * its index comes from `scanNotesDir`, and an empty installation is an empty vault by design.
+   * An existing key wins, even an empty list: a spec or an import already decided the contents.
+   */
+  private seedBrowserVault(): void {
+    if (isTauri()) return;
+    const itemsKey = this.getItemsKey();
+    if (this.itemsIndex.has(itemsKey) || localStorage.getItem(itemsKey) !== null) return;
+    this.cacheItems(itemsKey, this.currentVault.id === 'default_vault' ? generateDemoItems() : []);
   }
 
   /**
@@ -349,6 +398,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public getItemsKey(): string {
     return `${ITEMS_STORAGE_PREFIX}${this.currentVault.id}`;
+  }
+
+  public getTrashKey(): string {
+    return trashStorageKey(this);
   }
 
   private getFoldersKey(): string {
@@ -575,6 +628,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public getTrashItems(): SlagItem[] {
     return readTrash(this);
+  }
+
+  /** The trash list the scan and the writes keep: the same snapshot door as `.trash/` itself. */
+  public readTrashIndex(): SlagItem[] {
+    return this.readItemsIndex(this.getTrashKey());
+  }
+
+  public cacheTrash(items: SlagItem[]): void {
+    this.cacheItems(this.getTrashKey(), items);
   }
 
   public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {

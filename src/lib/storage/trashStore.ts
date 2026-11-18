@@ -1,10 +1,10 @@
-// Keeps deleted notes in a per-vault trash, so restore and purge happen before sync.
+// Keeps deleted notes in a per-vault trash, so restore happens before sync. The list is a snapshot
+// of `.trash/`, rebuilt by the start-up scan; the host owns where that snapshot is kept.
 import type { SlagItem, VaultMeta } from '../../types';
 import { STORAGE_KEYS } from '../../config';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { AttachmentStore } from './attachments';
-import { readStoredJson } from './readJson';
 import type { StorageChangeEvent } from '.';
 
 const fsLog = logger.scope('FS');
@@ -22,6 +22,9 @@ export interface TrashStoreHost {
   saveItem(item: SlagItem, origin?: 'local' | 'remote'): SlagItem;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
+  /** The snapshot of `.trash/` as the host keeps it: memory, and the web build's localStorage. */
+  readTrashIndex(): SlagItem[];
+  cacheTrash(items: SlagItem[]): void;
   emitChange(event: StorageChangeEvent): void;
 }
 
@@ -29,10 +32,9 @@ export function trashStorageKey(store: TrashStoreHost): string {
   return `${TRASH_STORAGE_PREFIX}${store.currentVault.id}`;
 }
 
+/** What `.trash/` holds: a snapshot the disk scan fills on start and every delete or restore edits. */
 export function readTrash(store: TrashStoreHost): SlagItem[] {
-  return readStoredJson<SlagItem[]>(trashStorageKey(store), [], value => (
-    Array.isArray(value) ? store.attachments.hydrate(value as SlagItem[]) : undefined
-  ));
+  return store.attachments.hydrate(store.readTrashIndex()).map(item => ({ ...item }));
 }
 
 export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | 'remote' = 'local'): void {
@@ -47,7 +49,7 @@ export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | '
   // Save to .trash
   const trash = readTrash(store);
   trash.unshift({ ...item, updatedAt: Date.now() });
-  store.cacheItems(trashStorageKey(store), trash);
+  store.cacheTrash(trash);
   fsLog.info(`Moved "${item.title || item.id}" to .trash`);
 
   if (isTauri()) {
@@ -62,8 +64,7 @@ export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'loc
   if (!item) return null;
 
   // Remove from trash
-  const remainingTrash = trash.filter(i => i.id !== id);
-  store.cacheItems(trashStorageKey(store), remainingTrash);
+  store.cacheTrash(trash.filter(i => i.id !== id));
 
   // Restore to active items
   store.saveItem(item, origin);
