@@ -80,6 +80,11 @@ export class NodeVault implements VaultPort {
     return [this.getCurrentVault()];
   }
 
+  /** The node reads its folder in the constructor, before anything can ask it to push. */
+  public isHydrated(): boolean {
+    return true;
+  }
+
   public ensureVaultSyncId(vaultId: string): string {
     if (this.vault.id === vaultId && this.vault.syncId) return this.vault.syncId;
     if (vaultId !== this.vault.id) throw new Error(`Unknown vault: ${vaultId}`);

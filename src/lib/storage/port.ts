@@ -32,6 +32,12 @@ export interface VaultPort {
   getVaults(): VaultMeta[];
   ensureVaultSyncId(vaultId: string): string;
 
+  /**
+   * Whether the vault has been read from its storage. Sync asks before it pushes: a bundle built
+   * from an index that is still loading describes an empty vault, and the relay believes it.
+   */
+  isHydrated(): boolean;
+
   getItems(): SlagItem[];
   getFolders(): FolderMeta[];
   getWorkspaceState(): WorkspaceState;

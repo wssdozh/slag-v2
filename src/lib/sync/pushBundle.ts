@@ -34,6 +34,14 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
     if (engine.status.initialSync.vaultId === engine.currentVaultId &&
         (engine.status.initialSync.state === 'loading' || engine.status.initialSync.state === 'error')) return;
     if (engine.config.localSyncMode === 'receive-only') return;
+    // A bundle built from an index that is still loading describes a vault with no notes in it, and
+    // the relay has no way to tell that apart from a person who deleted them. The app wires the
+    // order — the disk is read, then sync wakes — and this is the same rule where it cannot be
+    // skipped by a second caller of `init()`.
+    if (!vault().isHydrated()) {
+      syncLog.debug('Push skipped: the vault is still being read from disk');
+      return;
+    }
 
     engine.isProcessingSync = true;
     const generation = engine.initGeneration;

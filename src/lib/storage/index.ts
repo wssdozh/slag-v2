@@ -129,6 +129,8 @@ const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
 export class StorageService {
   public currentVault: VaultMeta;
   private changeListeners: Set<StorageChangeListener> = new Set();
+  /** Set once the disk scan settles; see `isHydrated()`. */
+  private hydrated = false;
   public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   public attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
@@ -261,7 +263,21 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public initTauriFs(): Promise<boolean> {
-    return this.files.initTauriFs();
+    return this.files.initTauriFs().finally(() => {
+      this.hydrated = true;
+    });
+  }
+
+  /**
+   * Whether the disk has been read: the notes and the trash are in the index, so "not loaded yet"
+   * and "empty" are finally two different answers.
+   *
+   * It flips when the scan settles, not when it succeeds. A vault whose files could not be read is
+   * still a vault someone has to be able to open, and a push it makes says nothing about deletions
+   * either way — that is the point of the flag, not a promise the scan worked.
+   */
+  public isHydrated(): boolean {
+    return this.hydrated;
   }
 
   constructor() {
@@ -270,7 +286,12 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
-      void this.files.initTauriFs();
+      void this.files.initTauriFs().finally(() => {
+        this.hydrated = true;
+      });
+    } else {
+      // No disk to wait for: a browser build's index is whatever the store already holds.
+      this.hydrated = true;
     }
   }
 
