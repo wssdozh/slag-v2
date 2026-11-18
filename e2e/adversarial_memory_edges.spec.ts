@@ -153,8 +153,15 @@ test.describe('adversarial memory edges', () => {
       memoryService.remember({ text: 'второй факт про работу', tag: '#работа' });
       memoryService.remember({ text: 'третий факт про работу', tag: 'РАБОТА' });
       memoryService.remember({ text: 'четвёртый факт без темы', tag: 'заметка' });
-      const raw = JSON.parse(localStorage.getItem(key) ?? '[]');
-      return { count: raw.length, tags: raw.map((item: { tag: string | null }) => item.tag) };
+      // The facts live in memory first; the backend write is coalesced, so the stored copy is a
+      // tick behind. Waiting for it here keeps the assertion about the shape, not about timing.
+      let raw: Array<{ tag: string | null }> = [];
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        raw = JSON.parse(localStorage.getItem(key) ?? '[]');
+        if (raw.length >= 4) break;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
+      return { count: raw.length, tags: raw.map((item) => item.tag) };
     }, MEMORY_KEY);
 
     expect(result.count).toBe(4);
