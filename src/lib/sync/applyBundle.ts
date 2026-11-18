@@ -2,7 +2,7 @@ import type { SyncEngine } from './syncEngine';
 import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload, AssistantPromptPayload } from './types';
 import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
-import { loadSentHashes, loadTombstones, saveSentHashes, tombstonesKey } from './localBookkeeping';
+import { loadSentHashes, loadTombstones, saveSentHashes, saveTombstones } from './localBookkeeping';
 import { attachmentSignature } from './attachmentSignature';
 import { logger } from '../logger/logger';
 import { vault } from '../storage/port';
@@ -356,7 +356,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       }
 
       if (tombstonesDirty) {
-        localStorage.setItem(tombstonesKey(engine.bookkeeping), JSON.stringify(tombstones));
+        saveTombstones(engine.bookkeeping, tombstones);
       }
 
       const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
