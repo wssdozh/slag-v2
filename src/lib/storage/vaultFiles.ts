@@ -261,7 +261,6 @@ export class VaultFiles {
       }
       for (const folder of folders) byPath.set(folder.path, folder);
       state.folders = [...byPath.values()];
-      state.updatedAt = Date.now();
       await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
     });
   }
@@ -292,7 +291,6 @@ export class VaultFiles {
       try {
         const state = await this.readStateObject();
         state[name] = { ...asStateObject(state[name]), ...patch };
-        state.updatedAt = Date.now();
         await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
       } catch (err) {
         fsLog.warn(`Failed to write the "${name}" section of state.json:`, err);
@@ -654,7 +652,6 @@ export class VaultFiles {
       try {
         const state = await this.readStateObject();
         state.workspace = this.deps.getWorkspaceState();
-        state.updatedAt = Date.now();
         await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
       } catch (err) {
         fsLog.warn(`Failed to flush state.json to disk:`, err);
