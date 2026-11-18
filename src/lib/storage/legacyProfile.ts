@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The one-off move off the webview profile.
  *
  * An older build kept the interface settings and the vault's own drafts, assistant chat, memory,
@@ -16,6 +16,7 @@
 import { DEFAULT_VAULT_META, DEFAULT_WORKSPACE_STATE, STORAGE_KEYS } from '../../config/storage.ts';
 import { SYNC_STORAGE_KEYS } from '../../config/sync.ts';
 import type { VaultMeta } from '../../types';
+import { parseLegacyJson } from './legacyJson.ts';
 import {
   STATE_SECTIONS,
   chatFromSection,
@@ -402,13 +403,11 @@ function profileValue(key: string): string | null {
   }
 }
 
+/** The shared parse with this module's warning: junk in the profile is worth one log line. */
 function parseProfileJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch (err) {
-    fsWarn('A legacy profile value is not JSON, it is skipped', err);
-    return null;
-  }
+  return parseLegacyJson(raw, (error) =>
+    fsWarn('A legacy profile value is not JSON, it is skipped', error)
+  );
 }
 
 /**

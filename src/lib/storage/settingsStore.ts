@@ -1,4 +1,4 @@
-﻿// The small per-vault things a reload must not lose: composer and fullscreen drafts, the assistant's
+// The small per-vault things a reload must not lose: composer and fullscreen drafts, the assistant's
 // chat and memory, and the workspace.
 //
 // They used to live in `localStorage`, one key per vault. A webview profile can be wiped from the
@@ -31,6 +31,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
 import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from './prefs';
+import { parseLegacyJson } from './legacyJson';
 import {
   STATE_SECTIONS,
   chatFromSection,
@@ -277,15 +278,6 @@ function readLegacySections(store: SettingsStoreHost): LegacySections {
       getPrefJson<unknown>(`${STORAGE_KEYS.WORKSPACE_STATE_PREFIX}${vaultId}`, null)
     ),
   };
-}
-
-/** A legacy value parsed once: a half-written or foreign one reads as "not there". */
-function parseLegacyJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
 }
 
 /**
