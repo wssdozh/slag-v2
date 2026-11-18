@@ -7,7 +7,8 @@ import { isTauri } from '@tauri-apps/api/core';
 import { readDir, stat, BaseDirectory } from '@tauri-apps/plugin-fs';
 import { isAndroidApp } from '../platform/deviceAccess';
 import { logger } from '../logger/logger';
-import { diffFolderPaths, diffNoteFiles, type NoteFileStamp, type VaultFileChange } from './vaultWatchDiff';
+import { diffFolderPaths } from './folderSource';
+import { diffNoteFiles, type NoteFileStamp, type VaultFileChange } from './vaultWatchDiff';
 
 export type { NoteFileStamp, VaultFileChange } from './vaultWatchDiff';
 
@@ -135,10 +136,13 @@ export async function startVaultWatch(options: VaultWatchOptions): Promise<Vault
       const files = diffNoteFiles(previous.files, next.files);
       const folders = diffFolderPaths(previous.folders, next.folders);
 
-      for (const path of files.changed) missingFiles.delete(path);
+      // A path that is here is not going anywhere: its miss streak starts over, whatever the
+      // previous sweep counted. Clearing only the changed ones would let a file that blinked out
+      // and came back keep its streak and die on the next miss.
+      for (const path of next.files.keys()) missingFiles.delete(path);
       const removed = confirmRemovals(files.removed, missingFiles, missingSweeps);
 
-      for (const path of folders.added) missingFolders.delete(path);
+      for (const path of next.folders) missingFolders.delete(path);
       const foldersRemoved = confirmRemovals(folders.removed, missingFolders, missingSweeps);
 
       // Unconfirmed deletions stay in the baseline, otherwise the next sweep would never see

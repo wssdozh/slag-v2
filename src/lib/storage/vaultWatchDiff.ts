@@ -38,18 +38,3 @@ export function diffNoteFiles(
   }
   return { changed: changed.sort(), removed: removed.sort() };
 }
-
-/** Same contract as the file diff, for the directories collected by the same walk. */
-export function diffFolderPaths(previous: string[], next: string[]): { added: string[]; removed: string[] } {
-  const before = new Set(previous);
-  const after = new Set(next);
-  const added: string[] = [];
-  for (const path of after) {
-    if (!before.has(path)) added.push(path);
-  }
-  const removed: string[] = [];
-  for (const path of before) {
-    if (!after.has(path)) removed.push(path);
-  }
-  return { added: added.sort(), removed: removed.sort() };
-}

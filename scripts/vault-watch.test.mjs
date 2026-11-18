@@ -3,7 +3,8 @@
 // The rest of the guard reads files.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { diffFolderPaths, diffNoteFiles } from '../src/lib/storage/vaultWatchDiff.ts';
+import { diffNoteFiles } from '../src/lib/storage/vaultWatchDiff.ts';
+import { diffFolderPaths } from '../src/lib/storage/folderSource.ts';
 import { hasNewerVersionOnDisk } from '../src/lib/storage/writeGuard.ts';
 
 const stamp = (mtime, size = 100) => ({ mtime, size });
