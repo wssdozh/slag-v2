@@ -55,6 +55,9 @@ let writeQueue: Promise<void> = Promise.resolve();
 let flushQueued = false;
 /** A flush running right now; a write that lands mid-flush waits for the queue instead. */
 let flushing = false;
+/** Failed flushes since the last success, so a broken backend is warned about instead of retried forever. */
+let failedFlushes = 0;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Reads the snapshot into memory. Called once from `boot()` before the first render; a second call
@@ -186,12 +189,23 @@ async function flush(): Promise<void> {
     pending.clear();
     try {
       await backend.save(changes);
+      failedFlushes = 0;
     } catch (err) {
       // A failed write keeps its keys for the next attempt; memory is still correct either way.
       for (const [key, value] of Object.entries(changes)) {
         if (!pending.has(key)) pending.set(key, value);
       }
       warn('Settings could not be written; they stay in memory:', err);
+      // Once the queue drains, nothing writes again until some unrelated setting changes, and a
+      // setting written at boot would sit in memory until the app closes. Two windows replacing the
+      // same file used to fail exactly here. Retry — but a backend that is genuinely gone must not
+      // spin: three attempts, then the next write decides.
+      if (++failedFlushes < 3 && !retryTimer) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          queueFlush();
+        }, 250 * failedFlushes);
+      }
     }
   } finally {
     flushing = false;
