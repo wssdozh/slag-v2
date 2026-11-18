@@ -10,6 +10,7 @@
 // where it lives on a disk. Imports carry their extension so that test can read this file too.
 import { SYNC_STORAGE_KEYS } from '../../config/sync.ts';
 import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from '../storage/prefs.ts';
+import { parseLegacyJson } from '../storage/legacyJson.ts';
 import { sanitizeTombstones } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
 import type { SyncOperation } from './entities/types.ts';
@@ -328,15 +329,6 @@ function readLegacySection(vaultId: string): { state: SyncSectionState; keys: st
   }
 
   return { state, keys };
-}
-
-/** A legacy value parsed once: a half-written or foreign one reads as "not there". */
-function parseLegacyJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
 }
 
 /**
