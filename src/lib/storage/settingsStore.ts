@@ -513,10 +513,6 @@ function composerDraftsKey(vaultId: string): string {
   return `${STORAGE_KEYS.DRAFTS_PREFIX}${vaultId}`;
 }
 
-export function draftsStorageKey(store: SettingsStoreHost): string {
-  return composerDraftsKey(store.currentVault.id);
-}
-
 export function readComposerDrafts(store: SettingsStoreHost): ComposerDraftMap {
   const current = snapshotFor(store);
   if (current) return { ...current.composer };

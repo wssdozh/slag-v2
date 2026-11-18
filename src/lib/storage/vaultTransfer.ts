@@ -53,11 +53,7 @@ export function buildVaultExportJson(snapshot: VaultSnapshot): string {
 
 /** The little bit of the storage service an import needs. */
 export interface VaultImportIo {
-  /** Still named by the caller, no longer written here: the folders are the directories' business. */
-  foldersKey(): string;
   itemsKey(): string;
-  /** The old draft key: the drafts are written through `settingsStore` now, so it stays for the caller. */
-  draftsKey(): string;
   cacheItems(key: string, items: SlagItem[]): void;
   saveAssistantHistory(messages: ChatMessage[]): void;
   saveMemory(items: MemoryItem[]): void;
