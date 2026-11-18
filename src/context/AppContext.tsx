@@ -11,6 +11,8 @@ import type {
 import { storage } from '../lib/storage';
 import { logger } from '../lib/logger/logger';
 import { normalizeAiSettings } from '../lib/ai/connections/settings';
+import { aiKeySecretName, stripAiKeys } from '../lib/ai/connections/secrets';
+import { deleteSecret, setSecret } from '../lib/platform/secretStore';
 import { openAppFolder } from '../lib/platform/folderOpener';
 import { isPrimaryWindow, listenDesktopEvents } from '../lib/platform/windowControls';
 import { syncEngine } from '../lib/sync';
@@ -525,7 +527,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const saveAiSettings = (newSettings: Partial<AiSettings>) => {
     const updated = normalizeAiSettings({ ...aiSettings, ...newSettings });
     setAiSettings(updated);
-    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
+    // Keys never reach localStorage. If the secret store refuses one, the plaintext write is the
+    // fallback: keeping the old behaviour is a smaller evil than losing a key the user pasted.
+    const keepPlaintext = () => localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(updated));
+    const onSecretFailure = (error: unknown) => {
+      uiLog.error('Could not persist an AI provider key in the secret store', { error });
+      keepPlaintext();
+    };
+    localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(stripAiKeys(updated)));
+    const previousKeys = new Map(aiSettings.connections.map((c) => [c.id, c.apiKey.trim()]));
+    for (const connection of updated.connections) {
+      const apiKey = connection.apiKey.trim();
+      if (apiKey === (previousKeys.get(connection.id) ?? '')) continue;
+      void (apiKey
+        ? setSecret(aiKeySecretName(connection.id), apiKey)
+        : deleteSecret(aiKeySecretName(connection.id))
+      ).catch(onSecretFailure);
+    }
+    for (const id of previousKeys.keys()) {
+      if (updated.connections.some((connection) => connection.id === id)) continue;
+      void deleteSecret(aiKeySecretName(id)).catch(onSecretFailure);
+    }
     uiLog.info(`AI settings updated: connections=${updated.connections.length}, chat=${updated.roles.chat ?? 'off'}, vision=${updated.roles.vision ?? 'off'}`);
     addToast('Настройки сохранены', 'success');
   };
