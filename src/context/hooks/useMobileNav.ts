@@ -7,6 +7,7 @@ import { STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
 export const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { isDesktopApp, isMobilePlatform } from '../../lib/platform/windowControls';
+import { getPrefJson, setPref } from '../../lib/storage/prefs';
 import { swapScreen, type ScreenSwap } from '../../lib/motion';
 
 const MOBILE_DOCK_TABS_KEY = STORAGE_KEYS.MOBILE_DOCK_TABS;
@@ -42,23 +43,15 @@ export function useMobileNav(
   const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
   const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState<boolean>(false);
   const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
-  const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() => {
-    try {
-      const saved = localStorage.getItem(MOBILE_DOCK_TABS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {
-      // Ignore
-    }
-    return DEFAULT_MOBILE_DOCK_TABS;
-  });
+  const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() =>
+    getPrefJson(MOBILE_DOCK_TABS_KEY, DEFAULT_MOBILE_DOCK_TABS, (value) =>
+      Array.isArray(value) ? (value as MobileTabId[]) : undefined
+    )
+  );
 
   const setMobileDockTabs = useCallback((tabs: MobileTabId[]) => {
     setMobileDockTabsState(tabs);
-    try {
-      localStorage.setItem(MOBILE_DOCK_TABS_KEY, JSON.stringify(tabs));
-    } catch {
-      // Ignore
-    }
+    setPref(MOBILE_DOCK_TABS_KEY, JSON.stringify(tabs));
   }, []);
 
   const mobileFolderRef = useRef<string | null>(null);

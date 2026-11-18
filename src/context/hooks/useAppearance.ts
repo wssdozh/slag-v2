@@ -1,8 +1,9 @@
-// Density, font and accent: presets to localStorage and then to CSS variables.
+// Density, font and accent: presets to prefs and then to CSS variables.
 import { useCallback, useEffect, useState } from 'react';
 import type { AppUiConfig, DeviceUiConfig } from '../../types';
 import { ACCENT_COLORS, STORAGE_KEYS } from '../../config';
 import { getFontFamilyConfig, getFontScaleMultiplier } from '../../config/typography';
+import { getPrefJson, setPref } from '../../lib/storage/prefs';
 
 const UI_CONFIG_KEY = STORAGE_KEYS.UI_CONFIG;
 
@@ -24,7 +25,7 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
 /**
  * How the app looks: density, font, accent.
  *
- * One reason to change — appearance. The presets land in localStorage and then on the
+ * One reason to change — appearance. The presets land in the settings file and then on the
  * document root as CSS variables, which is why the theme lives in one place instead of
  * per component.
  *
@@ -33,21 +34,16 @@ const DEFAULT_UI_CONFIG: AppUiConfig = {
  * so the state, the button and its two storage keys are gone rather than half-wired.
  */
 export function useAppearance(isMobile: boolean) {
-  const [uiConfig, setUiConfig] = useState<AppUiConfig>(() => {
-    try {
-      const saved = localStorage.getItem(UI_CONFIG_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          desktop: { ...DEFAULT_UI_CONFIG.desktop, ...parsed.desktop },
-          mobile: { ...DEFAULT_UI_CONFIG.mobile, ...parsed.mobile },
-        };
-      }
-      return DEFAULT_UI_CONFIG;
-    } catch {
-      return DEFAULT_UI_CONFIG;
-    }
-  });
+  const [uiConfig, setUiConfig] = useState<AppUiConfig>(() =>
+    getPrefJson(UI_CONFIG_KEY, DEFAULT_UI_CONFIG, (value) => {
+      if (!value || typeof value !== 'object') return undefined;
+      const saved = value as Partial<AppUiConfig>;
+      return {
+        desktop: { ...DEFAULT_UI_CONFIG.desktop, ...saved.desktop },
+        mobile: { ...DEFAULT_UI_CONFIG.mobile, ...saved.mobile },
+      };
+    })
+  );
 
   const updateUiConfig = useCallback((device: 'desktop' | 'mobile', updates: Partial<DeviceUiConfig>) => {
     setUiConfig(prev => {
@@ -58,11 +54,7 @@ export function useAppearance(isMobile: boolean) {
           ...updates,
         },
       };
-      try {
-        localStorage.setItem(UI_CONFIG_KEY, JSON.stringify(next));
-      } catch {
-        // Ignore
-      }
+      setPref(UI_CONFIG_KEY, JSON.stringify(next));
       return next;
     });
   }, []);

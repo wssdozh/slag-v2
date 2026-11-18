@@ -3,10 +3,13 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { SlagItem } from '../../types';
 import { formatDurationBadge } from './calendarHelpers';
 import { baseTaskId } from '../../lib/tasks/taskUtils';
+import { getPref, setPref } from '../../lib/storage/prefs';
 
 export const DEFAULT_HOUR_HEIGHT = 52;
 export const MIN_HOUR_HEIGHT = 44;
 export const MAX_HOUR_HEIGHT = 160;
+
+const HOUR_HEIGHT_KEY = 'slag_calendar_hour_height';
 
 export interface TimelineResizingState {
   startY: number;
@@ -40,17 +43,8 @@ export function useCalendarInteractions({
 }: UseCalendarInteractionsOptions) {
   // Dynamic Hour Height for Week View Timeline (44px .. 160px, default 52px)
   const [hourHeight, setHourHeight] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('slag_calendar_hour_height');
-      if (saved) {
-        const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= MIN_HOUR_HEIGHT && parsed <= MAX_HOUR_HEIGHT) {
-          return parsed;
-        }
-      }
-    } catch {
-      // fallback
-    }
+    const parsed = parseInt(getPref(HOUR_HEIGHT_KEY) ?? '', 10);
+    if (!isNaN(parsed) && parsed >= MIN_HOUR_HEIGHT && parsed <= MAX_HOUR_HEIGHT) return parsed;
     return DEFAULT_HOUR_HEIGHT;
   });
 
@@ -157,13 +151,7 @@ export function useCalendarInteractions({
       window.removeEventListener('pointercancel', handleUp);
 
       setTimelineResizing(current => {
-        if (current && hasMoved) {
-          try {
-            localStorage.setItem('slag_calendar_hour_height', String(current.currentHeight));
-          } catch {
-            // ignore
-          }
-        }
+        if (current && hasMoved) setPref(HOUR_HEIGHT_KEY, String(current.currentHeight));
         return null;
       });
     };
@@ -184,11 +172,7 @@ export function useCalendarInteractions({
       const delta = e.deltaY > 0 ? -10 : 10;
       setHourHeight(prev => {
         const next = Math.max(MIN_HOUR_HEIGHT, Math.min(MAX_HOUR_HEIGHT, prev + delta));
-        try {
-          localStorage.setItem('slag_calendar_hour_height', String(next));
-        } catch {
-          // ignore
-        }
+        setPref(HOUR_HEIGHT_KEY, String(next));
         return next;
       });
     }
@@ -198,11 +182,7 @@ export function useCalendarInteractions({
     e.preventDefault();
     e.stopPropagation();
     setHourHeight(DEFAULT_HOUR_HEIGHT);
-    try {
-      localStorage.setItem('slag_calendar_hour_height', String(DEFAULT_HOUR_HEIGHT));
-    } catch {
-      // ignore
-    }
+    setPref(HOUR_HEIGHT_KEY, String(DEFAULT_HOUR_HEIGHT));
     addToast('Масштаб таймлайна сброшен: деления 1 час (52px)', 'info');
   }, [addToast]);
 
