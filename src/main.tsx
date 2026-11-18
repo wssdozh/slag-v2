@@ -1,8 +1,10 @@
-// Boots the React root into #root, in StrictMode, after the secret store and global stylesheet.
+// Boots the React root into #root, in StrictMode, after the settings store, the secret store and
+// the global stylesheet.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { logger } from './lib/logger/logger'
+import { initPrefs } from './lib/storage/prefs'
 import { initSecretStore } from './lib/platform/secretStore'
 
 const bootLog = logger.scope('APP')
@@ -43,6 +45,8 @@ function showBootFailure(): void {
 
 async function boot(): Promise<void> {
   try {
+    // Settings before the shell: every reader below expects them in memory, synchronously.
+    await initPrefs()
     await initSecretStore()
     const { default: App } = await import('./App')
     const root = document.getElementById('root')!
@@ -53,7 +57,7 @@ async function boot(): Promise<void> {
       </StrictMode>,
     )
   } catch (error) {
-    bootLog.error('Secret store initialization failed', error)
+    bootLog.error('Boot failed', error)
     showBootFailure()
   }
 }
