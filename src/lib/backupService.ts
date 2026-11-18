@@ -23,6 +23,8 @@ import {
 } from './storage/indexedDb';
 import { logger } from './logger/logger';
 import { bytesToBase64, dataUrlToBytes } from './media/byteCodec';
+import { getPrefJson, setPref } from './storage/prefs';
+import { replaceComposerDrafts } from './storage/settingsStore';
 import { isTauri } from '@tauri-apps/api/core';
 import {
   writeFile,
@@ -91,23 +93,23 @@ function guessMimeType(filename: string): string {
 export class BackupService {
   private inFlightBackup: Promise<BackupSnapshotMeta> | null = null;
 
+  /**
+   * Backup settings are per-machine, not per-vault: they say how often *this* installation packs a
+   * snapshot, so they live in `settings.json` beside the other prefs.
+   */
   public getSettings(): BackupSettings {
-    try {
-      const raw = localStorage.getItem(BACKUP_SETTINGS_KEY);
-      if (raw) {
-        return { ...DEFAULT_BACKUP_SETTINGS, ...JSON.parse(raw) };
-      }
-    } catch {
-      // fallback
-    }
-    return { ...DEFAULT_BACKUP_SETTINGS };
+    return getPrefJson<BackupSettings>(BACKUP_SETTINGS_KEY, { ...DEFAULT_BACKUP_SETTINGS }, value => (
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? { ...DEFAULT_BACKUP_SETTINGS, ...(value as Partial<BackupSettings>) }
+        : undefined
+    ));
   }
 
   public saveSettings(settings: Partial<BackupSettings>): BackupSettings {
     const current = this.getSettings();
     const updated = { ...current, ...settings };
     try {
-      localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify(updated));
+      setPref(BACKUP_SETTINGS_KEY, JSON.stringify(updated));
     } catch (err) {
       backupLog.warn('Failed to save backup settings:', err);
     }
@@ -452,11 +454,9 @@ export class BackupService {
           storage.saveWorkspaceState(manifest.workspaceState);
         }
         if (manifest.composerDrafts) {
-          try {
-            localStorage.setItem(`slag_drafts_${storage.getCurrentVault().id}`, JSON.stringify(manifest.composerDrafts));
-          } catch {
-            // ignore
-          }
+          // The archive carries the whole map: it replaces what the vault had, through the one
+          // writer the composer drafts have.
+          replaceComposerDrafts(manifest.composerDrafts, storage);
         }
       } catch (err) {
         backupLog.warn('Could not parse slag-manifest.json, falling back to file scan:', err);

@@ -4,7 +4,8 @@ import type { AssistantActionPayload } from '../sync/accountTypes';
 import { DEFAULT_INBOX_FOLDER } from '../../config/storage';
 import { logger } from '../logger/logger';
 import { storage } from '../storage';
-import { readStoredJson } from '../storage/readJson';
+import { clearTelegramThread, readTelegramThread, writeTelegramThread } from '../storage/settingsStore';
+import type { TelegramThreadEntry } from '../storage/stateSections';
 import { accountClient } from '../sync/account';
 import { assistantOrchestrator } from '../ai/orchestrator';
 import { loadAiSettings } from '../ai/connections/settings';
@@ -101,38 +102,28 @@ export function buildAssistantAnswer(items: SlagItem[], now = Date.now()): strin
   return lines.join('\n');
 }
 
-/** A short thread, device-local on purpose: the relay never stores what was asked or answered. */
+/**
+ * A short thread, device-local on purpose: the relay never stores what was asked or answered. It is
+ * the `telegram` half of the vault's `chat` section, so a webview wipe no longer forgets the last
+ * exchanges — but it still goes nowhere else.
+ */
 const HISTORY_LIMIT = 8;
 const HISTORY_ENTRY_CHARS = 600;
-
-interface HistoryEntry {
-  role: 'user' | 'assistant';
-  content: string;
-}
 
 function historyKey(vaultId: string): string {
   return `slag_tg_history_${vaultId}`;
 }
 
-function loadHistory(vaultId: string): HistoryEntry[] {
-  return readStoredJson<HistoryEntry[]>(historyKey(vaultId), [], (parsed) => {
-    if (!Array.isArray(parsed)) return undefined;
-    return parsed
-      .filter((entry): entry is HistoryEntry => (
-        Boolean(entry) && typeof entry === 'object'
-        && ((entry as HistoryEntry).role === 'user' || (entry as HistoryEntry).role === 'assistant')
-        && typeof (entry as HistoryEntry).content === 'string'
-      ))
-      .slice(-HISTORY_LIMIT);
-  });
+function loadHistory(vaultId: string): TelegramThreadEntry[] {
+  // `settingsStore` knows the section and the one lazy merge of the old key; the key is here
+  // because it is named after the sync id, which only the caller knows.
+  return readTelegramThread(storage, historyKey(vaultId)).slice(-HISTORY_LIMIT);
 }
 
-function saveHistory(vaultId: string, entries: HistoryEntry[]): void {
-  try {
-    localStorage.setItem(historyKey(vaultId), JSON.stringify(entries.slice(-HISTORY_LIMIT)));
-  } catch {
-    // Quota or a locked storage: losing the thread is better than losing the answer.
-  }
+function saveHistory(vaultId: string, entries: TelegramThreadEntry[]): void {
+  // Losing the thread is better than losing the answer: the write is best-effort, the snapshot
+  // keeps it either way.
+  writeTelegramThread(storage, historyKey(vaultId), entries.slice(-HISTORY_LIMIT));
 }
 
 /**
@@ -142,11 +133,7 @@ function saveHistory(vaultId: string, entries: HistoryEntry[]): void {
  * whoever is not in the room keeps a thread that a restart of the conversation no longer needs.
  */
 export function clearAssistantHistory(vaultId: string): void {
-  try {
-    localStorage.removeItem(historyKey(vaultId));
-  } catch {
-    // A locked storage keeps the old thread; there is nothing to report to the person either.
-  }
+  clearTelegramThread(storage, historyKey(vaultId));
 }
 
 /**
@@ -166,7 +153,7 @@ export async function answerAssistantQuestion(
 ): Promise<void> {
   const items = storage.getItems();
   const history = loadHistory(vaultId);
-  const asked: HistoryEntry = { role: 'user', content: (question.trim() || 'что по задачам?').slice(0, HISTORY_ENTRY_CHARS) };
+  const asked: TelegramThreadEntry = { role: 'user', content: (question.trim() || 'что по задачам?').slice(0, HISTORY_ENTRY_CHARS) };
   let answer = '';
   let offered: AssistantActionPayload | null = null;
   // The stages are logged one by one because "бот задумался" is answered by exactly one of

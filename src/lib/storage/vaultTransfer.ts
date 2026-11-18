@@ -9,12 +9,17 @@ import type {
   WorkspaceState,
 } from '../../types';
 import { logger } from '../logger/logger';
+import { replaceComposerDrafts } from './settingsStore';
 
 /**
  * Moving a vault in and out. This is the interchange format — a backup file, a
  * relay bundle, an Obsidian drop — and it changes when that contract changes,
  * not when note persistence does. Keeping it apart also keeps the storage
  * service from owning `JSON.stringify` of its own guts.
+ *
+ * It writes no cache of its own: folders live in the directories and their metadata in
+ * `state.json.folders`, and the drafts go through the writer in `settingsStore`, which is the one
+ * place that knows where they belong now.
  */
 
 const transferLog = logger.scope('FS');
@@ -48,8 +53,10 @@ export function buildVaultExportJson(snapshot: VaultSnapshot): string {
 
 /** The little bit of the storage service an import needs. */
 export interface VaultImportIo {
+  /** Still named by the caller, no longer written here: the folders are the directories' business. */
   foldersKey(): string;
   itemsKey(): string;
+  /** The old draft key: the drafts are written through `settingsStore` now, so it stays for the caller. */
   draftsKey(): string;
   cacheItems(key: string, items: SlagItem[]): void;
   saveAssistantHistory(messages: ChatMessage[]): void;
@@ -68,9 +75,8 @@ export interface VaultImportPayload {
 
 export function importVaultPayload(data: VaultImportPayload, io: VaultImportIo): boolean {
   try {
-    if (Array.isArray(data.folders) && data.folders.length > 0) {
-      localStorage.setItem(io.foldersKey(), JSON.stringify(data.folders));
-    }
+    // The folder list is not cached here any more: a directory is what makes a folder, and
+    // `state.json.folders` only dresses it. Writing the imported list would be a third opinion.
     if (Array.isArray(data.items)) {
       io.cacheItems(io.itemsKey(), data.items);
     }
@@ -84,11 +90,7 @@ export function importVaultPayload(data: VaultImportPayload, io: VaultImportIo):
       io.saveWorkspaceState(data.workspaceState, 'remote');
     }
     if (data.composerDrafts && typeof data.composerDrafts === 'object') {
-      try {
-        localStorage.setItem(io.draftsKey(), JSON.stringify(data.composerDrafts));
-      } catch {
-        // a full quota must not abort the rest of the import
-      }
+      replaceComposerDrafts(data.composerDrafts);
     }
     transferLog.info(
       `Imported vault data: ${data.items?.length || 0} items, ${data.folders?.length || 0} folders`,

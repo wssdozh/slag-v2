@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { logger } from './lib/logger/logger'
 import { initPrefs } from './lib/storage/prefs'
+import { hydrateSettings } from './lib/storage/settingsStore'
 import { initSecretStore } from './lib/platform/secretStore'
 
 const bootLog = logger.scope('APP')
@@ -48,6 +49,12 @@ async function boot(): Promise<void> {
     // Settings before the shell: every reader below expects them in memory, synchronously.
     await initPrefs()
     await initSecretStore()
+    // The vault's own small state — drafts, chat, memory, workspace — now lives in its
+    // `state.json`, and the same rule applies: the first render reads it synchronously, so the
+    // snapshot has to be here before the shell. On the browser build there is no file and this
+    // returns at once; the old keys keep answering.
+    const { storage } = await import('./lib/storage')
+    await hydrateSettings(storage)
     const { default: App } = await import('./App')
     const root = document.getElementById('root')!
     root.replaceChildren()
