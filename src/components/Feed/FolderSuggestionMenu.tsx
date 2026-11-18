@@ -19,13 +19,16 @@ interface FolderSuggestionMenuProps {
 
 // The tree is drawn, not spelled: a text `╰──` sits on the text baseline, so the line under a
 // nested folder ran below the icon instead of into its middle. The grid is the menu's own: one
-// level = 16px, the hook is a square half level (8px) and the first icon starts 8px in.
+// level = 16px, the hook is half a level (8px) with a rounded corner, and the icon keeps a 4px
+// gap from the line so the two do not touch.
 const TREE_INDENT = 16;
 const TREE_PADDING = 8;
 const TREE_HOOK = TREE_INDENT / 2;
+const TREE_GAP = 4;
 const TREE_LINE = 'bg-tint-15';
+const TREE_CORNER = 'border-tint-15';
 
-const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT}px`;
+const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT + TREE_GAP}px`;
 const guideLeft = (column: number) => `${TREE_PADDING + column * TREE_INDENT + TREE_HOOK}px`;
 
 /**
@@ -45,25 +48,26 @@ const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
           />
         ) : null
       )}
-      {row.depth > 0 && (
-        <>
-          {/* The hook is square: half a level up, half a level across to the icon. */}
+      {row.depth > 0 &&
+        (row.isLast ? (
+          // The closing corner is a border, not two bars: that is what rounds the turn like the
+          // context menu does instead of meeting in a hard square.
           <span
-            className={`pointer-events-none absolute w-px ${TREE_LINE}`}
-            style={{ left: ownColumn, top: `calc(50% - ${TREE_HOOK}px)`, height: `${TREE_HOOK}px` }}
+            className={`pointer-events-none absolute rounded-bl-[4px] border-l border-b ${TREE_CORNER}`}
+            style={{ left: ownColumn, top: `calc(50% - ${TREE_HOOK}px)`, width: `${TREE_HOOK}px`, height: `${TREE_HOOK}px` }}
           />
-          {!row.isLast && (
+        ) : (
+          <>
             <span
-              className={`pointer-events-none absolute top-1/2 -bottom-px w-px ${TREE_LINE}`}
-              style={{ left: ownColumn }}
+              className={`pointer-events-none absolute w-px ${TREE_LINE}`}
+              style={{ left: ownColumn, top: `calc(50% - ${TREE_HOOK}px)`, bottom: 0 }}
             />
-          )}
-          <span
-            className={`pointer-events-none absolute top-1/2 h-px ${TREE_LINE}`}
-            style={{ left: ownColumn, width: `${TREE_HOOK}px` }}
-          />
-        </>
-      )}
+            <span
+              className={`pointer-events-none absolute top-1/2 h-px ${TREE_LINE}`}
+              style={{ left: ownColumn, width: `${TREE_HOOK}px` }}
+            />
+          </>
+        ))}
     </>
   );
 };
