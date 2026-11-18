@@ -18,13 +18,14 @@ interface FolderSuggestionMenuProps {
 }
 
 // The tree is drawn, not spelled: a text `╰──` sits on the text baseline, so the line under a
-// nested folder ran below the icon instead of into its middle. A column is 14px, a row starts
-// 10px in (the menu's own padding) and every level adds one column.
+// nested folder ran below the icon instead of into its middle. The hook of a row is square —
+// the vertical half of the row and the horizontal reach to the icon are both one indent, 14px.
 const TREE_INDENT = 14;
-const TREE_PADDING = 10;
+// Left inset before the first column: 4 + half an indent keeps a root icon where it used to be.
+const TREE_PADDING = 4;
 const TREE_LINE = 'bg-tint-15';
 
-const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT}px`;
+const rowPadding = (depth: number) => `${TREE_PADDING + depth * TREE_INDENT + TREE_INDENT / 2}px`;
 const guideLeft = (column: number) => `${TREE_PADDING + column * TREE_INDENT + TREE_INDENT / 2}px`;
 
 /**
@@ -46,9 +47,10 @@ const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
       )}
       {row.depth > 0 && (
         <>
+          {/* The hook is square: one indent up, one indent across to the icon. */}
           <span
-            className={`pointer-events-none absolute -top-px bottom-1/2 w-px ${TREE_LINE}`}
-            style={{ left: ownColumn }}
+            className={`pointer-events-none absolute w-px ${TREE_LINE}`}
+            style={{ left: ownColumn, top: `calc(50% - ${TREE_INDENT}px)`, height: `${TREE_INDENT}px` }}
           />
           {!row.isLast && (
             <span
@@ -58,7 +60,7 @@ const BranchLines: React.FC<{ row: FolderTreeRow }> = ({ row }) => {
           )}
           <span
             className={`pointer-events-none absolute top-1/2 h-px ${TREE_LINE}`}
-            style={{ left: ownColumn, width: `${TREE_INDENT / 2 - 2}px` }}
+            style={{ left: ownColumn, width: `${TREE_INDENT}px` }}
           />
         </>
       )}
@@ -123,7 +125,7 @@ export const FolderSuggestionMenu: React.FC<FolderSuggestionMenuProps> = ({
               aria-hidden="true"
               data-depth={row.depth}
               onMouseDown={(e) => e.preventDefault()}
-              className="relative flex items-center pr-2.5 py-1 opacity-45 select-none"
+              className="relative flex items-center pr-2.5 py-1.5 opacity-45 select-none"
               style={{ paddingLeft: rowPadding(row.depth) }}
             >
               <BranchLines row={row} />
