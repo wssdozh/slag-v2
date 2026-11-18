@@ -1,5 +1,5 @@
-// Boots the React root into #root, in StrictMode, after the settings store, the secret store and
-// the global stylesheet.
+// Boots the React root into #root, in StrictMode, after the settings store, the one-off import of
+// the old webview profile and the secret store.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -49,6 +49,12 @@ async function boot(): Promise<void> {
     // Settings before the shell: every reader below expects them in memory, synchronously.
     await initPrefs()
     await initSecretStore()
+    // The one-off move off the webview profile: an older build kept the settings and the vault's
+    // drafts, chat, memory and workspace there, and the files this build reads would open empty.
+    // It has to finish before the storage service is created — that constructor hydrates its
+    // settings snapshot from `state.json` and would read the sections before they were written.
+    const { importLegacyProfile } = await import('./lib/storage/legacyProfile')
+    await importLegacyProfile()
     // The vault's own small state — drafts, chat, memory, workspace — now lives in its
     // `state.json`, and the same rule applies: the first render reads it synchronously, so the
     // snapshot has to be here before the shell. On the browser build there is no file and this
