@@ -1,20 +1,21 @@
-// One place for sync secrets at rest. Desktop uses the OS keychain, web/Android uses an
-// AES-GCM store whose key never leaves IndexedDB. Consumers read the synchronous cache.
+// One place for sync secrets at rest. Desktop uses the OS keychain; a build without one uses the
+// AES-GCM store from `encryptedLocalStore.ts`, whose ciphertext is a file on a native runtime and
+// `localStorage` in a browser. Consumers read the synchronous cache, which `initSecretStore()` fills
+// in `boot()` before the first render.
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
-import {
-  deleteLocalSecret,
-  ENCRYPTED_SECRET_PREFIX,
-  getLocalSecret,
-  setLocalSecret,
-} from './encryptedLocalStore';
-import { STORAGE_KEYS, SYNC_STORAGE_KEYS } from '../../config';
+import { deleteLocalSecret, getLocalSecret, setLocalSecret } from './encryptedLocalStore';
+import { STORAGE_KEYS } from '../../config';
 import { aiKeySecretName, splitAiKeys } from '../ai/connections/secrets';
-import { getPrefJson } from '../storage/prefs';
+import { getPref, getPrefJson, setPref } from '../storage/prefs';
 
 const storeLog = logger.scope('SYNC');
 
-const MODE_KEY = 'slag_secret_mode';
+/**
+ * Which backend the previous run chose. A preference, not a secret: the ciphertext is the secret,
+ * and a marker that disagreed with the probe was always overwritten rather than trusted.
+ */
+const MODE_PREF = 'slag_secret_mode';
 const PROBE_KEY = '__probe__';
 
 export const SECRET_KEYS = {
@@ -25,6 +26,11 @@ export const SECRET_KEYS = {
   aiKey: (connectionId: string) => aiKeySecretName(connectionId),
 } as const;
 
+/**
+ * `os` — the OS keychain. `local` — the AES-GCM store: ciphertext in `<AppData>/secrets.json` on a
+ * native runtime, in the webview profile in a browser. `file` — a runtime that installs its own
+ * file store (`src/node/secrets.ts`) and brings its own path.
+ */
 export type SecretStoreMode = 'os' | 'local' | 'file';
 
 export interface SecretBackend {
@@ -34,26 +40,10 @@ export interface SecretBackend {
   delete(key: string): Promise<void>;
 }
 
-interface LegacySecret {
-  key: string;
-  value: string;
-  remove: () => void;
-}
-
 export class SecretStoreUnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SecretStoreUnavailableError';
-  }
-}
-
-export class SecretMigrationError extends Error {
-  readonly failedKeys: string[];
-
-  constructor(failedKeys: string[]) {
-    super('Не удалось перенести ключи синхронизации в защищённое хранилище');
-    this.name = 'SecretMigrationError';
-    this.failedKeys = failedKeys;
   }
 }
 
@@ -88,144 +78,61 @@ function osBackend(invoke: typeof import('@tauri-apps/api/core').invoke): Secret
   };
 }
 
-function localBackend(): SecretBackend {
+function encryptedBackend(): SecretBackend {
   return {
     mode: 'local',
     get: getLocalSecret,
     set: setLocalSecret,
-    delete: async (key) => deleteLocalSecret(key),
+    delete: deleteLocalSecret,
   };
 }
 
 async function probeOsBackend(): Promise<SecretBackend | null> {
   if (!isTauri()) return null;
-  // Android keeps the encrypted IndexedDB fallback: the desktop `keyring` commands are not
-  // registered there, and a copied `os` marker must not lock the app out.
+  // Android keeps the encrypted store: the desktop `keyring` commands are not registered there,
+  // and a copied `os` marker must not lock the app out.
   if (/Android/i.test(navigator.userAgent)) return null;
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke<string | null>('secret_get', { key: PROBE_KEY });
     return osBackend(invoke);
   } catch (error) {
-    storeLog.warn('OS credential store is unavailable, using encrypted local fallback', { error });
+    storeLog.warn('OS credential store is unavailable, using the encrypted store', { error });
     return null;
   }
 }
 
 function readStoredMode(): SecretStoreMode | null {
-  const value = localStorage.getItem(MODE_KEY);
+  const value = getPref(MODE_PREF);
   return value === 'os' || value === 'local' ? value : null;
 }
 
-function parseJson(raw: string | null): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+function rememberMode(mode: SecretStoreMode): void {
+  setPref(MODE_PREF, mode);
 }
 
-function vaultIdFromConfigKey(key: string): string | null {
-  if (key === SYNC_STORAGE_KEYS.SYNC_CONFIG) return 'default_vault';
-  const prefix = `${SYNC_STORAGE_KEYS.SYNC_CONFIG}_`;
-  return key.startsWith(prefix) ? key.slice(prefix.length) : null;
-}
-
-function collectLegacySecrets(): LegacySecret[] {
-  const collected: LegacySecret[] = [];
-  if (typeof localStorage === 'undefined') return collected;
-
-  for (let index = 0; index < localStorage.length; index++) {
-    const key = localStorage.key(index);
-    if (!key) continue;
-
-    if (key === SYNC_STORAGE_KEYS.ACCOUNT_SESSION) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        collected.push({ key: SECRET_KEYS.accountSession, value: raw, remove: () => localStorage.removeItem(key) });
-      }
-      continue;
-    }
-
-    if (key.startsWith(SYNC_STORAGE_KEYS.DEVICE_KEY_PREFIX)) {
-      const raw = localStorage.getItem(key);
-      const deviceId = key.slice(SYNC_STORAGE_KEYS.DEVICE_KEY_PREFIX.length);
-      if (raw && deviceId) {
-        collected.push({
-          key: SECRET_KEYS.deviceKey(deviceId),
-          value: raw,
-          remove: () => localStorage.removeItem(key),
-        });
-      }
-      continue;
-    }
-
-    const vaultId = vaultIdFromConfigKey(key);
-    if (!vaultId) continue;
-    const parsed = parseJson(localStorage.getItem(key));
-    const seed = parsed?.seedPhrase;
-    if (typeof seed !== 'string' || !seed.trim()) continue;
-    collected.push({
-      key: SECRET_KEYS.vaultSeed(vaultId),
-      value: seed,
-      remove: () => {
-        const current = parseJson(localStorage.getItem(key));
-        if (!current) return;
-        delete current.seedPhrase;
-        localStorage.setItem(key, JSON.stringify(current));
-      },
-    });
+/**
+ * Which store this run uses.
+ *
+ * The probe answers "is there a keychain", not "where are the keys": a boot with a locked keychain
+ * fills the encrypted store, and a later boot that finds the keychain working again would leave
+ * those keys unreadable. So a store that is in use keeps them, and the marker says which one that
+ * is. With no marker — a first run, a wiped settings file — the probe decides.
+ */
+async function resolveBackend(): Promise<SecretBackend> {
+  const storedMode = readStoredMode();
+  const os = await probeOsBackend();
+  if (os && storedMode !== 'local') {
+    if (storedMode !== 'os') rememberMode('os');
+    return os;
   }
-
-  return collected;
-}
-
-function knownVaultIds(): Set<string> {
-  const ids = new Set<string>(['default_vault']);
-  if (typeof localStorage === 'undefined') return ids;
-
-  const registry = parseJson(localStorage.getItem(STORAGE_KEYS.VAULTS));
-  const rawVaults = registry && Array.isArray(registry) ? registry : [];
-  for (const entry of rawVaults) {
-    if (typeof entry === 'object' && entry !== null && typeof (entry as { id?: unknown }).id === 'string') {
-      ids.add((entry as { id: string }).id);
-    }
+  if (storedMode === 'os') {
+    // A wiped keychain or a data directory copied to another machine. The same answer as on
+    // Android: an encrypted store and a warning, not a session with no sync.
+    storeLog.warn('OS credential store was in use but is gone, falling back to the encrypted store');
   }
-
-  const current = parseJson(localStorage.getItem(STORAGE_KEYS.CURRENT_VAULT));
-  if (typeof current?.id === 'string') ids.add(current.id);
-
-  for (let index = 0; index < localStorage.length; index++) {
-    const key = localStorage.key(index);
-    if (!key) continue;
-    const vaultId = vaultIdFromConfigKey(key);
-    if (vaultId) ids.add(vaultId);
-  }
-
-  return ids;
-}
-
-function knownDeviceIds(): Set<string> {
-  const ids = new Set<string>();
-  if (typeof localStorage === 'undefined') return ids;
-
-  for (let index = 0; index < localStorage.length; index++) {
-    const key = localStorage.key(index);
-    if (!key) continue;
-    const vaultId = vaultIdFromConfigKey(key);
-    if (!vaultId) continue;
-    const parsed = parseJson(localStorage.getItem(key));
-    if (typeof parsed?.deviceId === 'string' && parsed.deviceId) ids.add(parsed.deviceId);
-  }
-
-  const session = parseJson(localStorage.getItem(SYNC_STORAGE_KEYS.ACCOUNT_SESSION))
-    ?? parseJson(cache.get(SECRET_KEYS.accountSession) ?? null);
-  if (typeof session?.deviceId === 'string' && session.deviceId) ids.add(session.deviceId);
-  return ids;
+  if (storedMode !== 'local') rememberMode('local');
+  return encryptedBackend();
 }
 
 /**
@@ -245,15 +152,34 @@ function aiConnectionIds(): string[] {
 }
 
 /**
+ * Vault ids the registry knows. Their seeds are worth a warm cache because sharing a vault asks for
+ * another vault's seed synchronously; a vault the registry never heard of has no seed to find. The
+ * list is `prefs`, not a scan of anything: the registry has one owner and this is a reader.
+ */
+function knownVaultIds(): string[] {
+  const ids = new Set<string>(['default_vault']);
+  const registry = getPrefJson<unknown>(STORAGE_KEYS.VAULTS, []);
+  for (const entry of Array.isArray(registry) ? registry : []) {
+    if (typeof entry === 'object' && entry !== null && typeof (entry as { id?: unknown }).id === 'string') {
+      ids.add((entry as { id: string }).id);
+    }
+  }
+  const current = getPrefJson<unknown>(STORAGE_KEYS.CURRENT_VAULT, null);
+  if (typeof current === 'object' && current !== null && typeof (current as { id?: unknown }).id === 'string') {
+    ids.add((current as { id: string }).id);
+  }
+  return [...ids];
+}
+
+/**
  * The old shape kept provider keys in the settings JSON in plain text. Move them into the store,
  * then rewrite the settings without them — everything that is not a key is left as it was. Once
  * the plaintext is gone this does nothing, so a second boot writes nothing.
  */
 async function migrateAiKeys(target: SecretBackend): Promise<void> {
-  if (typeof localStorage === 'undefined') return;
-  const raw = localStorage.getItem(STORAGE_KEYS.AI_SETTINGS);
-  if (!raw) return;
-  const { keys, settings } = splitAiKeys(parseJson(raw));
+  const saved = getPrefJson<unknown>(STORAGE_KEYS.AI_SETTINGS, null);
+  if (saved === null) return;
+  const { keys, settings } = splitAiKeys(saved);
   if (!keys.length || !settings) return;
 
   const failed: string[] = [];
@@ -274,56 +200,17 @@ async function migrateAiKeys(target: SecretBackend): Promise<void> {
     storeLog.warn('AI provider keys stayed in the settings: the secret store refused them', { keys: failed });
     return;
   }
-  localStorage.setItem(STORAGE_KEYS.AI_SETTINGS, JSON.stringify(settings));
+  setPref(STORAGE_KEYS.AI_SETTINGS, JSON.stringify(settings));
 }
 
-async function migrateEncryptedLocalToOs(target: SecretBackend): Promise<boolean> {
-  const entries: Array<{ key: string; value: string }> = [];
-  for (let index = 0; index < localStorage.length; index++) {
-    const key = localStorage.key(index);
-    if (!key?.startsWith(ENCRYPTED_SECRET_PREFIX)) continue;
-    const secretKey = key.slice(ENCRYPTED_SECRET_PREFIX.length);
-    const value = await getLocalSecret(secretKey);
-    if (value !== null) entries.push({ key: secretKey, value });
-  }
-
-  // Write every value before deleting anything: a partial move must not leave a key only
-  // in the store we are about to stop using.
-  for (const entry of entries) {
-    try {
-      await target.set(entry.key, entry.value);
-    } catch (error) {
-      storeLog.warn('Could not move encrypted local secret into the OS store', { key: entry.key, error });
-      return false;
-    }
-  }
-  for (const entry of entries) deleteLocalSecret(entry.key);
-  return true;
-}
-
-async function migrateLegacy(target: SecretBackend): Promise<void> {
-  const legacy = collectLegacySecrets();
-  const failed: string[] = [];
-
-  for (const entry of legacy) {
-    try {
-      const existing = await target.get(entry.key);
-      if (existing === null) await target.set(entry.key, entry.value);
-      cache.set(entry.key, existing ?? entry.value);
-      entry.remove();
-    } catch (error) {
-      storeLog.error('Could not migrate a legacy sync secret', { key: entry.key, error });
-      failed.push(entry.key);
-    }
-  }
-
-  if (failed.length) throw new SecretMigrationError(failed);
-}
-
+/**
+ * The cache exists for the readers that cannot wait: the account session is read while its module
+ * is being imported, a shared vault asks for another vault's seed, and `loadAiSettings` resolves
+ * keys during render. Everything else goes through `getSecret`.
+ */
 async function preload(target: SecretBackend): Promise<void> {
   const keys = new Set<string>([SECRET_KEYS.accountSession]);
   for (const vaultId of knownVaultIds()) keys.add(SECRET_KEYS.vaultSeed(vaultId));
-  for (const deviceId of knownDeviceIds()) keys.add(SECRET_KEYS.deviceKey(deviceId));
   for (const connectionId of aiConnectionIds()) keys.add(SECRET_KEYS.aiKey(connectionId));
 
   for (const key of keys) {
@@ -338,47 +225,7 @@ async function preload(target: SecretBackend): Promise<void> {
 }
 
 async function doInitSecretStore(): Promise<void> {
-  if (override) {
-    backend = override;
-    await migrateLegacy(backend);
-    await migrateAiKeys(backend);
-    await preload(backend);
-    ready = true;
-    return;
-  }
-  let storedMode = readStoredMode();
-  if (/Android/i.test(navigator.userAgent) && storedMode === 'os') {
-    // A desktop data directory copied onto Android has no keyring entries.
-    storedMode = null;
-    localStorage.removeItem(MODE_KEY);
-  }
-  const os = await probeOsBackend();
-
-  if (storedMode === 'os' && !os) {
-    // A wiped keychain or a data directory copied to another machine. Same answer as on Android:
-    // fall back to the encrypted local store instead of blocking sync for the whole session.
-    storeLog.warn('OS credential store was in use but is gone, falling back to the encrypted local store');
-    storedMode = null;
-    localStorage.removeItem(MODE_KEY);
-  }
-
-  if (os && (storedMode === null || storedMode === 'local')) {
-    const moved = await migrateEncryptedLocalToOs(os);
-    if (moved) {
-      backend = os;
-      localStorage.setItem(MODE_KEY, 'os');
-    } else {
-      backend = localBackend();
-      localStorage.setItem(MODE_KEY, 'local');
-    }
-  } else if (os) {
-    backend = os;
-  } else {
-    backend = localBackend();
-    if (storedMode !== 'local') localStorage.setItem(MODE_KEY, 'local');
-  }
-
-  await migrateLegacy(backend);
+  backend = override ?? (await resolveBackend());
   await migrateAiKeys(backend);
   await preload(backend);
   ready = true;
@@ -395,29 +242,12 @@ export function initSecretStore(): Promise<void> {
   return initPromise;
 }
 
-function readLegacySecret(key: string): string | null {
-  if (typeof localStorage === 'undefined') return null;
-  if (key === SECRET_KEYS.accountSession) {
-    return localStorage.getItem(SYNC_STORAGE_KEYS.ACCOUNT_SESSION);
-  }
-  if (key.startsWith('device-key:')) {
-    return localStorage.getItem(SYNC_STORAGE_KEYS.DEVICE_KEY_PREFIX + key.slice('device-key:'.length));
-  }
-  if (key.startsWith('vault-seed:')) {
-    const vaultId = key.slice('vault-seed:'.length);
-    const vaultKey = `${SYNC_STORAGE_KEYS.SYNC_CONFIG}_${vaultId}`;
-    const raw = localStorage.getItem(vaultKey)
-      ?? (vaultId === 'default_vault' ? localStorage.getItem(SYNC_STORAGE_KEYS.SYNC_CONFIG) : null);
-    const seed = parseJson(raw)?.seedPhrase;
-    return typeof seed === 'string' && seed ? seed : null;
-  }
-  return null;
-}
-
+/**
+ * The warm cache, and only it. A module can be imported before boot — `syncEngine` builds its
+ * config at load — so an early read answers `null`; nothing else is scraped to fill the gap, which
+ * is exactly what keeps the plaintext out of the picture. `boot()` awaits the init before rendering.
+ */
 export function getCachedSecret(key: string): string | null {
-  // A module can be imported before boot. Reads fall back to the legacy plaintext only
-  // until the migration has completed; writes never do.
-  if (!ready) return readLegacySecret(key);
   return cache.get(key) ?? null;
 }
 
