@@ -31,7 +31,6 @@ tags:
 │  - Уровни: trace | debug | info | warn | error         │
 │  - Sensitive Redactor: маскирование API-ключей         │
 │  - Time Tracking: logger.time / logger.trackAsync      │
-│  - Storage Health: getStorageHealth (KB / квота)       │
 │  - Session Breadcrumbs: переживает перезагрузку F5     │
 └───────────┬────────────────────────────────┬───────────┘
             │                                │
