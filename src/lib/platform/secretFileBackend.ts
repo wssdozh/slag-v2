@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Native ciphertext at rest: one flat map of `secretKey → { v, iv, data }` in `<AppData>/secrets.json`.
  *
  * The envelope is the AES-GCM one from `encryptedLocalStore.ts`, unchanged: this module only moves
@@ -7,18 +7,16 @@
  * seed phrase.
  *
  * A browser build never reaches this: there the profile is the store. A missing or broken file is an
- * empty store and a warning, never a reason to keep the app from opening. Writing is
- * write-then-rename, like `prefsBackend.native.ts`: a crash mid-write leaves the previous file whole.
+ * empty store and a warning, never a reason to keep the app from opening. Writing is the same
+ * write-then-rename `prefsBackend.native.ts` uses, through `writeJsonAtomic`.
  */
-import { BaseDirectory, exists, readTextFile, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { BaseDirectory, exists, readTextFile } from '@tauri-apps/plugin-fs';
 import { logger } from '../logger/logger';
+import { writeJsonAtomic } from './writeJsonAtomic';
 
 const fsLog = logger.scope('SYNC');
 
 const SECRETS_FILE = 'secrets.json';
-// The next snapshot is written here first and renamed over the real file. The name is fixed, so a
-// failed write cannot pile up temp files.
-const SECRETS_TEMP = 'secrets.json.tmp';
 
 /** One AES-GCM envelope, the same shape the browser profile keeps. */
 export interface SecretEnvelope {
@@ -65,14 +63,6 @@ async function readSecrets(): Promise<SecretEnvelopeMap> {
   return envelopes;
 }
 
-async function writeSecrets(envelopes: SecretEnvelopeMap): Promise<void> {
-  await writeTextFile(SECRETS_TEMP, JSON.stringify(envelopes, null, 2), { baseDir: BaseDirectory.AppData });
-  await rename(SECRETS_TEMP, SECRETS_FILE, {
-    oldPathBaseDir: BaseDirectory.AppData,
-    newPathBaseDir: BaseDirectory.AppData,
-  });
-}
-
 /**
  * Is there anything in the file? The one-time move off the webview profile asks before copying, so
  * a store that already has envelopes is never overwritten by older ones. An unreadable file answers
@@ -106,14 +96,14 @@ export function fileEnvelopeStore(): SecretEnvelopeStore {
     async set(key, envelope) {
       const envelopes = await readSecrets();
       envelopes[key] = envelope;
-      await writeSecrets(envelopes);
+      await writeJsonAtomic(SECRETS_FILE, envelopes);
     },
 
     async delete(key) {
       const envelopes = await readSecrets();
       if (!(key in envelopes)) return;
       delete envelopes[key];
-      await writeSecrets(envelopes);
+      await writeJsonAtomic(SECRETS_FILE, envelopes);
     },
   };
 }
