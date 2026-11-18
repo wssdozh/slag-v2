@@ -47,8 +47,12 @@ export const SyncSettingsTab: React.FC = () => {
     setIsRefreshing(true);
     try {
       await checkServerConnection(serverUrlInput.replace(/\/+$/, ''));
-      await syncEngine.pushLocalChanges();
-      addToast('Сервер проверен', 'success');
+      // Проверка сервера отвечает «жив», но это не значит, что синхронизация прошла: старую
+      // ошибку снимает и настоящий проход, а не успешный /health.
+      await syncEngine.retrySync();
+      const error = syncEngine.getStatus().error;
+      if (error) addToast(`Сервер проверен, но синхронизация не прошла: ${error}`, 'error');
+      else addToast('Сервер проверен', 'success');
     } catch (error) {
       addToast(`Не удалось проверить сервер: ${error instanceof Error ? error.message : String(error)}`, 'error');
     } finally {

@@ -29,6 +29,12 @@ export const SYNC_INTERVALS = {
   // A websocket push not confirmed in this window is resent over HTTP.
   WS_ACK_TIMEOUT_MS: 2500,
   WS_PING_INTERVAL_MS: 25000,
+  // A failed pass retries itself on this clock. Fixed, not a backoff: the user expects the
+  // panel to come back to life within the same ten seconds they would wait before pressing
+  // the refresh button themselves.
+  RETRY_DELAY_MS: 10000,
+  // A relay that accepts the connection and stalls the body must not hold a push forever.
+  PUSH_TIMEOUT_MS: 30000,
 } as const;
 
 /**

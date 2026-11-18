@@ -31,6 +31,7 @@ import { accountClient } from './account';
 export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
+import { syncErrorText } from './errorText';
 import { SyncTransport } from './transport';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
@@ -113,6 +114,9 @@ export class SyncEngine {
   public pullTimeoutMs = 30_000;
   /** Bundles per pull request. A page of attachment-carrying bundles is megabytes. */
   public pullPageSize = 100;
+  /** How soon a failed pass tries again. Public so a test does not sit through ten real seconds. */
+  public retryDelayMs = SYNC_INTERVALS.RETRY_DELAY_MS;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
   public initGeneration = 0;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
@@ -775,6 +779,59 @@ export class SyncEngine {
     await this.init();
   }
 
+  /**
+   * One retry on the clock, whatever failed. `disconnect` bumps the generation on every attempt,
+   * so a single timer per engine is all the deduplication this needs.
+   */
+  public scheduleRetry(): void {
+    if (this.retryTimer || !this.config.enabled) return;
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      void this.retrySync();
+    }, this.retryDelayMs);
+  }
+
+  /**
+   * The repair path for both the timer and the refresh button: drop the stale error, then redo
+   * whichever step is missing. A refused first sync never got a room and blocks every push until
+   * it succeeds, so that one restarts from `init`; everything else just pulls and pushes again.
+   */
+  public async retrySync(): Promise<void> {
+    this.clearRetryTimer();
+    // Unconditional: an error left over from a connection that is back is the whole reason the
+    // panel kept saying "Ошибка" after the server answered a health check.
+    this.status.error = null;
+    this.notify();
+    if (!this.config.enabled) return;
+    // One pass at a time: a pull already in flight is this retry, and two of them race the cursor.
+    if (this.isProcessingSync || this.pendingPull) {
+      this.scheduleRetry();
+      return;
+    }
+    if (this.status.initialSync.state === 'error' || !this.activeRoomId) {
+      await this.init();
+      return;
+    }
+    try {
+      this.status.state = 'syncing';
+      this.notify();
+      await this.fetchPendingBundlesHttp();
+      // The pull answered, so the red dot is a lie even before the push below decides anything.
+      this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
+      this.notify();
+      await pushLocalChanges(this);
+    } catch {
+      // The pull reported itself to the status and already asked for the next attempt.
+    }
+  }
+
+  private clearRetryTimer(): void {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+  }
+
   public async switchVault(vaultId: string): Promise<void> {
     if (this.currentVaultId === vaultId && this.status.state !== 'idle' && this.status.state !== 'error') {
       return;
@@ -905,6 +962,8 @@ export class SyncEngine {
         }));
         this.notify();
       }
+      // The pull that just succeeded is proof the connection is back, whatever failed before it.
+      this.status.error = null;
       // Bytes a bundle promised but never wrote are gone from the relay once it is ACKed, so the
       // whole vault is checked here — after the backlog is on disk, not mid-pull. A device that
       // missed those bundles entirely (an older build ACKed them) still asks on start.
@@ -913,13 +972,14 @@ export class SyncEngine {
       this.scheduleAttachmentPass();
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = syncErrorText(err, this.pullTimeoutMs);
       syncLog.error('Sync init error:', msg);
       this.batchUpdating = false;
       if (initial && isInitialSyncPending(this.currentVaultId)) this.status.initialSync.state = 'error';
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
+      this.scheduleRetry();
     }
   }
 
@@ -1017,6 +1077,9 @@ export class SyncEngine {
       clearTimeout(pending.fallbackTimer);
       pending.fallbackTimer = null;
     }
+    // A refusal from the relay is an answer, not a failure to repeat: only a lost connection or a
+    // timeout is worth another pass, and those schedule one below.
+    let retryable = true;
     try {
       if (!this.activeRoomId) throw new Error('Sync room is not ready');
       const cleanUrl = apiBase(this.config.serverUrl);
@@ -1026,17 +1089,19 @@ export class SyncEngine {
         body: JSON.stringify(pending.encrypted),
         // Without a deadline a relay that accepts and stalls keeps `init` in its `syncing` phase
         // forever, so the sidebar shows a spinner that never resolves.
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(SYNC_INTERVALS.PUSH_TIMEOUT_MS),
       });
       if (!response.ok) {
         if (response.status === 409) {
           // ponytail: relay dedups by bundle_id; replay means it is already delivered.
         } else if (response.status === 401 || response.status === 403) {
+          retryable = false;
           this.disconnect();
           throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
         } else if (response.status === 413) {
           // The plan's cache quota is counted in bundle bytes. Retrying the same ten-megabyte
           // attachment would hammer the relay forever, so attachments rest until a restart.
+          retryable = false;
           this.attachmentSyncBlocked = true;
           throw new Error('Квота сервера на синхронизацию кончилась: вложения больше не уходят');
         } else {
@@ -1047,11 +1112,12 @@ export class SyncEngine {
     } catch (err: unknown) {
       if (pending.settled) return;
       this.pendingPushes.delete(pending.bundleId);
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = syncErrorText(err, SYNC_INTERVALS.PUSH_TIMEOUT_MS);
       syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
+      if (retryable) this.scheduleRetry();
     }
   }
 
@@ -1143,8 +1209,11 @@ export class SyncEngine {
       if (generation !== this.initGeneration) return;
       syncLog.warn('HTTP bundles fetch failed:', e);
       this.status.state = 'error';
-      this.status.error = e instanceof Error ? e.message : String(e);
+      this.status.error = syncErrorText(e, this.pullTimeoutMs);
       this.notify();
+      // A relay hiccup, a laptop that just woke up, a tunnel that dropped: none of those need a
+      // person to press anything, so the same pass comes back on the retry clock.
+      this.scheduleRetry();
       throw e;
     }
   }
@@ -1156,6 +1225,8 @@ export class SyncEngine {
 
   public disconnect(): void {
     ++this.initGeneration;
+    // A retry belongs to the session it was armed in; a vault switch must not inherit it.
+    this.clearRetryTimer();
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
     this.pushDebounceTimer = null;
     this.pushDebounceDeadline = 0;
