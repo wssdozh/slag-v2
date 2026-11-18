@@ -26,7 +26,7 @@
     "where": "node scripts/gen-code-map.mjs where",
     "test:e2e": "playwright test",
     "shots": "playwright test e2e/quick_shots.spec.ts",
-    "test:scripts": "node --test scripts/release-meta.test.mjs scripts/release-assets.test.mjs scripts/release-version.test.mjs scripts/release-text.test.mjs scripts/mcp-note-card.test.mjs scripts/mcp-note-patch.test.mjs scripts/mcp-instructions.test.mjs scripts/vault-watch.test.mjs scripts/folder-source.test.mjs scripts/vault-discovery.test.mjs scripts/ai-keys-secret.test.mjs scripts/install-mcp.test.mjs",
+    "test:scripts": "node --test scripts/release-meta.test.mjs scripts/release-assets.test.mjs scripts/release-version.test.mjs scripts/release-text.test.mjs scripts/mcp-note-card.test.mjs scripts/mcp-note-patch.test.mjs scripts/mcp-instructions.test.mjs scripts/vault-watch.test.mjs scripts/folder-source.test.mjs scripts/vault-discovery.test.mjs scripts/ai-keys-secret.test.mjs scripts/sync-tombstones.test.mjs scripts/no-localstorage.test.mjs scripts/install-mcp.test.mjs",
     "release:dev": "node scripts/release-run.mjs --channel dev",
     "release:beta": "node scripts/release-run.mjs --channel beta",
     "release:stable": "node scripts/release-run.mjs --channel release",
