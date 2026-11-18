@@ -301,43 +301,23 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   private initCrossWindowDraftSync(): void {
-    if (typeof BroadcastChannel !== 'undefined') {
-      try {
-        this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
-        this.crossWindowDraftChannel.onmessage = (event) => {
-          const data = event.data;
-          if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
-            this.emitChange({
-              kind: 'draft',
-              action: data.action,
-              id: `composer:${data.folderPath}`,
-              payload: data.draft,
-              origin: 'remote',
-            });
-          }
-        };
-      } catch {
-        this.crossWindowDraftChannel = null;
-      }
-    }
-
-    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      window.addEventListener('storage', (event) => {
-        if (event.key === this.getDraftsKey() && event.newValue !== null) {
-          try {
-            const all = JSON.parse(event.newValue);
-            for (const [folderPath, draft] of Object.entries(all)) {
-              this.emitChange({
-                kind: 'draft',
-                action: 'upsert',
-                id: `composer:${folderPath}`,
-                payload: draft as ComposerDraft,
-                origin: 'remote',
-              });
-            }
-          } catch {}
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
+      this.crossWindowDraftChannel.onmessage = (event) => {
+        const data = event.data;
+        if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
+          this.emitChange({
+            kind: 'draft',
+            action: data.action,
+            id: `composer:${data.folderPath}`,
+            payload: data.draft,
+            origin: 'remote',
+          });
         }
-      });
+      };
+    } catch {
+      this.crossWindowDraftChannel = null;
     }
   }
 
