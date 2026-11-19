@@ -1,6 +1,7 @@
 // Панель «Состояние хранилища» — сверка целостности и отчёт о находках.
 import React, { useState } from 'react';
 import type { Finding, IntegrityStatus } from '../../../../lib/vault/integrity/types';
+import type { ManifestStatus } from '../../../../lib/sync/types';
 import { Icon } from '../../../UI/icons/Icon';
 import { IntegrityFindingCard } from './IntegrityFindingCard';
 
@@ -9,6 +10,8 @@ export interface IntegrityPanelProps {
   findings: Finding[];
   busy: boolean;
   lastScan: string | null;       // ISO или null
+  /** Последняя сверка с комнатой: её ведёт движок синка, сканер её не трогает. */
+  remote: ManifestStatus | null;
   onVerify(): void;
   onRepair(dryRun: boolean): void;
 }
@@ -41,6 +44,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   findings,
   busy,
   lastScan,
+  remote,
   onVerify,
   onRepair,
 }) => {
@@ -91,6 +95,28 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
     }
   }
 
+  /* ── строка сервера ───────────────────────────────── */
+  // Четыре состояния, и каждое честное: «нет данных» — сверку ещё не делали, «не ответил» — комната
+  // молчит, «сходится» — корни равны, «разошлось» — корни разные. Последнее не приговор: движок
+  // уже переотправил состояние, если это ещё может помочь.
+  let remoteText = 'сервер: нет данных';
+  let remoteTone = 'text-fg-dim';
+  if (remote) {
+    if (remote.remoteRoot === null) {
+      remoteText = 'сервер: не ответил';
+    } else if (remote.inSync) {
+      remoteText = `сервер: сходится · ${remote.remoteRoot.slice(0, 8)}…`;
+      remoteTone = 'text-success';
+    } else if (remote.action === 'reconcile') {
+      remoteText = 'сервер: разошлось — отправляю заново';
+      remoteTone = 'text-fg-secondary';
+    } else {
+      remoteText = 'сервер: разошлось — нужен разбор';
+      remoteTone = 'text-fg-secondary';
+    }
+  }
+  const remoteTitle = remote ? `сверено ${remote.at}` : 'движок синка ещё не сверял корень с комнатой';
+
   /* ── рендер ────────────────────────────────────────── */
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
@@ -112,6 +138,18 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         </span>
         {scanTime && (
           <span className="text-2xs font-mono text-fg-dim">{scanTime}</span>
+        )}
+      </div>
+
+      {/* сверка с комнатой: свой счёт, потому что это не диск, а сосед */}
+      <div className="-mt-1 flex items-center justify-between px-1" data-testid="integrity-remote">
+        <span className={`text-2xs font-mono ${remoteTone}`} title={remoteTitle}>
+          {remoteText}
+        </span>
+        {remote && remote.folders.length > 0 && (
+          <span className="text-2xs font-mono text-fg-dim">
+            {remote.folders.length} папок
+          </span>
         )}
       </div>
 

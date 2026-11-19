@@ -222,6 +222,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .initTauriFs()
       .then((loadedNew) => {
         if (loadedNew) refreshData();
+        // The frame after the data lands is the first one a person sees notes in. One number, so a
+        // claim about a slow start has something to be compared with.
+        requestAnimationFrame(() =>
+          appLog.info('Первый кадр ленты', { fromBootMs: Math.round(performance.now()) })
+        );
       })
       .finally(() => void syncEngine.init());
 

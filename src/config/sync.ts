@@ -35,6 +35,11 @@ export const SYNC_INTERVALS = {
   RETRY_DELAY_MS: 10000,
   // A relay that accepts the connection and stalls the body must not hold a push forever.
   PUSH_TIMEOUT_MS: 30000,
+  // The room's manifest is a few kilobytes; a slow answer is a dead answer.
+  MANIFEST_TIMEOUT_MS: 8000,
+  // After a confirmed push, one manifest round trip per burst is plenty: the relay's row keeps
+  // only the latest root anyway, and an edit every second must not double the request rate.
+  MANIFEST_CHECK_DEBOUNCE_MS: 5000,
 } as const;
 
 /**

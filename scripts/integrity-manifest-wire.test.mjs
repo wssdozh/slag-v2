@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   MAX_WIRE_BYTES,
   WIRE_VERSION,
+  decideManifest,
   describeWire,
   diffWire,
   leavesToRequest,
@@ -210,3 +211,61 @@ test('describeWire says when the leaves were not sent', () => {
 
   assert.ok(line.includes('не присланы'), line);
 });
+
+// --- what a device does about it ------------------------------------------------------------
+
+const quiet = { reconciledRoot: null, receiveOnly: false };
+
+test('a matching root asks for nothing', () => {
+  const decision = decideManifest(manifest(), wire(), quiet);
+
+  assert.equal(decision.action, 'none');
+  assert.equal(decision.drift?.rootMatch, true);
+});
+
+test('a device that got no answer does not call that a mismatch', () => {
+  assert.deepEqual(decideManifest(manifest(), null, quiet), { action: 'none', drift: null });
+});
+
+test('a diverged root is resent once', () => {
+  const decision = decideManifest(manifest(), wire({ root: 'root-b' }), quiet);
+
+  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.drift?.rootMatch, false);
+});
+
+test('the same peer root is never resent against twice', () => {
+  const decision = decideManifest(manifest(), wire({ root: 'root-b' }), {
+    reconciledRoot: 'root-b',
+    receiveOnly: false,
+  });
+
+  assert.equal(decision.action, 'report');
+});
+
+test('a fresh peer state is worth another look after the latch was set on an older one', () => {
+  const decision = decideManifest(manifest(), wire({ root: 'root-c' }), {
+    reconciledRoot: 'root-b',
+    receiveOnly: false,
+  });
+
+  assert.equal(decision.action, 'reconcile');
+});
+
+test('a receive-only device reports a divergence and never resends', () => {
+  const decision = decideManifest(manifest(), wire({ root: 'root-b' }), {
+    reconciledRoot: null,
+    receiveOnly: true,
+  });
+
+  assert.equal(decision.action, 'report');
+});
+
+test('a remote without leaves still decides on the root', () => {
+  const decision = decideManifest(manifest(), wire({ root: 'root-b', leaves: undefined }), quiet);
+
+  assert.equal(decision.action, 'reconcile');
+  assert.deepEqual(decision.drift?.missing, []);
+  assert.deepEqual(decision.drift?.conflict, []);
+});
+

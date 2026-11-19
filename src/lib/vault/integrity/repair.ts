@@ -8,6 +8,7 @@ import { FIX_KIND_BY_SCANNER } from './types.ts';
 
 const DEFAULT_MAX_ACTIONS = 50;
 const DEFAULT_MAX_SHARE = 0.1;
+const DEFAULT_MAX_ATTACHMENTS = 200;
 const DEFAULT_HYGIENE_ROOT = '.trash/.hygiene';
 
 /** Vault-relative, slash-separated, no `./`, no leading `/`, no `..` segments. */
@@ -38,10 +39,15 @@ function byId(a: Finding, b: Finding): number {
 export function planRepair(findings: Finding[], snapshot: VaultSnapshot, options: RepairOptions = {}): RepairPlan {
   const maxActions = options.maxActions ?? DEFAULT_MAX_ACTIONS;
   const maxShare = options.maxShare ?? DEFAULT_MAX_SHARE;
+  const maxAttachments = options.maxAttachments ?? DEFAULT_MAX_ATTACHMENTS;
   const hygieneDir = `${normalizePath(options.hygieneRoot ?? DEFAULT_HYGIENE_ROOT)}/${normalizePath(options.runId ?? 'run') || 'run'}`;
 
   const notesByPath = new Map(snapshot.notes.map((note) => [normalizePath(note.path), note]));
   const ops: RepairOp[] = [];
+  // Orphaned bytes are their own budget and their own verdict: one is a stray paste, two hundred
+  // are a vault that has been used. Mixing them into `ops` would either block the sweep on a
+  // ceiling meant for notes or need the note ceiling raised to a number that stops meaning anything.
+  const attachmentOps: RepairOp[] = [];
   const seen = new Set<string>();
 
   const push = (op: RepairOp): void => {
@@ -49,6 +55,13 @@ export function planRepair(findings: Finding[], snapshot: VaultSnapshot, options
     if (seen.has(key)) return;
     seen.add(key);
     ops.push(op);
+  };
+
+  const pushAttachment = (op: RepairOp): void => {
+    const key = op.kind === 'move' ? `move:${op.from}` : `att:${op.kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    attachmentOps.push(op);
   };
 
   for (const finding of [...findings].sort(byId)) {
@@ -87,6 +100,21 @@ export function planRepair(findings: Finding[], snapshot: VaultSnapshot, options
     if (finding.scanner === 'trash-aging') {
       const path = normalizePath(finding.path);
       if (path) push({ kind: 'move', findingId: finding.id, from: path, to: `${hygieneDir}/${path}`, note: `старая корзина ${path} в архив чистки` });
+      continue;
+    }
+
+    if (finding.scanner === 'unreferenced-attachment') {
+      // The finding names a file in `.attachments/` by its bare name; the op names it vault-relative,
+      // the way the executor tells a trash path from a note path.
+      const name = normalizePath(finding.path);
+      if (!name) continue;
+      pushAttachment({
+        kind: 'move',
+        findingId: finding.id,
+        from: `.attachments/${name}`,
+        to: `${hygieneDir}/attachments/${name}`,
+        note: `вложение ${name} в архив чистки`,
+      });
     }
   }
 
@@ -95,5 +123,12 @@ export function planRepair(findings: Finding[], snapshot: VaultSnapshot, options
   if (tooMuch) {
     return { ops: [], blocked: [...findings].sort(byId).filter((finding) => FIX_KIND_BY_SCANNER[finding.scanner] === 'safe') };
   }
-  return { ops, blocked: [] };
+
+  if (attachmentOps.length > maxAttachments) {
+    const blockedAttachments = [...findings]
+      .sort(byId)
+      .filter((finding) => finding.scanner === 'unreferenced-attachment');
+    return { ops, blocked: blockedAttachments };
+  }
+  return { ops: [...ops, ...attachmentOps], blocked: [] };
 }

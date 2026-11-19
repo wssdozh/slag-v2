@@ -62,7 +62,12 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // An attachment pass has nothing to do with the note state hash: it must get past the
       // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
       // A request for missing bytes changes no note either, so it opens the gate the same way.
+      // A forced full push is the same story and used to be the bug: the flag was read below this
+      // return, so a vault that agreed with its own checkpoint never resent anything — neither
+      // after a manifest divergence nor after the relay admitted its history no longer covers our
+      // cursor. The gate asked "did anything change locally", and the answer was no.
       if (
+        !engine.forceFullPush &&
         !engine.attachmentPass &&
         !engine.hasPendingAttachmentRequests() &&
         lastSyncedHash === stateHash &&

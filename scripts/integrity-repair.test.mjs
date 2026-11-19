@@ -94,11 +94,55 @@ test('ghosts, empty folders and old trash each become their own op', () => {
 
 test('manual findings are never planned and never blocked', () => {
   const plan = planRepair(
-    [finding('unreferenced-attachment', { path: 'stat.webp' }), finding('folder-missing', { path: 'x/a.md' })],
+    [finding('broken-frontmatter', { path: 'x/broken.md' }), finding('folder-missing', { path: 'x/a.md' })],
     snapshot([{ path: 'x/a.md', id: 'item_4' }]),
   );
   assert.deepEqual(plan.ops, []);
   assert.deepEqual(plan.blocked, []);
+});
+
+test('an orphaned attachment is moved into the hygiene trash, not deleted', () => {
+  const plan = planRepair(
+    [finding('unreferenced-attachment', { path: 'att_1_shot.webp' })],
+    snapshot([{ path: 'Входящие/note.md', id: 'item_1' }], { attachmentFiles: ['att_1_shot.webp'] }),
+  );
+
+  assert.deepEqual(plan.ops, [
+    {
+      kind: 'move',
+      findingId: 'unreferenced-attachment:att_1_shot.webp',
+      from: '.attachments/att_1_shot.webp',
+      to: '.trash/.hygiene/run/attachments/att_1_shot.webp',
+      note: 'вложение att_1_shot.webp в архив чистки',
+    },
+  ]);
+  assert.deepEqual(plan.blocked, []);
+});
+
+test('attachments have their own ceiling, far above the note one', () => {
+  const many = Array.from({ length: 60 }, (_, i) => finding('unreferenced-attachment', { path: `att_${i}.webp` }));
+
+  // Sixty orphaned files is under the attachment ceiling, so the same plan the note ceiling would
+  // have refused outright goes through.
+  const planned = planRepair(many, snapshot([{ path: 'a.md', id: 'item_1' }]), { maxActions: 50 });
+  assert.equal(planned.ops.length, 60);
+  assert.deepEqual(planned.blocked, []);
+
+  const refused = planRepair(many, snapshot([{ path: 'a.md', id: 'item_1' }]), { maxAttachments: 10 });
+  assert.deepEqual(refused.ops, []);
+  assert.equal(refused.blocked.length, 60);
+});
+
+test('a mass note event takes the attachments down with it', () => {
+  const notes = Array.from({ length: 60 }, (_, i) => finding('empty-folder', { path: `f/${i}` }));
+  const plan = planRepair(
+    [...notes, finding('unreferenced-attachment', { path: 'att_1.webp' })],
+    snapshot(Array.from({ length: 400 }, (_, i) => ({ path: `n/${i}.md`, id: `i${i}` })), { attachmentFiles: ['att_1.webp'] }),
+    { maxActions: 50 },
+  );
+
+  assert.deepEqual(plan.ops, []);
+  assert.equal(plan.blocked.length, 61);
 });
 
 test('an empty vault of findings is an empty plan', () => {

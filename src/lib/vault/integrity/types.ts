@@ -36,7 +36,11 @@ export const FIX_KIND_BY_SCANNER: Record<ScannerId, FixKind> = {
   'ghost-folder': 'safe',
   'empty-folder': 'safe',
   'broken-frontmatter': 'manual',
-  'unreferenced-attachment': 'manual',
+  // A file nobody names is weight, and the sweep does not delete it: it moves it into the hygiene
+  // trash, where a wrong guess costs one copy back. The ordering rule lives outside the scanner —
+  // a file another device's note still names is only discovered after the two devices agree, which
+  // is why the sweep runs after a manifest reconciliation, never before.
+  'unreferenced-attachment': 'safe',
   'trash-aging': 'safe',
 };
 
@@ -123,10 +127,17 @@ export interface RepairPlan {
 }
 
 export interface RepairOptions {
-  /** Hard ceiling on ops per run: a mass finding is a reason to look, not to sweep. */
+  /** Hard ceiling on note ops per run: a mass finding is a reason to look, not to sweep. */
   maxActions?: number;
   /** Share of notes a run may touch. Past it the whole run is report-only. */
   maxShare?: number;
+  /**
+   * Ceiling on attachment ops. Separate from `maxActions` on purpose: two hundred orphaned files
+   * are a normal vault after a few years of pasted screenshots, while fifty moved notes are an
+   * event. A share rule would be wrong here too — most of a vault's `.attachments/` being unnamed
+   * is a Monday, not a symptom.
+   */
+  maxAttachments?: number;
   /** Vault-relative directory the moved files land in. Default: `.trash/.hygiene`. */
   hygieneRoot?: string;
   /** One run's own directory under `hygieneRoot`, so two sweeps never overwrite each other. */

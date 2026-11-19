@@ -1,6 +1,8 @@
 // The storage panel's state: run a check, hand the plan to the repair, keep the last report.
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { Finding, IntegrityStatus, RepairPlan } from '../../lib/vault/integrity/types';
+import type { ManifestStatus } from '../../lib/sync/types';
+import { syncEngine } from '../../lib/sync/syncEngine';
 import { applyIntegrityRepair, runIntegrityCheck } from '../../lib/storage/integrityService';
 
 export interface UseIntegrity {
@@ -10,8 +12,15 @@ export interface UseIntegrity {
   plan: RepairPlan | null;
   lastScan: string | null;
   message: string | null;
+  /** The last comparison with the room. `null` until the engine has run one. */
+  remote: ManifestStatus | null;
   verify(): Promise<void>;
   repair(dryRun: boolean): Promise<void>;
+}
+
+/** One subscription for the whole app: the engine notifies every listener on every status change. */
+function subscribeToEngine(onChange: () => void): () => void {
+  return syncEngine.subscribe(() => onChange());
 }
 
 export function useIntegrity(): UseIntegrity {
@@ -21,6 +30,9 @@ export function useIntegrity(): UseIntegrity {
   const [plan, setPlan] = useState<RepairPlan | null>(null);
   const [lastScan, setLastScan] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // The engine keeps the same object between checks, so this reads the room's answer without
+  // copying it per render and without the panel having to press «сверить» to see it.
+  const remote = useSyncExternalStore(subscribeToEngine, () => syncEngine.getManifest(), () => null);
 
   const verify = useCallback(async () => {
     setBusy(true);
@@ -70,5 +82,5 @@ export function useIntegrity(): UseIntegrity {
     [plan],
   );
 
-  return { busy, findings, status, plan, lastScan, message, verify, repair };
+  return { busy, findings, status, plan, lastScan, message, remote, verify, repair };
 }

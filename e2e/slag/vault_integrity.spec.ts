@@ -21,6 +21,9 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   const panel = section.getByTestId('integrity-panel');
   await expect(panel).toBeVisible();
   await expect(panel).toContainText('ещё не сверяли');
+  // The room's own line: no engine has run a check in a browser, and saying "сходится" without a
+  // comparison would be the same lie the sweep refuses to tell.
+  await expect(panel.getByTestId('integrity-remote')).toContainText('сервер: нет данных');
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${SHOT_DIR}/vault-integrity.png` });

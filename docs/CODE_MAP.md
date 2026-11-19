@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **600**, строк: **105956**, зон: **48**.
+Модулей: **601**, строк: **106376**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,7 +12,7 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1733 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1294 | 19 |
+| `src/lib/sync/syncEngine.ts` | 1353 | 21 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/storage/index.ts` | 924 | 44 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
@@ -20,13 +20,13 @@
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 815 | 1 |
-| `src/context/AppContext.tsx` | 792 | 70 |
+| `src/context/AppContext.tsx` | 797 | 70 |
 | `src/mcp/vault.ts` | 780 | 6 |
-| `src/lib/storage/vaultFiles.ts` | 744 | 2 |
+| `src/lib/storage/vaultFiles.ts` | 779 | 2 |
 | `src/components/Feed/Composer.tsx` | 733 | 4 |
 | `src/types/index.ts` | 689 | 221 |
 
-## e2e (playwright) — 123 файлов, 23219 строк
+## e2e (playwright) — 123 файлов, 23222 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -262,7 +262,7 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 434 | 2 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
-## src/components/Settings — 48 файлов, 5283 строк
+## src/components/Settings — 48 файлов, 5322 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -304,8 +304,8 @@
 | `UpdatesSettingsTab.tsx` | 326 | 1 | UpdatesSettingsTab | The "Обновления" tab: what is installed, what is on GitHub, and the one butto… |
 | `vault/BackupSection.tsx` | 129 | 1 | BackupSection | «бэкапы»: the daily autobackup setting and the restore points it produces. |
 | `vault/integrity/IntegrityFindingCard.tsx` | 60 | 1 | IntegrityFindingCard | Карточка одной находки сканера — вынесена, чтобы панель не распухала. |
-| `vault/integrity/IntegrityPanel.tsx` | 197 | 1 | IntegrityPanelProps, IntegrityPanel | Панель «Состояние хранилища» — сверка целостности и отчёт о находках. |
-| `vault/integrity/IntegritySection.tsx` | 29 | 1 | IntegritySection | «состояние хранилища»: сверка по манифесту и уборка того, что можно убрать бе… |
+| `vault/integrity/IntegrityPanel.tsx` | 235 | 1 | IntegrityPanelProps, IntegrityPanel | Панель «Состояние хранилища» — сверка целостности и отчёт о находках. |
+| `vault/integrity/IntegritySection.tsx` | 30 | 1 | IntegritySection | «состояние хранилища»: сверка по манифесту и уборка того, что можно убрать бе… |
 | `vault/integrity/severityLabel.ts` | 23 | 1 | severityLabel | Подписи и цвета важности находок. Цвета — из токенов темы, никаких выдуманных… |
 | `vault/sections.ts` | 11 | 2 | VaultSection, VAULT_SECTIONS | The three blocks of the vault tab, named once: the rail shows them as nested … |
 | `vault/StorageSection.tsx` | 33 | 1 | StorageSection | «хранилище»: how much the store occupies and where its folders live on disk. |
@@ -396,25 +396,25 @@
 | `useDockPanels.ts` | 272 | 1 | UseDockPanelsOptions, useDockPanels | Dockview wiring: default layout, panel creation, tab menus, and saving the la… |
 | `WorkspaceShell.tsx` | 289 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 
-## src/config — 9 файлов, 453 строк
+## src/config — 9 файлов, 458 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 87 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 | Default endpoints, models and size limits for every AI provider the app can r… |
-| `index.ts` | 8 | 95 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
+| `index.ts` | 8 | 96 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
 | `search.ts` | 10 | 1 | SEARCH_LIMITS | Tuning for the Orama index and the palette: result counts, typo tolerance, te… |
 | `settingsTabs.ts` | 47 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel | Names and orders the settings sections once, so desktop and mobile cannot dri… |
 | `site.ts` | 4 | 2 | SITE_URL | Address of the public site, which lives in its own repository: the app build … |
 | `storage.ts` | 98 | 5 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
-| `sync.ts` | 53 | 3 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
+| `sync.ts` | 58 | 3 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
-## src/context — 2 файлов, 1031 строк
+## src/context — 2 файлов, 1036 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 792 | 70 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `AppContext.tsx` | 797 | 70 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
 | `appContext.types.ts` | 239 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 90 строк
@@ -478,14 +478,14 @@
 | `useAttachmentSrc.ts` | 63 | 12 | AttachmentSrcs, AttachmentSources, useAttachmentSrcs, useAttachmentSrc | Resolves attachment ids to object URLs on demand, keeping media bytes out of … |
 | `useComposerMedia.ts` | 204 | 1 | UseComposerMediaOptions, useComposerMedia | Composer's record controls: hold or lock, audio/video switch, finish and send. |
 
-## src/hooks/ui — 6 файлов, 477 строк
+## src/hooks/ui — 6 файлов, 489 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useAssistantActions.ts` | 90 | 1 | useAssistantActions | Applies an action tapped under a telegram answer, and tells the relay what it… |
 | `useDeepLink.ts` | 38 | 1 | useDeepLink | Opens the note an external `slag://` link points at. |
 | `useGlobalHotkeys.ts` | 55 | 1 | useGlobalHotkeys | Routes keydown through the APP_COMMANDS catalogue and the top-layer Escape. |
-| `useIntegrity.ts` | 75 | 1 | UseIntegrity, useIntegrity | The storage panel's state: run a check, hand the plan to the repair, keep the… |
+| `useIntegrity.ts` | 87 | 1 | UseIntegrity, useIntegrity | The storage panel's state: run a check, hand the plan to the repair, keep the… |
 | `useLayerStack.ts` | 123 | 1 | AppLayer, useLayerStack | LIFO dismiss stack shared by Escape and Android/browser back, synced to histo… |
 | `usePresence.ts` | 96 | 30 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
 
@@ -540,7 +540,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `logger.ts` | 555 | 69 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
+| `logger.ts` | 555 | 70 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
 | `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 
 ## src/lib/media — 17 файлов, 2009 строк
@@ -591,10 +591,10 @@
 | `secretFileBackend.ts` | 89 | 1 | hasSecretEnvelopes, fileEnvelopeStore | Native ciphertext at rest: one flat map of `secretKey → { v, iv, data }` in `… |
 | `secretStore.ts` | 266 | 8 | SECRET_KEYS, SecretBackend, installSecretBackend, initSecretStore, getCachedSecret, +3 | One place for sync secrets at rest. Desktop uses the OS keychain; a build wit… |
 | `updateChannel.ts` | 27 | 2 | DEFAULT_UPDATE_CHANNEL, UPDATE_CHANNEL_OPTIONS, normalizeUpdateChannel, readUpdateChannel, writeUpdateChannel | Which release stream this install follows. The choice is device-local on purp… |
-| `windowControls.ts` | 379 | 18 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
+| `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 32 | 2 | writeJsonAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
 
-## src/lib/storage — 29 файлов, 6332 строк
+## src/lib/storage — 29 файлов, 6371 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -605,12 +605,12 @@
 | `index.ts` | 924 | 44 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 158 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
-| `integrityService.ts` | 155 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
+| `integrityService.ts` | 159 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
 | `integrityStore.ts` | 90 | 1 | encodeIndex, decodeIndex, encodeLeaves, decodeLeaves, integrityDir, +4 | The integrity index: a tiny inline summary, a bulk leaves file, and the codec… |
 | `legacyJson.ts` | 18 | 3 | parseLegacyJson | The JSON an older build left in the webview profile. Every module that moves … |
 | `legacyProfile.ts` | 438 | 1 | LegacyVaultSection, LegacyVaultKey, LegacyKeySplit, splitLegacyKeys, importLegacyProfile | The one-off move off the webview profile. |
 | `noteRemoval.ts` | 25 | 1 | notesRemovedByImport | Which files a synced import takes off the disk. |
-| `port.ts` | 76 | 5 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
+| `port.ts` | 76 | 6 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
 | `prefs.ts` | 214 | 23 | PrefsBackend, PrefsProfileBackend, initPrefs, getPref, setPref, +3 | Preferences: the one place settings live, wherever they came from. |
 | `prefsBackend.browser.ts` | 42 | 1 | prefsBackend | Browser settings: `localStorage`, the same keys and the same strings that wer… |
 | `prefsBackend.native.ts` | 60 | 1 | prefsBackend | Native settings: one JSON object of key → string in `<AppData>/settings.json`. |
@@ -620,7 +620,7 @@
 | `trashStore.ts` | 79 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 744 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultFiles.ts` | 779 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 181 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
@@ -628,14 +628,14 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 30 файлов, 7976 строк
+## src/lib/sync — 31 файлов, 8247 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `account.ts` | 677 | 29 | accountClient, generateMnemonic, AccountDevice, AccountDeviceInput, AccountInfo, +19 | The sync account: session and sign-in, what the plan is, and the device ident… |
 | `accountCrypto.ts` | 266 | 6 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
 | `accountTypes.ts` | 217 | 13 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +19 | Shapes of the relay account API: plans, devices, vault grants and invitations. |
-| `apiBase.ts` | 5 | 3 | apiBase | The relay address without trailing slashes: every request path starts with on… |
+| `apiBase.ts` | 5 | 4 | apiBase | The relay address without trailing slashes: every request path starts with on… |
 | `applyBundle.ts` | 437 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 7 | 2 | attachmentSignature | Cheap identity for an attachment: name plus size, enough to spot a stale copy. |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
@@ -649,18 +649,19 @@
 | `index.ts` | 6 | 3 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine | Barrel: re-exports the sync protocol, crypto, pairing and engine for lib/sync… |
 | `itemDeletions.ts` | 33 | 1 | ItemDeletion, deletionsFromOutbox | Which notes a push announces as gone. |
 | `localBookkeeping.ts` | 533 | 6 | SYNC_SECTION, SyncScope, stateHashKey, tombstonesKey, sentHashesKey, +32 | What this device sent, knows and deleted — read from `state.json`'s `sync` se… |
-| `manifestChannel.ts` | 170 | 0 | WIRE_VERSION, MAX_WIRE_BYTES, toWire, parseWire, wireToText, +4 | How a manifest crosses the wire: shape, validation, comparison. |
+| `manifestChannel.ts` | 204 | 1 | WIRE_VERSION, MAX_WIRE_BYTES, toWire, parseWire, wireToText, +6 | How a manifest crosses the wire: shape, validation, comparison. |
+| `manifestSync.ts` | 156 | 1 | syncManifest | The room's own copy of this vault's manifest: publish ours, read the neighbou… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `presence.ts` | 28 | 1 | DevicePresence, devicePresence | Who is actually on the line right now. The relay touches a device's `lastSeen… |
-| `pushBundle.ts` | 370 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
-| `syncConfig.ts` | 220 | 2 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1294 | 19 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `pushBundle.ts` | 375 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
+| `syncConfig.ts` | 220 | 3 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
+| `syncEngine.ts` | 1353 | 21 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 44 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
 | `transport.ts` | 269 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
-| `types.ts` | 147 | 24 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, SyncStatus, +10 | Shared sync types: device profile, connection state, subscription and status … |
+| `types.ts` | 164 | 26 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestStatus, +11 | Shared sync types: device profile, connection state, subscription and status … |
 | `vaultSharing.ts` | 85 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
 
 ## src/lib/tasks — 2 файлов, 164 строк
@@ -689,7 +690,7 @@
 | `recurrenceHelper.ts` | 306 | 6 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
 | `todoistTaskParser.ts` | 429 | 12 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +2 | Parses Todoist-style quick input into title, due date, tags, priority, durati… |
 
-## src/lib/vault — 18 файлов, 1976 строк
+## src/lib/vault — 18 файлов, 2022 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -699,11 +700,11 @@
 | `folderPaths.ts` | 38 | 4 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 | Folder names are file names on disk, so the OS-forbidden characters become da… |
 | `folderTree.ts` | 153 | 8 | FolderNode, FolderTreeRow, FolderDropMode, folderName, folderRank, +5 | The folder hierarchy and the order it is drawn in: one tree for the sidebar, … |
 | `integrity/fingerprint.ts` | 75 | 1 | canonicalJson, fingerprint, sha256Hex | One line per note that a device can compare byte for byte. |
-| `integrity/manifest.ts` | 95 | 1 | buildManifest, compare | A vault reduced to three levels of hashes: one line per note, one per folder,… |
-| `integrity/repair.ts` | 100 | 1 | planRepair | What a sweep would do, decided before anything is touched. |
+| `integrity/manifest.ts` | 95 | 2 | buildManifest, compare | A vault reduced to three levels of hashes: one line per note, one per folder,… |
+| `integrity/repair.ts` | 135 | 1 | planRepair | What a sweep would do, decided before anything is touched. |
 | `integrity/scanners.ts` | 253 | 1 | scanDuplicateIds, scanPathMismatch, scanFolderMissing, scanGhostFolders, scanEmptyFolders, +5 | The scans themselves: what a vault looks like when it has quietly filled with… |
 | `integrity/snapshot.ts` | 217 | 2 | FolderEntry, VaultReader, DiskNote, VaultSnapshot, buildSnapshot | Build a VaultSnapshot from a VaultReader abstraction. |
-| `integrity/types.ts` | 195 | 15 | Severity, FixKind, ScannerId, FIX_KIND_BY_SCANNER, Finding, +14 | What a storage check finds, and what fixing it would do. |
+| `integrity/types.ts` | 206 | 16 | Severity, FixKind, ScannerId, FIX_KIND_BY_SCANNER, Finding, +14 | What a storage check finds, and what fixing it would do. |
 | `itemSchema.ts` | 46 | 1 | PropertySchemaItem, ITEM_MUTABLE_PROPERTIES, ITEM_UPDATES_SCHEMA | Single Source of Truth (SSOT) metadata registry for SlagItem mutable fields. |
 | `itemUpdates.ts` | 70 | 2 | applyItemUpdates | Applies a partial update to an item without touching storage. |
 | `markdownSerializer.ts` | 205 | 5 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |

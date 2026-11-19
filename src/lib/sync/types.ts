@@ -29,6 +29,22 @@ export interface SubscriptionInfo {
   isExpiringSoon?: boolean;
 }
 
+/**
+ * The last manifest check: this device's root, the room's root, and what was done about it.
+ *
+ * `remoteRoot: null` means the room had nothing to answer with — not "we agree". `action` is the
+ * decision the engine took: `none` (equal or nothing to compare), `reconcile` (one full resend was
+ * scheduled) or `report` (diverged, and a resend against this same peer state already happened).
+ */
+export interface ManifestStatus {
+  at: string;
+  root: string;
+  remoteRoot: string | null;
+  inSync: boolean;
+  folders: string[];
+  action: 'none' | 'reconcile' | 'report';
+}
+
 export interface SyncStatus {
   initialSync: { vaultId: string; state: 'idle' | 'loading' | 'ready' | 'error'; processed: number; rejected: number };
   state: SyncConnectionState;
@@ -41,6 +57,7 @@ export interface SyncStatus {
   connectedDevicesCount: number;
   currentRoomId: string | null;
   subscription: SubscriptionInfo;
+  manifest?: ManifestStatus;
 }
 
 export interface SyncConfig {

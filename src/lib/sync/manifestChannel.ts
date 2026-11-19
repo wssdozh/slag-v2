@@ -91,6 +91,14 @@ export function wireToText(wire: WireManifest): string {
 }
 
 /**
+ * What the relay will count. Bytes, not characters: a vault of Russian folder names is twice the
+ * size on the wire that `text.length` suggests, and the relay's 413 is about bytes.
+ */
+export function wireBytes(wire: WireManifest): number {
+  return byteLength(wireToText(wire));
+}
+
+/**
  * Text back into a manifest, or `null`.
  *
  * Size is checked before parsing: a payload that cannot be a manifest is not worth JSON.parse.
@@ -156,6 +164,40 @@ export function leavesToRequest(report: DriftReport, wire: WireManifest): string
 }
 
 /**
+ * What a device does about the room's manifest.
+ *
+ * `reconcile` means one full resend. The relay keeps only the root and the folders, so a mismatch
+ * names no note that could be pulled: the honest repair is "send everything once", not "fetch the
+ * five notes". `report` is the end of the line — the divergence is real and a second resend against
+ * the same peer state cannot fix it, so the panel says so and nothing loops.
+ */
+export interface ManifestDecision {
+  action: 'none' | 'reconcile' | 'report';
+  drift: DriftReport | null;
+}
+
+/**
+ * The decision, in the order that makes each step safe to repeat.
+ *
+ * `remote === null` is "nobody answered", not a mismatch: our own manifest is already written and
+ * there is nothing to compare against. `reconciledRoot` is the anti-loop latch — the root this
+ * device already resent against once.
+ */
+export function decideManifest(
+  local: Manifest,
+  remote: WireManifest | null,
+  state: { reconciledRoot: string | null; receiveOnly: boolean },
+): ManifestDecision {
+  if (remote === null) return { action: 'none', drift: null };
+
+  const drift = diffWire(local, remote);
+  if (drift.rootMatch) return { action: 'none', drift };
+  if (state.receiveOnly) return { action: 'report', drift };
+  if (state.reconciledRoot === remote.root) return { action: 'report', drift };
+  return { action: 'reconcile', drift };
+}
+
+/**
  * One line for the log: version, counts, size. Never a hash.
  *
  * A manifest is fingerprints of vault contents; the log is copied around and shipped in bug
@@ -164,6 +206,5 @@ export function leavesToRequest(report: DriftReport, wire: WireManifest): string
 export function describeWire(wire: WireManifest): string {
   const folders = Object.keys(wire.folders).length;
   const leaves = wire.leaves === undefined ? 'не присланы' : String(Object.keys(wire.leaves).length);
-  const bytes = byteLength(wireToText(wire));
-  return `манифест v${wire.v}: папок ${folders}, листьев ${leaves}, ${bytes} байт`;
+  return `манифест v${wire.v}: папок ${folders}, листьев ${leaves}, ${wireBytes(wire)} байт`;
 }

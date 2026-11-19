@@ -67,11 +67,14 @@ function backupStateFile(vaultDir, runRoot) {
 }
 
 /**
- * Two namespaces meet here: a note path is relative to `notes/`, while the trash and the hygiene
- * directory sit beside it. One rule keeps them apart — anything under `.trash/` is vault-relative.
+ * Two namespaces meet here: a note path is relative to `notes/`, while the trash, the attachments
+ * and the hygiene directory sit beside it. One rule keeps them apart — anything under `.trash/` or
+ * `.attachments/` is vault-relative.
  */
 function absoluteIn(vaultDir, path) {
-  return path.startsWith('.trash/') ? join(vaultDir, path) : join(vaultDir, 'notes', path);
+  return path.startsWith('.trash/') || path.startsWith('.attachments/')
+    ? join(vaultDir, path)
+    : join(vaultDir, 'notes', path);
 }
 
 function applyPlan(plan, vaultDir, runRoot) {

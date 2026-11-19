@@ -204,7 +204,7 @@ export function scanUnreferencedAttachments(snapshot: VaultSnapshot): Finding[] 
     if (referenced.has(name)) continue;
     findings.push(
       finding('unreferenced-attachment', name, `на вложение «${name}» никто не ссылается`, 'файл едет в синке и в бэкапах, но открыть его из заметки нельзя — это чистый вес', {
-        action: 'проверить глазами: возможно, файл нужен снаружи',
+        action: 'убрать в архив чистки',
       }),
     );
   }

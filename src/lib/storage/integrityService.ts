@@ -37,10 +37,14 @@ function notesPathOf(): string {
   return `vaults/${dirName}/notes`;
 }
 
-/** Anything under `.trash/` is vault-relative; a note path is relative to `notes/`. */
+/**
+ * Three namespaces meet here: a note path is relative to `notes/`, and both the trash and the
+ * attachments sit beside it. One rule keeps them apart — anything under `.trash/` or `.attachments/`
+ * is vault-relative.
+ */
 function absoluteIn(notesPath: string, path: string): string {
   const root = notesPath.replace(/[/\\]notes$/, '');
-  return path.startsWith('.trash/') ? `${root}/${path}` : `${notesPath}/${path}`;
+  return path.startsWith('.trash/') || path.startsWith('.attachments/') ? `${root}/${path}` : `${notesPath}/${path}`;
 }
 
 export async function runIntegrityCheck(): Promise<IntegrityRun> {

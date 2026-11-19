@@ -150,6 +150,7 @@ export class VaultFiles {
 
   public async syncCurrentVaultFs(): Promise<boolean> {
     if (!isTauri()) return false;
+    const startedAt = performance.now();
     try {
       const notesPath = this.getVaultNotesPath();
       const trashPath = this.getVaultTrashPath();
@@ -160,7 +161,9 @@ export class VaultFiles {
       // from these directories.
       await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
 
+      const notesStartedAt = performance.now();
       const loadedItems = await this.scanNotesDir(notesPath);
+      const notesMs = performance.now() - notesStartedAt;
       if (loadedItems.length > 0) {
         this.deps.cacheItems(this.deps.getItemsKey(), loadedItems);
         fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.vault.name}" from ${notesPath}`);
@@ -172,21 +175,40 @@ export class VaultFiles {
       }
 
       // The trash list is the `.trash/` snapshot, exactly as the notes list is the `notes/` one:
-      // a note deleted in an earlier session still has to be restorable.
-      const trashedItems = await this.scanTrashDir();
+      // a note deleted in an earlier session still has to be restorable. Three independent reads,
+      // one wait: the trash, the directory tree and the folder metadata never look at each other,
+      // and running them in sequence was most of the start-up.
+      const sideStartedAt = performance.now();
+      const [trashedItems, folderPaths, folderMeta] = await Promise.all([
+        this.scanTrashDir(),
+        this.listFolderPaths(),
+        this.readFoldersMeta(),
+      ]);
+      const sideMs = performance.now() - sideStartedAt;
       this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
       fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
 
       // After the notes: a note that lands on disk creates its folder, and the list read before that
       // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
       // the list came from the disk, so there is nothing to write back to it.
-      const folders = folderMetaFor(await this.listFolderPaths(), await this.readFoldersMeta(), DEFAULT_INBOX_FOLDER);
+      const folders = folderMetaFor(folderPaths, folderMeta, DEFAULT_INBOX_FOLDER);
       this.deps.persistFolders(folders, 'external');
       fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
 
       if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) {
         await this.flushStateToDisk();
       }
+      // One line with the numbers, because "the start feels slow" is not a measurement: the notes,
+      // the side reads and the total answer which of them to touch next.
+      fsLog.info('Vault read from disk', {
+        vault: this.vault.id,
+        notes: loadedItems.length,
+        trashed: trashedItems.length,
+        folders: folders.length,
+        notesMs: Math.round(notesMs),
+        sideMs: Math.round(sideMs),
+        totalMs: Math.round(performance.now() - startedAt),
+      });
       return true;
     } catch (err) {
       fsLog.error(`Failed to sync vault "${this.vault.name}" in AppData:`, err);
@@ -412,19 +434,32 @@ export class VaultFiles {
       return [];
     }
 
+    const files = entries.filter((entry) => !entry.isDirectory && entry.name.endsWith('.md'));
     const items: SlagItem[] = [];
-    for (const entry of entries) {
-      if (entry.isDirectory || !entry.name.endsWith('.md')) continue;
-      const subPath = `${trashPath}/${entry.name}`;
-      try {
-        const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
-        // The folder comes from the frontmatter; the inbox is only a fallback for a file written
-        // before a folder was part of the format.
-        const parsed = parseMarkdownToItem(content, entry.name.replace(/\.md$/, ''), DEFAULT_INBOX_FOLDER);
-        parsed.filename = entry.name;
-        items.push(parsed);
-      } catch (err) {
-        fsLog.warn(`Failed to read trashed note ${subPath}:`, err);
+    // Bounded parallelism, same as the notes scan: every `readTextFile` is one IPC round trip, and
+    // a vault with a few hundred trashed notes spent over a second here one file at a time. Batches
+    // keep the read order, so ties on `updatedAt` still sort the way the serial loop left them.
+    const CONCURRENCY = 8;
+    for (let i = 0; i < files.length; i += CONCURRENCY) {
+      const batch = files.slice(i, i + CONCURRENCY);
+      const parsed = await Promise.all(
+        batch.map(async (entry) => {
+          const subPath = `${trashPath}/${entry.name}`;
+          try {
+            const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
+            // The folder comes from the frontmatter; the inbox is only a fallback for a file written
+            // before a folder was part of the format.
+            const item = parseMarkdownToItem(content, entry.name.replace(/\.md$/, ''), DEFAULT_INBOX_FOLDER);
+            item.filename = entry.name;
+            return item;
+          } catch (err) {
+            fsLog.warn(`Failed to read trashed note ${subPath}:`, err);
+            return null;
+          }
+        }),
+      );
+      for (const item of parsed) {
+        if (item) items.push(item);
       }
     }
     return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));

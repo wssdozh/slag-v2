@@ -33,6 +33,7 @@ import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
 import { syncErrorText } from './errorText';
 import { SyncTransport } from './transport';
+import { syncManifest } from './manifestSync';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
   applyAccountDevices,
@@ -66,6 +67,7 @@ import type {
   DeviceProfile,
   DeviceSyncMode,
   AttachmentRequestPayload,
+  ManifestStatus,
 } from './types';
 import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, AssistantMode } from '../../types';
 import {
@@ -170,6 +172,15 @@ export class SyncEngine {
 
   private pushDebounceDeadline = 0;
   private pushDebounceTrailing = false;
+  /** The root this device last put in the room, so an unchanged vault makes no request. */
+  public manifestPostedRoot: string | null = null;
+  /**
+   * The room root this device already resent against. The anti-loop latch: a divergence that a
+   * full resend did not fix is reported, never resent again against the same peer state.
+   */
+  public manifestReconcileRoot: string | null = null;
+  private manifestTimer: ReturnType<typeof setTimeout> | null = null;
+  private manifestDeadline = 0;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
   public importBuffer: {
     items: SlagItem[];
@@ -330,11 +341,25 @@ export class SyncEngine {
   }
 
   public getStatus(): SyncStatus {
+    const manifest = this.status.manifest;
     return {
       ...this.status,
       initialSync: { ...this.status.initialSync },
       subscription: computeSubscription(this),
+      // Copied like the fields above: the panel holds this object, and a status the engine keeps
+      // mutating under a render is how a listener sees half an update.
+      manifest: manifest ? { ...manifest, folders: [...manifest.folders] } : undefined,
     };
+  }
+
+  /**
+   * The same object until the next check replaces it.
+   *
+   * `getStatus` copies, which is right for a listener and wrong for `useSyncExternalStore`: a new
+   * snapshot every render reads as "it changed". This is the stable handle the panel subscribes to.
+   */
+  public getManifest(): ManifestStatus | null {
+    return this.status.manifest ?? null;
   }
 
   public subscribe(listener: (status: SyncStatus) => void): () => void {
@@ -370,6 +395,27 @@ export class SyncEngine {
 
   public getOutbox(): Outbox {
     return new Outbox(this.bookkeeping);
+  }
+
+  /**
+   * One manifest check, on the earliest deadline anybody asked for.
+   *
+   * A push confirms in a burst; the room's row keeps only the latest root, so checking after every
+   * bundle would double the request rate and learn nothing new. `init` asks for it immediately —
+   * that is the check that catches a device that fell behind while it was asleep.
+   */
+  public scheduleManifestCheck(delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS): void {
+    const deadline = Date.now() + delayMs;
+    if (this.manifestTimer) {
+      if (this.manifestDeadline <= deadline) return;
+      clearTimeout(this.manifestTimer);
+    }
+    this.manifestDeadline = deadline;
+    this.manifestTimer = setTimeout(() => {
+      this.manifestTimer = null;
+      this.manifestDeadline = 0;
+      void syncManifest(this);
+    }, delayMs);
   }
 
   /**
@@ -970,6 +1016,10 @@ export class SyncEngine {
       void this.requestMissingAttachments();
       await pushLocalChanges(this);
       this.scheduleAttachmentPass();
+      // After the pull and the push, not before: the root this device has *now* is the one worth
+      // comparing, and a check against the pre-pull state would report a divergence that the pull
+      // just fixed.
+      this.scheduleManifestCheck(0);
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
       const msg = syncErrorText(err, this.pullTimeoutMs);
@@ -1069,6 +1119,9 @@ export class SyncEngine {
     syncLog.info(`Bundle ${pending.bundleId} confirmed by relay (${pending.changes} changes)`);
     this.notify();
     this.scheduleAttachmentPass();
+    // Only after a change actually reached the room: the manifest is the check on what the room
+    // holds, and a push that never left has nothing to confirm.
+    this.scheduleManifestCheck();
   }
 
   public async deliverPushOverHttp(pending: PendingPush): Promise<void> {
@@ -1231,6 +1284,12 @@ export class SyncEngine {
     this.pushDebounceTimer = null;
     this.pushDebounceDeadline = 0;
     this.pushDebounceTrailing = false;
+    if (this.manifestTimer) clearTimeout(this.manifestTimer);
+    this.manifestTimer = null;
+    this.manifestDeadline = 0;
+    // A new room is a new row: the root this device published belongs to the room it left.
+    this.manifestPostedRoot = null;
+    this.manifestReconcileRoot = null;
     if (this.importTimer) clearTimeout(this.importTimer);
     this.importTimer = null;
     this.importBuffer = null;
