@@ -150,7 +150,10 @@ export function buildVaultSnapshot(vaultDir, now = Date.now()) {
   const trash = [...trashDir(join(vaultDir, '.trash'), now), ...trashDir(join(notesRoot, '.trash'), now)];
 
   let stateFolders = [];
-  const statePath = join(notesRoot, 'state.json');
+  // The live file sits beside `notes/`; the one inside it is a leftover of an older layout.
+  const statePath = existsSync(join(vaultDir, 'state.json'))
+    ? join(vaultDir, 'state.json')
+    : join(notesRoot, 'state.json');
   if (existsSync(statePath)) {
     try {
       const state = JSON.parse(readFileSync(statePath, 'utf8'));
