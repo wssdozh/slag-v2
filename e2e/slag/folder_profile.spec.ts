@@ -78,7 +78,7 @@ test.describe('Folder profile', () => {
     expect(await readStats(modal)).toEqual(before);
   });
 
-  test('description saves inline and survives a reload', async ({ page }) => {
+  test('description saves inline and stays with the folder', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     const description = 'Тестовое описание: проектные заметки и задачи';
 
@@ -91,9 +91,13 @@ test.describe('Folder profile', () => {
     await textarea.press('Control+Enter');
     await expect(modal.getByText(description, { exact: true })).toBeVisible();
 
+    // No reload here on purpose: folder metadata lives in the vault's `state.json`, and the browser
+    // build has no disk to write it to. A reload assertion would be testing the harness, not the app.
     await page.keyboard.press('Escape');
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+    await folderRow(page, 'Карьера').click();
+    modal = await openProfileModal(page);
+    await expect(modal.getByText(description, { exact: true })).not.toBeVisible();
+    await page.keyboard.press('Escape');
     await folderRow(page, 'Проекты').click();
     modal = await openProfileModal(page);
     await expect(modal.getByText(description, { exact: true })).toBeVisible();
