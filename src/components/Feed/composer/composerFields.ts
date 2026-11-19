@@ -63,6 +63,8 @@ export interface ComposerFields {
   reminder?: string;
   duration?: number;
   recurrence?: RecurrenceRule;
+  /** Unrecognised recurrence fragment — keep for UI to handle separately. */
+  unparsed?: { recurrence: string };
 }
 
 export function resolveComposerFields({
@@ -127,5 +129,6 @@ export function resolveComposerFields({
     reminder: nextReminder,
     duration: nextDuration,
     recurrence: nextRecurrence,
+    unparsed: parsed.unparsed,
   };
 }

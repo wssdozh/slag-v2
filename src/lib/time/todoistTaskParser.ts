@@ -15,6 +15,8 @@ export interface ParsedTodoistTask {
   rawMatchedDateText?: string;
   duration?: number; // in minutes (e.g. 15, 30, 45, 60, 90)
   recurrence?: RecurrenceRule;
+  /** Text that contains a recurrence marker but wasn't matched to any known pattern. */
+  unparsed?: { recurrence: string };
 }
 
 const WEEKDAY_MAP: Record<string, number> = {
@@ -84,40 +86,154 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
 
   // c) Recurrence parsing
   let recurrence: RecurrenceRule | undefined = undefined;
+  let recurrenceMarkerFound = false;
+
+  // helpers
+  function hasRecurrenceMarker(s: string): boolean {
+    return /(?:кажд\w*|раз\s+в|every|ежедневно|еженедельно|ежемесячно|ежегодно)/iu.test(s);
+  }
+
+  // Multi-day weekdays: "каждый понедельник и среду", "по пн и ср", "every monday and wednesday".
+  // One list matcher instead of one regex per wording: the names are matched longest-first, so
+  // "среду" cannot be eaten as "ср" and leave "еду" in the title.
+  if (!recurrence) {
+    const altDays = Object.keys(WEEKDAY_MAP).sort((a, b) => b.length - a.length).join('|');
+    const dayListRe = new RegExp(
+      '(?:^|\\s)(?:каждый|каждую|каждое|каждые|every|по)\\s+'
+        + '((?:' + altDays + ')(?:\\s*(?:,|и|and)\\s*(?:' + altDays + '))+)',
+      'i'
+    );
+    const dayList = dayListRe.exec(workingText);
+    if (dayList) {
+      const days = Array.from(new Set(
+        dayList[1]
+          .split(/,|\s+и\s+|\s+and\s+/i)
+          .map((part) => WEEKDAY_MAP[part.trim().toLowerCase()])
+          .filter((day): day is number => day !== undefined)
+      )).sort((a, b) => a - b);
+      if (days.length >= 2) {
+        recurrence = { freq: 'weekly', interval: 1, weekdays: days, resetSubtasks: true };
+        workingText = workingText.replace(dayList[0], ' ');
+        recurrenceMarkerFound = true;
+      }
+    }
+  }
 
   // Daily
-  if (/(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?:\b|\s|$)/i.test(workingText)) {
+  if (!recurrence && /(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?=$|[,\s.;:!?)»])/i.test(workingText)) {
     recurrence = { freq: 'daily', interval: 1, resetSubtasks: true };
-    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?:\b|\s|$)/gi, ' ');
+    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*день|ежедневно|every\s*day|daily)(?=$|[,\s.;:!?)»])/gi, ' ');
+    recurrenceMarkerFound = true;
   }
-  // Weekdays (Пн-Пт)
-  else if (/(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?:\b|\s|$)/i.test(workingText)) {
+
+  // Weekdays (Mon-Fri)
+  if (!recurrence && /(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?=$|[,\s.;:!?)»])/i.test(workingText)) {
     recurrence = { freq: 'weekdays', interval: 1, resetSubtasks: true };
-    workingText = workingText.replace(/(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?:\b|\s|$)/gi, ' ');
+    workingText = workingText.replace(/(?:^|\s)(?:по\s*будням|каждый\s*будний\s*день|every\s*weekday|weekdays)(?=$|[,\s.;:!?)»])/gi, ' ');
+    recurrenceMarkerFound = true;
   }
-  // Specific day of week (e.g. каждый вторник / every tuesday)
-  else {
-    const specificDayMatch = workingText.match(/(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*([а-яa-z]+)(?:\b|\s|$)/i);
+
+  // General weekly
+  if (!recurrence && /(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?=$|[,\s.;:!?)»])/i.test(workingText)) {
+    recurrence = { freq: 'weekly', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?=$|[,\s.;:!?)»])/gi, ' ');
+    recurrenceMarkerFound = true;
+  }
+
+  // Monthly
+  if (!recurrence && /(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?=$|[,\s.;:!?)»])/i.test(workingText)) {
+    recurrence = { freq: 'monthly', interval: 1, resetSubtasks: true };
+    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?=$|[,\s.;:!?)»])/gi, ' ');
+    recurrenceMarkerFound = true;
+  }
+
+  // Specific day of week: "каждый вторник" / "every tuesday"
+  if (!recurrence) {
+    const specificDayMatch = workingText.match(
+      /(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*([а-яa-z]+)(?![а-яё])/i
+    );
     if (specificDayMatch) {
       const rawDay = specificDayMatch[1].toLowerCase();
       const mappedWeekday = WEEKDAY_MAP[rawDay];
       if (mappedWeekday) {
         recurrence = { freq: 'weekly', interval: 1, weekdays: [mappedWeekday], resetSubtasks: true };
-        workingText = workingText.replace(/(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*[а-яa-z]+(?:\b|\s|$)/gi, ' ');
+        workingText = workingText.replace(/(?:^|\s)(?:кажд(?:ый|ую|ое|ые)|every)\s*[а-яa-z]+(?![а-яё])/gi, ' ');
+        recurrenceMarkerFound = true;
       }
     }
   }
 
-  // Weekly general
-  if (!recurrence && /(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?:\b|\s|$)/i.test(workingText)) {
-    recurrence = { freq: 'weekly', interval: 1, resetSubtasks: true };
-    workingText = workingText.replace(/(?:^|\s)(?:каждую\s*неделю|еженедельно|every\s*week|weekly)(?:\b|\s|$)/gi, ' ');
+  // Interval-based weekly via runtime builder to avoid escape warnings
+  if (!recurrence) {
+    const wkPats = [
+      '(?:каждые\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:недели|недель|нед))',
+      '(?:раз\\s*в\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:недели|недель|нед))',
+      '(?:каждый\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:недели|недель|нед))',
+      '(?:every\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:week|weeks))',
+    ].join('|');
+    const wkRe = new RegExp('(?:^|\\s)(?:' + wkPats + ')(?!\\S)', 'i');
+    const wm = wkRe.exec(workingText);
+    if (wm) {
+      const n = Math.round(parseFloat((wm[1]??wm[2]??wm[3]??wm[4]).replace(',', '.')));
+      if (n > 0) { recurrence = { freq: 'weekly', interval: n, resetSubtasks: true }; workingText = workingText.replace(wm[0], ' '); recurrenceMarkerFound = true; }
+    }
   }
 
-  // Monthly
-  if (!recurrence && /(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?:\b|\s|$)/i.test(workingText)) {
-    recurrence = { freq: 'monthly', interval: 1, resetSubtasks: true };
-    workingText = workingText.replace(/(?:^|\s)(?:каждый\s*месяц|ежемесячно|every\s*month|monthly)(?:\b|\s|$)/gi, ' ');
+  // Interval-based daily
+  if (!recurrence) {
+    const dyPats = [
+      '(?:каждые\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:дня|дней))',
+      '(?:раз\\s*в\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:дня|дней))',
+      '(?:каждый\\s+(\\d+(?:[.,]\\d+)?)\\s*день)',
+      '(?:every\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:day|days))',
+    ].join('|');
+    const dyRe = new RegExp('(?:^|\\s)(?:' + dyPats + ')(?!\\S)', 'i');
+    const dm = dyRe.exec(workingText);
+    if (dm) {
+      const n = Math.round(parseFloat((dm[1]??dm[2]??dm[3]??dm[4]).replace(',', '.')));
+      if (n > 0) { recurrence = { freq: 'daily', interval: n, resetSubtasks: true }; workingText = workingText.replace(dm[0], ' '); recurrenceMarkerFound = true; }
+    }
+  }
+
+  // Interval-based monthly
+  if (!recurrence) {
+    const moPats = [
+      '(?:каждые\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:месяца|месяцев|мес))',
+      '(?:раз\\s*в\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:месяца|месяцев|мес))',
+      '(?:каждый\\s+(\\d+(?:[.,]\\d+)?)\\s*месяц)',
+      '(?:every\\s+(\\d+(?:[.,]\\d+)?)\\s*(?:month|months))',
+    ].join('|');
+    const moRe = new RegExp('(?:^|\\s)(?:' + moPats + ')(?!\\S)', 'i');
+    const mm = moRe.exec(workingText);
+    if (mm) {
+      const n = Math.round(parseFloat((mm[1]??mm[2]??mm[3]??mm[4]).replace(',', '.')));
+      if (n > 0) { recurrence = { freq: 'monthly', interval: n, resetSubtasks: true }; workingText = workingText.replace(mm[0], ' '); recurrenceMarkerFound = true; }
+    }
+  }
+
+  // Special: "раз в полгода", "every half year" = monthly interval 6
+  if (!recurrence) {
+    const semiM = workingText.match(/(?:^|\s)(?:раз\s*в\s*полгода|half\s+(?:a\s*)?year)(?=$|[,\s.;:!?)»])/i);
+    if (semiM) {
+      recurrence = { freq: 'monthly', interval: 6, resetSubtasks: true };
+      workingText = workingText.replace(semiM[0], ' ');
+      recurrenceMarkerFound = true;
+    }
+  }
+
+  // Yearly
+  if (!recurrence) {
+    const yearM = workingText.match(/(?:^|\s)(?:каждый\s*год|каждый\s*годик|ежегодно|once\s*a\s*year|every\s*(?:single\s*)?year|yearly)(?=$|[,\s.;:!?)»])/i);
+    if (yearM) {
+      recurrence = { freq: 'yearly', interval: 1, resetSubtasks: true };
+      workingText = workingText.replace(yearM[0], ' ');
+      recurrenceMarkerFound = true;
+    }
+  }
+
+  // Unrecognised marker flag
+  if (!recurrence && hasRecurrenceMarker(workingText)) {
+    recurrenceMarkerFound = true;
   }
 
   // d) Duration parsing (e.g. "на 45 мин", "for 1h", "10:00-11:30")
@@ -126,7 +242,7 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   let rangeStartMinute: number | undefined = undefined;
 
   // 1. Time range in text: 10:00-11:30 or 10:00 - 11:30
-  const rangeMatch = workingText.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)\b/);
+  const rangeMatch = workingText.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*[-—]\s*([01]?\d|2[0-3]):([0-5]\d)(?![а-яё])/);
   if (rangeMatch) {
     const startH = parseInt(rangeMatch[1], 10);
     const startM = parseInt(rangeMatch[2], 10);
@@ -134,7 +250,10 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     const endM = parseInt(rangeMatch[4], 10);
     const startTotal = startH * 60 + startM;
     const endTotal = endH * 60 + endM;
-    duration = endTotal > startTotal ? endTotal - startTotal : 60;
+    // Night range: if end <= start, add 24 hours to end
+    let rawDur = endTotal > startTotal ? endTotal - startTotal : endTotal - startTotal + 1440;
+    rawDur = Math.min(rawDur, 1440); // ceiling 1440
+    duration = rawDur;
     rangeStartHour = startH;
     rangeStartMinute = startM;
     workingText = workingText.replace(rangeMatch[0], ' ');
@@ -142,12 +261,16 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
 
   // 2. Explicit duration phrases: "на 45 мин", "for 30m", "на 1.5 часа", "for 2h"
   if (duration === undefined) {
-    const minsMatch = workingText.match(/(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(м|мин|минут[а-я]*|m|min|mins|minutes)\b/i);
+    const minsMatch = workingText.match(
+      /(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(м|мин|минут[а-я]*|m|min|mins|minutes)(?![a-zа-яё])/i
+    );
     if (minsMatch) {
       duration = Math.round(parseFloat(minsMatch[1].replace(',', '.')));
       workingText = workingText.replace(minsMatch[0], ' ');
     } else {
-      const hoursMatch = workingText.match(/(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(ч|час[а-я]*|h|hr|hrs|hour|hours)\b/i);
+      const hoursMatch = workingText.match(
+        /(?:^|\s)(?:на|for)\s*(\d+(?:[.,]\d+)?)\s*(ч|час[а-я]*|h|hr|hrs|hour|hours)(?![a-zа-яё])/i
+      );
       if (hoursMatch) {
         duration = Math.round(parseFloat(hoursMatch[1].replace(',', '.')) * 60);
         workingText = workingText.replace(hoursMatch[0], ' ');
@@ -155,14 +278,29 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     }
   }
 
-  // e) Dates / Times (chrono-node)
+  // Validate duration: drop 0, NaN, Infinity; cap at 1440
+  if (duration !== undefined) {
+    if (!Number.isFinite(duration) || duration <= 0) {
+      duration = undefined;
+    } else {
+      duration = Math.min(duration, 1440);
+    }
+  }
+
+  // e) Dates / Times — chrono always runs regardless of recurrence marker presence
   let dueDate: string | undefined = undefined;
   let reminder: string | undefined = undefined;
   let hasTime = false;
   let rawMatchedDateText: string | undefined = undefined;
+  let unparsed: { recurrence: string } | undefined = undefined;
 
   const trimmedText = workingText.trim();
   if (trimmedText) {
+    // If known recurrence but no matching rule → flag as unparsed
+    if (recurrenceMarkerFound && !recurrence) {
+      unparsed = { recurrence: trimmedText };
+    }
+    // Always run chrono to extract dates/times (even when recurrence marker present)
     const isCyrillic = /[а-яё]/i.test(trimmedText);
     const chrono = isCyrillic ? chronoRu.casual : chronoEn.casual;
     const matches = chrono.parse(trimmedText, referenceDate, { forwardDate: true });
@@ -199,8 +337,11 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     }
   }
 
-  // f) Clean Title
-  const cleanText = workingText.replace(/\s+/g, ' ').trim();
+  // f) Clean Title — strip the punctuation the removed tokens left behind.
+  let cleanText = workingText.replace(/\s+/g, ' ').trim();
+  cleanText = cleanText.replace(/^[\s,;:.!?—–-]+/, '').replace(/[\s,;:]+$/, '');
+  cleanText = cleanText.replace(/\s+/g, ' ').trim();
+
   let cleanTitle = cleanText;
   if (cleanTitle) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
@@ -219,6 +360,7 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
     rawMatchedDateText,
     duration,
     recurrence,
+    unparsed,
   };
 }
 
