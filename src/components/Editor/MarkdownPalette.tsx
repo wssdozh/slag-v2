@@ -16,7 +16,6 @@ export const MarkdownPalette: React.FC<MarkdownPaletteProps> = ({
   onInsertMarkdown,
   onInsertTable,
   onAttachClick,
-  onAiDecompose,
   activeDropdown,
   onActiveDropdownChange,
 }) => {
@@ -323,16 +322,6 @@ export const MarkdownPalette: React.FC<MarkdownPaletteProps> = ({
           </button>
 
           <div className="h-3.5 w-px bg-tint-8 mx-0.5 shrink-0" />
-
-          {/* AI Sparkles */}
-          <button
-            type="button"
-            onClick={onAiDecompose}
-            className="p-1.5 rounded-md text-fg-secondary hover:text-purple-300 hover:bg-purple-500/10 motion-press cursor-pointer"
-            title="Разобрать через ИИ (папка и теги)"
-          >
-            <Icon name="system.ai" size="md" tone="inherit" />
-          </button>
 
           {/* Right Edge Divider */}
           <div className="h-4 w-px bg-tint-8 shrink-0" />

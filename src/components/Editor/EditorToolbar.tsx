@@ -13,8 +13,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   folder,
   onFolderChange,
   folderOptions,
-  type,
-  onTypeChange,
   selectedAttachment,
   onSelectAttachment,
   onRemoveAttachment,
@@ -25,7 +23,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onInsertMarkdown,
   onInsertTable,
   onAttachClick,
-  onAiDecompose,
   isZenMode,
   onToggleZenMode,
   isFullWidth,
@@ -73,8 +70,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           folder={folder}
           onFolderChange={onFolderChange}
           folderOptions={folderOptions}
-          type={type}
-          onTypeChange={onTypeChange}
           onClose={onClose}
         />
 
@@ -90,7 +85,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onInsertMarkdown={onInsertMarkdown}
           onInsertTable={onInsertTable}
           onAttachClick={onAttachClick}
-          onAiDecompose={onAiDecompose}
           activeDropdown={activeTopDropdown}
           onActiveDropdownChange={setActiveTopDropdown}
         />

@@ -15,8 +15,6 @@ export interface EditorToolbarProps {
   folder: string;
   onFolderChange: (folder: string) => void;
   folderOptions: Array<{ value: string; label: string; dividerBefore?: boolean }>;
-  type: SlagItemType;
-  onTypeChange: (type: SlagItemType) => void;
   selectedAttachment: SlagAttachment | undefined;
   onSelectAttachment: (id: string | null) => void;
   onRemoveAttachment: (id: string) => void;
@@ -32,7 +30,6 @@ export interface EditorToolbarProps {
   onInsertMarkdown: (prefix: string, suffix?: string) => void;
   onInsertTable: () => void;
   onAttachClick: () => void;
-  onAiDecompose: () => void;
   isZenMode: boolean;
   onToggleZenMode: () => void;
   isFullWidth?: boolean;
@@ -50,7 +47,7 @@ export interface EditorToolbarProps {
 
 export type EditorTopBarProps = Pick<
   EditorToolbarProps,
-  'folder' | 'onFolderChange' | 'folderOptions' | 'type' | 'onTypeChange' | 'onClose'
+  'folder' | 'onFolderChange' | 'folderOptions' | 'onClose'
 >;
 
 export type MarkdownPaletteProps = Pick<
@@ -65,7 +62,6 @@ export type MarkdownPaletteProps = Pick<
   | 'onInsertMarkdown'
   | 'onInsertTable'
   | 'onAttachClick'
-  | 'onAiDecompose'
 > & {
   itemId: string;
   activeDropdown: MarkdownDropdown | null;

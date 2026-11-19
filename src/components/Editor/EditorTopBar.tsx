@@ -1,18 +1,13 @@
-// Editor top row: back, folder selector, item type.
+// Editor top row: back and folder. The record type lives with the metadata, under the title.
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { Select } from '../UI/Select';
-import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
-import type { SlagItemType } from '../../types';
-import { ITEM_TYPE_OPTIONS } from './editorToolbarParts';
 import type { EditorTopBarProps } from './editorToolbarParts';
 
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   folder,
   onFolderChange,
   folderOptions,
-  type,
-  onTypeChange,
   onClose,
 }) => {
   return (
@@ -40,21 +35,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         options={folderOptions}
         className="max-w-[220px] md:max-w-[280px] h-7 text-xs font-mono"
       />
-
-      {/* Vertical Divider */}
-      <div className="h-4 w-px bg-tint-8 shrink-0 hidden sm:block" />
-
-      {/* Item Type: droplist, the same control the composer uses */}
-      <div className="hidden shrink-0 sm:block">
-        <ResponsiveSegmented<SlagItemType>
-          value={type}
-          onChange={onTypeChange}
-          options={ITEM_TYPE_OPTIONS}
-          compact
-          size="sm"
-          ariaLabel="Сменить тип записи"
-        />
-      </div>
     </div>
   );
 };

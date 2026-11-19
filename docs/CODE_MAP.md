@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **603**, строк: **106455**, зон: **48**.
+Модулей: **603**, строк: **106428**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -24,7 +24,7 @@
 | `src/lib/storage/vaultFiles.ts` | 788 | 2 |
 | `src/mcp/vault.ts` | 780 | 6 |
 | `src/components/Feed/Composer.tsx` | 735 | 4 |
-| `src/types/index.ts` | 686 | 220 |
+| `src/types/index.ts` | 686 | 219 |
 
 ## e2e (playwright) — 124 файлов, 23278 строк
 
@@ -94,21 +94,21 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 103 | 1 | QuickComposerWindow | The transparent quick-capture window: hosts the composer and resets between i… |
 
-## src/components/Editor — 13 файлов, 2775 строк
+## src/components/Editor — 13 файлов, 2748 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AttachmentStrip.tsx` | 237 | 1 | AttachmentStripProps, AttachmentStrip | The editor's attachment rail: reorder, remove, insert into the text, inline p… |
-| `EditorToolbar.tsx` | 173 | 1 | EditorToolbar, EditorToolbarProps | Editor toolbar assembly: top row, markdown palette, save/zen actions. |
-| `editorToolbarParts.tsx` | 74 | 5 | ITEM_TYPE_OPTIONS, MarkdownDropdown, EditorToolbarProps, EditorTopBarProps, MarkdownPaletteProps | Shared props, options and dropdown state for the editor toolbar halves. |
-| `EditorTopBar.tsx` | 61 | 1 | EditorTopBar | Editor top row: back, folder selector, item type. |
+| `EditorToolbar.tsx` | 167 | 1 | EditorToolbar, EditorToolbarProps | Editor toolbar assembly: top row, markdown palette, save/zen actions. |
+| `editorToolbarParts.tsx` | 70 | 5 | ITEM_TYPE_OPTIONS, MarkdownDropdown, EditorToolbarProps, EditorTopBarProps, MarkdownPaletteProps | Shared props, options and dropdown state for the editor toolbar halves. |
+| `EditorTopBar.tsx` | 41 | 1 | EditorTopBar | Editor top row: back and folder. The record type lives with the metadata, und… |
 | `fullscreen/attachmentEmbeds.ts` | 208 | 1 | AttachmentEmbedDeps, syncAttachmentEmbedDeps, attachmentEmbeds | Inline `![[file]]` embeds in the fullscreen editor: the token is replaced by … |
 | `fullscreen/composerDraftOwner.ts` | 29 | 2 | rememberComposerDraft, restoreComposerDraft, consumeComposerDraft | Internal ownership of a composer draft expanded into the editor; never infer … |
 | `fullscreen/EditorTagsRow.tsx` | 184 | 1 | EditorTagsRowProps, EditorTagsRow | The editor's tag ribbon: chips you can step into and rename in place. |
 | `fullscreen/useEditorAiActions.ts` | 72 | 1 | EditorAiActionsOptions, useEditorAiActions | The editor's two AI actions: file the draft into a folder plus tags, or pick … |
 | `fullscreen/useEditorAttachments.ts` | 162 | 1 | EditorAttachmentsOptions, useEditorAttachments | Getting files into the editor: picker, drop, paste, and the `![[file]]` link … |
-| `FullscreenEditor.tsx` | 599 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
-| `MarkdownPalette.tsx` | 344 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
+| `FullscreenEditor.tsx` | 613 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
+| `MarkdownPalette.tsx` | 333 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
 | `MobileEditorBar.tsx` | 312 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 320 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
@@ -357,7 +357,7 @@
 | `TaskStatusMark.tsx` | 50 | 4 | TaskStatusMarkProps, TaskStatusMark | Round task status glyph whose check stroke draws itself when the task is comp… |
 | `TimePicker.tsx` | 284 | 1 | TimePickerProps, TimePicker | A time of day: two snap wheels inside the app's dialog frame. |
 | `Toast.tsx` | 172 | 1 | ToastContainer | The toast stack: pauses on hover, flicks away, carries one action or an undo. |
-| `ToolbarButton.tsx` | 53 | 3 | ToolbarButtonProps, ToolbarButton | Square toolbar button with an active glow, for editor, calendar and view chro… |
+| `ToolbarButton.tsx` | 53 | 4 | ToolbarButtonProps, ToolbarButton | Square toolbar button with an active glow, for editor, calendar and view chro… |
 | `VideoCirclePlayer.tsx` | 137 | 3 | VideoCirclePlayer | Round Telegram-style video bubble: tap to play, mute toggle, progress ring. |
 | `VideoRecorder.tsx` | 227 | 1 | VideoRecorder | Records a video memo with a live preview, then hands the clip to the composer. |
 | `WindowControls.tsx` | 51 | 1 | WindowControls | Desktop-only minimize/maximize/close cluster pinned to the window's top-right… |
@@ -752,5 +752,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 686 | 220 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 686 | 219 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

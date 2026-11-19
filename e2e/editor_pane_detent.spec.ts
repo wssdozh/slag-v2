@@ -20,7 +20,7 @@ test('desktop editor docks into its pane, then expands to the window', async ({ 
   await page.screenshot({ path: 'test-results/screenshots/editor-docked-pane.png' });
 
   // Type is a droplist now, and it lives in the pane rather than a row of three buttons.
-  const typeTrigger = page.locator('header button[aria-label="Сменить тип записи"]');
+  const typeTrigger = page.locator('[data-testid="fullscreen-editor-modal"] button[aria-label="Сменить тип записи"]');
   await typeTrigger.click();
   await page.screenshot({ path: 'test-results/screenshots/editor-type-droplist.png' });
   await page.getByRole('button', { name: 'Таска', exact: true }).last().click();

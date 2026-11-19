@@ -1521,7 +1521,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.screenshot({ path: 'test-results/screenshots/editor-desktop-sticky.png' });
 
     // Switch to task mode to verify clean monochrome task metadata without lines
-    await page.locator('header button[aria-label="Сменить тип записи"]').click();
+    await page.locator('[data-testid="fullscreen-editor-modal"] button[aria-label="Сменить тип записи"]').click();
     await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: 'screenshots/editor-task-clean.png' });

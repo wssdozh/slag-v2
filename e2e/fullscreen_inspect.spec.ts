@@ -13,7 +13,7 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
   await expect(editorModal).toBeVisible();
 
   // 1. Task Mode with title, tags, and content
-  await page.locator('header button[aria-label="Сменить тип записи"]').click();
+  await page.locator('[data-testid="fullscreen-editor-modal"] button[aria-label="Сменить тип записи"]').click();
   await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
   await page.waitForTimeout(200);
 

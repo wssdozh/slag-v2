@@ -1,7 +1,7 @@
 // The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome.
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { SlagItem, SlagItemStatus } from '../../types';
+import type { SlagItem, SlagItemStatus, SlagItemType } from '../../types';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
@@ -18,6 +18,9 @@ import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
 import { EditorToolbar } from './EditorToolbar';
+import { ITEM_TYPE_OPTIONS } from './editorToolbarParts';
+import { ResponsiveSegmented } from '../UI/ResponsiveSegmented';
+import { ToolbarButton } from '../UI/ToolbarButton';
 import { TaskMetaBar } from '../UI/TaskMetaBar';
 import { EditorTagsRow } from './fullscreen/EditorTagsRow';
 import { useEditorAttachments } from './fullscreen/useEditorAttachments';
@@ -381,8 +384,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           folder={folder}
           onFolderChange={setFolder}
           folderOptions={folderOptions}
-          type={type}
-          onTypeChange={setType}
           selectedAttachment={selectedAttachment}
           onSelectAttachment={setSelectedAttachmentId}
           onRemoveAttachment={removeAttachment}
@@ -393,7 +394,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           onInsertMarkdown={insertMarkdown}
           onInsertTable={handleInsertTable}
           onAttachClick={handleAttachClick}
-          onAiDecompose={handleAiDecomposeInline}
           isZenMode={isZenMode}
           onToggleZenMode={() => setIsZenMode(prev => !prev)}
           isFullWidth={isMobile ? isSheetExpanded : isFullWidth}
@@ -453,9 +453,18 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 isZenMode ? 'opacity-20 hover:opacity-100' : 'opacity-100'
               }`}
             >
-              {/* Task Controls Row */}
-              {type === 'task' && (
-                <div className="flex flex-wrap items-center gap-1">
+              {/* One row under the title: record type, task metadata, the AI pass. */}
+              <div className="flex flex-wrap items-center gap-1">
+                <ResponsiveSegmented<SlagItemType>
+                  value={type}
+                  onChange={setType}
+                  options={ITEM_TYPE_OPTIONS}
+                  compact
+                  size="sm"
+                  ariaLabel="Сменить тип записи"
+                />
+                <div className="h-4 w-px bg-tint-8 mx-0.5 shrink-0" />
+                {type === 'task' && (
                   <TaskMetaBar
                     size="sm"
                     direction="down"
@@ -474,13 +483,18 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                     recurrence={recurrence}
                     onRecurrenceChange={setRecurrence}
                   />
-                </div>
-              )}
+                )}
+                <ToolbarButton
+                  size="sm"
+                  onClick={handleAiDecomposeInline}
+                  title="Разобрать через ИИ (папка и теги)"
+                  aria-label="Разобрать через ИИ"
+                  icon={<Icon name="system.ai" size="sm" tone="inherit" />}
+                />
+              </div>
 
-              {/* Subtle Divider between Task Controls and Tags */}
-              {type === 'task' && (
-                <div className="h-px bg-tint-6 w-full" />
-              )}
+              {/* Subtle Divider between the meta row and the tags */}
+              <div className="h-px bg-tint-6 w-full" />
 
               {/* Tags Ribbon Row: chips are stepped into and renamed, not just appended to. */}
               <EditorTagsRow tags={tags} onChange={setTags} />
