@@ -146,10 +146,10 @@ export const Sidebar: React.FC = () => {
           position="bottom"
         />
 
-        {/* Sync Status button */}
+        {/* Sync Status button: the glyph itself carries the state, no status dot on top of it */}
         <button
           onClick={() => openSettingsModal('sync')}
-          className="p-1.5 rounded text-fg-secondary hover:text-fg-soft hover:bg-tint-6 transition-colors shrink-0 cursor-pointer relative group"
+          className="p-1.5 rounded hover:bg-tint-6 transition-colors shrink-0 cursor-pointer"
           title={
             syncStatus.authRequired && !syncStatus.isAuthenticated
               ? 'Синхронизация: войдите в SLAG ID'
@@ -161,14 +161,18 @@ export const Sidebar: React.FC = () => {
           }
           data-testid="sidebar-sync-btn"
         >
-          <Icon name="action.refresh" size="md" tone="inherit" className={`transition-transform ${syncStatus.state === 'syncing' ? 'animate-spin text-amber-400' : syncStatus.state === 'connected' ? 'text-fg-secondary group-hover:text-white' : 'text-fg-dim'}`} />
-          <span
-            className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${
-              syncStatus.state === 'connected'
-                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
-                : syncStatus.state === 'syncing'
-                ? 'bg-amber-400 animate-pulse'
-                : 'bg-fg-dim'
+          <Icon
+            name="action.refresh"
+            size="md"
+            tone="inherit"
+            className={`transition-colors ${
+              syncStatus.state === 'syncing'
+                ? 'animate-spin text-warning'
+                : syncStatus.state === 'connected'
+                ? 'text-success'
+                : syncStatus.state === 'error'
+                ? 'text-danger'
+                : 'text-fg-dim'
             }`}
           />
         </button>
