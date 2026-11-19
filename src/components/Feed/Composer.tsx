@@ -9,7 +9,7 @@ import { parseTodoistInput, type ParsedTodoistTask } from '../../lib/time/todois
 import { BaseComposer } from './BaseComposer';
 import { useComposerFiles } from './composer/useComposerFiles';
 import { ToolbarButton } from '../UI/ToolbarButton';
-import { ComposerTaskControls } from './ComposerTaskControls';
+import { TaskMetaBar } from '../UI/TaskMetaBar';
 import { SlashCommandMenu } from './SlashCommandMenu';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu } from './TagSuggestionMenu';
@@ -601,9 +601,16 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* Task properties sit with the type selector, under the input */}
       {itemType === 'task' && (
-        <ComposerTaskControls
-          effectiveDueDate={effectiveDueDate}
-          effectiveDateLabel={effectiveDateLabel}
+        <TaskMetaBar
+          size="md"
+          direction="up"
+          priority={effectivePriority}
+          onPriorityChange={(val) => {
+            setPriority(val);
+            setIsPriorityDismissed(false);
+          }}
+          dueDate={effectiveDueDate}
+          dateLabel={effectiveDateLabel}
           onDateChange={(newDate) => {
             setDueDate(newDate);
             setIsDateDismissed(false);
@@ -612,20 +619,15 @@ export const Composer: React.FC<ComposerProps> = ({
             setIsDateDismissed(true);
             setDueDate('');
           }}
-          effectiveDuration={effectiveDuration}
+          duration={effectiveDuration}
           onDurationChange={(mins) => {
             setDuration(mins);
             setIsDurationDismissed(mins === undefined);
           }}
-          effectiveRecurrence={effectiveRecurrence}
+          recurrence={effectiveRecurrence}
           onRecurrenceChange={(rule) => {
             setRecurrence(rule);
             setIsRecurrenceDismissed(!rule);
-          }}
-          effectivePriority={effectivePriority}
-          onPriorityChange={(val) => {
-            setPriority(val);
-            setIsPriorityDismissed(false);
           }}
         />
       )}

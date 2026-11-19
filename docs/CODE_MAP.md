@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **604**, строк: **106669**, зон: **48**.
+Модулей: **603**, строк: **106455**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -23,8 +23,8 @@
 | `src/context/AppContext.tsx` | 795 | 70 |
 | `src/lib/storage/vaultFiles.ts` | 788 | 2 |
 | `src/mcp/vault.ts` | 780 | 6 |
-| `src/components/Feed/Composer.tsx` | 733 | 4 |
-| `src/types/index.ts` | 686 | 221 |
+| `src/components/Feed/Composer.tsx` | 735 | 4 |
+| `src/types/index.ts` | 686 | 220 |
 
 ## e2e (playwright) — 124 файлов, 23278 строк
 
@@ -94,7 +94,7 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 103 | 1 | QuickComposerWindow | The transparent quick-capture window: hosts the composer and resets between i… |
 
-## src/components/Editor — 14 файлов, 3089 строк
+## src/components/Editor — 13 файлов, 2775 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -105,15 +105,14 @@
 | `fullscreen/attachmentEmbeds.ts` | 208 | 1 | AttachmentEmbedDeps, syncAttachmentEmbedDeps, attachmentEmbeds | Inline `![[file]]` embeds in the fullscreen editor: the token is replaced by … |
 | `fullscreen/composerDraftOwner.ts` | 29 | 2 | rememberComposerDraft, restoreComposerDraft, consumeComposerDraft | Internal ownership of a composer draft expanded into the editor; never infer … |
 | `fullscreen/EditorTagsRow.tsx` | 184 | 1 | EditorTagsRowProps, EditorTagsRow | The editor's tag ribbon: chips you can step into and rename in place. |
-| `fullscreen/EditorTaskFields.tsx` | 311 | 1 | EditorTaskFieldsProps, EditorTaskFields | The task row inside the editor: status, priority, due date, duration, recurre… |
 | `fullscreen/useEditorAiActions.ts` | 72 | 1 | EditorAiActionsOptions, useEditorAiActions | The editor's two AI actions: file the draft into a folder plus tags, or pick … |
 | `fullscreen/useEditorAttachments.ts` | 162 | 1 | EditorAttachmentsOptions, useEditorAttachments | Getting files into the editor: picker, drop, paste, and the `![[file]]` link … |
-| `FullscreenEditor.tsx` | 602 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
+| `FullscreenEditor.tsx` | 599 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
 | `MarkdownPalette.tsx` | 344 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
 | `MobileEditorBar.tsx` | 312 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 320 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 52 файлов, 8192 строк
+## src/components/Feed — 51 файлов, 7941 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -129,7 +128,7 @@
 | `assistant/ChatTaskBlock.tsx` | 53 | 1 | ChatTaskBlock | A task rendered inside a chat reply: title plus checkbox lines, read-only. |
 | `AssistantChat.tsx` | 235 | 2 | AssistantChat | The assistant view: thread state, input, expanded traces, and the diff it ope… |
 | `BaseComposer.tsx` | 325 | 2 | BaseComposerProps, BaseComposer | The shared composer shell: the text surface, slot layout, and the send plate. |
-| `Composer.tsx` | 733 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
+| `Composer.tsx` | 735 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
 | `composer/ComposerAiButton.tsx` | 31 | 1 | ComposerAiButtonProps, ComposerAiButton | The +AI button: asks the model for folder and tags, spinning while the call r… |
 | `composer/ComposerAttachmentStrip.tsx` | 113 | 1 | ComposerAttachmentStripProps, ComposerAttachmentStrip | The tray of what is about to be sent: attachment chips, each removable. |
 | `composer/composerDecorations.ts` | 50 | 1 | setComposerHighlights, composerHighlightExtensions | Paints the tokens the parser understood right inside the CodeMirror composer … |
@@ -147,7 +146,6 @@
 | `composer/useComposerFiles.ts` | 152 | 1 | useComposerFiles | Files into the composer: picker, drop and paste, with no opinion on titles or… |
 | `composer/useComposerSlashCommands.ts` | 141 | 1 | UseComposerSlashCommandsOptions, useComposerSlashCommands | What a `/command` does to the draft: swap the type, set a property, start a r… |
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
-| `ComposerTaskControls.tsx` | 253 | 1 | ComposerTaskControlsProps, ComposerTaskControls | The task-only composer controls: due date, duration, recurrence and priority. |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
 | `FeedHeader.tsx` | 160 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder name and icon, filter badges, sort, materials toggl… |
 | `FeedList.tsx` | 559 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
@@ -315,14 +313,14 @@
 | `vault/usageTone.ts` | 20 | 2 | SEGMENT_TONE, toneOf, MEDIA_SEGMENT_IDS | Tones for the storage ring: one token pair per sector, no colour invented in … |
 | `VaultSettingsTab.tsx` | 76 | 1 | VaultSettingsTab | The vault tab: the disk, the backups, the way out. On a desktop the rail owns… |
 
-## src/components/Sidebar — 2 файлов, 555 строк
+## src/components/Sidebar — 2 файлов, 559 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `FolderTree.tsx` | 356 | 1 | FolderTree | Nested folder tree in the sidebar: expand, select, and drag — a note lands in… |
-| `Sidebar.tsx` | 199 | 1 | Sidebar | Left rail: vault switcher, folder tree, inbox, sync state and settings shortc… |
+| `Sidebar.tsx` | 203 | 1 | Sidebar | Left rail: vault switcher, folder tree, inbox, sync state and settings shortc… |
 
-## src/components/UI — 36 файлов, 6387 строк
+## src/components/UI — 37 файлов, 6713 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -331,10 +329,10 @@
 | `Button.tsx` | 57 | 7 | ButtonProps, Button | The kit's one button: four tones, three sizes, optional icon, ref-forwarded. |
 | `Checkbox.tsx` | 75 | 2 | CheckboxProps, Checkbox | A checkbox with a label and hint, toggled by click or keyboard for settings r… |
 | `ContextMenu.tsx` | 357 | 1 | ContextMenu | Right-click menu for items, folders and feed rows: sections, submenus and hov… |
-| `DatePickerPopover.tsx` | 301 | 2 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
+| `DatePickerPopover.tsx` | 301 | 1 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
 | `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
-| `icons/Icon.tsx` | 109 | 147 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
+| `icons/Icon.tsx` | 109 | 146 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
 | `icons/icons.ts` | 509 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 87 | 1 | InfoHintProps, InfoHint | One question mark for every explanation in the app. |
@@ -347,14 +345,15 @@
 | `MenuDropdown.tsx` | 197 | 5 | MenuDropdownProps, MenuDropdown | Anchored popover menu that flips and clamps itself inside the viewport, porta… |
 | `MobileActionSheet.tsx` | 177 | 1 | MobileActionSheet | Phone action sheet for a feed item: drag to dismiss, the same actions as righ… |
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput | Stepper input: minus/plus buttons and a typed value, clamped to min/max on bl… |
-| `PriorityBadge.tsx` | 76 | 5 | TaskPriority, LinearSignalBarsProps, LinearSignalBars | Priority as four Linear-style signal bars, plus the matching badge for task r… |
+| `PriorityBadge.tsx` | 76 | 4 | TaskPriority, LinearSignalBarsProps, LinearSignalBars | Priority as four Linear-style signal bars, plus the matching badge for task r… |
 | `priorityTone.ts` | 47 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Maps a priority to its one colour family; text, dot and chip classes hang off… |
 | `ResponsiveSegmented.tsx` | 245 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
 | `segmentedVariants.ts` | 56 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Class presets for the segmented strip, so mobile headers share one geometry. |
-| `Select.tsx` | 349 | 11 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
+| `Select.tsx` | 349 | 10 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
 | `SendButton.tsx` | 50 | 4 | SendButtonProps, SendButton | The round accent arrow that confirms: send, attach or save, one plate for all… |
 | `SheetPanel.tsx` | 441 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel | The bottom-sheet shell: detents, drag-to-fold, velocity-aware release, scroll… |
 | `TagChip.tsx` | 81 | 5 | TagChipProps, TagChip | A tag as a chip: clickable to filter, removable while editing, flat or pill. |
+| `TaskMetaBar.tsx` | 326 | 2 | TaskMetaBarProps, TaskMetaBar | One row of task controls — status, priority, due date, duration, recurrence —… |
 | `TaskStatusMark.tsx` | 50 | 4 | TaskStatusMarkProps, TaskStatusMark | Round task status glyph whose check stroke draws itself when the task is comp… |
 | `TimePicker.tsx` | 284 | 1 | TimePickerProps, TimePicker | A time of day: two snap wheels inside the app's dialog frame. |
 | `Toast.tsx` | 172 | 1 | ToastContainer | The toast stack: pauses on hover, flicks away, carries one action or an undo. |
@@ -629,7 +628,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 32 файлов, 8313 строк
+## src/lib/sync — 32 файлов, 8334 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -637,7 +636,7 @@
 | `accountCrypto.ts` | 266 | 6 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
 | `accountTypes.ts` | 217 | 13 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +19 | Shapes of the relay account API: plans, devices, vault grants and invitations. |
 | `apiBase.ts` | 5 | 4 | apiBase | The relay address without trailing slashes: every request path starts with on… |
-| `applyBundle.ts` | 437 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
+| `applyBundle.ts` | 456 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 7 | 2 | attachmentSignature | Cheap identity for an attachment: name plus size, enough to spot a stale copy. |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
 | `crypto.ts` | 181 | 13 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
@@ -652,7 +651,7 @@
 | `localBookkeeping.ts` | 533 | 6 | SYNC_SECTION, SyncScope, stateHashKey, tombstonesKey, sentHashesKey, +32 | What this device sent, knows and deleted — read from `state.json`'s `sync` se… |
 | `manifestChannel.ts` | 211 | 1 | WIRE_VERSION, MAX_WIRE_BYTES, toWire, parseWire, wireToText, +7 | How a manifest crosses the wire: shape, validation, comparison. |
 | `manifestPrefs.ts` | 16 | 2 | readManifestAutoCheck, writeManifestAutoCheck | Whether this device compares its vault root with the room on its own. |
-| `manifestSync.ts` | 177 | 1 | syncManifest | The room's own copy of this vault's manifest: publish ours, read the neighbou… |
+| `manifestSync.ts` | 179 | 1 | syncManifest | The room's own copy of this vault's manifest: publish ours, read the neighbou… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `presence.ts` | 28 | 1 | DevicePresence, devicePresence | Who is actually on the line right now. The relay touches a device's `lastSeen… |
@@ -671,7 +670,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `taskCompletion.ts` | 55 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
-| `taskUtils.ts` | 109 | 18 | baseTaskId, parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, +1 | The calendar projects a recurring task into every occurrence as |
+| `taskUtils.ts` | 109 | 17 | baseTaskId, parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, +1 | The calendar projects a recurring task into every occurrence as |
 
 ## src/lib/text — 5 файлов, 463 строк
 
@@ -688,8 +687,8 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `calendarLayout.ts` | 139 | 6 | LayoutPositionedTask, TimedBlockBox, timedBlockBox, computeAntiOverlapLayout | Day-calendar geometry: which column a timed task takes and how tall its block… |
-| `dateUtils.ts` | 189 | 29 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +14 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
-| `recurrenceHelper.ts` | 306 | 6 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
+| `dateUtils.ts` | 189 | 30 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +14 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
+| `recurrenceHelper.ts` | 306 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +4 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
 | `todoistTaskParser.ts` | 429 | 12 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +2 | Parses Todoist-style quick input into title, due date, tags, priority, durati… |
 
 ## src/lib/vault — 18 файлов, 2040 строк
@@ -753,5 +752,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 686 | 221 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 686 | 220 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

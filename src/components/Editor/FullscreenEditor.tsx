@@ -13,11 +13,12 @@ import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../..
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
+import { formatDueDateLabel } from '../../lib/time/dateUtils';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
 import { EditorToolbar } from './EditorToolbar';
-import { EditorTaskFields } from './fullscreen/EditorTaskFields';
+import { TaskMetaBar } from '../UI/TaskMetaBar';
 import { EditorTagsRow } from './fullscreen/EditorTagsRow';
 import { useEditorAttachments } from './fullscreen/useEditorAttachments';
 import { useEditorAiActions } from './fullscreen/useEditorAiActions';
@@ -110,13 +111,9 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     addToast,
   });
 
-  const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false);
-  const [isRecurrenceDropdownOpen, setIsRecurrenceDropdownOpen] = useState(false);
-
   // Phone editor sits as a half sheet (56% of the surface) and grows to the full window when
   // the handle is pulled up. Reset belongs to render: a new note starts folded.
+  const [activeMobilePopover, setActiveMobilePopover] = useState<'formatting' | 'lists' | 'ai' | null>(null);
   const [isSheetExpanded, setIsSheetExpanded] = useState(false);
   const [sheetItemId, setSheetItemId] = useState(item.id);
   if (sheetItemId !== item.id) {
@@ -458,26 +455,26 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
             >
               {/* Task Controls Row */}
               {type === 'task' && (
-                <EditorTaskFields
-                  status={status}
-                  setStatus={setStatus}
-                  priority={priority}
-                  setPriority={setPriority}
-                  dueDate={dueDate}
-                  setDueDate={setDueDate}
-                  reminder={reminder}
-                  setReminder={setReminder}
-                  duration={duration}
-                  setDuration={setDuration}
-                  recurrence={recurrence}
-                  setRecurrence={setRecurrence}
-                  isDatePickerOpen={isDatePickerOpen}
-                  setIsDatePickerOpen={setIsDatePickerOpen}
-                  isDurationDropdownOpen={isDurationDropdownOpen}
-                  setIsDurationDropdownOpen={setIsDurationDropdownOpen}
-                  isRecurrenceDropdownOpen={isRecurrenceDropdownOpen}
-                  setIsRecurrenceDropdownOpen={setIsRecurrenceDropdownOpen}
-                />
+                <div className="flex flex-wrap items-center gap-1">
+                  <TaskMetaBar
+                    size="sm"
+                    direction="down"
+                    status={status}
+                    onStatusChange={(s) => setStatus(s)}
+                    priority={priority}
+                    onPriorityChange={(p) => setPriority(p)}
+                    dueDate={dueDate}
+                    dateLabel={formatDueDateLabel(dueDate)}
+                    onDateChange={setDueDate}
+                    onDateClear={() => { setDueDate(''); setReminder(undefined); }}
+                    dueTime={reminder ? reminder.slice(11, 16) : undefined}
+                    onDueTimeChange={(t) => setReminder(t ?? undefined)}
+                    duration={duration}
+                    onDurationChange={setDuration}
+                    recurrence={recurrence}
+                    onRecurrenceChange={setRecurrence}
+                  />
+                </div>
               )}
 
               {/* Subtle Divider between Task Controls and Tags */}
