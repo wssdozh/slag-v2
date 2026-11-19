@@ -410,6 +410,11 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         }
       }
 
+      // A bundle we took, even one that changed nothing, is a fact the room needs: the next check
+      // republishes our row, so its `at` moves past the peer's resend. Without it a peer that
+      // accepted a resend but kept its root looks like it refused the notes, and auto-resolve
+      // would act on "has not looked yet".
+      engine.manifestPostedRoot = null;
       engine.status.lastSyncTime = new Date().toLocaleTimeString();
       engine.status.state = engine.batchUpdating ? 'syncing' : 'connected';
       engine.notify();
