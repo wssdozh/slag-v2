@@ -32,6 +32,7 @@ export { accountClient };
 import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
 import { syncErrorText } from './errorText';
+import { isPageTimeout, nextPullStep, pullDeadlineMs, shrinkPullBudget } from './pullPage';
 import { SyncTransport } from './transport';
 import * as manifestSchedule from './manifest/schedule';
 import * as manifestSync from './manifest/sync';
@@ -99,6 +100,13 @@ export interface PendingPush {
   fallbackTimer: ReturnType<typeof setTimeout> | null;
 }
 
+/** One answer of the room's bundle feed: a page sized by weight, plus the room's watermarks. */
+interface PullPage {
+  bundles: { payload?: unknown; syncId?: unknown }[];
+  head: number | null;
+  oldest: number;
+}
+
 export class SyncEngine {
   public config: SyncConfig;
   public status: SyncStatus;
@@ -118,6 +126,12 @@ export class SyncEngine {
   public pullTimeoutMs = 60_000;
   /** Bundles per pull request. A page of attachment-carrying bundles is megabytes. */
   public pullPageSize = 100;
+  /**
+   * Page budget in bytes, sent to the relay as `maxBytes`. The relay pages by weight, so one
+   * answer stays a page a deadline can cover: with 31 queued attachments the count-based page was
+   * hundreds of megabytes and died with an AbortError on every attempt.
+   */
+  public pullPageBytes: number = SYNC_INTERVALS.PULL_PAGE_BYTES;
   /** How soon a failed pass tries again. Public so a test does not sit through ten real seconds. */
   public retryDelayMs = SYNC_INTERVALS.RETRY_DELAY_MS;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1263,46 +1277,77 @@ export class SyncEngine {
     return promise;
   }
 
+  /** One page of the room's feed, sized by weight and by the byte budget of this device. */
+  private async fetchPullPage(generation: number, cursor: number): Promise<PullPage | null> {
+    const cleanUrl = apiBase(this.config.serverUrl);
+    const params = new URLSearchParams({
+      device: this.config.deviceId,
+      vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
+      limit: String(this.pullPageSize),
+      maxBytes: String(this.pullPageBytes),
+    });
+    if (cursor > 0) params.set('since', String(cursor));
+    const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
+      headers: authHeaders(this),
+      signal: AbortSignal.timeout(pullDeadlineMs(this.pullPageBytes, this.pullTimeoutMs)),
+    });
+    if (generation !== this.initGeneration) return null;
+    if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
+    return {
+      bundles: data.bundles,
+      head: typeof data.head === 'number' ? data.head : null,
+      oldest: typeof data.oldest === 'number' ? data.oldest : 0,
+    };
+  }
+
   private async pullPendingBundles(generation: number): Promise<void> {
     try {
-      const cleanUrl = apiBase(this.config.serverUrl);
-      const params = new URLSearchParams({
-        device: this.config.deviceId,
-        vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
-        limit: String(this.pullPageSize),
-      });
       // A full first sync is tens of megabytes; a pull that dies halfway must not start over.
       let cursor = loadCursor(this.bookkeeping);
+      let shrinks = 0;
       while (generation === this.initGeneration) {
         const previousCursor = cursor;
-        if (cursor > 0) params.set('since', String(cursor));
-        const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
-          headers: authHeaders(this),
-          signal: AbortSignal.timeout(this.pullTimeoutMs),
-        });
-        if (generation !== this.initGeneration) return;
-        if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
-        const data = await res.json();
-        if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
-        const requestedSince = cursor;
-        if (requestedSince > 0 && typeof data.oldest === 'number' && data.oldest > 0 && requestedSince + 1 < data.oldest) {
+        let page: PullPage | null;
+        try {
+          page = await this.fetchPullPage(generation, cursor);
+        } catch (e) {
+          // Half the budget and ask the same cursor again; three sizes down is the floor.
+          if (shrinks < 3 && this.pullPageBytes > SYNC_INTERVALS.PULL_PAGE_MIN_BYTES && isPageTimeout(e)) {
+            shrinks++;
+            this.pullPageBytes = shrinkPullBudget(this.pullPageBytes);
+            syncLog.warn(
+              `Pull page timed out: shrinking to ${Math.round(this.pullPageBytes / 1024)} KB and asking again`
+            );
+            continue;
+          }
+          throw e;
+        }
+        if (!page) return;
+        shrinks = 0;
+        if (cursor > 0 && page.oldest > 0 && cursor + 1 < page.oldest) {
           // The cursor points before the oldest bundle the relay still keeps: everything in
           // between expired, so a delta can never close the gap — resend the full state once.
-          syncLog.warn(`Sync cursor ${requestedSince} is older than relay history (${data.oldest}): scheduling a full resend`);
+          syncLog.warn(`Sync cursor ${cursor} is older than relay history (${page.oldest}): scheduling a full resend`);
           this.forceFullPush = true;
         }
-        for (const item of data.bundles) {
+        for (const item of page.bundles) {
           if (generation !== this.initGeneration) return;
           if (!item.payload) throw new Error('Missing sync bundle payload');
           await this.applyIncomingBundle(item.payload);
           if (typeof item.syncId === 'number' && item.syncId > cursor) cursor = item.syncId;
         }
-        if (data.bundles.length < this.pullPageSize) {
-          saveCursor(this.bookkeeping, cursor);
-          break;
-        }
         saveCursor(this.bookkeeping, cursor);
-        if (cursor <= previousCursor) throw new Error('Sync pagination cursor did not advance');
+        const step = nextPullStep({
+          previousCursor,
+          cursor,
+          bundles: page.bundles.length,
+          head: page.head,
+          pageSize: this.pullPageSize,
+        });
+        if (step === 'done') break;
+        if (step === 'stuck') throw new Error('Sync pagination cursor did not advance');
       }
       // The channel is free again: the pass this pull deferred is the one that fills the backlog's
       // attachments.
@@ -1311,7 +1356,7 @@ export class SyncEngine {
       if (generation !== this.initGeneration) return;
       syncLog.warn('HTTP bundles fetch failed:', e);
       this.status.state = 'error';
-      this.status.error = syncErrorText(e, this.pullTimeoutMs);
+      this.status.error = syncErrorText(e, pullDeadlineMs(this.pullPageBytes, this.pullTimeoutMs));
       this.notify();
       // A relay hiccup, a laptop that just woke up, a tunnel that dropped: none of those need a
       // person to press anything, so the same pass comes back on the retry clock.
