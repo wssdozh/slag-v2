@@ -32,7 +32,7 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   await expect(panel).toContainText('ещё не сверяли');
 
   // And the explanation is on screen, not in a commit message.
-  await expect(panel).toContainText('запуск и отправка');
+  await expect(panel).toContainText('не чаще раза в 5 секунд');
   await expect(panel).toContainText('одна переотправка');
 
   await page.waitForTimeout(250);

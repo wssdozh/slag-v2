@@ -142,21 +142,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
       {/* ── сервер ─────────────────────────────────────── */}
-      <SettingsGroup
-        title="Сверка с сервером"
-        action={
-          <span className="flex items-center gap-2">
-            <span className="text-2xs font-mono text-fg-dim">авто</span>
-            <SettingsSwitch
-              checked={autoCheck}
-              onChange={onToggleAutoCheck}
-              disabled={busy}
-              label="Автосверка"
-              testId="integrity-autocheck"
-            />
-          </span>
-        }
-      >
+      <SettingsGroup title="Сверка с сервером">
         <SettingsRow
           label="Состояние"
           description={server.hint}
@@ -170,9 +156,17 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         />
         <SettingsDivider />
         <SettingsRow
-          label="Когда сверяю"
-          value="запуск и отправка"
-          description="на старте и после каждой отправки к серверу; не чаще раза в 5 секунд — в комнате один корень на хранилище"
+          label="Автосверка"
+          description="при запуске и после каждой отправки, не чаще раза в 5 секунд. выключено — сверяю только по кнопке ниже, и комната узнаёт мой корень тоже только тогда"
+          right={
+            <SettingsSwitch
+              checked={autoCheck}
+              onChange={onToggleAutoCheck}
+              disabled={busy}
+              label="Автосверка"
+              testId="integrity-autocheck"
+            />
+          }
         />
         <SettingsDivider />
         <SettingsRow
@@ -192,11 +186,17 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
       </SettingsGroup>
 
       {/* ── диск ───────────────────────────────────────── */}
-      <SettingsGroup
-        title="Это устройство"
-        action={
-          <span className="flex items-center gap-2">
-            <span className="text-2xs font-mono text-fg-dim">только отчёт</span>
+      <SettingsGroup title="Это устройство">
+        <SettingsRow
+          label="Находки"
+          value={findingsValue}
+          description={findingsHint}
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Только отчёт"
+          description="сверка и чистка ничего не пишут на диск. выключено — «Почистить» правда переносит файлы в архив чистки"
+          right={
             <SettingsSwitch
               checked={dryRun}
               onChange={setDryRun}
@@ -204,13 +204,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
               label="Только отчёт"
               testId="integrity-dryrun"
             />
-          </span>
-        }
-      >
-        <SettingsRow
-          label="Находки"
-          value={findingsValue}
-          description={findingsHint}
+          }
         />
         <SettingsDivider />
         <SettingsRow
