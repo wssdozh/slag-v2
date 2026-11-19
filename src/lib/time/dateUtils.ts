@@ -1,6 +1,9 @@
 /**
  * dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2.
+ *
+ * Что означает `reminder` и как его записать — в `./reminder`, чтобы разбор часа был один.
  */
+import { reminderClock, reminderClockLabel, reminderDay } from './reminder';
 
 export const RUSSIAN_MONTHS = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -102,21 +105,6 @@ export function formatDueDateLabel(dateIso: string, rawMatchedText?: string): st
 
 const SHORT_MONTHS = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'] as const;
 
-const BARE_CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)/;
-
-/**
- * Часы и минуты из срока. `reminder` приходит в двух видах: ISO-момент из парсера
- * и голое `17:42` из ручного выбора в календаре. Оба означают одно и то же время.
- */
-export function timeFromReminder(reminder?: string): { hours: number; minutes: number } | null {
-  const raw = reminder?.trim();
-  if (!raw) return null;
-  const bare = BARE_CLOCK.exec(raw);
-  if (bare) return { hours: Number(bare[1]), minutes: Number(bare[2]) };
-  const at = new Date(raw);
-  return Number.isNaN(at.getTime()) ? null : { hours: at.getHours(), minutes: at.getMinutes() };
-}
-
 /**
  * День со днём недели: `пн, 16 ноя`. Для карточки действия — там дата стоит первой,
  * потому что человек ищет в ней «когда», а не «что».
@@ -152,15 +140,13 @@ export function formatDueStamp(dueDate?: string, reminder?: string): string {
     ? `${day} ${SHORT_MONTHS[monthIdx]}`
     : `${day} ${SHORT_MONTHS[monthIdx]} ${year}`;
 
-  const clock = timeFromReminder(reminder);
-  if (!clock) return shortDay;
-  const raw = reminder?.trim() ?? '';
-  const isBareClock = BARE_CLOCK.test(raw);
-  const belongsToDay = isBareClock || getISODateString(new Date(raw)) === dueDate;
-  if (!belongsToDay) return shortDay;
+  // Голое время принадлежит самому `dueDate`; у момента свои сутки, и чужие часы под этой
+  // датой обещали бы не тот день.
+  const clock = reminderClock(reminder);
+  const momentDay = reminderDay(reminder);
+  if (!clock || (momentDay !== null && momentDay !== dueDate)) return shortDay;
 
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${shortDay} · ${pad(clock.hours)}:${pad(clock.minutes)}`;
+  return `${shortDay} · ${reminderClockLabel(reminder)}`;
 }
 
 /**

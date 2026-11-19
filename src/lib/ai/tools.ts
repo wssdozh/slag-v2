@@ -4,6 +4,8 @@ import { querySearch, getSearchableAttachmentText } from '../searchService';
 import { serializeItemToMarkdown } from '../vault/markdownSerializer';
 import { storage } from '../storage';
 import { parseTodoistInput } from '../time/todoistTaskParser';
+import { getTodayIso } from '../time/dateUtils';
+import { normalizeReminder, reminderDay } from '../time/reminder';
 import { DEFAULT_INBOX_FOLDER, AI_LIMITS } from '../../config';
 import { cleanSnippetText } from './actionParser';
 import { getAppGuideContent } from './appGuide';
@@ -282,11 +284,15 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
       }
 
       if (found) {
-        if (reminder && !reminder.includes('T')) {
-          const effectiveDate = dueDate || found.dueDate || new Date().toISOString().slice(0, 10);
-          dueDate = effectiveDate;
-          const time = reminder.trim();
-          reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
+        if (reminder) {
+          // Голое время ассистента живёт на дне задачи: без даты берём сегодняшний день, как
+          // делал старый парсер, иначе напоминанию некуда встать.
+          const anchorDay = dueDate || found.dueDate || getTodayIso();
+          const normalized = normalizeReminder(reminder, anchorDay);
+          if (normalized) {
+            if (reminderDay(reminder) === null) dueDate = anchorDay;
+            reminder = normalized;
+          }
         }
 
         let actionLabel = args.actionLabel || (rawUpdates as any).actionLabel;
@@ -349,8 +355,8 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
         };
       }
 
-      if (reminder && !reminder.includes('T') && dueDate) {
-        reminder = `${dueDate}T${reminder}:00`;
+      if (reminder && dueDate) {
+        reminder = normalizeReminder(reminder, dueDate) ?? reminder;
       }
 
       const effectiveType = itemType || (name === 'schedule_task' || dueDate ? 'task' : 'note');
@@ -411,11 +417,12 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
           if (parsed.priority) rawUpdates.priority = parsed.priority;
         }
 
-        if (rawUpdates.reminder && !rawUpdates.reminder.includes('T')) {
-          const effectiveDate = rawUpdates.dueDate || target.dueDate || new Date().toISOString().slice(0, 10);
-          rawUpdates.dueDate = effectiveDate;
-          const time = rawUpdates.reminder.trim();
-          rawUpdates.reminder = `${effectiveDate}T${time.length === 5 ? time : time.slice(0, 5)}:00`;
+        if (rawUpdates.reminder) {
+          // Как и в одиночном обновлении: голое время ставится на день задачи или на сегодня.
+          const bareReminder = rawUpdates.reminder;
+          const anchorDay = rawUpdates.dueDate || target.dueDate || getTodayIso();
+          rawUpdates.reminder = normalizeReminder(bareReminder, anchorDay) ?? bareReminder;
+          if (reminderDay(bareReminder) === null) rawUpdates.dueDate = anchorDay;
         }
 
         resolvedItems.push({

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import type { SlagItem } from '../types';
 import { getTodayString } from '../lib/time/dateUtils';
 import { getRecurringOccurrencesInRange } from '../lib/time/recurrenceHelper';
+import { reminderClock, reminderToIso } from '../lib/time/reminder';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 
 export interface CalendarTask extends SlagItem {
@@ -80,24 +81,10 @@ export function useCalendarSchedule({
           if (occDate !== task.dueDate) {
             const list = map.get(occDate) || [];
             if (!list.some((it) => it.id.startsWith(task.id + '_virtual_'))) {
-              let nextReminder: string | undefined = undefined;
-              if (task.reminder) {
-                try {
-                  const orig = new Date(task.reminder);
-                  const [y, m, d] = occDate.split('-').map(Number);
-                  nextReminder = new Date(
-                    y,
-                    m - 1,
-                    d,
-                    orig.getHours(),
-                    orig.getMinutes(),
-                    0,
-                    0
-                  ).toISOString();
-                } catch {
-                  // ignore
-                }
-              }
+              // Проекция несёт тот же час, но свой день: собираем момент тем же модулем, что и
+              // редактор, иначе виртуальная задача показывалась бы без времени.
+              const clock = reminderClock(task.reminder);
+              const nextReminder = clock ? reminderToIso(occDate, clock) : undefined;
 
               const virtualItem: CalendarTask = {
                 ...task,

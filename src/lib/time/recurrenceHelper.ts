@@ -1,9 +1,8 @@
 // Recurrence rules: parse, describe and advance a repeating task to its next occurrence.
 import type { RecurrenceRule, SlagItem } from '../../types';
 import { getISODateString } from './dateUtils';
+import { shiftReminderToDay } from './reminder';
 import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../tasks/taskUtils';
-
-export { getISODateString };
 
 export const RECURRENCE_PRESETS: Array<{ label: string; rule: RecurrenceRule }> = [
   { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } },
@@ -56,6 +55,7 @@ export function formatRecurrenceLabel(recurrence?: RecurrenceRule): string {
     case 'weekly':
       if (recurrence.weekdays && recurrence.weekdays.length > 0) {
         const days = recurrence.weekdays.map(d => RUSSIAN_DAY_NAMES[d] || String(d)).join(', ');
+        if (interval > 1) return `Каждые ${interval} нед. по ${days}`;
         return `Каждый ${days}`;
       }
       return interval === 1 ? 'Каждую неделю' : `Каждые ${interval} нед.`;
@@ -150,19 +150,6 @@ function occurrenceOnOrAfter(baseDueDate: string, recurrence: RecurrenceRule, ta
   return current;
 }
 
-function moveReminder(reminder: string | undefined, fromDueDate: string, toDueDate: string): string | undefined {
-  if (!reminder) return undefined;
-  const original = new Date(reminder);
-  const from = parseISODateString(fromDueDate);
-  const to = parseISODateString(toDueDate);
-  if (![original, from, to].every(date => Number.isFinite(date.getTime()))) return reminder;
-  const dayOffset = Math.round((Date.UTC(original.getFullYear(), original.getMonth(), original.getDate())
-    - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 86400000);
-  to.setDate(to.getDate() + dayOffset);
-  to.setHours(original.getHours(), original.getMinutes(), original.getSeconds(), original.getMilliseconds());
-  return Number.isFinite(to.getTime()) ? to.toISOString() : reminder;
-}
-
 /**
  * Computes the next occurrence date for a recurring task when completed or rescheduled.
  * If overdue, advances along the existing schedule to its first occurrence on or after the reference day.
@@ -177,7 +164,7 @@ export function computeNextOccurrence(
   const nextDueDate = Number.isFinite(referenceDate.getTime())
     ? occurrenceOnOrAfter(firstNext, recurrence, getISODateString(referenceDate))
     : firstNext;
-  return { nextDueDate, nextReminder: moveReminder(currentTimeIso, currentDueDate, nextDueDate) };
+  return { nextDueDate, nextReminder: shiftReminderToDay(currentTimeIso, currentDueDate, nextDueDate) };
 }
 
 /**
@@ -273,7 +260,7 @@ export function evaluateRecurringTasks(
         ...item,
         status: 'todo' as const,
         dueDate: targetDueDate,
-        reminder: moveReminder(item.reminder, item.dueDate, targetDueDate),
+        reminder: shiftReminderToDay(item.reminder, item.dueDate, targetDueDate),
         streak: newStreak,
         content: updatedContent,
         subtasks: updatedSubtasks,
@@ -291,7 +278,7 @@ export function evaluateRecurringTasks(
         ...item,
         status: 'todo' as const,
         dueDate: targetDueDate,
-        reminder: moveReminder(item.reminder, item.dueDate, targetDueDate),
+        reminder: shiftReminderToDay(item.reminder, item.dueDate, targetDueDate),
         streak: 0,
         createdAt: nowTs,
         updatedAt: nowTs,

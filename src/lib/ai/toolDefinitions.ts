@@ -88,7 +88,7 @@ export function getCanonicalTools(webSearchEnabled: boolean): AssistantToolDefin
         tags: { type: 'array', items: { type: 'string' }, description: 'Список тегов без знака #' },
         dueDate: { type: 'string', description: 'Срок выполнения задачи в формате YYYY-MM-DD (или пустая строка для сброса)' },
         dueDateText: { type: 'string', description: 'Естественное описание даты (например, "завтра в 10:00")' },
-        reminder: { type: 'string', description: 'Время напоминания или слот дня (например, "10:00", "14:30" или ISO)' },
+        reminder: { type: 'string', description: 'ISO 8601 с часовым поясом; если хочешь только время — сначала дай dueDate' },
         priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'Приоритет задачи' },
         status: { type: 'string', enum: ['backlog', 'todo', 'in_progress', 'done'], description: 'Статус задачи' },
         subtasks: { type: 'array', items: { type: 'string' }, description: 'Список подзадач' },

@@ -5,6 +5,7 @@ import { logger } from '../logger/logger';
 import { accountClient } from '../sync/account';
 import { computeHash } from '../sync/crypto';
 import { formatDueDateLabel, getISODateString } from '../time/dateUtils';
+import { reminderClock, reminderDay, reminderToIso } from '../time/reminder';
 import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive, saveNotifyRoutes } from './prefs';
 import { DAY_MS, shiftOutOfQuiet } from './quiet';
 
@@ -14,8 +15,6 @@ const notifyLog = logger.scope('NOTIFY');
 const STALE_AFTER_MS = 5 * 60_000;
 /** Overdue tasks get their morning ping at this local hour. */
 const OVERDUE_HOUR = 10;
-/** Reminder text that carries only a time of day, e.g. "10:00" or "10:00:00". */
-const BARE_TIME = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 /** A reminder that names its own offset is the one case where the instant, not the clock, is fixed. */
 const ABSOLUTE_REMINDER = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 
@@ -67,28 +66,32 @@ function formatNotifyStamp(moment: number): string {
  */
 function dueStamp(item: SlagItem): string {
   if (!item.dueDate) return '';
-  const bare = BARE_TIME.exec(item.reminder?.trim() ?? '');
-  if (!bare) return formatDueDateLabel(item.dueDate).toLowerCase();
-  const [year, month, day] = item.dueDate.split('-').map(Number);
-  if (![year, month, day].every(Number.isFinite)) return item.dueDate;
-  const at = new Date(year, month - 1, day, Number(bare[1]), Number(bare[2]), Number(bare[3] ?? 0));
-  return Number.isFinite(at.getTime()) ? formatNotifyStamp(at.getTime()) : item.dueDate;
+  const clock = reminderClock(item.reminder);
+  // Только голое время стоит на дне задачи: у момента свои сутки, и подпись под чужим днём
+  // обещала бы не то время.
+  if (!clock || reminderDay(item.reminder) !== null) return formatDueDateLabel(item.dueDate).toLowerCase();
+  const iso = reminderToIso(item.dueDate, clock);
+  if (!iso) return item.dueDate;
+  return formatNotifyStamp(new Date(iso).getTime());
 }
 
 /** Absolute epoch ms of `item.reminder`, or null when it cannot be resolved to a moment. */
 export function resolveReminder(item: Pick<SlagItem, 'reminder' | 'dueDate'>): number | null {
   const raw = item.reminder?.trim();
   if (!raw) return null;
-  const bare = BARE_TIME.exec(raw);
-  if (bare) {
-    if (!item.dueDate) return null;
-    const [year, month, day] = item.dueDate.split('-').map(Number);
-    if (![year, month, day].every(Number.isFinite)) return null;
-    const at = new Date(year, month - 1, day, Number(bare[1]), Number(bare[2]), Number(bare[3] ?? 0));
-    return Number.isFinite(at.getTime()) ? at.getTime() : null;
+  const clock = reminderClock(raw);
+  if (!clock) return null;
+  // Moment: it names its own day, so it resolves on its own; a bare clock is a wall time on the
+  // task's due date and has no moment without one.
+  if (reminderDay(raw) !== null) {
+    const at = new Date(raw).getTime();
+    return Number.isFinite(at) ? at : null;
   }
-  const parsed = new Date(raw);
-  return Number.isFinite(parsed.getTime()) ? parsed.getTime() : null;
+  if (!item.dueDate) return null;
+  const iso = reminderToIso(item.dueDate, clock);
+  if (!iso) return null;
+  const at = new Date(iso).getTime();
+  return Number.isFinite(at) ? at : null;
 }
 
 function isOverdueTask(item: SlagItem, todayKey: string): boolean {

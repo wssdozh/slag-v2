@@ -47,7 +47,8 @@ test('range projection ignores wall clock and counts only results inside the ran
 
 test('rollover preserves done until next cycle, resets missed streak and follows schedule', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { evaluateRecurringTasks: evaluate, getISODateString } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
+    const { evaluateRecurringTasks: evaluate } = await import(/* @vite-ignore */ '/src/lib/time/recurrenceHelper.ts');
+    const { getISODateString } = await import(/* @vite-ignore */ '/src/lib/time/dateUtils.ts');
     const base = {
       id: 'routine', type: 'task', title: 'routine', folder: 'Входящие', tags: [], attachments: [],
       content: '- [x] step', subtasks: [{ id: 'st_0', title: 'step', completed: true }],

@@ -13,7 +13,8 @@ import { expandFromRect, collapseToRect, enterFromEdge, exitToEdge } from '../..
 import { usePresence } from '../../hooks/ui/usePresence';
 import { useEditorPaneRect } from '../../hooks/layout/useEditorPaneRect';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
-import { formatDueDateLabel } from '../../lib/time/dateUtils';
+import { formatDueDateLabel, getTodayIso } from '../../lib/time/dateUtils';
+import { reminderClockLabel, reminderToIso, shiftReminderToDay } from '../../lib/time/reminder';
 import { useFullscreenDraft } from './useFullscreenDraft';
 import { AttachmentStrip } from './AttachmentStrip';
 import { MobileEditorBar } from './MobileEditorBar';
@@ -474,10 +475,15 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                     onPriorityChange={(p) => setPriority(p)}
                     dueDate={dueDate}
                     dateLabel={formatDueDateLabel(dueDate)}
-                    onDateChange={setDueDate}
+                    onDateChange={(next) => {
+                      // The reminder rides the day: without the new date it has nowhere to land,
+                      // and the old day is already gone by the time this runs.
+                      setReminder((prev) => shiftReminderToDay(prev, dueDate, next));
+                      setDueDate(next);
+                    }}
                     onDateClear={() => { setDueDate(''); setReminder(undefined); }}
-                    dueTime={reminder ? reminder.slice(11, 16) : undefined}
-                    onDueTimeChange={(t) => setReminder(t ?? undefined)}
+                    dueTime={reminderClockLabel(reminder)}
+                    onDueTimeChange={(t) => setReminder(t ? reminderToIso(dueDate || getTodayIso(), t) : undefined)}
                     duration={duration}
                     onDurationChange={setDuration}
                     recurrence={recurrence}

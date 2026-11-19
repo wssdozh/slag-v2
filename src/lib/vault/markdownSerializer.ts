@@ -3,6 +3,7 @@ import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
 import { parseSubtasksFromContent } from '../tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath';
+import { normalizeReminder } from '../time/reminder';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -26,7 +27,12 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     if (item.kanbanColumn) frontmatterData.kanbanColumn = item.kanbanColumn;
     if (item.priority && item.priority !== 'none') frontmatterData.priority = item.priority;
     if (item.dueDate) frontmatterData.dueDate = item.dueDate;
-    if (item.reminder) frontmatterData.reminder = item.reminder;
+    if (item.reminder) {
+      // На диск — только ISO с offset: голое `10:00` из старых записей дописывается до момента
+      // дня задачи, а нераспознанное остаётся как есть (стирать чужие данные нельзя).
+      const reminder = normalizeReminder(item.reminder, item.dueDate);
+      if (reminder) frontmatterData.reminder = reminder;
+    }
     if (item.duration !== undefined) frontmatterData.duration = item.duration;
     if (item.recurrence) frontmatterData.recurrence = item.recurrence;
     if (typeof item.streak === 'number') frontmatterData.streak = item.streak;

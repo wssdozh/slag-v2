@@ -22,7 +22,7 @@ export const ITEM_MUTABLE_PROPERTIES: Record<string, PropertySchemaItem> = {
   priority: { type: 'string', enum: ['none', 'low', 'medium', 'high'], description: 'Приоритет задачи' },
   dueDate: { type: 'string', description: 'Срок выполнения в формате YYYY-MM-DD (или пустая строка/null для сброса)' },
   dueDateText: { type: 'string', description: 'Естественное описание даты (например, "завтра в 10:00 p1")' },
-  reminder: { type: 'string', description: 'Время напоминания или слота дня (например, "10:00", "14:30" или ISO)' },
+  reminder: { type: 'string', description: 'ISO 8601 с часовым поясом; если хочешь только время — сначала дай dueDate' },
   duration: { type: 'number', description: 'Длительность задачи в минутах (например, 15, 30, 45, 60, 90)' },
   kanbanColumn: { type: 'string', description: 'Колонка канбан-доски' },
   tags: { type: 'array', items: { type: 'string' }, description: 'Полный список тегов (заменяет старый)' },
