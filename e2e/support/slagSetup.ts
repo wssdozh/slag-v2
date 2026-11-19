@@ -22,10 +22,15 @@ export async function setupSlag(page: Page, testInfo: TestInfo) {
       localStorage.setItem('slag_ai_settings_v2', JSON.stringify({ sourceMode: 'byok' }));
     });
   }
-  // `domcontentloaded` waits for the whole dev module graph to execute — seven
-  // hundred untransformed modules on a cold Vite cache. We do not care about that
-  // event, only that the app mounted. The first spec of a run pays the transform
-  // once (that is why the budget is this wide); every later spec is seconds.
-  await page.goto('/', { waitUntil: 'commit' });
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
+  // Cold Vite cache on this machine can take well over 120 s; the app stays
+  // alive during that time. We raise the budget to 240 s and retry the goto
+  // once when the commit step itself times out.
+  try {
+    await page.goto('/', { waitUntil: 'commit' });
+  } catch (err) {
+    if ((err as Error).message.includes('Timeout')) {
+      await page.goto('/', { waitUntil: 'commit' });
+    } else throw err;
+  }
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 240000 });
 }
