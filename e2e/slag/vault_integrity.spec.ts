@@ -4,8 +4,9 @@ const SHOT_DIR = 'test-results/screenshots';
 
 /**
  * «состояние» — the fourth block of the vault tab. Two blocks: what the relay knows and what the
- * disk holds. Each carries one line of prose and one question mark; the long version is a dialog,
- * because a settings row that explains itself in five lines is a row nobody reads.
+ * disk holds. The body is rows and nothing else: the short answer is the question mark's tooltip,
+ * the long one is its dialog. A block that writes a paragraph under its own title is a block that
+ * will be rewritten by whoever reads it next.
  */
 test('the vault tab opens the storage state block and it refuses a web sweep', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -35,7 +36,7 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   const info = panel.getByTestId('integrity-server-info');
   const bubble = panel.getByTestId('integrity-server-info-hint');
   await expect(bubble).toBeAttached();
-  await expect(bubble).toContainText('не чаще раза в 5 секунд');
+  await expect(bubble).toContainText('при запуске и после отправки');
   await info.hover();
   await info.click();
   // By name, not `.last()`: the settings dialog is a dialog too, and after this one closes it

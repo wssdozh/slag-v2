@@ -114,7 +114,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         action={
           <InfoHint
             testId="integrity-server-info"
-            hint="при запуске и после отправки, не чаще раза в 5 секунд"
+            hint="сравниваю корень хранилища с корнем комнаты: при запуске и после отправки"
             title="Сверка с сервером"
           >
             <p>
@@ -133,10 +133,6 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
           </InfoHint>
         }
       >
-        <p className="px-3.5 pt-3 pb-2.5 text-xs leading-relaxed text-fg-muted">
-          проверяю, что у меня и у других устройств одно и то же хранилище
-        </p>
-        <SettingsDivider />
         <SettingsRow
           label="Состояние"
           value={<span data-testid="integrity-server" className={server.tone}>{server.value}</span>}
@@ -176,7 +172,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         action={
           <InfoHint
             testId="integrity-disk-info"
-            hint="диск читаю только по кнопке"
+            hint="читаю файлы на диске по кнопке и показываю, что не так"
             title="Это устройство"
           >
             <p>
@@ -195,10 +191,6 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
           </InfoHint>
         }
       >
-        <p className="px-3.5 pt-3 pb-2.5 text-xs leading-relaxed text-fg-muted">
-          читаю файлы на диске и показываю, что не так
-        </p>
-        <SettingsDivider />
         <SettingsRow label="Находки" value={findingsValue} />
         <SettingsDivider />
         <SettingsRow
