@@ -1149,16 +1149,22 @@ export class SyncEngine {
     // A refusal from the relay is an answer, not a failure to repeat: only a lost connection or a
     // timeout is worth another pass, and those schedule one below.
     let retryable = true;
+    // The deadline is bytes-shaped, not flat. A 7 MB attachment over a home uplink is a legitimate
+    // push that needs more than thirty seconds: the fixed deadline cut it off mid-transfer, the pull
+    // put that file back in the queue, and the machine sat in a push → timeout → retry loop where
+    // the sidebar never stopped spinning. 100 KB/s is the floor we are willing to wait for.
+    const body = JSON.stringify(pending.encrypted);
+    const timeoutMs = SYNC_INTERVALS.PUSH_TIMEOUT_MS + Math.ceil(body.length / 100_000) * 1000;
     try {
       if (!this.activeRoomId) throw new Error('Sync room is not ready');
       const cleanUrl = apiBase(this.config.serverUrl);
       const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
         method: 'POST',
         headers: authHeaders(this, true),
-        body: JSON.stringify(pending.encrypted),
+        body,
         // Without a deadline a relay that accepts and stalls keeps `init` in its `syncing` phase
         // forever, so the sidebar shows a spinner that never resolves.
-        signal: AbortSignal.timeout(SYNC_INTERVALS.PUSH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) {
         if (response.status === 409) {
@@ -1181,7 +1187,7 @@ export class SyncEngine {
     } catch (err: unknown) {
       if (pending.settled) return;
       this.pendingPushes.delete(pending.bundleId);
-      const msg = syncErrorText(err, SYNC_INTERVALS.PUSH_TIMEOUT_MS);
+      const msg = syncErrorText(err, timeoutMs);
       syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
       this.status.state = 'error';
       this.status.error = msg;
