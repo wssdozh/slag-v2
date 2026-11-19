@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **612**, строк: **108053**, зон: **48**.
+Модулей: **612**, строк: **108073**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -112,7 +112,7 @@
 | `MobileEditorBar.tsx` | 312 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 320 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 51 файлов, 7969 строк
+## src/components/Feed — 51 файлов, 7989 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -142,7 +142,7 @@
 | `composer/useComposerAiTags.ts` | 70 | 1 | UseComposerAiTagsOptions, useComposerAiTags | +AI in the composer: writes the suggested folder and tags back as @ and # tok… |
 | `composer/useComposerAutocomplete.ts` | 354 | 1 | ComposerKeyEvent, UseComposerAutocompleteOptions, useComposerAutocomplete | The composer's suggestions: which trigger is open, what it matches, and apply… |
 | `composer/useComposerDraft.ts` | 436 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft | The composer draft on disk: restore, autosave, reset, and repairing pre-reply… |
-| `composer/useComposerField.ts` | 31 | 1 | ComposerEngine, useComposerField | React wrapper for the field handle: the DOM is read lazily inside callbacks, … |
+| `composer/useComposerField.ts` | 51 | 1 | ComposerEngine, useComposerField | React wrapper for the field handle: the DOM is read lazily inside callbacks, … |
 | `composer/useComposerFiles.ts` | 152 | 1 | useComposerFiles | Files into the composer: picker, drop and paste, with no opinion on titles or… |
 | `composer/useComposerSlashCommands.ts` | 141 | 1 | UseComposerSlashCommandsOptions, useComposerSlashCommands | What a `/command` does to the draft: swap the type, set a property, start a r… |
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
