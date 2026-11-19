@@ -132,3 +132,63 @@ export interface RepairOptions {
   /** One run's own directory under `hygieneRoot`, so two sweeps never overwrite each other. */
   runId?: string;
 }
+
+// --- one truth, three levels ----------------------------------------------------------------
+//
+// A leaf is one note, a folder is its leaves, the root is every folder. Comparing the root answers
+// "am I in sync" in one string; a folder that disagrees is the only branch worth walking.
+
+export interface Manifest {
+  /** Hash over the sorted `path:folderHash` list. */
+  root: string;
+  /** Folder path → hash over its sorted `id:leafHash` list. */
+  folders: Record<string, string>;
+  /** Note id → fingerprint of its canonical form. Kept apart from the index so startup stays cheap. */
+  leaves: Record<string, string>;
+}
+
+/**
+ * What a comparison found. A report, never an action: `extra` means "this device has something the
+ * reference does not", and the lesson of 2026-11-18 is that absence is not permission to delete.
+ */
+export interface DriftReport {
+  rootMatch: boolean;
+  /** Folders whose hash disagrees with the reference. */
+  folders: string[];
+  /** Ids the reference has and this device does not. */
+  missing: string[];
+  /** Ids this device has and the reference does not. */
+  extra: string[];
+  /** Ids both have with different fingerprints. */
+  conflict: string[];
+}
+
+/** What the device keeps: a small index inline in `state.json`, the leaves on demand. */
+export interface IntegrityIndex {
+  at: string;
+  root: string;
+  folders: Record<string, string>;
+}
+
+export interface IntegrityStore {
+  readIndex(): Promise<IntegrityIndex | null>;
+  saveIndex(index: IntegrityIndex): Promise<void>;
+  readLeaves(): Promise<Record<string, string> | null>;
+  saveLeaves(leaves: Record<string, string>): Promise<void>;
+}
+
+/** The manifest as it travels between devices: fingerprints keyed with the vault key. */
+export interface WireManifest {
+  v: 1;
+  root: string;
+  folders: Record<string, string>;
+  leaves?: Record<string, string>;
+}
+
+/** What the storage panel draws. */
+export interface IntegrityStatus {
+  at: string | null;
+  root: string | null;
+  inSync: boolean;
+  drift: DriftReport | null;
+}
