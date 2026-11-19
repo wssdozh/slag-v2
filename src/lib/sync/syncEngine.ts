@@ -115,7 +115,7 @@ export class SyncEngine {
   /** Set by the headless node: it holds a copy and never sends its own state back. */
   public forceReceiveOnly = false;
   /** A first pull over a tunnel can take minutes; the app on a LAN never needs more than 30s. */
-  public pullTimeoutMs = 30_000;
+  public pullTimeoutMs = 60_000;
   /** Bundles per pull request. A page of attachment-carrying bundles is megabytes. */
   public pullPageSize = 100;
   /** How soon a failed pass tries again. Public so a test does not sit through ten real seconds. */
@@ -448,6 +448,13 @@ export class SyncEngine {
   private scheduleAttachmentPass(): void {
     // A queued ask for missing bytes drains one bundle at a time, on the same one-shot push.
     if (this.pendingRequests.size > 0) this.scheduleDebouncedPush(0);
+    // A backlog pull owns the channel: one file per push here is slower than the pull and would
+    // starve it — the pull died with "Сервер не ответил за 30 с" on a laptop uploading 31 files.
+    // The pull asks for the pass again when it is done.
+    if (this.pendingPull) {
+      syncLog.debug('Attachment pass deferred: a backlog pull is in flight');
+      return;
+    }
     // init and every confirmed push both call this: one queued pass is enough for both.
     if (this.attachmentPass) return;
     if (this.attachmentSyncBlocked) {
@@ -1297,6 +1304,9 @@ export class SyncEngine {
         saveCursor(this.bookkeeping, cursor);
         if (cursor <= previousCursor) throw new Error('Sync pagination cursor did not advance');
       }
+      // The channel is free again: the pass this pull deferred is the one that fills the backlog's
+      // attachments.
+      this.scheduleAttachmentPass();
     } catch (e) {
       if (generation !== this.initGeneration) return;
       syncLog.warn('HTTP bundles fetch failed:', e);
