@@ -1,9 +1,10 @@
 // Панель «состояние хранилища»: что знает сервер и что видит диск — двумя блоками, как соседние
-// разделы хранилища. Настройки и объяснения живут здесь же: «сходится» без «когда и почему» —
-// это строка, которую нельзя ни проверить, ни выключить.
-import React from 'react';
+// разделы хранилища. В каждом блоке одна строка «что это» и один вопросик: коротко на наведении,
+// подробно в модалке. Строки остаются строками, а не абзацами под каждой подписью.
+import React, { useState } from 'react';
 import type { Finding, IntegrityStatus } from '../../../../lib/vault/integrity/types';
 import type { ManifestStatus, ManifestTrigger } from '../../../../lib/sync/types';
+import { InfoHint } from '../../../UI/InfoHint';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSwitch } from '../../SettingsUI';
 import { IntegrityFindingCard } from './IntegrityFindingCard';
 
@@ -66,41 +67,13 @@ function formatTime(iso: string | null): string {
   }
 }
 
-/** Что показать про комнату и что это значит словами, а не только цветом. */
-function serverText(remote: ManifestStatus | null): { value: string; tone: string; hint: string } {
-  if (!remote) {
-    return {
-      value: 'нет данных',
-      tone: 'text-fg-dim',
-      hint: 'сверку ещё не запускали: движок синка делает её при запуске и после отправки',
-    };
-  }
-  if (remote.remoteRoot === null) {
-    return {
-      value: 'не ответил',
-      tone: 'text-fg-secondary',
-      hint: 'в комнате нет корня или сервер не пустил: смотри «Логи и диагностика»',
-    };
-  }
-  if (remote.inSync) {
-    return {
-      value: `сходится · ${remote.remoteRoot.slice(0, 8)}…`,
-      tone: 'text-success',
-      hint: 'корень этой копии совпал с тем, что прислало другое устройство',
-    };
-  }
-  if (remote.action === 'reconcile') {
-    return {
-      value: 'разошлось — отправляю заново',
-      tone: 'text-fg-secondary',
-      hint: 'корни разные: отправляю всё состояние целиком, это уже в работе',
-    };
-  }
-  return {
-    value: 'разошлось — нужен разбор',
-    tone: 'text-danger',
-    hint: 'переотправка не помогла: где-то лежит файл не там или иное содержимое, смотри находки ниже',
-  };
+/** Состояние комнаты одним словом и его цвет. Значение без объяснений: они в вопросике. */
+function serverState(remote: ManifestStatus | null): { value: string; tone: string } {
+  if (!remote) return { value: 'нет данных', tone: 'text-fg-dim' };
+  if (remote.remoteRoot === null) return { value: 'не ответил', tone: 'text-fg-secondary' };
+  if (remote.inSync) return { value: `сходится · ${remote.remoteRoot.slice(0, 8)}…`, tone: 'text-success' };
+  if (remote.action === 'reconcile') return { value: 'разошлось — отправляю заново', tone: 'text-fg-secondary' };
+  return { value: 'разошлось — нужен разбор', tone: 'text-danger' };
 }
 
 export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
@@ -115,23 +88,17 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   onVerify,
   onRepair,
 }) => {
-  const [dryRun, setDryRun] = React.useState(true);
-  const server = serverText(remote);
+  const [dryRun, setDryRun] = useState(true);
+  const server = serverState(remote);
 
-  /* ── диск: что нашлось и что можно сделать ─────────── */
+  /* ── диск: что нашлось ─────────────────────────────── */
   let findingsValue = 'ещё не сверяли';
-  let findingsHint = 'сверка читает файлы с диска — она по кнопке, а не сама';
   if (status) {
     if (findings.length === 0) {
       findingsValue = 'чисто';
-      findingsHint = 'ни одной находки: дублей, кривых путей и висячих файлов нет';
     } else {
       const safe = findings.filter((finding) => finding.fix === 'safe').length;
-      findingsValue = `${findings.length}${safe > 0 ? ` · к починке ${safe}` : ''}`;
-      findingsHint =
-        safe > 0
-          ? 'остальное требует человека: такое я не трогаю сама'
-          : 'безопасно чинить нечего — остальное нужно смотреть глазами';
+      findingsValue = safe > 0 ? `${findings.length} · к починке ${safe}` : `${findings.length}`;
     }
   }
 
@@ -142,10 +109,36 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
       {/* ── сервер ─────────────────────────────────────── */}
-      <SettingsGroup title="Сверка с сервером">
+      <SettingsGroup
+        title="Сверка с сервером"
+        action={
+          <InfoHint
+            testId="integrity-server-info"
+            hint="при запуске и после отправки, не чаще раза в 5 секунд"
+            title="Сверка с сервером"
+          >
+            <p>
+              Корень — отпечаток всех заметок и папок. Комната хранит один корень на хранилище,
+              поэтому «сходится» значит: моя копия и копия соседа совпали.
+            </p>
+            <p>
+              Проверяю при запуске и после каждой отправки, не чаще раза в 5 секунд. Разошлось —
+              отправляю состояние целиком, один раз. Дальше показываю расхождение и жду человека:
+              молча перезаписать чужое однажды стоило 84 заметок.
+            </p>
+            <p>
+              Автосверка выключена — проверяю и публикую только по кнопке. Тогда другое устройство
+              не узнает мой корень, пока я не нажму.
+            </p>
+          </InfoHint>
+        }
+      >
+        <p className="px-3.5 pt-3 pb-2.5 text-xs leading-relaxed text-fg-muted">
+          проверяю, что у меня и у других устройств одно и то же хранилище
+        </p>
+        <SettingsDivider />
         <SettingsRow
           label="Состояние"
-          description={server.hint}
           value={<span data-testid="integrity-server" className={server.tone}>{server.value}</span>}
         />
         <SettingsDivider />
@@ -157,7 +150,6 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         <SettingsDivider />
         <SettingsRow
           label="Автосверка"
-          description="при запуске и после каждой отправки, не чаще раза в 5 секунд. выключено — сверяю только по кнопке ниже, и комната узнаёт мой корень тоже только тогда"
           right={
             <SettingsSwitch
               checked={autoCheck}
@@ -170,14 +162,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         />
         <SettingsDivider />
         <SettingsRow
-          label="Если разошлось"
-          value="одна переотправка"
-          description="потом только показываю расхождение — молча перезаписать чужое однажды стоило 84 заметок"
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Сверить с сервером сейчас"
-          description="прочитает корень комнаты и, если он другой, отправит состояние заново"
+          label="Сверить сейчас"
           onClick={onCheckServer}
           disabled={busy}
           chevron
@@ -186,16 +171,38 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
       </SettingsGroup>
 
       {/* ── диск ───────────────────────────────────────── */}
-      <SettingsGroup title="Это устройство">
-        <SettingsRow
-          label="Находки"
-          value={findingsValue}
-          description={findingsHint}
-        />
+      <SettingsGroup
+        title="Это устройство"
+        action={
+          <InfoHint
+            testId="integrity-disk-info"
+            hint="диск читаю только по кнопке"
+            title="Это устройство"
+          >
+            <p>
+              Читаю notes/, .attachments/ и .trash/. Восемь сканеров: дубли id, заметки не в своей
+              папке, папки из frontmatter, которых нет, папки в state.json без каталога, пустые
+              папки, сломанный frontmatter, вложения без ссылок, старая корзина.
+            </p>
+            <p>
+              Чиню только обратимое: файл уезжает в .trash/.hygiene/&lt;дата&gt;/, state.json
+              правится с копией. Заметку не удаляю.
+            </p>
+            <p>
+              «Только отчёт» включён — чистка показывает, что перенесла бы. Диск сам не читаю:
+              это секунды работы с файлами, поэтому по кнопке.
+            </p>
+          </InfoHint>
+        }
+      >
+        <p className="px-3.5 pt-3 pb-2.5 text-xs leading-relaxed text-fg-muted">
+          читаю файлы на диске и показываю, что не так
+        </p>
+        <SettingsDivider />
+        <SettingsRow label="Находки" value={findingsValue} />
         <SettingsDivider />
         <SettingsRow
           label="Только отчёт"
-          description="сверка и чистка ничего не пишут на диск. выключено — «Почистить» правда переносит файлы в архив чистки"
           right={
             <SettingsSwitch
               checked={dryRun}
@@ -208,20 +215,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         />
         <SettingsDivider />
         <SettingsRow
-          label="Что читаю"
-          value="8 сканеров"
-          description="notes/, .attachments/ и .trash/: дубли id, пути, папки в state.json, вложения без ссылок, старая корзина"
-        />
-        <SettingsDivider />
-        <SettingsRow
-          label="Что чиню сама"
-          value="переносы и записи"
-          description="файл уезжает в .trash/.hygiene/<дата>/, state.json — с копией. заметку не удаляю никогда"
-        />
-        <SettingsDivider />
-        <SettingsRow
           label={busy ? 'Читаю диск…' : 'Сверить диск'}
-          description="собрать находки и манифест, ничего не трогая"
           onClick={onVerify}
           disabled={busy}
           chevron
@@ -229,18 +223,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         />
         <SettingsDivider />
         <SettingsRow
-          label={
-            busy
-              ? 'Чищу…'
-              : dryRun
-                ? 'Почистить (с отчётом)'
-                : 'Почистить по-настоящему'
-          }
-          description={
-            dryRun
-              ? 'покажет, что перенесла бы; переключатель «только отчёт» выше выключает запись'
-              : 'перенесёт безопасное: тумблер «только отчёт» выше выключен'
-          }
+          label={busy ? 'Чищу…' : 'Почистить'}
           onClick={() => onRepair(dryRun)}
           disabled={busy}
           chevron
