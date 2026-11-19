@@ -26,7 +26,7 @@ export interface DatePickerPopoverProps {
 
 const CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
-/** Typed, not wheeled: the time is four digits, and a field is faster than a wheel for four digits. */
+/** Typed, not wheeled: the time is four digits, and a field beats a wheel for four digits. */
 const TimeField: React.FC<{ value?: string; onChange: (time: string | null) => void }> = ({ value, onChange }) => {
   const [draft, setDraft] = useState(value ?? '');
   const [seen, setSeen] = useState(value);
@@ -48,8 +48,8 @@ const TimeField: React.FC<{ value?: string; onChange: (time: string | null) => v
   };
 
   return (
-    <div className="flex items-center gap-2 px-1">
-      <Icon name="time.time" size="sm" tone="inherit" className="shrink-0 text-fg-muted" />
+    <label className="flex items-center gap-2.5 h-9 px-1 border-b border-tint-8 focus-within:border-hover transition-colors">
+      <Icon name="time.time" size="sm" className="shrink-0 text-fg-muted" />
       <input
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
@@ -63,18 +63,24 @@ const TimeField: React.FC<{ value?: string; onChange: (time: string | null) => v
         inputMode="numeric"
         aria-label="время задачи"
         data-testid="date-popover-time"
-        className="w-14 bg-transparent font-mono text-xs text-fg-soft placeholder-fg-dim outline-none ring-0"
+        className="flex-1 min-w-0 bg-transparent font-mono text-sm text-fg-soft placeholder-fg-dim outline-none ring-0"
       />
-      {value && (
+      {value ? (
         <button
           type="button"
-          onClick={() => onChange(null)}
-          className="ml-auto text-3xs text-fg-muted hover:text-fg-soft transition-colors cursor-pointer"
+          onClick={() => {
+            setDraft('');
+            onChange(null);
+          }}
+          title="Снять время"
+          className="p-0.5 shrink-0 text-fg-muted hover:text-rose-400 transition-colors cursor-pointer"
         >
-          без времени
+          <Icon name="action.close" size="sm" tone="inherit" />
         </button>
+      ) : (
+        <span className="text-2xs text-fg-dim shrink-0">нет</span>
       )}
-    </div>
+    </label>
   );
 };
 
@@ -166,39 +172,32 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
     <div
       ref={containerRef}
       data-motion-state={phase}
+      data-testid="date-popover"
       onTransitionEnd={onTransitionEnd}
       inert={!isOpen}
       onClick={(e) => e.stopPropagation()}
       className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-tint-10 shadow-2xl shadow-scrim-90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
     >
-      {/* Quick Presets */}
+      {/* Quick Presets. Picking a day no longer closes the popover: the time sits right below it,
+          and reopening the calendar to type four digits was the whole reason people skipped it. */}
       <div className="grid grid-cols-3 gap-1">
         <button
           type="button"
-          onClick={() => {
-            onChange(getTodayIso());
-            onClose();
-          }}
+          onClick={() => onChange(getTodayIso())}
           className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           Сегодня
         </button>
         <button
           type="button"
-          onClick={() => {
-            onChange(getTomorrowIso());
-            onClose();
-          }}
+          onClick={() => onChange(getTomorrowIso())}
           className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           Завтра
         </button>
         <button
           type="button"
-          onClick={() => {
-            onChange(getNextWeekIso());
-            onClose();
-          }}
+          onClick={() => onChange(getNextWeekIso())}
           className="px-2 py-1 rounded-lg text-xs font-medium text-fg-tertiary hover:text-white bg-tint-4 hover:bg-tint-8 transition-colors cursor-pointer text-center"
         >
           След. нед
@@ -251,10 +250,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
             <button
               key={cell.dateStr}
               type="button"
-              onClick={() => {
-                onChange(cell.dateStr);
-                onClose();
-              }}
+              onClick={() => onChange(cell.dateStr)}
               className={`h-7 rounded-lg text-xs flex items-center justify-center transition-colors cursor-pointer ${
                 isSelected
                   ? 'bg-accent text-white font-bold shadow-sm'
@@ -271,8 +267,10 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
         })}
       </div>
 
-      {/* Time of day lives next to the date it belongs to, not in a second popover. */}
-      {value && onTimeChange && (
+      {/* Time of day lives next to the date it belongs to, not in a second popover. It stays
+          visible before a day is picked: typing a time sets today, and hiding the field until
+          then made the feature look absent. */}
+      {onTimeChange && (
         <>
           <div className="h-px bg-tint-6 -mx-1" />
           <TimeField value={time} onChange={onTimeChange} />
@@ -285,16 +283,22 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
           <div className="h-px bg-tint-6 -mx-1" />
           <button
             type="button"
-            onClick={() => {
-              onClear();
-              onClose();
-            }}
+            onClick={onClear}
             className="w-full py-1 text-center text-xs text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
           >
             Снять срок
           </button>
         </>
       )}
+
+      <div className="h-px bg-tint-6 -mx-1" />
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full py-1.5 text-center text-xs font-medium text-fg-soft hover:text-white bg-tint-6 hover:bg-tint-10 rounded-lg transition-colors cursor-pointer"
+      >
+        Готово
+      </button>
     </div>
   );
 };

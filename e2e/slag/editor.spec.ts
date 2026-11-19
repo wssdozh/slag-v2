@@ -1580,11 +1580,14 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // 5. Select "Завтра"
     await popover.locator('button', { hasText: 'Завтра' }).click();
 
-    // 6. Verify popover closed and calendar button is active blue
-    await expect(popover).not.toBeVisible();
+    // 6. The popover stays open (the time field lives under the calendar), the button turns active,
+    // and "Готово" is the explicit way out.
+    await expect(popover).toBeVisible();
     const activeDateBtn = page.locator('button[title*="Срок: Завтра"]').first();
     await expect(activeDateBtn).toBeVisible();
     await expect(activeDateBtn).toHaveClass(/text-blue-400/);
+    await popover.locator('button', { hasText: 'Готово' }).click();
+    await expect(popover).not.toBeVisible();
   });
 
   test('48. Fullscreen editor: tag chips step into an inline edit instead of playing a picture', async ({ page }) => {

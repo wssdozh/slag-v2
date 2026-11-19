@@ -73,8 +73,11 @@ test.describe('reminder time in the focus editor', () => {
 
     await page.screenshot({ path: 'test-results/screenshots/task-time-contract-editor.png' });
 
-    // Moving the date carries the same wall clock to the new day.
+    // Moving the date carries the same wall clock to the new day. The popover stays open on a
+    // pick, so the time field is right there — no second trip through the calendar.
     await page.getByRole('button', { name: 'Завтра', exact: true }).click();
+    await expect(page.locator('[data-testid="date-popover"]')).toBeVisible();
+    await expect(page.locator('[data-testid="date-popover-time"]')).toHaveValue('10:45');
     await expect
       .poll(async () => (await savedItem())?.reminder)
       .toMatch(new RegExp(`^${seeded.tomorrow}T10:45:00[+-]\\d{2}:\\d{2}$`));

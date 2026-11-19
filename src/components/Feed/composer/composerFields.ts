@@ -23,6 +23,8 @@ export interface ComposerDismissals {
   isDateDismissed: boolean;
   isRecurrenceDismissed: boolean;
   isDurationDismissed: boolean;
+  /** The time of day was cleared by hand while the text still names one. */
+  isTimeDismissed: boolean;
   dismissedTags: ReadonlySet<string>;
 }
 
@@ -111,7 +113,7 @@ export function resolveComposerFields({
         : (dueDate || (nextRecurrence ? getTodayIso() : undefined)))
     : undefined;
   const nextReminder = isTask
-    ? (!dismissals.isDateDismissed && parsed.reminder ? parsed.reminder : (reminder || undefined))
+    ? (!dismissals.isTimeDismissed && parsed.reminder ? parsed.reminder : (reminder || undefined))
     : undefined;
   const nextDuration = isTask
     ? (!dismissals.isDurationDismissed && parsed.duration !== undefined ? parsed.duration : duration)

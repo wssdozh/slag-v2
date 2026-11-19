@@ -14,7 +14,8 @@ import { SlashCommandMenu } from './SlashCommandMenu';
 import { FolderSuggestionMenu } from './FolderSuggestionMenu';
 import { TagSuggestionMenu } from './TagSuggestionMenu';
 import { SuggestionMenuShell } from './SuggestionMenuShell';
-import { formatDueDateLabel } from '../../lib/time/dateUtils';
+import { formatDueDateLabel, getTodayIso } from '../../lib/time/dateUtils';
+import { reminderClockLabel, reminderToIso, shiftReminderToDay } from '../../lib/time/reminder';
 import { DEFAULT_INBOX_FOLDER, UI_DELAYS } from '../../config';
 import { getPref } from '../../lib/storage/prefs';
 import { Icon } from '../UI/icons/Icon';
@@ -95,7 +96,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [documentId] = useState(() => `composer-draft-${Date.now()}`);
 
   const [taskStatus] = useState<SlagItemStatus>(initialStatus || 'todo');
-  const [reminder] = useState<string | undefined>(initialReminder);
+  const [reminder, setReminder] = useState<string | undefined>(initialReminder);
 
   // Todoist parser & Ghost-chips state
   const [parsedTask, setParsedTask] = useState<ParsedTodoistTask | null>(null);
@@ -103,6 +104,7 @@ export const Composer: React.FC<ComposerProps> = ({
   const [isPriorityDismissed, setIsPriorityDismissed] = useState(false);
   const [isDurationDismissed, setIsDurationDismissed] = useState(false);
   const [isRecurrenceDismissed, setIsRecurrenceDismissed] = useState(false);
+  const [isTimeDismissed, setIsTimeDismissed] = useState(false);
   const [dismissedTags, setDismissedTags] = useState<Set<string>>(new Set());
 
   const {
@@ -144,6 +146,7 @@ export const Composer: React.FC<ComposerProps> = ({
       setParsedTask(null);
       setIsDateDismissed(false);
       setIsPriorityDismissed(false);
+      setIsTimeDismissed(false);
       setDismissedTags(new Set());
     },
   });
@@ -298,6 +301,7 @@ export const Composer: React.FC<ComposerProps> = ({
     isDateDismissed,
     isRecurrenceDismissed,
     isDurationDismissed,
+    isTimeDismissed,
     dismissedTags,
   };
 
@@ -332,6 +336,13 @@ export const Composer: React.FC<ComposerProps> = ({
         ? parsedTask.recurrence
         : recurrence)
     : undefined;
+
+  // The parser understands «в 10:00» too: the time it found wins until a person edits the field.
+  const effectiveReminder = itemType === 'task'
+    ? (!isTimeDismissed && parsedTask?.reminder ? parsedTask.reminder : reminder)
+    : undefined;
+
+  const effectiveDueTime = reminderClockLabel(effectiveReminder);
 
   // What the parser understood, painted right in the field: the date and tags in the
   // mention tone, the priority in the one the priority bars already use.
@@ -612,12 +623,24 @@ export const Composer: React.FC<ComposerProps> = ({
           dueDate={effectiveDueDate}
           dateLabel={effectiveDateLabel}
           onDateChange={(newDate) => {
+            // The reminder rides the day, exactly like the editor's: picking a new date must not
+            // leave the time pinned to the old one.
+            setReminder((prev) => shiftReminderToDay(prev ?? effectiveReminder, effectiveDueDate, newDate));
             setDueDate(newDate);
             setIsDateDismissed(false);
+            setIsTimeDismissed(false);
           }}
           onDateClear={() => {
             setIsDateDismissed(true);
+            setIsTimeDismissed(true);
             setDueDate('');
+            setReminder(undefined);
+          }}
+          dueTime={effectiveDueTime}
+          onDueTimeChange={(time) => {
+            setIsTimeDismissed(!time);
+            setReminder(time ? reminderToIso(effectiveDueDate || getTodayIso(), time) : undefined);
+            if (time && !effectiveDueDate) setIsDateDismissed(false);
           }}
           duration={effectiveDuration}
           onDurationChange={(mins) => {

@@ -183,10 +183,9 @@ export const TaskMetaBar: React.FC<TaskMetaBarProps> = ({
           isOpen={isDatePickerOpen}
           value={dueDate}
           time={dueTime}
-          onChange={(newDate) => {
-            onDateChange(newDate);
-            setIsDatePickerOpen(false);
-          }}
+          // The popover stays open on a pick: the time field sits right below the calendar, and
+          // closing on every day click made "pick a day, then a time" a two-gesture job.
+          onChange={onDateChange}
           onTimeChange={(nextTime) => {
             if (!onDueTimeChange) return;
             if (!nextTime) {
@@ -200,7 +199,6 @@ export const TaskMetaBar: React.FC<TaskMetaBarProps> = ({
           onClear={() => {
             onDateClear();
             if (onDueTimeChange) onDueTimeChange(null);
-            setIsDatePickerOpen(false);
           }}
           onClose={() => setIsDatePickerOpen(false)}
           direction={direction}
