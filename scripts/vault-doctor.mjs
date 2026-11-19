@@ -51,8 +51,14 @@ function moveFile(fromAbs, toAbs) {
   return toAbs;
 }
 
+/** The live file sits beside `notes/`; the copy inside it is a leftover of an older layout. */
+function statePathFor(vaultDir) {
+  const beside = join(vaultDir, 'state.json');
+  return existsSync(beside) ? beside : join(vaultDir, 'notes', 'state.json');
+}
+
 function backupStateFile(vaultDir, runRoot) {
-  const statePath = join(vaultDir, 'notes', 'state.json');
+  const statePath = statePathFor(vaultDir);
   if (!existsSync(statePath)) return null;
   const backupPath = join(runRoot, 'state.json.bak');
   mkdirSync(runRoot, { recursive: true });
