@@ -54,6 +54,105 @@ test('completion transition is the single gate for status, streak and checklist 
   });
 });
 
+test('reopen → rename stays todo and streak does not change', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { applyTaskCompletion } = await import(/* @vite-ignore */ '/src/lib/tasks/taskCompletion.ts');
+    const today = new Date(2026, 10, 7, 14);
+    const done = {
+      id: 't', type: 'task' as const, title: 'original', folder: 'Входящие', tags: [], attachments: [],
+      content: '- [x] one\n- [x] two',
+      subtasks: [{ id: 'st_0', title: 'one', completed: true }, { id: 'st_1', title: 'two', completed: true }],
+      createdAt: 1, updatedAt: 1, status: 'done' as const,
+      recurrence: { freq: 'daily' as const, interval: 1 },
+      streak: 5, history: ['2026-11-03', '2026-11-04'], lastCompletedDate: '2026-11-04',
+    };
+    // User reopens the task (explicitly changes status)
+    const reopened = applyTaskCompletion(done, { ...done, status: 'todo', title: 'renamed' }, today);
+    // Second save: user edits title again, content/subtasks unchanged
+    const renameAgain = applyTaskCompletion(reopened, { ...reopened, title: 'again renamed' }, today);
+    return {
+      reopened: {
+        status: reopened.status, streak: reopened.streak, title: reopened.title,
+        last: reopened.lastCompletedDate,
+      },
+      renameAgain: {
+        status: renameAgain.status, streak: renameAgain.streak, title: renameAgain.title,
+      },
+    };
+  });
+  expect(result).toEqual({
+    reopened: { status: 'todo', streak: 5, title: 'renamed', last: '2026-11-04' },
+    renameAgain: { status: 'todo', streak: 5, title: 'again renamed' },
+  });
+});
+
+test('partial checklist does not close', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { applyTaskCompletion } = await import(/* @vite-ignore */ '/src/lib/tasks/taskCompletion.ts');
+    const today = new Date(2026, 10, 7, 14);
+    const open = {
+      id: 't', type: 'task' as const, title: 'open', folder: 'Входящие', tags: [], attachments: [],
+      content: '- [x] one\n- [ ] two\n- [ ] three',
+      subtasks: [
+        { id: 'st_0', title: 'one', completed: true },
+        { id: 'st_1', title: 'two', completed: false },
+        { id: 'st_2', title: 'three', completed: false },
+      ],
+      createdAt: 1, updatedAt: 1, status: 'todo' as const,
+      recurrence: { freq: 'daily' as const, interval: 1 },
+      streak: 1, history: [], lastCompletedDate: undefined,
+    };
+    const tickedOneMore = applyTaskCompletion(
+      open,
+      { ...open, content: '- [x] one\n- [x] two\n- [ ] three', subtasks: [
+        { id: 'st_0', title: 'one', completed: true },
+        { id: 'st_1', title: 'two', completed: true },
+        { id: 'st_2', title: 'three', completed: false },
+      ]},
+      today,
+    );
+    return {
+      status: tickedOneMore.status,
+      subtasks: tickedOneMore.subtasks?.map(st => st.completed),
+    };
+  });
+  expect(result).toEqual({ status: 'todo', subtasks: [true, true, false] });
+});
+
+test('legacy subtasks without checkboxes close on the transition', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const { applyTaskCompletion } = await import(/* @vite-ignore */ '/src/lib/tasks/taskCompletion.ts');
+    const today = new Date(2026, 10, 7, 14);
+    // Legacy format: body has no checkboxes, subtasks carry the list
+    const open = {
+      id: 't', type: 'task' as const, title: 'open', folder: 'Входящие', tags: [], attachments: [],
+      content: 'просто текст',
+      subtasks: [{ id: 'st_0', title: 'one', completed: false }, { id: 'st_1', title: 'two', completed: false }],
+      createdAt: 1, updatedAt: 1, status: 'todo' as const,
+      recurrence: { freq: 'daily' as const, interval: 1 },
+      streak: 2, history: ['2026-11-03'], lastCompletedDate: '2026-11-03',
+    };
+    const allDone = applyTaskCompletion(
+      open,
+      { ...open, subtasks: [{ id: 'st_0', title: 'one', completed: true }, { id: 'st_1', title: 'two', completed: true }] },
+      today,
+    );
+    // Second write: user tweaks title, everything else identical
+    const tweakTitle = applyTaskCompletion(allDone, { ...allDone, title: 'tweaked' }, today);
+    return {
+      first: { status: allDone.status, streak: allDone.streak, last: allDone.lastCompletedDate },
+      second: { status: tweakTitle.status, streak: tweakTitle.streak },
+    };
+  });
+  expect(result).toEqual({
+    first: { status: 'done', streak: 3, last: '2026-11-07' },
+    second: { status: 'done', streak: 3 },
+  });
+});
+
 test('ticking the last subtask completes the task on its own', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {

@@ -17,10 +17,12 @@ export function applyTaskCompletion(previous: SlagItem, next: SlagItem, referenc
   if (next.type !== 'task') return next;
 
   // Ticking the last subtask is a completion, so it takes the same route as the status click.
-  // Only a write that keeps the status as it was counts: an explicit status change always wins,
-  // otherwise reopening a done task would be swallowed by its still-checked checklist.
+  // Only a write that keeps the status as it was AND transitions from "not all checked" → "all checked" counts:
+  // an explicit status change always wins, otherwise reopening a done task would be swallowed by its still-checked checklist.
+  const wasComplete = allSubtasksCompleted(previous);
+  const isComplete = allSubtasksCompleted(next);
   const autoClosed: SlagItem =
-    next.status === previous.status && next.status !== 'done' && allSubtasksCompleted(next)
+    next.status === previous.status && next.status !== 'done' && !wasComplete && isComplete
       ? { ...next, status: 'done' }
       : next;
 
