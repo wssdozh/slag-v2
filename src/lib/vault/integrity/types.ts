@@ -18,9 +18,9 @@ export type FixKind = 'safe' | 'manual' | 'none';
 export type ScannerId =
   | 'duplicate-id'
   | 'path-mismatch'
+  | 'folder-missing'
   | 'ghost-folder'
   | 'empty-folder'
-  | 'orphan-file'
   | 'broken-frontmatter'
   | 'unreferenced-attachment'
   | 'trash-aging';
@@ -32,9 +32,9 @@ export type ScannerId =
 export const FIX_KIND_BY_SCANNER: Record<ScannerId, FixKind> = {
   'duplicate-id': 'safe',
   'path-mismatch': 'safe',
+  'folder-missing': 'manual',
   'ghost-folder': 'safe',
   'empty-folder': 'safe',
-  'orphan-file': 'manual',
   'broken-frontmatter': 'manual',
   'unreferenced-attachment': 'manual',
   'trash-aging': 'safe',
@@ -122,6 +122,8 @@ export interface RepairOptions {
   maxActions?: number;
   /** Share of notes a run may touch. Past it the whole run is report-only. */
   maxShare?: number;
-  /** Vault-relative directory the moved files land in. */
+  /** Vault-relative directory the moved files land in. Default: `.trash/.hygiene`. */
   hygieneRoot?: string;
+  /** One run's own directory under `hygieneRoot`, so two sweeps never overwrite each other. */
+  runId?: string;
 }
