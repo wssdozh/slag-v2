@@ -35,6 +35,14 @@ export const SYNC_INTERVALS = {
   RETRY_DELAY_MS: 10000,
   // A relay that accepts the connection and stalls the body must not hold a push forever.
   PUSH_TIMEOUT_MS: 30000,
+  // A pull page is capped by bytes, not by bundle count: one attachment bundle is ~8 MB of json,
+  // and a hundred of them is a page no deadline survives on any link. The relay honours this.
+  PULL_PAGE_BYTES: 2_000_000,
+  // After a timed-out page the budget halves down to this: a narrow link still converges, slower.
+  PULL_PAGE_MIN_BYTES: 250_000,
+  // The bandwidth a pull is willing to wait for. The page deadline is sized from it, so a slow
+  // laptop gets a long deadline instead of the same flat one as a LAN desktop.
+  PULL_FLOOR_BYTES_PER_SECOND: 40_000,
   // The room's manifest is a few kilobytes; a slow answer is a dead answer.
   MANIFEST_TIMEOUT_MS: 8000,
   // After a confirmed push, one manifest round trip per burst is plenty: the relay's rows keep
