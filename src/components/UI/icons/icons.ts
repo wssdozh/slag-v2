@@ -41,7 +41,10 @@ import {
   CirclePlus,
   Clock,
   ClockArrowLeft,
+  Cloud,
+  CloudAlert,
   CloudCheck,
+  CloudOff,
   CloudUpload,
   Code,
   Coffee,
@@ -337,6 +340,14 @@ export const ICONS = {
   'system.ai': Sparkles,
   'system.logs': Terminal,
   'system.sync': RefreshCw,
+  // Sync state as a glyph, not a dot: a crossed-out cloud reads as "not connected" before any
+  // tooltip, and a cloud with a bang is the case a spinner cannot show — connected, but the two
+  // copies disagree.
+  'system.syncIdle': Cloud,
+  'system.syncOk': CloudCheck,
+  'system.syncOffline': CloudOff,
+  'system.syncDiverged': CloudAlert,
+  'system.syncError': TriangleAlert,
   'system.update': CircleArrowDown,
   'system.web': Globe,
   'system.settings': Settings,

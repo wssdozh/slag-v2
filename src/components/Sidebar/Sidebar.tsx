@@ -8,6 +8,7 @@ import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import type { SyncStatus } from '../../lib/sync/types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Icon } from '../UI/icons/Icon';
+import { syncGlyph } from './syncGlyph';
 export const Sidebar: React.FC = () => {
   const {
     vault,
@@ -54,6 +55,7 @@ export const Sidebar: React.FC = () => {
   }, [isVaultDropdownOpen]);
 
   const inboxItemsCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
+  const glyph = syncGlyph(syncStatus);
 
   return (
     <aside
@@ -150,30 +152,16 @@ export const Sidebar: React.FC = () => {
         <button
           onClick={() => openSettingsModal('sync')}
           className="p-1.5 rounded hover:bg-tint-6 transition-colors shrink-0 cursor-pointer"
-          title={
-            syncStatus.authRequired && !syncStatus.isAuthenticated
-              ? 'Синхронизация: войдите в SLAG ID'
-              : syncStatus.state === 'connected'
-              ? `Синхронизация активна (${syncStatus.pingMs ?? 1} ms) · Клик: открыть настройки`
-              : syncStatus.state === 'syncing'
-              ? 'Синхронизация дельт...'
-              : 'Синхронизация: офлайн · Клик: открыть настройки'
-          }
+          title={glyph.title}
+          aria-label={glyph.title}
           data-testid="sidebar-sync-btn"
+          data-sync-state={syncStatus.state}
         >
           <Icon
-            name="action.refresh"
+            name={glyph.name}
             size="md"
             tone="inherit"
-            className={`transition-colors ${
-              syncStatus.state === 'syncing'
-                ? 'animate-spin text-warning'
-                : syncStatus.state === 'connected'
-                ? 'text-success'
-                : syncStatus.state === 'error'
-                ? 'text-danger'
-                : 'text-fg-dim'
-            }`}
+            className={`transition-colors ${glyph.className}`}
           />
         </button>
 
