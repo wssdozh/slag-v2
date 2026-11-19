@@ -30,7 +30,8 @@
     "release:dev": "node scripts/release-run.mjs --channel dev",
     "release:beta": "node scripts/release-run.mjs --channel beta",
     "release:stable": "node scripts/release-run.mjs --channel release",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "perf:startup": "node scripts/perf-startup.mjs"
   },
   "dependencies": {
     "@atomic-editor/editor": "^0.6.2",
