@@ -30,7 +30,21 @@ export interface SubscriptionInfo {
 }
 
 /**
- * The last manifest check: this device's root, the room's root, and what was done about it.
+ * One other device's root as the last check saw it.
+ *
+ * `deviceId: null` is an old client: the relay cannot name it, and the check cannot ask it for a
+ * note. `extra`/`missing` stay empty when that peer sent no leaves — there is nothing to name.
+ */
+export interface ManifestPeerStatus {
+  deviceId: string | null;
+  root: string;
+  inSync: boolean;
+  extra: string[];
+  missing: string[];
+}
+
+/**
+ * The last manifest check: this device's root, the room's roots, and what was done about them.
  *
  * `remoteRoot: null` means the room had nothing to answer with — not "we agree". `action` is the
  * decision the engine took: `none` (equal or nothing to compare), `reconcile` (one full resend was
@@ -41,6 +55,7 @@ export interface SubscriptionInfo {
 export interface ManifestStatus {
   at: string;
   root: string;
+  /** The first diverged peer's root, or the first peer's when they all agree. */
   remoteRoot: string | null;
   inSync: boolean;
   folders: string[];
@@ -50,6 +65,8 @@ export interface ManifestStatus {
   missing: string[];
   action: 'none' | 'reconcile' | 'report';
   trigger: ManifestTrigger;
+  /** Every peer this check saw, one line each. Empty when no other device has published. */
+  peers: ManifestPeerStatus[];
 }
 
 /** What started a manifest check. */

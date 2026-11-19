@@ -6,7 +6,11 @@
 // "delete": it is the trash, one small batch, and only for leaves that were already on the wire
 // before that resend. A note edited afterwards was never in front of the neighbour and is left
 // alone — that is the difference between "he refused it" and "he has not seen it yet".
-import type { DriftReport } from '../vault/integrity/types';
+import { vault } from '../../storage/port';
+import type { DriftReport, Manifest } from '../../vault/integrity/types';
+import type { SyncEngine } from '../syncEngine';
+import type { ManifestDecision, PeerManifest } from './channel';
+import { readManifestAutoResolve } from './prefs';
 
 /** Notes the neighbour can plausibly have refused in one pass. More than this is not a stray note. */
 export const RESOLVE_MAX = 8;
@@ -39,5 +43,28 @@ export function decideResolve(input: ResolveInput): string[] {
   return extra.filter((id) => {
     const at = input.updatedAt.get(id);
     return at !== undefined && at < resentAt;
+  });
+}
+
+/**
+ * The ids worth the trash after a `report`, with this device's state already gathered.
+ *
+ * A peer that sent no leaves names no note: the comparison then says nothing about notes, and
+ * acting on that guess is how a vault loses them. A peer with leaves is one the resend reached,
+ * so `decideResolve` can tell a refusal from a note that arrived late.
+ */
+export function resolveRejected(
+  engine: SyncEngine,
+  local: Manifest,
+  decision: ManifestDecision,
+): string[] {
+  const peer: PeerManifest | null = decision.peer;
+  if (peer === null || peer.leaves === undefined) return [];
+  return decideResolve({
+    drift: decision.drift,
+    resentAt: engine.manifestResentAt,
+    updatedAt: new Map(vault().getItems().map((item) => [item.id, item.updatedAt ?? 0])),
+    leaves: Object.keys(local.leaves).length,
+    enabled: readManifestAutoResolve(),
   });
 }

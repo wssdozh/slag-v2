@@ -48,6 +48,7 @@ test('the sidebar glyph names the sync state', async ({ page }) => {
       missing: [],
       action: 'report',
       trigger: 'push',
+      peers: [{ deviceId: 'peer-device', root: 'bbbb2222', inSync: false, extra: ['item_left_behind'], missing: [] }],
     },
   });
   await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncDiverged');

@@ -87,6 +87,13 @@ test('a named divergence offers the trash instead of «нужен разбор»
       missing: [],
       action: 'report',
       trigger: 'push',
+      peers: [{
+        deviceId: 'peer-device',
+        root: 'bbbb2222',
+        inSync: false,
+        extra: ['item_left_behind', 'item_left_behind_too'],
+        missing: [],
+      }],
     };
     syncEngine.notify();
   });
