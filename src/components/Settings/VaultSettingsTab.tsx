@@ -7,10 +7,11 @@ import type { IconName } from '../UI/icons/icons';
 import { StorageSection } from './vault/StorageSection';
 import { BackupSection } from './vault/BackupSection';
 import { TransferSection } from './vault/TransferSection';
+import { IntegritySection } from './vault/integrity/IntegritySection';
 import { VAULT_SECTIONS, type VaultSection } from './vault/sections';
 
 /** Which folds a phone left open. Module scope: the tab body unmounts on a tab switch. */
-let lastOpen: Record<VaultSection, boolean> = { storage: true, backups: false, transfer: false };
+let lastOpen: Record<VaultSection, boolean> = { storage: true, integrity: false, backups: false, transfer: false };
 
 interface VaultSettingsTabProps {
   /** Set by the desktop rail's nested items; without it the tab drives itself with folds. */
@@ -19,6 +20,7 @@ interface VaultSettingsTabProps {
 
 const SectionBody: React.FC<{ id: VaultSection }> = ({ id }) => {
   if (id === 'storage') return <StorageSection />;
+  if (id === 'integrity') return <IntegritySection />;
   if (id === 'backups') return <BackupSection />;
   return <TransferSection />;
 };
