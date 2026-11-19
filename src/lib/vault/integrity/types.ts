@@ -56,6 +56,11 @@ export interface Finding {
   why: string;
   /** What a fix would do; empty when there is none. */
   action?: string;
+  /**
+   * The paths a fix works on, when the finding spans more than one file. The first one is the
+   * keeper: the scan decides which copy survives, the repair only carries that decision out.
+   */
+  paths?: string[];
   /** What a person needs in front of them to decide: paths, counts, timestamps. */
   evidence: string[];
 }
