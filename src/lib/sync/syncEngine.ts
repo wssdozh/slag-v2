@@ -181,6 +181,11 @@ export class SyncEngine {
    * full resend did not fix is reported, never resent again against the same peer state.
    */
   public manifestReconcileRoot: string | null = null;
+  /**
+   * When that resend went out, ms. A note edited after this moment was never in front of the
+   * neighbour, so it cannot be one it refused — `decideResolve` refuses to touch it.
+   */
+  public manifestResentAt: number | null = null;
   private manifestTimer: ReturnType<typeof setTimeout> | null = null;
   private manifestDeadline = 0;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
@@ -350,7 +355,9 @@ export class SyncEngine {
       subscription: computeSubscription(this),
       // Copied like the fields above: the panel holds this object, and a status the engine keeps
       // mutating under a render is how a listener sees half an update.
-      manifest: manifest ? { ...manifest, folders: [...manifest.folders] } : undefined,
+      manifest: manifest
+        ? { ...manifest, folders: [...manifest.folders], extra: [...manifest.extra], missing: [...manifest.missing] }
+        : undefined,
     };
   }
 
@@ -432,6 +439,19 @@ export class SyncEngine {
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
     this.scheduleManifestCheck(0, 'manual');
+  }
+
+  /**
+   * Moves notes the neighbour refused to the trash, and says so in the log.
+   *
+   * `origin: 'local'` on purpose: the engine ignores remote-origin writes so two devices cannot
+   * echo each other, and this deletion has to travel — the person's own `deleteItem` goes the same
+   * way. The trash is reversible; a delete would not be.
+   */
+  public trashRejectedNotes(ids: string[]): void {
+    if (ids.length === 0) return;
+    for (const id of ids) vault().moveToTrash(id);
+    syncLog.warn(`Убрал в корзину ${ids.length} заметок, которых сосед не принял: ${ids.join(', ')}`);
   }
 
   /**
@@ -1312,6 +1332,7 @@ export class SyncEngine {
     // A new room is a new row: the root this device published belongs to the room it left.
     this.manifestPostedRoot = null;
     this.manifestReconcileRoot = null;
+    this.manifestResentAt = null;
     if (this.importTimer) clearTimeout(this.importTimer);
     this.importTimer = null;
     this.importBuffer = null;

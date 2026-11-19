@@ -43,6 +43,11 @@ export interface VaultPort {
   getWorkspaceState(): WorkspaceState;
   getMemory(): MemoryItem[];
   saveMemory(items: MemoryItem[], origin?: ChangeOrigin): boolean;
+  /**
+   * Takes a note to `.trash/`, with the tombstone and the outbox op that keep it deleted. The only
+   * deletion sync is allowed, and only for notes the neighbour refused.
+   */
+  moveToTrash(id: string): void;
 
   importSyncedVaultData(data: SyncedVaultData): Promise<void>;
   /** `false` means the bytes did not reach the disk; the caller must not treat them as delivered. */

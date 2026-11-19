@@ -27,6 +27,7 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   await expect(panel.getByTestId('integrity-server')).toContainText('нет данных');
   await expect(panel.getByTestId('integrity-server-last')).toContainText('ни разу');
   await expect(panel.getByTestId('integrity-autocheck')).toHaveAttribute('aria-checked', 'true');
+  await expect(panel.getByTestId('integrity-autoresolve')).toHaveAttribute('aria-checked', 'true');
   await expect(panel.getByTestId('integrity-dryrun')).toHaveAttribute('aria-checked', 'true');
 
   await page.waitForTimeout(250);

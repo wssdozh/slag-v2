@@ -19,6 +19,9 @@ export interface IntegrityPanelProps {
   /** Автосверка после запуска и после отправки. Выключена — остаётся только кнопка. */
   autoCheck: boolean;
   onToggleAutoCheck(next: boolean): void;
+  /** Убирать ли отвергнутое соседом в корзину без кнопки. */
+  autoResolve: boolean;
+  onToggleAutoResolve(next: boolean): void;
   onCheckServer(): void;
   /** Take this device's notes the neighbour rejected off to the trash. */
   onDropExtra(ids: string[]): void;
@@ -96,6 +99,8 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   remote,
   autoCheck,
   onToggleAutoCheck,
+  autoResolve,
+  onToggleAutoResolve,
   onCheckServer,
   onDropExtra,
   onVerify,
@@ -142,8 +147,10 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
             </p>
             <p>
               Если сосед прислал свои заметки, расхождение называется по имени: «у соседа нет
-              N заметок» — значит он их отверг, обычно потому что удалил раньше. Такие заметки
-              уезжают в корзину по кнопке, а не сами: удаление данных синк не решает.
+              N заметок» — значит он их отверг, обычно потому что удалил раньше. С «Разбирать сам»
+              такие заметки уезжают в корзину сами: только те, что уже были в переотправке,
+              не больше восьми за проход и не больше 5% хранилища. Крупное расхождение так не
+              «чинится» — это сломанная копия, и её должен увидеть человек.
             </p>
             <p>
               Автосверка выключена — проверяю и публикую только по кнопке. Тогда другое устройство
@@ -172,6 +179,19 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
               disabled={busy}
               label="Автосверка"
               testId="integrity-autocheck"
+            />
+          }
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Разбирать сам"
+          right={
+            <SettingsSwitch
+              checked={autoResolve}
+              onChange={onToggleAutoResolve}
+              disabled={busy}
+              label="Разбирать сам"
+              testId="integrity-autoresolve"
             />
           }
         />

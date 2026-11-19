@@ -123,8 +123,16 @@ export class NodeVault implements VaultPort {
     return true;
   }
 
-  public async importSyncedVaultData(data: SyncedVaultData): Promise<void> {
-    if (data.items) this.applyItems(data.items);
+  /** The node's own delete: the file into `.trash/`, the index without it, one local event. */
+  public moveToTrash(id: string): void {
+    if (!this.byId.has(id)) return;
+    this.trashItemFile(id);
+    this.byId.delete(id);
+    this.items = this.items.filter((item) => item.id !== id);
+    this.emit({ kind: 'item', action: 'delete', id, origin: 'local' });
+  }
+
+  public async importSyncedVaultData(data: SyncedVaultData): Promise<void> {    if (data.items) this.applyItems(data.items);
     if (data.folders) {
       this.folders = data.folders.slice();
       this.writeState();

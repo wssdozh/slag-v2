@@ -9,7 +9,7 @@ import { IntegrityPanel } from './IntegrityPanel';
 export const IntegritySection: React.FC = () => {
   const {
     busy, findings, status, lastScan, message, remote,
-    autoCheck, setAutoCheck, checkServer, verify, repair,
+    autoCheck, setAutoCheck, autoResolve, setAutoResolve, checkServer, verify, repair,
   } = useIntegrity();
   const { deleteItem } = useApp();
 
@@ -32,6 +32,8 @@ export const IntegritySection: React.FC = () => {
         remote={remote}
         autoCheck={autoCheck}
         onToggleAutoCheck={setAutoCheck}
+        autoResolve={autoResolve}
+        onToggleAutoResolve={setAutoResolve}
         onCheckServer={checkServer}
         onDropExtra={dropExtra}
         onVerify={verify}

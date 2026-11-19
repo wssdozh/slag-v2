@@ -11,10 +11,12 @@ import { logger } from '../logger/logger';
 import { isPrimaryWindow } from '../platform/windowControls';
 import { vault } from '../storage/port';
 import { buildManifest } from '../vault/integrity/manifest';
-import type { Manifest, WireManifest } from '../vault/integrity/types';
+import type { DriftReport, Manifest, WireManifest } from '../vault/integrity/types';
 import type { ManifestTrigger } from './types';
 import { apiBase } from './apiBase';
 import { MAX_WIRE_BYTES, decideManifest, describeWire, parseWire, toWire, wireBytes, wireToText } from './manifestChannel';
+import { readManifestAutoResolve } from './manifestPrefs';
+import { decideResolve } from './manifestResolve';
 import { authHeaders } from './syncConfig';
 import type { SyncEngine } from './syncEngine';
 
@@ -137,6 +139,7 @@ export async function syncManifest(
     // One full resend per peer state, not per pass: the other device pulls it, both roots move to
     // the same string, and the next check finds nothing to do.
     engine.manifestReconcileRoot = remote.root;
+    engine.manifestResentAt = Date.now();
     engine.forceFullPush = true;
     engine.scheduleDebouncedPush(0);
     syncLog.warn(`Корень разошёлся с комнатой: переотправляю состояние (${describeWire(wire)})`);
@@ -176,5 +179,26 @@ export async function syncManifest(
     // Debug, not warn: one device that cannot converge (a note its neighbour keeps rejecting on
     // LWW) would otherwise write this line every check interval, forever, and drown the log.
     syncLog.debug(`${describeWire(wire)}; корень расходится с комнатой, переотправка уже была`);
+    resolveRejected(engine, local, decision.drift);
   }
+}
+
+/**
+ * The divergence a resend could not fix, minus the notes this device should stop insisting on.
+ *
+ * Only notes the neighbour could have seen are candidates: one edited after the resend was never
+ * in front of it, so its absence means "not here yet", not "refused". The batch is capped inside
+ * `decideResolve`, and it lands in the trash — reversible — rather than in a delete.
+ */
+function resolveRejected(engine: SyncEngine, local: Manifest, drift: DriftReport | null): void {
+  if (!drift) return;
+  const ids = decideResolve({
+    drift,
+    resentAt: engine.manifestResentAt,
+    updatedAt: new Map(vault().getItems().map((item) => [item.id, item.updatedAt ?? 0])),
+    leaves: Object.keys(local.leaves).length,
+    enabled: readManifestAutoResolve(),
+  });
+  if (ids.length === 0) return;
+  engine.trashRejectedNotes(ids);
 }
