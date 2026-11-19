@@ -49,7 +49,7 @@ src/
   lib/          ai/ (LLM + fallback/ по интентам), logger/ (логи и редактирование секретов),
                 platform/ (tauri, окна, проводник), text/ (markdown, дифф, размеры),
                 tasks/ (чекбоксы, завершение), storage/ (диск, реестр, папки, корзина),
-                sync/ (relay: движок, конфиг, сокет), vault/ (модель), time/ (даты),
+                sync/ (relay: движок, конфиг, сокет), vault/ (модель; integrity/ — манифест, сканеры, ремонт), time/ (даты),
                 media/ (вложения и аудио), notify/ (prefs — настройки канала, quiet — тихие
                 часы, plan — напоминания, assistant — ответ из telegram), остальное плоско
   types/        доменные типы
@@ -58,7 +58,8 @@ src/
 src-tauri/      Rust: десктоп и Android
 e2e/            Playwright: slag/ по зонам + support/
 config/         Vite, tsconfig и oxlint
-scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android, bench/
+scripts/        инструменты репозитория: gen-code-map.mjs (карта и `where`), иконки Android, bench/,
+                vault-doctor.mjs (проверка хранилища без приложения)
 docs/project-map/  база знаний проекта, 15 документов
 ```
 
@@ -83,6 +84,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |
 | хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
 | корзина | `src/lib/storage/trashStore.ts` |
+| проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
