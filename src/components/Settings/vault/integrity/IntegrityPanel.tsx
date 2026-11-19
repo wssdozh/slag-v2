@@ -93,7 +93,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
 
   /* ── рендер ────────────────────────────────────────── */
   return (
-    <div className="flex flex-col gap-3 select-none">
+    <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
       {/* строка статуса */}
       <div className="flex items-center justify-between px-1 py-1">
         <span className="text-xs text-fg-muted font-mono">
@@ -120,6 +120,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         <button
           type="button"
           disabled={busy}
+          data-testid="integrity-verify"
           onClick={() => onVerify()}
           className="inline-flex items-center h-7 px-2.5 text-[13px] rounded-lg bg-tint-6 hover:bg-tint-10 text-fg-secondary border border-border-subtle disabled:opacity-40 cursor-pointer transition-colors whitespace-nowrap"
         >
@@ -136,6 +137,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         <button
           type="button"
           disabled={busy}
+          data-testid="integrity-repair"
           onClick={() => onRepair(dryRun)}
           className="inline-flex items-center h-7 px-2.5 text-[13px] rounded-lg bg-tint-6 hover:bg-tint-10 text-fg-secondary border border-border-subtle disabled:opacity-40 cursor-pointer transition-colors whitespace-nowrap"
         >
@@ -149,16 +151,19 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
           )}
         </button>
 
-        <label className="inline-flex items-center gap-1.5 text-2xs text-fg-muted ml-auto cursor-pointer">
-          <input
-            type="checkbox"
-            checked={dryRun}
-            onChange={(e) => setDryRun(e.currentTarget.checked)}
-            disabled={busy}
-            className="w-3 h-3 accent-accent rounded cursor-pointer"
-          />
-          только отчёт
-        </label>
+        <button
+          type="button"
+          aria-pressed={dryRun}
+          disabled={busy}
+          onClick={() => setDryRun((value) => !value)}
+          title="С отчётом ничего не меняется: кнопка показывает, что починила бы"
+          className={`ml-auto inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-2xs transition-colors cursor-pointer disabled:opacity-40 ${
+            dryRun ? 'border-border-subtle bg-tint-6 text-fg-secondary' : 'border-accent/40 bg-accent-subtle text-accent'
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${dryRun ? 'bg-fg-dim' : 'bg-accent'}`} />
+          {dryRun ? 'только отчёт' : 'по-настоящему'}
+        </button>
       </div>
 
       {/* список находок */}

@@ -4,6 +4,7 @@
 // The app moves files and rewrites folder metadata. It never deletes a note: every file it touches
 // lands in `.trash/.hygiene/<run>/` first, and a finding that is not `safe` stays in the report.
 import { BaseDirectory, copyFile, exists, mkdir, readTextFile, remove, rename, writeTextFile } from '@tauri-apps/plugin-fs';
+import { isTauri } from '@tauri-apps/api/core';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import type { Finding, IntegrityStatus, RepairOp, RepairPlan } from '../vault/integrity/types';
 import { FIX_KIND_BY_SCANNER } from '../vault/integrity/types';
@@ -43,6 +44,11 @@ function absoluteIn(notesPath: string, path: string): string {
 }
 
 export async function runIntegrityCheck(): Promise<IntegrityRun> {
+  if (!isTauri()) {
+    // The browser and the headless node have no vault on a disk to sweep; the panel says so
+    // instead of pretending the vault is clean.
+    throw new Error('проверка хранилища доступна в приложении');
+  }
   const notesPath = notesPathOf();
   const snapshot = await buildSnapshot(tauriVaultReader(notesPath), DEFAULT_INBOX_FOLDER);
   const findings = scanVault(snapshot);
