@@ -56,3 +56,47 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   await panel.getByTestId('integrity-verify').click();
   await expect(section.getByRole('status')).toContainText('доступна в приложении', { timeout: 15000 });
 });
+
+/**
+ * A divergence the room can name: the peer sent its leaves, so the panel says which side is short
+ * instead of shrugging, and offers the one repair sync is allowed to make — the trash.
+ */
+test('a named divergence offers the trash instead of «нужен разбор»', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/');
+  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
+
+  await page.getByTestId('sidebar-settings-btn').click();
+  const scope = page.locator('.fixed.z-50').filter({ has: page.locator('[data-tab="vault"]') });
+  await scope.locator('[data-tab="vault"]').click();
+  await scope.getByTestId('vault-subtab-integrity').click();
+  const panel = scope.getByTestId('vault-section-integrity').getByTestId('integrity-panel');
+
+  // The engine keeps the last comparison; a check needs a disk and a relay, so the state is
+  // planted the way a real pass would leave it.
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.status.manifest = {
+      at: new Date().toISOString(),
+      root: 'aaaa1111',
+      remoteRoot: 'bbbb2222',
+      inSync: false,
+      folders: [],
+      extra: ['item_left_behind', 'item_left_behind_too'],
+      missing: [],
+      action: 'report',
+      trigger: 'push',
+    };
+    syncEngine.notify();
+  });
+
+  await expect(panel.getByTestId('integrity-server')).toContainText('у соседа нет 2 заметок');
+  await expect(panel.getByTestId('integrity-drop-extra')).toContainText('Убрать 2 лишние в корзину');
+
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${SHOT_DIR}/vault-integrity-diverged.png` });
+
+  // Unknown ids: the click has to be harmless, not a crash.
+  await panel.getByTestId('integrity-drop-extra').click();
+  await expect(panel).toBeVisible();
+});

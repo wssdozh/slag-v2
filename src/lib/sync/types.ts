@@ -44,6 +44,10 @@ export interface ManifestStatus {
   remoteRoot: string | null;
   inSync: boolean;
   folders: string[];
+  /** Notes this device holds and the room does not. Empty when the peer sent no leaves. */
+  extra: string[];
+  /** Notes the room holds and this device does not. Empty when the peer sent no leaves. */
+  missing: string[];
   action: 'none' | 'reconcile' | 'report';
   trigger: ManifestTrigger;
 }

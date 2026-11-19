@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import type { Finding, IntegrityStatus } from '../../../../lib/vault/integrity/types';
 import type { ManifestStatus, ManifestTrigger } from '../../../../lib/sync/types';
+import { pluralRu } from '../../../../lib/time/dateUtils';
 import { InfoHint } from '../../../UI/InfoHint';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSwitch } from '../../SettingsUI';
 import { IntegrityFindingCard } from './IntegrityFindingCard';
@@ -19,6 +20,8 @@ export interface IntegrityPanelProps {
   autoCheck: boolean;
   onToggleAutoCheck(next: boolean): void;
   onCheckServer(): void;
+  /** Take this device's notes the neighbour rejected off to the trash. */
+  onDropExtra(ids: string[]): void;
   onVerify(): void;
   onRepair(dryRun: boolean): void;
 }
@@ -73,6 +76,15 @@ function serverState(remote: ManifestStatus | null): { value: string; tone: stri
   if (remote.remoteRoot === null) return { value: 'не ответил', tone: 'text-fg-secondary' };
   if (remote.inSync) return { value: `сходится · ${remote.remoteRoot.slice(0, 8)}…`, tone: 'text-success' };
   if (remote.action === 'reconcile') return { value: 'разошлось — отправляю заново', tone: 'text-fg-secondary' };
+  // The peer sent its leaves, so the drift can be named instead of shrugged at.
+  if (remote.extra.length > 0) {
+    const n = remote.extra.length;
+    return { value: `у соседа нет ${n} ${pluralRu(n, ['заметки', 'заметок', 'заметок'])}`, tone: 'text-danger' };
+  }
+  if (remote.missing.length > 0) {
+    const n = remote.missing.length;
+    return { value: `у меня нет ${n} ${pluralRu(n, ['заметки', 'заметок', 'заметок'])}`, tone: 'text-danger' };
+  }
   return { value: 'разошлось — нужен разбор', tone: 'text-danger' };
 }
 
@@ -85,11 +97,13 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   autoCheck,
   onToggleAutoCheck,
   onCheckServer,
+  onDropExtra,
   onVerify,
   onRepair,
 }) => {
   const [dryRun, setDryRun] = useState(true);
   const server = serverState(remote);
+  const extra = remote?.extra ?? [];
 
   /* ── диск: что нашлось ─────────────────────────────── */
   let findingsValue = 'ещё не сверяли';
@@ -127,6 +141,11 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
               молча перезаписать чужое однажды стоило 84 заметок.
             </p>
             <p>
+              Если сосед прислал свои заметки, расхождение называется по имени: «у соседа нет
+              N заметок» — значит он их отверг, обычно потому что удалил раньше. Такие заметки
+              уезжают в корзину по кнопке, а не сами: удаление данных синк не решает.
+            </p>
+            <p>
               Автосверка выключена — проверяю и публикую только по кнопке. Тогда другое устройство
               не узнает мой корень, пока я не нажму.
             </p>
@@ -157,6 +176,18 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
           }
         />
         <SettingsDivider />
+        {extra.length > 0 && (
+          <>
+            <SettingsRow
+              label={`Убрать ${extra.length} ${pluralRu(extra.length, ['лишнюю', 'лишние', 'лишних'])} в корзину`}
+              onClick={() => onDropExtra(extra)}
+              disabled={busy}
+              chevron
+              testId="integrity-drop-extra"
+            />
+            <SettingsDivider />
+          </>
+        )}
         <SettingsRow
           label="Сверить сейчас"
           onClick={onCheckServer}

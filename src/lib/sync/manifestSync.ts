@@ -157,6 +157,8 @@ export async function syncManifest(
     remoteRoot: remote?.root ?? null,
     inSync: remote !== null && decision.drift?.rootMatch === true,
     folders: decision.drift?.folders ?? [],
+    extra: decision.drift?.extra ?? [],
+    missing: decision.drift?.missing ?? [],
     action: decision.action,
     trigger,
   };
