@@ -96,7 +96,9 @@ test('buildSnapshot reads every note and resolves duplicates', async () => {
   // dup-b mentions: used.webp, unused.png, https://example.com/img.jpg
   assert.ok(dupB.attachments.some(a => a === 'used.webp'));
   assert.ok(dupB.attachments.some(a => a === 'unused.png'));
-  assert.ok(dupB.attachments.some(a => a.includes('img.jpg')));
+  // A web link is not a vault file: counting it as a reference would hide a real orphan whose name
+  // happens to match the end of a URL.
+  assert.equal(dupB.attachments.some(a => a.startsWith('http')), false);
 
   // wiki-note mentions: attached-file.pdf, some-att.jpg, doc.pdf
   assert.ok(wikiNote.attachments.some(a => a === 'attached-file.pdf'));
@@ -126,4 +128,36 @@ test('missing reader methods do not crash the snapshot', async () => {
   const snap = await buildSnapshot(sparse, 'Входящие');
   assert.equal(snap.notes.length, 1);
   assert.ok(snap.stateFolders == null || Array.isArray(snap.stateFolders));
+});
+
+test('a markdown destination with spaces is one reference, not a fragment of one', async () => {
+  // The editor writes exactly this for a pasted image, and the file name has a space in it. A
+  // parser that stops at the first blank reported `.attachments/Pasted` and then claimed the real
+  // picture was referenced by nobody: the sweep would have archived 56 files that notes use.
+  const reader = {
+    listFolders: async () => ['Входящие'],
+    listNotes: async (folder) => (folder === '' ? [] : ['photo.md']),
+    readNote: async () =>
+      '---\nid: n-photo\ntitle: photo\n---\n![Pasted image 1.png](.attachments/Pasted image 1.png)\n' +
+      '![подпись](<.attachments/with a space.png>)\n' +
+      '[сайт](https://example.com/x "title")\n' +
+      '[файл](.attachments/doc.pdf "подпись")\n',
+    listAttachments: async () => ['Pasted image 1.png', 'with a space.png', 'doc.pdf'],
+    listTrash: async () => [],
+    readStateFolders: async () => [],
+  };
+
+  const snap = await buildSnapshot(reader, 'Входящие');
+  const note = snap.notes.find((entry) => entry.path === 'Входящие/photo.md');
+
+  assert.ok(note);
+  assert.ok(note.attachments.includes('.attachments/Pasted image 1.png'), note.attachments.join(' | '));
+  assert.ok(note.attachments.includes('.attachments/with a space.png'), note.attachments.join(' | '));
+  assert.ok(note.attachments.includes('.attachments/doc.pdf'), note.attachments.join(' | '));
+  // A web link is not a vault file, and its title is not part of the path.
+  assert.equal(
+    note.attachments.some((entry) => entry.startsWith('http')),
+    false,
+    note.attachments.join(' | '),
+  );
 });

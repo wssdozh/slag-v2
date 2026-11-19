@@ -23,6 +23,15 @@ function readFrontmatter(content: string): Record<string, unknown> | 'broken' {
   }
 }
 
+/** `decodeURIComponent` throws on a lone `%`; a note is not allowed to break a scan over it. */
+function safeDecode(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
 /** Extract attachment references from note body text. */
 function bodyReferences(content: string): string[] {
   const out: string[] = [];
@@ -31,9 +40,18 @@ function bodyReferences(content: string): string[] {
     const ref = m[1].trim();
     if (ref) out.push(ref);
   }
-  // [text](url), ![alt](url)  — only when not preceded by [[ (wiki link already matched)
-  for (const m of content.matchAll(/\]\(([^)\s]+)\)/g)) {
-    out.push(decodeURIComponent(m[1]));
+  // [text](url), ![alt](url). The destination may contain spaces — `![Pasted image 1.png](.attachments/Pasted image 1.png)`
+  // is exactly what the editor writes — so it runs to the closing paren, not to the first blank.
+  // A title (`(path "подпись")`) is the one thing that is not part of the path.
+  for (const m of content.matchAll(/\]\(([^)]+)\)/g)) {
+    let target = m[1].trim();
+    if (target.startsWith('<') && target.includes('>')) {
+      target = target.slice(1, target.indexOf('>')).trim();
+    } else {
+      target = target.replace(/\s+(["']).*\1\s*$/, '').trim();
+    }
+    if (!target || /^(https?:|data:|mailto:)/i.test(target)) continue;
+    out.push(safeDecode(target));
   }
   return out;
 }

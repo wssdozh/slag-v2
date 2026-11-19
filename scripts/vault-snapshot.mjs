@@ -25,11 +25,35 @@ function readFrontmatter(content) {
   }
 }
 
-/** Attachment references a note makes in its body: wiki embeds, wiki links and markdown links. */
+/** `decodeURIComponent` throws on a lone `%`; a note is not allowed to break a scan over it. */
+function safeDecode(text) {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Attachment references a note makes in its body: wiki embeds, wiki links and markdown links.
+ *
+ * A markdown destination may contain spaces — `![Pasted image 1.png](.attachments/Pasted image 1.png)`
+ * is what the editor writes — so it runs to the closing paren. A title after a quoted string is the
+ * one thing that is not part of the path.
+ */
 function bodyReferences(content) {
   const out = [];
   for (const m of content.matchAll(/!?\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]/g)) out.push(m[1].trim());
-  for (const m of content.matchAll(/\]\(([^)\s]+)\)/g)) out.push(decodeURIComponent(m[1]));
+  for (const m of content.matchAll(/\]\(([^)]+)\)/g)) {
+    let target = m[1].trim();
+    if (target.startsWith('<') && target.includes('>')) {
+      target = target.slice(1, target.indexOf('>')).trim();
+    } else {
+      target = target.replace(/\s+(["']).*\1\s*$/, '').trim();
+    }
+    if (!target || /^(https?:|data:|mailto:)/i.test(target)) continue;
+    out.push(safeDecode(target));
+  }
   return out;
 }
 
