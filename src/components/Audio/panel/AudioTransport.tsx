@@ -96,7 +96,7 @@ export const AudioTransport: React.FC<AudioTransportProps> = ({
           title="Вперед на 10 секунд (→)"
           aria-label="Вперед на 10 секунд"
         >
-          <Icon name="media.seekForward" size="md" tone="inherit" />
+          <Icon name="action.retryForward" size="md" tone="inherit" />
         </button>
       </div>
 
