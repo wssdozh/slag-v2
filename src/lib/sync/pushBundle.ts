@@ -68,7 +68,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // cursor. The gate asked "did anything change locally", and the answer was no.
       if (
         !engine.forceFullPush &&
-        !engine.attachmentPass &&
+        !engine.canPackAttachment() &&
         !engine.hasPendingAttachmentRequests() &&
         lastSyncedHash === stateHash &&
         pendingOps.length === 0
@@ -197,7 +197,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // ponytail: no chunks and no re-seed. The relay keeps a bundle for 7 days, so a device that
       // sleeps longer never gets the file. Upgrade: a `restore` request from the receiver clears
       // its hash here and the bytes are pushed again.
-      if (engine.attachmentPass) {
+      if (engine.canPackAttachment()) {
         engine.attachmentPass = false;
         let packedOne = false;
         for (const item of items) {

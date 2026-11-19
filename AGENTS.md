@@ -71,7 +71,8 @@ docs/project-map/  база знаний проекта, 15 документов
 
 | задача | начинать с |
 |---|---|
-| синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `syncSocket.ts`, `applyBundle.ts`, `pushBundle.ts` |
+| синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
+| загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
 | сверка корней между устройствами, манифест комнаты | `src/lib/sync/manifest/`: `sync.ts` — оркестратор (сборка → соседи → решение → реакция), `channel.ts` — форма и решение по пирам, `peers.ts` — чтение чужих корней и запрос недостающих, `publish.ts` — свой POST, `schedule.ts` — тайминги, `resolve.ts` — авторазбор. Хэши заметок — `src/lib/vault/integrity/manifest.ts` |
 | конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
 | экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |

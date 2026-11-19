@@ -86,6 +86,37 @@ test('pending pull drains more than 100 bundles using the highest syncId as sinc
   expect(result.applied).toEqual(Array.from({ length: 137 }, (_, index) => index));
 });
 
+test('byte-budget timeout retries the same cursor and drains short pages', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const path = '/src/lib/sync/syncEngine.ts';
+    const { SyncEngine } = await import(/* @vite-ignore */ path);
+    const engine = new SyncEngine();
+    engine.activeRoomId = 'room_byte_pages';
+    engine.activeVaultKey = {};
+    const originalFetch = window.fetch;
+    const requests: [string | null, string | null][] = [];
+    const applied: number[] = [];
+    engine.applyIncomingBundle = async (payload: { id: number }) => { applied.push(payload.id); };
+    window.fetch = async (input) => {
+      const params = new URL(String(input)).searchParams;
+      const since = params.get('since');
+      requests.push([since, params.get('maxBytes')]);
+      if (requests.length === 2) throw new DOMException('timed out', 'TimeoutError');
+      if (requests.length > 3) throw new Error('pagination did not terminate');
+      const next = Number(since) + 1;
+      return Response.json({ head: 2, bundles: [{ syncId: next, payload: { id: next } }] });
+    };
+    try {
+      await engine.fetchPendingBundlesHttp();
+      return { requests, applied };
+    } finally {
+      window.fetch = originalFetch;
+      engine.disconnect();
+    }
+  });
+  expect(result).toEqual({ requests: [[null, '2000000'], ['1', '2000000'], ['1', '1000000']], applied: [1, 2] });
+});
+
 test('HTTP pull failure rejects all callers, reports error and permits retry', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const path = '/src/lib/sync/syncEngine.ts';

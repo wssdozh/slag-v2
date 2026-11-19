@@ -135,6 +135,7 @@ export class SyncTransport {
       const authParams = new URLSearchParams({
         device: options.deviceId,
         vault: options.vaultId,
+        backlog: 'http',
       });
       const token = accountClient.getToken(options.serverUrl);
       if (token) authParams.set('token', token);

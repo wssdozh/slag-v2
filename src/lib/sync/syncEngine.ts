@@ -231,6 +231,10 @@ export class SyncEngine {
   public pushDirty = false;
   /** One-shot: the next push may carry a single attachment. */
   public attachmentPass = false;
+
+  public canPackAttachment(): boolean {
+    return this.attachmentPass && this.pendingPull === null;
+  }
   /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
   private attachmentSyncBlocked = false;
   /** Attachments with no bytes on this device, so every push does not re-stat the same files. */
@@ -470,7 +474,10 @@ export class SyncEngine {
       return;
     }
     // init and every confirmed push both call this: one queued pass is enough for both.
-    if (this.attachmentPass) return;
+    if (this.attachmentPass) {
+      this.scheduleDebouncedPush(0);
+      return;
+    }
     if (this.attachmentSyncBlocked) {
       syncLog.debug('Attachment pass skipped: relay refused the plan quota for this session');
       return;
@@ -1270,9 +1277,13 @@ export class SyncEngine {
     if (!this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
     const generation = this.initGeneration;
     if (this.pendingPull && this.pendingPull.generation === generation) return this.pendingPull.promise;
-    const promise = this.pullPendingBundles(generation).finally(() => {
-      if (this.pendingPull && this.pendingPull.generation === generation) this.pendingPull = null;
-    });
+    const promise = this.pullPendingBundles(generation)
+      .finally(() => {
+        if (this.pendingPull?.generation === generation) this.pendingPull = null;
+      })
+      .then(() => {
+        if (generation === this.initGeneration) this.scheduleAttachmentPass();
+      });
     this.pendingPull = { generation, promise };
     return promise;
   }
@@ -1287,35 +1298,50 @@ export class SyncEngine {
       maxBytes: String(this.pullPageBytes),
     });
     if (cursor > 0) params.set('since', String(cursor));
-    const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
-      headers: authHeaders(this),
-      signal: AbortSignal.timeout(pullDeadlineMs(this.pullPageBytes, this.pullTimeoutMs)),
-    });
-    if (generation !== this.initGeneration) return null;
-    if (!res.ok) throw new Error(`Sync pull failed: HTTP ${res.status}`);
-    const data = await res.json();
-    if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
-    return {
-      bundles: data.bundles,
-      head: typeof data.head === 'number' ? data.head : null,
-      oldest: typeof data.oldest === 'number' ? data.oldest : 0,
-    };
+    const controller = new AbortController();
+    const abort = () => controller.abort(new DOMException('Sync pull timed out', 'TimeoutError'));
+    let timer = setTimeout(abort, this.pullTimeoutMs);
+    try {
+      const res = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundles?${params.toString()}`, {
+        headers: authHeaders(this),
+        signal: controller.signal,
+      });
+      if (generation !== this.initGeneration || !res.ok) {
+        controller.abort();
+        if (generation !== this.initGeneration) return null;
+        throw new Error(`Sync pull failed: HTTP ${res.status}`);
+      }
+      // The first bundle can exceed the page budget. Use the actual response size when known.
+      clearTimeout(timer);
+      const length = Number(res.headers.get('Content-Length'));
+      const bytes = Number.isSafeInteger(length) && length > 0 ? length : this.pullPageBytes;
+      timer = setTimeout(abort, pullDeadlineMs(bytes, this.pullTimeoutMs));
+      const data = await res.json();
+      if (generation !== this.initGeneration) return null;
+      if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
+      return {
+        bundles: data.bundles,
+        head: typeof data.head === 'number' ? data.head : null,
+        oldest: typeof data.oldest === 'number' ? data.oldest : 0,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async pullPendingBundles(generation: number): Promise<void> {
     try {
       // A full first sync is tens of megabytes; a pull that dies halfway must not start over.
       let cursor = loadCursor(this.bookkeeping);
-      let shrinks = 0;
       while (generation === this.initGeneration) {
         const previousCursor = cursor;
         let page: PullPage | null;
         try {
           page = await this.fetchPullPage(generation, cursor);
         } catch (e) {
-          // Half the budget and ask the same cursor again; three sizes down is the floor.
-          if (shrinks < 3 && this.pullPageBytes > SYNC_INTERVALS.PULL_PAGE_MIN_BYTES && isPageTimeout(e)) {
-            shrinks++;
+          if (generation !== this.initGeneration) return;
+          // Retry this cursor with less data; only the request that hit the floor fails the pass.
+          if (this.pullPageBytes > SYNC_INTERVALS.PULL_PAGE_MIN_BYTES && isPageTimeout(e)) {
             this.pullPageBytes = shrinkPullBudget(this.pullPageBytes);
             syncLog.warn(
               `Pull page timed out: shrinking to ${Math.round(this.pullPageBytes / 1024)} KB and asking again`
@@ -1325,7 +1351,6 @@ export class SyncEngine {
           throw e;
         }
         if (!page) return;
-        shrinks = 0;
         if (cursor > 0 && page.oldest > 0 && cursor + 1 < page.oldest) {
           // The cursor points before the oldest bundle the relay still keeps: everything in
           // between expired, so a delta can never close the gap — resend the full state once.
@@ -1338,6 +1363,7 @@ export class SyncEngine {
           await this.applyIncomingBundle(item.payload);
           if (typeof item.syncId === 'number' && item.syncId > cursor) cursor = item.syncId;
         }
+        if (generation !== this.initGeneration) return;
         saveCursor(this.bookkeeping, cursor);
         const step = nextPullStep({
           previousCursor,
@@ -1349,9 +1375,6 @@ export class SyncEngine {
         if (step === 'done') break;
         if (step === 'stuck') throw new Error('Sync pagination cursor did not advance');
       }
-      // The channel is free again: the pass this pull deferred is the one that fills the backlog's
-      // attachments.
-      this.scheduleAttachmentPass();
     } catch (e) {
       if (generation !== this.initGeneration) return;
       syncLog.warn('HTTP bundles fetch failed:', e);
