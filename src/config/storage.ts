@@ -27,6 +27,7 @@ export const STORAGE_KEYS = {
   SESSION_BREADCRUMBS: 'slag_session_breadcrumbs',
   UPDATE_DISMISSED: 'slag_update_dismissed_version',
   UPDATE_CHANNEL: 'slag_update_channel',
+  MANIFEST_AUTOCHECK: 'slag_manifest_autocheck_v1',
 } as const;
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
@@ -40,7 +41,6 @@ export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {
   isKanbanMaterialsOpen: true,
   sortBy: 'createdAt',
   sortOrder: 'asc',
-  hideCompletedTasks: false,
   folderSettings: {},
 };
 

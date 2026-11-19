@@ -16,6 +16,7 @@ export const FolderViewModal: React.FC = () => {
     sortBy,
     sortOrder,
     hideCompletedTasks,
+    setHideCompletedTasks,
     isPinnedOnlyFilter,
     setIsPinnedOnlyFilter,
     updateCurrentFolderViewSettings,
@@ -266,7 +267,7 @@ export const FolderViewModal: React.FC = () => {
         {/* Section 4: iOS / Linear Switches */}
         <div className="pt-2 border-t border-tint-6 space-y-1.5">
           <div
-            onClick={() => updateCurrentFolderViewSettings({ hideCompletedTasks: !hideCompletedTasks })}
+            onClick={() => setHideCompletedTasks(!hideCompletedTasks)}
             className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-tint-4 cursor-pointer transition-colors group"
           >
             <span className="text-fg-tertiary group-hover:text-white transition-colors text-xs">

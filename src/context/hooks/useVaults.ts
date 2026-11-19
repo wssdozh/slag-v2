@@ -49,7 +49,6 @@ export function useVaults(deps: {
   setIsKanbanMaterialsOpen: Dispatch<SetStateAction<boolean>>;
   setSortBy: Dispatch<SetStateAction<SortField>>;
   setSortOrder: Dispatch<SetStateAction<SortOrder>>;
-  setHideCompletedTasks: Dispatch<SetStateAction<boolean>>;
   setFolderSettings: Dispatch<SetStateAction<Record<string, FolderViewSettings>>>;
   setChatMessages: Dispatch<SetStateAction<ChatMessage[]>>;
   setSelectedItem: Dispatch<SetStateAction<SlagItem | null>>;
@@ -66,7 +65,7 @@ export function useVaults(deps: {
     vault, setVault, setVaults, setFolders, setItems,
     setCurrentFolder, setFeedViewMode, setInboxMode, setActiveTypeFilter,
     setActiveTagFilter, setActiveMobileTab, setIsKanbanMaterialsOpen,
-    setSortBy, setSortOrder, setHideCompletedTasks, setFolderSettings,
+    setSortBy, setSortOrder, setFolderSettings,
     setChatMessages, setSelectedItem, refreshData, addToast,
   } = deps;
 
@@ -100,7 +99,6 @@ export function useVaults(deps: {
       setIsKanbanMaterialsOpen(typeof newWs.isKanbanMaterialsOpen === 'boolean' ? newWs.isKanbanMaterialsOpen : true);
       setSortBy(newWs.sortBy || 'createdAt');
       setSortOrder(newWs.sortOrder || 'asc');
-      setHideCompletedTasks(newWs.hideCompletedTasks ?? false);
       setFolderSettings(newWs.folderSettings || {});
       setChatMessages(storage.getAssistantHistory());
       setSelectedItem(null);

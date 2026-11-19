@@ -12,6 +12,7 @@ import { isPrimaryWindow } from '../platform/windowControls';
 import { vault } from '../storage/port';
 import { buildManifest } from '../vault/integrity/manifest';
 import type { Manifest, WireManifest } from '../vault/integrity/types';
+import type { ManifestTrigger } from './types';
 import { apiBase } from './apiBase';
 import { MAX_WIRE_BYTES, decideManifest, describeWire, parseWire, toWire, wireBytes, wireToText } from './manifestChannel';
 import { authHeaders } from './syncConfig';
@@ -95,7 +96,11 @@ async function readRemoteManifest(engine: SyncEngine): Promise<WireManifest | nu
   }
 }
 
-export async function syncManifest(engine: SyncEngine): Promise<void> {
+export async function syncManifest(
+  engine: SyncEngine,
+  trigger: ManifestTrigger = 'start',
+  manual = false,
+): Promise<void> {
   const skip = skipReason(engine);
   if (skip) {
     syncLog.debug(`Сверка манифеста пропущена: ${skip}`);
@@ -122,7 +127,9 @@ export async function syncManifest(engine: SyncEngine): Promise<void> {
   if (generation !== engine.initGeneration) return;
 
   const decision = decideManifest(local, remote, {
-    reconciledRoot: engine.manifestReconcileRoot,
+    // A person pressing «сверить сейчас» gets a resend even if this peer root was already answered:
+    // the latch exists to stop a machine from looping, not to refuse an explicit ask.
+    reconciledRoot: manual ? null : engine.manifestReconcileRoot,
     receiveOnly: engine.config.localSyncMode === 'receive-only',
   });
 
@@ -151,6 +158,7 @@ export async function syncManifest(engine: SyncEngine): Promise<void> {
     inSync: remote !== null && decision.drift?.rootMatch === true,
     folders: decision.drift?.folders ?? [],
     action: decision.action,
+    trigger,
   };
   engine.notify();
 

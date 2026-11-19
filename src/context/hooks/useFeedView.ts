@@ -66,9 +66,9 @@ export function useFeedView(
   const [sortOrder, setSortOrder] = useState<SortOrder>(
     () => initialFolderSetting?.sortOrder || initialWorkspace.sortOrder || 'asc',
   );
-  const [hideCompletedTasks, setHideCompletedTasks] = useState<boolean>(
-    () => initialFolderSetting?.hideCompletedTasks ?? initialWorkspace.hideCompletedTasks ?? false,
-  );
+  // Session-only, like the pinned and AI filters: a launch never reopens with done tasks
+  // hidden because of something switched on days ago.
+  const [hideCompletedTasks, setHideCompletedTasks] = useState<boolean>(false);
   const [aiItemFilter, setAiItemFilter] = useState<AiItemFilter | null>(null);
 
   const togglePinnedOnlyFilter = useCallback(() => {
@@ -89,7 +89,7 @@ export function useFeedView(
       if (saved.inboxMode) setInboxMode(saved.inboxMode);
       setSortBy(saved.sortBy);
       setSortOrder(saved.sortOrder);
-      setHideCompletedTasks(saved.hideCompletedTasks ?? false);
+      setHideCompletedTasks(false);
     } else {
       setFeedViewMode('feed');
       setActiveTypeFilter('all');
@@ -143,7 +143,6 @@ export function useFeedView(
       if (partial.inboxMode !== undefined) setInboxMode(partial.inboxMode);
       if (partial.sortBy !== undefined) setSortBy(partial.sortBy);
       if (partial.sortOrder !== undefined) setSortOrder(partial.sortOrder);
-      if (partial.hideCompletedTasks !== undefined) setHideCompletedTasks(partial.hideCompletedTasks);
 
       setFolderSettings((prev) => {
         const current = prev[currentFolder] || {
@@ -152,7 +151,6 @@ export function useFeedView(
           inboxMode: partial.inboxMode ?? inboxMode,
           sortBy: partial.sortBy ?? sortBy,
           sortOrder: partial.sortOrder ?? sortOrder,
-          hideCompletedTasks: partial.hideCompletedTasks ?? hideCompletedTasks,
         };
         const updated: FolderViewSettings = { ...current, ...partial };
         const next = { ...prev, [currentFolder]: updated };
@@ -160,7 +158,7 @@ export function useFeedView(
         return next;
       });
     },
-    [currentFolder, feedViewMode, activeTypeFilter, inboxMode, sortBy, sortOrder, hideCompletedTasks],
+    [currentFolder, feedViewMode, activeTypeFilter, inboxMode, sortBy, sortOrder],
   );
 
   const resetCurrentFolderViewSettings = useCallback(() => {

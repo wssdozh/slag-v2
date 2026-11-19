@@ -35,6 +35,8 @@ export interface SubscriptionInfo {
  * `remoteRoot: null` means the room had nothing to answer with — not "we agree". `action` is the
  * decision the engine took: `none` (equal or nothing to compare), `reconcile` (one full resend was
  * scheduled) or `report` (diverged, and a resend against this same peer state already happened).
+ * `trigger` says what started this check, because "сходится" after a button press and after a
+ * silent pass at start-up are different promises to a person.
  */
 export interface ManifestStatus {
   at: string;
@@ -43,7 +45,11 @@ export interface ManifestStatus {
   inSync: boolean;
   folders: string[];
   action: 'none' | 'reconcile' | 'report';
+  trigger: ManifestTrigger;
 }
+
+/** What started a manifest check. */
+export type ManifestTrigger = 'start' | 'push' | 'manual';
 
 export interface SyncStatus {
   initialSync: { vaultId: string; state: 'idle' | 'loading' | 'ready' | 'error'; processed: number; rejected: number };

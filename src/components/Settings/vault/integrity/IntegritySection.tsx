@@ -6,7 +6,10 @@ import { useIntegrity } from '../../../../hooks/ui/useIntegrity';
 import { IntegrityPanel } from './IntegrityPanel';
 
 export const IntegritySection: React.FC = () => {
-  const { busy, findings, status, lastScan, message, remote, verify, repair } = useIntegrity();
+  const {
+    busy, findings, status, lastScan, message, remote,
+    autoCheck, setAutoCheck, checkServer, verify, repair,
+  } = useIntegrity();
 
   return (
     <div className="flex flex-col gap-2">
@@ -16,6 +19,9 @@ export const IntegritySection: React.FC = () => {
         busy={busy}
         lastScan={lastScan}
         remote={remote}
+        autoCheck={autoCheck}
+        onToggleAutoCheck={setAutoCheck}
+        onCheckServer={checkServer}
         onVerify={verify}
         onRepair={repair}
       />

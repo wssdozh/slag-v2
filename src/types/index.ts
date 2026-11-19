@@ -155,7 +155,6 @@ export interface FolderViewSettings {
   inboxMode?: InboxMode;
   sortBy: SortField;
   sortOrder: SortOrder;
-  hideCompletedTasks?: boolean;
 }
 
 export const DEFAULT_FOLDER_VIEW_SETTINGS: FolderViewSettings = {
@@ -164,7 +163,6 @@ export const DEFAULT_FOLDER_VIEW_SETTINGS: FolderViewSettings = {
   inboxMode: 'all',
   sortBy: 'createdAt',
   sortOrder: 'asc',
-  hideCompletedTasks: false,
 };
 
 export interface AiItemFilter {
@@ -437,7 +435,6 @@ export interface WorkspaceState {
   fullscreenEditorState?: FullscreenEditorWorkspaceState;
   sortBy?: SortField;
   sortOrder?: SortOrder;
-  hideCompletedTasks?: boolean;
   folderSettings?: Record<string, FolderViewSettings>;
   profile?: ProfileInfo;
   notifyRoutes?: NotifyRoute[];

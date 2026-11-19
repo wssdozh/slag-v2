@@ -1,8 +1,10 @@
-// Панель «Состояние хранилища» — сверка целостности и отчёт о находках.
-import React, { useState } from 'react';
+// Панель «состояние хранилища»: что знает сервер и что видит диск — двумя блоками, как соседние
+// разделы хранилища. Настройки и объяснения живут здесь же: «сходится» без «когда и почему» —
+// это строка, которую нельзя ни проверить, ни выключить.
+import React from 'react';
 import type { Finding, IntegrityStatus } from '../../../../lib/vault/integrity/types';
-import type { ManifestStatus } from '../../../../lib/sync/types';
-import { Icon } from '../../../UI/icons/Icon';
+import type { ManifestStatus, ManifestTrigger } from '../../../../lib/sync/types';
+import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSwitch } from '../../SettingsUI';
 import { IntegrityFindingCard } from './IntegrityFindingCard';
 
 export interface IntegrityPanelProps {
@@ -12,6 +14,10 @@ export interface IntegrityPanelProps {
   lastScan: string | null;       // ISO или null
   /** Последняя сверка с комнатой: её ведёт движок синка, сканер её не трогает. */
   remote: ManifestStatus | null;
+  /** Автосверка после запуска и после отправки. Выключена — остаётся только кнопка. */
+  autoCheck: boolean;
+  onToggleAutoCheck(next: boolean): void;
+  onCheckServer(): void;
   onVerify(): void;
   onRepair(dryRun: boolean): void;
 }
@@ -28,6 +34,12 @@ const SCANNER_LABELS: Record<string, string> = {
   'trash-aging': 'Старый мусор',
 };
 
+const TRIGGER_LABELS: Record<ManifestTrigger, string> = {
+  start: 'при запуске',
+  push: 'после отправки',
+  manual: 'вручную',
+};
+
 /** Сгруппировать находки по сканеру. Пустые группы не попадают в результат. */
 function groupByScanner(findings: Finding[]): [string, Finding[]][] {
   const map = new Map<string, Finding[]>();
@@ -39,175 +51,219 @@ function groupByScanner(findings: Finding[]): [string, Finding[]][] {
   return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
+/** Когда сверялись: «19 ноя, 11:23» или пусто, если ни разу. */
+function formatTime(iso: string | null): string {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+/** Что показать про комнату и что это значит словами, а не только цветом. */
+function serverText(remote: ManifestStatus | null): { value: string; tone: string; hint: string } {
+  if (!remote) {
+    return {
+      value: 'нет данных',
+      tone: 'text-fg-dim',
+      hint: 'сверку ещё не запускали: движок синка делает её при запуске и после отправки',
+    };
+  }
+  if (remote.remoteRoot === null) {
+    return {
+      value: 'не ответил',
+      tone: 'text-fg-secondary',
+      hint: 'в комнате нет корня или сервер не пустил: смотри «Логи и диагностика»',
+    };
+  }
+  if (remote.inSync) {
+    return {
+      value: `сходится · ${remote.remoteRoot.slice(0, 8)}…`,
+      tone: 'text-success',
+      hint: 'корень этой копии совпал с тем, что прислало другое устройство',
+    };
+  }
+  if (remote.action === 'reconcile') {
+    return {
+      value: 'разошлось — отправляю заново',
+      tone: 'text-fg-secondary',
+      hint: 'корни разные: отправляю всё состояние целиком, это уже в работе',
+    };
+  }
+  return {
+    value: 'разошлось — нужен разбор',
+    tone: 'text-danger',
+    hint: 'переотправка не помогла: где-то лежит файл не там или иное содержимое, смотри находки ниже',
+  };
+}
+
 export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   status,
   findings,
   busy,
   lastScan,
   remote,
+  autoCheck,
+  onToggleAutoCheck,
+  onCheckServer,
   onVerify,
   onRepair,
 }) => {
-  const [dryRun, setDryRun] = useState(true);
+  const [dryRun, setDryRun] = React.useState(true);
+  const server = serverText(remote);
 
-  /* ── строка состояния ─────────────────────────────── */
-  let statusText = '';
-  let statusDetail = '';
-  let isSynced = false;
-
+  /* ── диск: что нашлось и что можно сделать ─────────── */
+  let findingsValue = 'ещё не сверяли';
+  let findingsHint = 'сверка читает файлы с диска — она по кнопке, а не сама';
   if (status) {
-    const root = status.root;
-    if (root) {
-      statusText = `${root.slice(0, 8)}…`;
+    if (findings.length === 0) {
+      findingsValue = 'чисто';
+      findingsHint = 'ни одной находки: дублей, кривых путей и висячих файлов нет';
     } else {
-      statusText = 'корень неизвестен';
-    }
-
-    if (status.inSync) {
-      isSynced = true;
-      statusDetail = 'в синхроне';
-    } else if (status.drift) {
-      const driftFolders = (status.drift.folders ?? []).length;
-      const driftNotes = (status.drift.conflict ?? []).length + (status.drift.extra ?? []).length;
-      isSynced = false;
-      if (driftFolders > 0 && driftNotes > 0) {
-        statusDetail = `разошлось: ${driftFolders} папок, ${driftNotes} зам.`;
-      } else if (driftFolders > 0) {
-        statusDetail = `разошлось: ${driftFolders} папок`;
-      } else if (driftNotes > 0) {
-        statusDetail = `разошлось: ${driftNotes} зам.`;
-      }
+      const safe = findings.filter((finding) => finding.fix === 'safe').length;
+      findingsValue = `${findings.length}${safe > 0 ? ` · к починке ${safe}` : ''}`;
+      findingsHint =
+        safe > 0
+          ? 'остальное требует человека: такое я не трогаю сама'
+          : 'безопасно чинить нечего — остальное нужно смотреть глазами';
     }
   }
 
-  let scanTime = '';
-  if (lastScan) {
-    try {
-      const d = new Date(lastScan);
-      scanTime = d.toLocaleString('ru-RU', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      scanTime = lastScan;
-    }
-  }
+  const lastServer = remote
+    ? `${formatTime(remote.at)} · ${TRIGGER_LABELS[remote.trigger]}`
+    : 'ни разу';
 
-  /* ── строка сервера ───────────────────────────────── */
-  // Четыре состояния, и каждое честное: «нет данных» — сверку ещё не делали, «не ответил» — комната
-  // молчит, «сходится» — корни равны, «разошлось» — корни разные. Последнее не приговор: движок
-  // уже переотправил состояние, если это ещё может помочь.
-  let remoteText = 'сервер: нет данных';
-  let remoteTone = 'text-fg-dim';
-  if (remote) {
-    if (remote.remoteRoot === null) {
-      remoteText = 'сервер: не ответил';
-    } else if (remote.inSync) {
-      remoteText = `сервер: сходится · ${remote.remoteRoot.slice(0, 8)}…`;
-      remoteTone = 'text-success';
-    } else if (remote.action === 'reconcile') {
-      remoteText = 'сервер: разошлось — отправляю заново';
-      remoteTone = 'text-fg-secondary';
-    } else {
-      remoteText = 'сервер: разошлось — нужен разбор';
-      remoteTone = 'text-fg-secondary';
-    }
-  }
-  const remoteTitle = remote ? `сверено ${remote.at}` : 'движок синка ещё не сверял корень с комнатой';
-
-  /* ── рендер ────────────────────────────────────────── */
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
-      {/* строка статуса */}
-      <div className="flex items-center justify-between px-1 py-1">
-        <span className="text-xs text-fg-muted font-mono">
-          {isSynced ? (
-            <span className="text-success inline-flex items-center gap-1">
-              <Icon name="action.check" size="xs" tone="success" />
-              {statusDetail}
-            </span>
-          ) : status ? (
-            <>
-              {statusText} · <span className={isSynced ? 'text-success' : ''}>{statusDetail || 'есть расхождения'}</span>
-            </>
-          ) : (
-            'ещё не сверяли'
-          )}
-        </span>
-        {scanTime && (
-          <span className="text-2xs font-mono text-fg-dim">{scanTime}</span>
-        )}
-      </div>
-
-      {/* сверка с комнатой: свой счёт, потому что это не диск, а сосед */}
-      <div className="-mt-1 flex items-center justify-between px-1" data-testid="integrity-remote">
-        <span className={`text-2xs font-mono ${remoteTone}`} title={remoteTitle}>
-          {remoteText}
-        </span>
-        {remote && remote.folders.length > 0 && (
-          <span className="text-2xs font-mono text-fg-dim">
-            {remote.folders.length} папок
+      {/* ── сервер ─────────────────────────────────────── */}
+      <SettingsGroup
+        title="Сверка с сервером"
+        action={
+          <span className="flex items-center gap-2">
+            <span className="text-2xs font-mono text-fg-dim">авто</span>
+            <SettingsSwitch
+              checked={autoCheck}
+              onChange={onToggleAutoCheck}
+              disabled={busy}
+              label="Автосверка"
+              testId="integrity-autocheck"
+            />
           </span>
-        )}
-      </div>
-
-      {/* кнопки действий */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          type="button"
+        }
+      >
+        <SettingsRow
+          label="Состояние"
+          description={server.hint}
+          value={<span data-testid="integrity-server" className={server.tone}>{server.value}</span>}
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Последняя сверка"
+          value={lastServer}
+          testId="integrity-server-last"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Когда сверяю"
+          value="запуск и отправка"
+          description="на старте и после каждой отправки к серверу; не чаще раза в 5 секунд — в комнате один корень на хранилище"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Если разошлось"
+          value="одна переотправка"
+          description="потом только показываю расхождение — молча перезаписать чужое однажды стоило 84 заметок"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Сверить с сервером сейчас"
+          description="прочитает корень комнаты и, если он другой, отправит состояние заново"
+          onClick={onCheckServer}
           disabled={busy}
-          data-testid="integrity-verify"
-          onClick={() => onVerify()}
-          className="inline-flex items-center h-7 px-2.5 text-[13px] rounded-lg bg-tint-6 hover:bg-tint-10 text-fg-secondary border border-border-subtle disabled:opacity-40 cursor-pointer transition-colors whitespace-nowrap"
-        >
-          {busy ? (
-            <>сверяю…</>
-          ) : (
-            <>
-              <Icon name="action.refresh" size="xs" tone="inherit" className="mr-1 shrink-0" />
-              Сверить
-            </>
-          )}
-        </button>
+          chevron
+          testId="integrity-server-check"
+        />
+      </SettingsGroup>
 
-        <button
-          type="button"
+      {/* ── диск ───────────────────────────────────────── */}
+      <SettingsGroup
+        title="Это устройство"
+        action={
+          <span className="flex items-center gap-2">
+            <span className="text-2xs font-mono text-fg-dim">только отчёт</span>
+            <SettingsSwitch
+              checked={dryRun}
+              onChange={setDryRun}
+              disabled={busy}
+              label="Только отчёт"
+              testId="integrity-dryrun"
+            />
+          </span>
+        }
+      >
+        <SettingsRow
+          label="Находки"
+          value={findingsValue}
+          description={findingsHint}
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Что читаю"
+          value="8 сканеров"
+          description="notes/, .attachments/ и .trash/: дубли id, пути, папки в state.json, вложения без ссылок, старая корзина"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label="Что чиню сама"
+          value="переносы и записи"
+          description="файл уезжает в .trash/.hygiene/<дата>/, state.json — с копией. заметку не удаляю никогда"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label={busy ? 'Читаю диск…' : 'Сверить диск'}
+          description="собрать находки и манифест, ничего не трогая"
+          onClick={onVerify}
           disabled={busy}
-          data-testid="integrity-repair"
+          chevron
+          testId="integrity-verify"
+        />
+        <SettingsDivider />
+        <SettingsRow
+          label={
+            busy
+              ? 'Чищу…'
+              : dryRun
+                ? 'Почистить (с отчётом)'
+                : 'Почистить по-настоящему'
+          }
+          description={
+            dryRun
+              ? 'покажет, что перенесла бы; переключатель «только отчёт» выше выключает запись'
+              : 'перенесёт безопасное: тумблер «только отчёт» выше выключен'
+          }
           onClick={() => onRepair(dryRun)}
-          className="inline-flex items-center h-7 px-2.5 text-[13px] rounded-lg bg-tint-6 hover:bg-tint-10 text-fg-secondary border border-border-subtle disabled:opacity-40 cursor-pointer transition-colors whitespace-nowrap"
-        >
-          {busy ? (
-            <>чищу…</>
-          ) : (
-            <>
-              <Icon name="folder.sparkles" size="xs" tone="inherit" className="mr-1 shrink-0" />
-              Почистить
-            </>
-          )}
-        </button>
-
-        <button
-          type="button"
-          aria-pressed={dryRun}
           disabled={busy}
-          onClick={() => setDryRun((value) => !value)}
-          title="С отчётом ничего не меняется: кнопка показывает, что починила бы"
-          className={`ml-auto inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-2xs transition-colors cursor-pointer disabled:opacity-40 ${
-            dryRun ? 'border-border-subtle bg-tint-6 text-fg-secondary' : 'border-accent/40 bg-accent-subtle text-accent'
-          }`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${dryRun ? 'bg-fg-dim' : 'bg-accent'}`} />
-          {dryRun ? 'только отчёт' : 'по-настоящему'}
-        </button>
-      </div>
+          chevron
+          testId="integrity-repair"
+        />
+      </SettingsGroup>
 
-      {/* список находок */}
+      {lastScan && (
+        <span className="px-1 text-2xs font-mono text-fg-dim">
+          диск прочитан {formatTime(lastScan)}
+        </span>
+      )}
+
+      {/* ── находки ────────────────────────────────────── */}
       {findings.length === 0 ? (
-        <div className="text-center py-6 text-xs text-fg-dim">
-          {status && !isSynced
+        <div className="text-center py-4 text-xs text-fg-dim">
+          {status && !status.inSync
             ? 'Расхождения есть, но сканер ничего не нашёл — возможно, это первый запуск'
             : 'Находок нет. Запустите сверку, чтобы проверить хранилище'}
         </div>

@@ -34,6 +34,7 @@ import { createSyncOpFromStorageEvent } from './entities/registry';
 import { syncErrorText } from './errorText';
 import { SyncTransport } from './transport';
 import { syncManifest } from './manifestSync';
+import { readManifestAutoCheck } from './manifestPrefs';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
   applyAccountDevices,
@@ -68,6 +69,7 @@ import type {
   DeviceSyncMode,
   AttachmentRequestPayload,
   ManifestStatus,
+  ManifestTrigger,
 } from './types';
 import type { SlagItem, SlagAttachment, FolderMeta, WorkspaceState, AssistantMode } from '../../types';
 import {
@@ -402,9 +404,18 @@ export class SyncEngine {
    *
    * A push confirms in a burst; the room's row keeps only the latest root, so checking after every
    * bundle would double the request rate and learn nothing new. `init` asks for it immediately —
-   * that is the check that catches a device that fell behind while it was asleep.
+   * that is the check that catches a device that fell behind while it was asleep. `manual` is the
+   * button in the panel: it ignores the auto-check switch and the anti-loop latch, because a person
+   * pressing it is entitled to a real resend.
    */
-  public scheduleManifestCheck(delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS): void {
+  public scheduleManifestCheck(
+    delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS,
+    trigger: ManifestTrigger = 'push',
+  ): void {
+    if (trigger !== 'manual' && !readManifestAutoCheck()) {
+      syncLog.debug('Сверка манифеста выключена в настройках хранилища');
+      return;
+    }
     const deadline = Date.now() + delayMs;
     if (this.manifestTimer) {
       if (this.manifestDeadline <= deadline) return;
@@ -414,8 +425,13 @@ export class SyncEngine {
     this.manifestTimer = setTimeout(() => {
       this.manifestTimer = null;
       this.manifestDeadline = 0;
-      void syncManifest(this);
+      void syncManifest(this, trigger, trigger === 'manual');
     }, delayMs);
+  }
+
+  /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
+  public requestManifestCheck(): void {
+    this.scheduleManifestCheck(0, 'manual');
   }
 
   /**
@@ -1019,7 +1035,7 @@ export class SyncEngine {
       // After the pull and the push, not before: the root this device has *now* is the one worth
       // comparing, and a check against the pre-pull state would report a divergence that the pull
       // just fixed.
-      this.scheduleManifestCheck(0);
+      this.scheduleManifestCheck(0, 'start');
     } catch (err: unknown) {
       if (generation !== this.initGeneration) return;
       const msg = syncErrorText(err, this.pullTimeoutMs);

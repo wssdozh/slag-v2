@@ -313,7 +313,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       },
       sortBy,
       sortOrder,
-      hideCompletedTasks,
       folderSettings,
     });
   }, [
@@ -328,7 +327,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     selectedItem,
     sortBy,
     sortOrder,
-    hideCompletedTasks,
     folderSettings,
   ]);
 
@@ -596,7 +594,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     vault, setVault, setVaults, setFolders, setItems,
     setCurrentFolder, setFeedViewMode, setInboxMode, setActiveTypeFilter,
     setActiveTagFilter, setActiveMobileTab, setIsKanbanMaterialsOpen,
-    setSortBy, setSortOrder, setHideCompletedTasks, setFolderSettings,
+    setSortBy, setSortOrder, setFolderSettings,
     setChatMessages, setSelectedItem, refreshData, addToast,
   });
 

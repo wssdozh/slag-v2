@@ -3,6 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { Finding, IntegrityStatus, RepairPlan } from '../../lib/vault/integrity/types';
 import type { ManifestStatus } from '../../lib/sync/types';
 import { syncEngine } from '../../lib/sync/syncEngine';
+import { readManifestAutoCheck, writeManifestAutoCheck } from '../../lib/sync/manifestPrefs';
 import { applyIntegrityRepair, runIntegrityCheck } from '../../lib/storage/integrityService';
 
 export interface UseIntegrity {
@@ -14,6 +15,11 @@ export interface UseIntegrity {
   message: string | null;
   /** The last comparison with the room. `null` until the engine has run one. */
   remote: ManifestStatus | null;
+  /** Whether the engine compares on its own. Off means only the button asks. */
+  autoCheck: boolean;
+  setAutoCheck(next: boolean): void;
+  /** «сверить с сервером сейчас»: one check, now, with the anti-loop latch aside. */
+  checkServer(): void;
   verify(): Promise<void>;
   repair(dryRun: boolean): Promise<void>;
 }
@@ -33,6 +39,17 @@ export function useIntegrity(): UseIntegrity {
   // The engine keeps the same object between checks, so this reads the room's answer without
   // copying it per render and without the panel having to press «сверить» to see it.
   const remote = useSyncExternalStore(subscribeToEngine, () => syncEngine.getManifest(), () => null);
+  // Lazy initial state, not an effect: the switch has to show the stored answer on the first frame.
+  const [autoCheck, setAutoCheckState] = useState(readManifestAutoCheck);
+
+  const setAutoCheck = useCallback((next: boolean) => {
+    writeManifestAutoCheck(next);
+    setAutoCheckState(next);
+  }, []);
+
+  const checkServer = useCallback(() => {
+    syncEngine.requestManifestCheck();
+  }, []);
 
   const verify = useCallback(async () => {
     setBusy(true);
@@ -82,5 +99,18 @@ export function useIntegrity(): UseIntegrity {
     [plan],
   );
 
-  return { busy, findings, status, plan, lastScan, message, remote, verify, repair };
+  return {
+    busy,
+    findings,
+    status,
+    plan,
+    lastScan,
+    message,
+    remote,
+    autoCheck,
+    setAutoCheck,
+    checkServer,
+    verify,
+    repair,
+  };
 }
