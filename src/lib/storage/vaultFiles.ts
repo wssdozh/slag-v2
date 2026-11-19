@@ -20,6 +20,15 @@ import type { AttachmentStore } from './attachments';
 const fsLog = logger.scope('FS');
 
 /**
+ * How many note files are read at once.
+ *
+ * Every `readTextFile` is an IPC round trip, and the disk is not the cost: 89 notes took 1.2 s at
+ * eight in flight (~13 ms per file), which is the bridge talking, not the SSD. Sixteen halves the
+ * number of batches without a queue deep enough to matter to a filesystem.
+ */
+const NOTE_READ_CONCURRENCY = 16;
+
+/**
  * The vault as files on disk: where they live, how a name is claimed, how a note is
  * flushed, renamed or removed, and how the disk is scanned back.
  *
@@ -439,7 +448,7 @@ export class VaultFiles {
     // Bounded parallelism, same as the notes scan: every `readTextFile` is one IPC round trip, and
     // a vault with a few hundred trashed notes spent over a second here one file at a time. Batches
     // keep the read order, so ties on `updatedAt` still sort the way the serial loop left them.
-    const CONCURRENCY = 8;
+    const CONCURRENCY = NOTE_READ_CONCURRENCY;
     for (let i = 0; i < files.length; i += CONCURRENCY) {
       const batch = files.slice(i, i + CONCURRENCY);
       const parsed = await Promise.all(
@@ -480,7 +489,7 @@ export class VaultFiles {
       // resolves to the first file, exactly like the serial loop did.
       const noteFiles = entries.filter((entry) => !entry.isDirectory && entry.name.endsWith('.md'));
       const parsedByName = new Map<string, SlagItem>();
-      const CONCURRENCY = 8;
+      const CONCURRENCY = NOTE_READ_CONCURRENCY;
       for (let i = 0; i < noteFiles.length; i += CONCURRENCY) {
         const batch = noteFiles.slice(i, i + CONCURRENCY);
         const results = await Promise.all(
