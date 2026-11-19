@@ -113,31 +113,11 @@ export async function syncManifest(engine: SyncEngine): Promise<void> {
   if (generation !== engine.initGeneration) return;
 
   const wire = toWire(local);
-  const publishedBefore = engine.manifestPostedRoot === local.root;
-  let published = publishedBefore;
-  if (!publishedBefore) {
-    published = await postManifest(engine, wire);
-    if (generation !== engine.initGeneration) return;
-    if (published) engine.manifestPostedRoot = local.root;
-  }
 
-  // A publish that did not land leaves the room holding an older root, and comparing against it
-  // would read this device's own failed request as a divergence between two machines. The next
-  // check tries again; nothing is resent on a guess.
-  if (!published) {
-    engine.status.manifest = {
-      at: new Date().toISOString(),
-      root: local.root,
-      remoteRoot: null,
-      inSync: false,
-      folders: [],
-      action: 'none',
-    };
-    engine.notify();
-    syncLog.debug(`${describeWire(wire)} не записан; сверка подождёт следующей попытки`);
-    return;
-  }
-
+  // Read the room BEFORE publishing. The relay keeps one row per room and vault, so a POST first
+  // leaves this device comparing its root with the copy it has just written — a check that can
+  // only ever answer "in sync". That bug shipped in dev.37 and both devices reported agreement
+  // while holding 21 and 22 folders.
   const remote = await readRemoteManifest(engine);
   if (generation !== engine.initGeneration) return;
 
@@ -155,6 +135,15 @@ export async function syncManifest(engine: SyncEngine): Promise<void> {
     syncLog.warn(`Корень разошёлся с комнатой: переотправляю состояние (${describeWire(wire)})`);
   }
 
+  // And publish last, so the row carries what this device holds *now* — after the resend above,
+  // not before it. An unchanged root makes no request: the row already says this.
+  let published = engine.manifestPostedRoot === local.root;
+  if (!published) {
+    published = await postManifest(engine, wire);
+    if (generation !== engine.initGeneration) return;
+    if (published) engine.manifestPostedRoot = local.root;
+  }
+
   engine.status.manifest = {
     at: new Date().toISOString(),
     root: local.root,
@@ -165,6 +154,10 @@ export async function syncManifest(engine: SyncEngine): Promise<void> {
   };
   engine.notify();
 
+  if (!published) {
+    syncLog.debug(`${describeWire(wire)} не записан; сверка подождёт следующей попытки`);
+    return;
+  }
   if (remote === null) {
     syncLog.info(`${describeWire(wire)} записан; комната ещё не ответила своим`);
   } else if (decision.action === 'none') {
