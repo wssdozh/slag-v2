@@ -13,38 +13,42 @@ import { planRepair } from '../src/lib/vault/integrity/repair.ts';
 const USAGE = `usage: node scripts/vault-doctor.mjs <vaultDir> [--json] [--apply]
   --only=a,b        run these scanners only
   --trash-days=N    trash older than N days is dirt (default 30)
-  --max-actions=N   ceiling on fixes per run (default 50)`;
+  --max-actions=N   ceiling on fixes per run (default 50)
+  --max-share=N     ceiling as a share of the vault's notes (default 0.1)`;
 
 function parseArgs(argv) {
-  const out = { vaultDir: '', json: false, apply: false, only: null, trashDays: 30, maxActions: 50 };
+  const out = { vaultDir: '', json: false, apply: false, only: null, trashDays: 30, maxActions: 50, maxShare: 0.1 };
   for (const arg of argv) {
     if (arg === '--json') out.json = true;
     else if (arg === '--apply') out.apply = true;
     else if (arg.startsWith('--only=')) out.only = arg.slice(7).split(',').map((id) => id.trim()).filter(Boolean);
     else if (arg.startsWith('--trash-days=')) out.trashDays = Number(arg.slice(13)) || 30;
     else if (arg.startsWith('--max-actions=')) out.maxActions = Number(arg.slice(14)) || 50;
+    else if (arg.startsWith('--max-share=')) out.maxShare = Number(arg.slice(12)) || 0.1;
     else if (arg.startsWith('--help') || arg === '-h') out.help = true;
     else if (!arg.startsWith('--') && !out.vaultDir) out.vaultDir = arg;
   }
   return out;
 }
 
-/** Moves one file, creating the target directory. Returns the path it actually landed on. */
+/**
+ * Moves one file, creating the target directory. Refuses when the target already exists: a second
+ * copy under a new name is the very duplicate the sweep is meant to remove.
+ */
 function moveFile(fromAbs, toAbs) {
+  if (existsSync(toAbs)) return null;
   mkdirSync(dirname(toAbs), { recursive: true });
-  let target = toAbs;
-  for (let n = 2; existsSync(target); n += 1) target = `${toAbs.replace(/\.md$/, '')}-${n}.md`;
   try {
-    renameSync(fromAbs, target);
+    renameSync(fromAbs, toAbs);
   } catch (err) {
     if (err && err.code === 'EXDEV') {
-      copyFileSync(fromAbs, target);
+      copyFileSync(fromAbs, toAbs);
       rmSync(fromAbs);
     } else {
       throw err;
     }
   }
-  return target;
+  return toAbs;
 }
 
 function backupStateFile(vaultDir, runRoot) {
@@ -68,8 +72,12 @@ function applyPlan(plan, vaultDir, runRoot) {
           continue;
         }
         const toAbs = join(vaultDir, op.to);
-        moveFile(fromAbs, toAbs);
-        applied.push({ op, landed: toAbs.slice(vaultDir.length + 1) });
+        const landed = moveFile(fromAbs, toAbs);
+        if (!landed) {
+          skipped.push({ op, reason: 'на месте назначения уже есть файл' });
+          continue;
+        }
+        applied.push({ op, landed: landed.slice(vaultDir.length + 1) });
       } else if (op.kind === 'remove-dir') {
         const dirAbs = join(vaultDir, op.path);
         // Non-recursive on purpose: a directory that still holds something is not empty dirt.
@@ -153,7 +161,7 @@ function main() {
   }
 
   const runId = new Date().toISOString().replace(/[:.]/g, '-');
-  const plan = planRepair(findings, snapshot, { maxActions: args.maxActions, runId });
+  const plan = planRepair(findings, snapshot, { maxActions: args.maxActions, maxShare: args.maxShare, runId });
 
   if (args.json) {
     console.log(JSON.stringify({ vault: vaultDir, snapshot: { notes: snapshot.notes.length }, findings, plan }, null, 2));
