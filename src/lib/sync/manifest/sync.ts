@@ -1,5 +1,5 @@
 // The room's own copy of this vault's manifest: build → peers → decide → react → publish → status.
-// One resend per peer root, then a report. The peer that diverged is who the resend is aimed at.
+// One resend per named peer root, then a report. A row without a device is "no data", not a job.
 import { SYNC_INTERVALS } from '../../../config';
 import { logger } from '../../logger/logger';
 import { vault } from '../../storage/port';
@@ -34,7 +34,10 @@ function manifestStatus(
     trigger,
     peers: peers.map((peer): ManifestPeerStatus => {
       const drift = diffWire(local, peer);
-      return { deviceId: peer.deviceId, root: peer.root, inSync: drift.rootMatch, extra: drift.extra, missing: drift.missing };
+      return {
+        deviceId: peer.deviceId, anonymous: peer.deviceId === null, root: peer.root,
+        inSync: drift.rootMatch, extra: drift.extra, missing: drift.missing,
+      };
     }),
   };
 }
@@ -66,8 +69,7 @@ export async function syncManifest(
   }
   if (generation !== engine.initGeneration) return;
 
-  // Read the peers BEFORE publishing: a POST first leaves this device reading its own row back and
-  // answering "in sync" to itself — the bug of dev.37, 86 of those a day.
+  // Read the peers BEFORE publishing: a POST first leaves this device reading its own row back.
   const peers = await readPeerManifests(engine);
   if (generation !== engine.initGeneration) return;
 
@@ -99,8 +101,7 @@ export async function syncManifest(
   engine.status.manifest = manifestStatus(local, peers, decision, trigger);
   engine.notify();
 
-  // Named notes are asked for by id; the answer is an ordinary bundle, so `applyBundle` stays the
-  // only way in.
+  // Named notes are asked for by id; the answer is an ordinary bundle, not a second path in.
   if (decision.peer && decision.drift) {
     const ids = leavesToRequest(decision.drift, decision.peer);
     if (ids.length > 0) void requestMissingNotes(engine, decision.peer, ids);
@@ -109,8 +110,7 @@ export async function syncManifest(
   if (!published) syncLog.debug(`${describeWire(wire)} не записан; сверка подождёт следующей попытки`);
   else if (peers.length === 0) syncLog.info(`${describeWire(wire)} записан; других устройств в комнате пока нет`);
   else if (decision.action === 'none') syncLog.info(`${describeWire(wire)}; корень сходится с соседями`);
-  // Debug, not warn: a device that cannot converge would otherwise write this line every check
-  // interval, forever, and drown the log.
+  // Debug, not warn: a device that cannot converge writes this every check interval.
   else if (decision.action === 'report') syncLog.debug(`${describeWire(wire)}; корень расходится с соседом`);
 
   if (published && decision.action === 'report') {

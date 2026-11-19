@@ -35,9 +35,9 @@ function wire(overrides = {}) {
   };
 }
 
-/** One peer's row: a wire plus the device that published it. */
+/** One peer's row: a wire plus the device that published it and when the relay wrote it. */
 function peer(deviceId, overrides = {}) {
-  return { deviceId, ...wire(overrides) };
+  return { deviceId, at: null, ...wire(overrides) };
 }
 
 test('toWire carries version, root, folders and leaves', () => {
@@ -248,11 +248,21 @@ test('a diverged peer root is resent once, at that peer', () => {
   assert.equal(decision.drift?.rootMatch, false);
 });
 
-test('an old client has no device id to resend to', () => {
+test('an old client is compared but never resent to', () => {
   const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' })], quiet);
 
-  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.action, 'none');
+  assert.equal(decision.peer?.deviceId, null);
+  assert.equal(decision.drift?.rootMatch, false);
   assert.equal(decision.resendTo, null);
+});
+
+test('a named peer that disagrees outranks the old client', () => {
+  const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' }), peer('dev-a', { root: 'root-c' })], quiet);
+
+  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.peer?.deviceId, 'dev-a');
+  assert.equal(decision.resendTo, 'dev-a');
 });
 
 test('the same peer root is never resent against twice', () => {

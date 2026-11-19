@@ -36,12 +36,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * One row of a peer answer, or `null` when it is not a manifest.
  *
  * The validation is `parseWire`'s, given the version a per-device row does not carry: a row is a
- * wire minus `v`, and two shapes of the same data must not grow two sets of rules.
+ * wire minus `v`, and two shapes of the same data must not grow two sets of rules. `at` is the
+ * relay's own clock and says when the row was written; a relay that does not send it leaves `null`.
  */
 function readPeerRow(raw: unknown, deviceId: string | null): PeerManifest | null {
   const wire = parseWire(isRecord(raw) ? { ...raw, v: WIRE_VERSION } : raw);
   if (wire === null) return null;
-  return { deviceId, root: wire.root, folders: wire.folders, leaves: wire.leaves };
+  const at = isRecord(raw) && typeof raw.at === 'number' && Number.isFinite(raw.at) ? raw.at : null;
+  return { deviceId, at, root: wire.root, folders: wire.folders, leaves: wire.leaves };
 }
 
 /** The device a row belongs to; an old client's row has none, and that is not an error. */

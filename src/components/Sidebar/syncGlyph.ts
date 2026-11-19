@@ -5,6 +5,7 @@
 // answer arrives before the tooltip: a crossed cloud is "not connected", a check is "both copies
 // agree", and cloud-with-a-bang is the state a spinner cannot express — connected, but the roots
 // disagree.
+import { anonymousOnlyDrift } from '../../lib/sync/types';
 import type { SyncStatus } from '../../lib/sync/types';
 import type { IconName } from '../UI/icons/icons';
 
@@ -54,6 +55,15 @@ export function syncGlyph(status: SyncStatus): SyncGlyph {
         name: 'system.syncDiverged',
         className: 'text-danger',
         title: `Копии разошлись${OPEN_SETTINGS}`,
+      };
+    }
+    // The room's old single row stopped updating: it disagrees forever and nobody can be asked
+    // through it. That is "no data about the peer", not an alert — the shape says "checking".
+    if (status.manifest && anonymousOnlyDrift(status.manifest.peers)) {
+      return {
+        name: 'system.sync',
+        className: 'text-fg-secondary',
+        title: `Синхронизация: нет данных о соседе${OPEN_SETTINGS}`,
       };
     }
     return {

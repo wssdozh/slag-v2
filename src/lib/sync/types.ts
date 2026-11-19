@@ -32,15 +32,35 @@ export interface SubscriptionInfo {
 /**
  * One other device's root as the last check saw it.
  *
- * `deviceId: null` is an old client: the relay cannot name it, and the check cannot ask it for a
- * note. `extra`/`missing` stay empty when that peer sent no leaves — there is nothing to name.
+ * `deviceId: null` is an old client: the relay cannot name it, nobody can be asked through it, and
+ * its row never updates again. `extra`/`missing` stay empty when that peer sent no leaves — there
+ * is nothing to name.
  */
 export interface ManifestPeerStatus {
   deviceId: string | null;
+  /** True for the room's frozen single row: compared, never acted on. */
+  anonymous: boolean;
   root: string;
   inSync: boolean;
   extra: string[];
   missing: string[];
+}
+
+/**
+ * Is the only disagreement the one with a client nobody can name?
+ *
+ * Such a row is the room's old single manifest: it stopped updating the day the room started
+ * keeping one row per device, its root is somebody else's forever, and no resend can help. The
+ * panel says "no data about the peer" about that instead of calling the vaults diverged.
+ */
+export function anonymousOnlyDrift(peers: ManifestPeerStatus[]): boolean {
+  let anonymous = false;
+  for (const peer of peers) {
+    if (peer.inSync) continue;
+    if (!peer.anonymous) return false;
+    anonymous = true;
+  }
+  return anonymous;
 }
 
 /**

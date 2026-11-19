@@ -63,6 +63,8 @@ export interface WireBody {
 /** One other device's manifest as the relay answered it. `deviceId: null` is an old client. */
 export interface PeerManifest extends WireBody {
   deviceId: string | null;
+  /** When the relay wrote this row, ms epoch. `null` is a relay that does not say. */
+  at: number | null;
 }
 
 export function toWire(manifest: Manifest): WireManifest {
@@ -202,6 +204,10 @@ export interface ManifestDecision {
  * No peers is "nobody answered", not a mismatch: our own row is already written and there is
  * nothing to compare against. `reconciledRoot` is the anti-loop latch — the peer root this device
  * already resent against once.
+ *
+ * A row with no device id is the room's old single manifest: it never updates, nobody can be asked
+ * through it, and a resend aimed at it is bundles into the void. It is compared and reported as
+ * "no data about the peer", never acted on — and it cannot win the verdict over a named peer.
  */
 export function decideManifest(
   local: Manifest,
@@ -210,12 +216,18 @@ export function decideManifest(
 ): ManifestDecision {
   if (peers.length === 0) return { action: 'none', peer: null, drift: null, resendTo: null };
 
+  const divergedNamed = peers.find((peer) => peer.deviceId !== null && peer.root !== local.root);
+  if (divergedNamed) {
+    const drift = diffWire(local, divergedNamed);
+    if (state.receiveOnly || state.reconciledRoot === divergedNamed.root) {
+      return { action: 'report', peer: divergedNamed, drift, resendTo: null };
+    }
+    return { action: 'reconcile', peer: divergedNamed, drift, resendTo: divergedNamed.deviceId };
+  }
+
+  // Only the old client's row is left to disagree: that is a fact for the panel, not a job.
   const peer = peers.find((candidate) => candidate.root !== local.root) ?? peers[0];
-  const drift = diffWire(local, peer);
-  if (drift.rootMatch) return { action: 'none', peer, drift, resendTo: null };
-  if (state.receiveOnly) return { action: 'report', peer, drift, resendTo: null };
-  if (state.reconciledRoot === peer.root) return { action: 'report', peer, drift, resendTo: null };
-  return { action: 'reconcile', peer, drift, resendTo: peer.deviceId };
+  return { action: 'none', peer, drift: diffWire(local, peer), resendTo: null };
 }
 
 /**

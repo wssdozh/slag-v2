@@ -49,9 +49,12 @@ export function decideResolve(input: ResolveInput): string[] {
 /**
  * The ids worth the trash after a `report`, with this device's state already gathered.
  *
- * A peer that sent no leaves names no note: the comparison then says nothing about notes, and
- * acting on that guess is how a vault loses them. A peer with leaves is one the resend reached,
- * so `decideResolve` can tell a refusal from a note that arrived late.
+ * Two things must be true before a silence means "refused". The peer has to be one that can be
+ * addressed and that sent its leaves — an old client's frozen row names no note, and acting on
+ * that guess is how a vault loses them. And its row has to be newer than our resend: a row from
+ * before it means "has not seen it yet", not "no", because a peer applies a bundle long before it
+ * republishes its own manifest (up to a heartbeat later). A relay that cannot date its rows leaves
+ * `at` empty, and then this device does not resolve at all: safer to wait for a person.
  */
 export function resolveRejected(
   engine: SyncEngine,
@@ -59,10 +62,12 @@ export function resolveRejected(
   decision: ManifestDecision,
 ): string[] {
   const peer: PeerManifest | null = decision.peer;
-  if (peer === null || peer.leaves === undefined) return [];
+  if (peer === null || peer.deviceId === null || peer.leaves === undefined) return [];
+  const resentAt = engine.manifestResentAt;
+  if (resentAt === null || peer.at === null || peer.at <= resentAt) return [];
   return decideResolve({
     drift: decision.drift,
-    resentAt: engine.manifestResentAt,
+    resentAt,
     updatedAt: new Map(vault().getItems().map((item) => [item.id, item.updatedAt ?? 0])),
     leaves: Object.keys(local.leaves).length,
     enabled: readManifestAutoResolve(),
