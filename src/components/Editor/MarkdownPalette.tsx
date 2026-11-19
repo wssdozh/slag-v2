@@ -320,11 +320,6 @@ export const MarkdownPalette: React.FC<MarkdownPaletteProps> = ({
           >
             <Icon name="action.attach" size="md" />
           </button>
-
-          <div className="h-3.5 w-px bg-tint-8 mx-0.5 shrink-0" />
-
-          {/* Right Edge Divider */}
-          <div className="h-4 w-px bg-tint-8 shrink-0" />
         </div>
       )}
     </div>

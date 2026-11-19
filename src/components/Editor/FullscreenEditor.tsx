@@ -454,8 +454,16 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 isZenMode ? 'opacity-20 hover:opacity-100' : 'opacity-100'
               }`}
             >
-              {/* One row under the title: record type, task metadata, the AI pass. */}
+              {/* One row under the title: the AI pass first, like the composer puts it, then the
+                  record type and the task metadata. */}
               <div className="flex flex-wrap items-center gap-1">
+                <ToolbarButton
+                  size="sm"
+                  onClick={handleAiDecomposeInline}
+                  title="Разобрать через ИИ (папка и теги)"
+                  aria-label="Разобрать через ИИ"
+                  icon={<Icon name="system.ai" size="sm" tone="inherit" />}
+                />
                 <ResponsiveSegmented<SlagItemType>
                   value={type}
                   onChange={setType}
@@ -490,13 +498,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                     onRecurrenceChange={setRecurrence}
                   />
                 )}
-                <ToolbarButton
-                  size="sm"
-                  onClick={handleAiDecomposeInline}
-                  title="Разобрать через ИИ (папка и теги)"
-                  aria-label="Разобрать через ИИ"
-                  icon={<Icon name="system.ai" size="sm" tone="inherit" />}
-                />
               </div>
 
               {/* Subtle Divider between the meta row and the tags */}
