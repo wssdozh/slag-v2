@@ -4,7 +4,7 @@
 // every byte it moves lands in `.trash/.hygiene/<run>/` first.
 //
 // This runs without the app on purpose: it is what a nightly job checks a backup with.
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, copyFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, copyFileSync, rmSync, rmdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { buildVaultSnapshot } from './vault-snapshot.mjs';
 import { scanVault } from '../src/lib/vault/integrity/scanners.ts';
@@ -60,18 +60,26 @@ function backupStateFile(vaultDir, runRoot) {
   return statePath;
 }
 
+/**
+ * Two namespaces meet here: a note path is relative to `notes/`, while the trash and the hygiene
+ * directory sit beside it. One rule keeps them apart — anything under `.trash/` is vault-relative.
+ */
+function absoluteIn(vaultDir, path) {
+  return path.startsWith('.trash/') ? join(vaultDir, path) : join(vaultDir, 'notes', path);
+}
+
 function applyPlan(plan, vaultDir, runRoot) {
   const applied = [];
   const skipped = [];
   for (const op of plan.ops) {
     try {
       if (op.kind === 'move') {
-        const fromAbs = join(vaultDir, op.from);
+        const fromAbs = absoluteIn(vaultDir, op.from);
         if (!existsSync(fromAbs)) {
           skipped.push({ op, reason: 'исходного файла уже нет' });
           continue;
         }
-        const toAbs = join(vaultDir, op.to);
+        const toAbs = absoluteIn(vaultDir, op.to);
         const landed = moveFile(fromAbs, toAbs);
         if (!landed) {
           skipped.push({ op, reason: 'на месте назначения уже есть файл' });
@@ -79,9 +87,9 @@ function applyPlan(plan, vaultDir, runRoot) {
         }
         applied.push({ op, landed: landed.slice(vaultDir.length + 1) });
       } else if (op.kind === 'remove-dir') {
-        const dirAbs = join(vaultDir, op.path);
+        const dirAbs = absoluteIn(vaultDir, op.path);
         // Non-recursive on purpose: a directory that still holds something is not empty dirt.
-        rmSync(dirAbs, { recursive: false });
+        rmdirSync(dirAbs);
         applied.push({ op });
       } else if (op.kind === 'drop-folders') {
         const statePath = backupStateFile(vaultDir, runRoot);

@@ -116,6 +116,18 @@ test('a folder holding a child directory is not empty', () => {
   assert.deepEqual(byScanner(findings, 'empty-folder').map((finding) => finding.path), ['Личное/Пусто']);
 });
 
+test('an empty folder somebody named in state.json is a decision, not dirt', () => {
+  const findings = scanVault(
+    snap({
+      notes: [note({ path: 'Входящие/a.md', id: 'i1' })],
+      diskFolders: ['Входящие', 'Будущее/Хотелки', 'Проекты/Безымянная'],
+      stateFolders: [{ path: 'Будущее/Хотелки', name: 'Хотелки' }],
+    }),
+  );
+
+  assert.deepEqual(byScanner(findings, 'empty-folder').map((finding) => finding.path), ['Проекты/Безымянная']);
+});
+
 test('a note without an id is broken, and it cannot be repaired automatically', () => {
   const findings = scanVault(snap({ notes: [note({ path: 'Входящие/без-id.md', title: 'текст' })], diskFolders: ['Входящие'] }));
 

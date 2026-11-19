@@ -146,17 +146,26 @@ export function scanGhostFolders(snapshot: VaultSnapshot): Finding[] {
   return findings;
 }
 
-/** A directory with nothing in it and nothing under it. */
+/**
+ * A directory with nothing in it and nothing under it — unless somebody named it.
+ *
+ * An entry in `state.json` with a name is a decision, not an accident: a person built a place for
+ * notes that have not been written yet. Reporting those would teach everyone to ignore the report.
+ */
 export function scanEmptyFolders(snapshot: VaultSnapshot): Finding[] {
+  const intentional = new Set(
+    snapshot.stateFolders.filter((entry) => entry.name && entry.name !== entry.path).map((entry) => entry.path),
+  );
   const findings: Finding[] = [];
   for (const path of snapshot.diskFolders) {
     if (!path || path === snapshot.inbox || path.startsWith('.')) continue;
+    if (intentional.has(path)) continue;
     const holdsNote = snapshot.notes.some((note) => dirOf(note.path, snapshot.inbox) === path);
     if (holdsNote) continue;
     const holdsChild = snapshot.diskFolders.some((other) => other.startsWith(`${path}/`));
     if (holdsChild) continue;
     findings.push(
-      finding('empty-folder', path, `папка «${path}» пуста`, 'пустая папка — это место, которое кто-то будет искать через полгода и не найдёт', {
+      finding('empty-folder', path, `папка «${path}» пуста`, 'каталог, который никто не намеревался создавать: ни заметок, ни имени в state.json', {
         action: 'убрать пустой каталог',
       }),
     );
