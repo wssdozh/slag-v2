@@ -12,6 +12,15 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 const syncLog = logger.scope('SYNC');
 
 /**
+ * End of a pass that stopped being this engine's pass: a vault switch or a reconnect bumped the
+ * generation, and `syncing` left standing here would outlive the work it described.
+ */
+function settleStatus(engine: SyncEngine): void {
+  engine.status.state = engine.ws && engine.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
+  engine.notify();
+}
+
+/**
  * What a bundle from the relay actually does to the vault: tombstones, staged
  * imports, the attachment pass, the ack.
  *
@@ -25,9 +34,6 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
     const roomId = engine.activeRoomId;
 
     try {
-      engine.status.state = 'syncing';
-      engine.notify();
-
       let bundle: SyncBundle;
       if (
         typeof bundlePayload === 'object' &&
@@ -96,6 +102,13 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         if (engine.batchUpdating) engine.status.initialSync.rejected++;
         return;
       }
+
+      // Only now, after every refusal above has returned: the sidebar spinner is a promise that
+      // this call ends it, and a refusal ends nothing. A relay that re-delivered an already
+      // acknowledged bundle used to leave the spinner turning until the next local edit, because
+      // the state went to `syncing` before the "we already have this" return.
+      engine.status.state = 'syncing';
+      engine.notify();
 
       syncLog.info(
         `Received bundle ${bundle.bundleId} from ${bundle.fromDeviceId} (${bundle.changes.length} changes)`
@@ -371,7 +384,10 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       }
 
       const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
-      if (generation !== engine.initGeneration) return;
+      if (generation !== engine.initGeneration) {
+        settleStatus(engine);
+        return;
+      }
 
       engine.appliedBundleIds.add(bundle.bundleId);
       if (engine.batchUpdating) engine.status.initialSync.processed++;
@@ -388,7 +404,10 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       } else {
         // Nothing to persist: no write exists for the ACK to outrun.
         await engine.sendAck(bundle.bundleId);
-        if (generation !== engine.initGeneration) return;
+        if (generation !== engine.initGeneration) {
+          settleStatus(engine);
+          return;
+        }
       }
 
       engine.status.lastSyncTime = new Date().toLocaleTimeString();

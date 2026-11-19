@@ -171,6 +171,8 @@ export async function syncManifest(
   } else if (decision.action === 'none') {
     syncLog.info(`${describeWire(wire)}; корень сходится с комнатой`);
   } else if (decision.action === 'report') {
-    syncLog.warn(`${describeWire(wire)}; корень расходится с комнатой, переотправка уже была`);
+    // Debug, not warn: one device that cannot converge (a note its neighbour keeps rejecting on
+    // LWW) would otherwise write this line every check interval, forever, and drown the log.
+    syncLog.debug(`${describeWire(wire)}; корень расходится с комнатой, переотправка уже была`);
   }
 }
