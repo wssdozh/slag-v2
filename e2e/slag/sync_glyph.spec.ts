@@ -48,11 +48,32 @@ test('the sidebar glyph names the sync state', async ({ page }) => {
       missing: [],
       action: 'report',
       trigger: 'push',
+      peers: [{ deviceId: 'peer-device', anonymous: false, root: 'bbbb2222', inSync: false, extra: ['item_left_behind'], missing: [] }],
     },
   });
   await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncDiverged');
   await expect(button).toHaveAttribute('title', /Копии разошлись/);
   await expect(button.locator('[data-icon]')).toHaveClass(/text-danger/);
+
+  // The room's old frozen row disagrees forever: "no data about the peer", not an alert.
+  await apply({
+    state: 'connected',
+    manifest: {
+      at: new Date().toISOString(),
+      root: 'aaaa1111',
+      remoteRoot: 'cccc3333',
+      inSync: false,
+      folders: [],
+      extra: [],
+      missing: [],
+      action: 'none',
+      trigger: 'push',
+      peers: [{ deviceId: null, anonymous: true, root: 'cccc3333', inSync: false, extra: [], missing: [] }],
+    },
+  });
+  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.sync');
+  await expect(button).toHaveAttribute('title', /нет данных о соседе/);
+  await expect(button.locator('[data-icon]')).toHaveClass(/text-fg-secondary/);
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${SHOT_DIR}/sidebar-sync-diverged.png`, clip: { x: 0, y: 860, width: 260, height: 140 } });

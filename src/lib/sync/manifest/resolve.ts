@@ -6,7 +6,11 @@
 // "delete": it is the trash, one small batch, and only for leaves that were already on the wire
 // before that resend. A note edited afterwards was never in front of the neighbour and is left
 // alone — that is the difference between "he refused it" and "he has not seen it yet".
-import type { DriftReport } from '../vault/integrity/types';
+import { vault } from '../../storage/port';
+import type { DriftReport, Manifest } from '../../vault/integrity/types';
+import type { SyncEngine } from '../syncEngine';
+import type { ManifestDecision, PeerManifest } from './channel';
+import { readManifestAutoResolve } from './prefs';
 
 /** Notes the neighbour can plausibly have refused in one pass. More than this is not a stray note. */
 export const RESOLVE_MAX = 8;
@@ -39,5 +43,33 @@ export function decideResolve(input: ResolveInput): string[] {
   return extra.filter((id) => {
     const at = input.updatedAt.get(id);
     return at !== undefined && at < resentAt;
+  });
+}
+
+/**
+ * The ids worth the trash after a `report`, with this device's state already gathered.
+ *
+ * Two things must be true before a silence means "refused". The peer has to be one that can be
+ * addressed and that sent its leaves — an old client's frozen row names no note, and acting on
+ * that guess is how a vault loses them. And its row has to be newer than our resend: a row from
+ * before it means "has not seen it yet", not "no", because a peer applies a bundle long before it
+ * republishes its own manifest (up to a heartbeat later). A relay that cannot date its rows leaves
+ * `at` empty, and then this device does not resolve at all: safer to wait for a person.
+ */
+export function resolveRejected(
+  engine: SyncEngine,
+  local: Manifest,
+  decision: ManifestDecision,
+): string[] {
+  const peer: PeerManifest | null = decision.peer;
+  if (peer === null || peer.deviceId === null || peer.leaves === undefined) return [];
+  const resentAt = engine.manifestResentAt;
+  if (resentAt === null || peer.at === null || peer.at <= resentAt) return [];
+  return decideResolve({
+    drift: decision.drift,
+    resentAt,
+    updatedAt: new Map(vault().getItems().map((item) => [item.id, item.updatedAt ?? 0])),
+    leaves: Object.keys(local.leaves).length,
+    enabled: readManifestAutoResolve(),
   });
 }

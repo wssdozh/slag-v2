@@ -1,10 +1,10 @@
 // How a manifest crosses the wire: shape, validation, comparison.
 //
 // The manifest arrives already keyed by `buildManifest`. This module never touches the leaves'
-// fingerprints: it decides what a `WireManifest` is allowed to look like, how two of them are
-// compared, and what is worth asking the other device for. The shape comes from the network, so
-// every field is narrowed from `unknown` here and nowhere else.
-import type { DriftReport, Manifest, WireManifest } from '../vault/integrity/types.ts';
+// fingerprints: it decides what a `WireManifest` is allowed to look like, how a local manifest is
+// compared with a peer's, and what is worth asking that peer for. The shape comes from the
+// network, so every field is narrowed from `unknown` here and nowhere else.
+import type { DriftReport, Manifest, WireManifest } from '../../vault/integrity/types';
 
 /** The one version this build speaks. A wire with any other `v` is refused, not upgraded. */
 export const WIRE_VERSION = 1;
@@ -48,6 +48,23 @@ function recordToText(record: Record<string, string>): string {
 
 function sortedUnion(left: Record<string, string>, right: Record<string, string>): string[] {
   return [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+}
+
+/**
+ * The fields a comparison reads. A `WireManifest` carries them with a version; a peer row the
+ * relay keeps per device carries them without one, and neither needs a second comparison.
+ */
+export interface WireBody {
+  root: string;
+  folders: Record<string, string>;
+  leaves?: Record<string, string>;
+}
+
+/** One other device's manifest as the relay answered it. `deviceId: null` is an old client. */
+export interface PeerManifest extends WireBody {
+  deviceId: string | null;
+  /** When the relay wrote this row, ms epoch. `null` is a relay that does not say. */
+  at: number | null;
 }
 
 export function toWire(manifest: Manifest): WireManifest {
@@ -123,7 +140,7 @@ export function wireFromText(text: string): WireManifest | null {
  * A remote without `leaves` is not a match: it means nobody sent the leaves, so the report leaves
  * `missing`/`extra`/`conflict` empty and speaks only about folders and the root.
  */
-export function diffWire(local: Manifest, remote: WireManifest): DriftReport {
+export function diffWire(local: Manifest, remote: WireBody): DriftReport {
   const folders = sortedUnion(local.folders, remote.folders).filter(
     (path) => local.folders[path] !== remote.folders[path]
   );
@@ -158,43 +175,59 @@ export function diffWire(local: Manifest, remote: WireManifest): DriftReport {
  * Empty when the remote sent no leaves — there is nothing to name, and an empty request is a
  * truthful "ask me again with leaves" rather than a list of guesses.
  */
-export function leavesToRequest(report: DriftReport, wire: WireManifest): string[] {
+export function leavesToRequest(report: DriftReport, wire: WireBody): string[] {
   if (wire.leaves === undefined) return [];
   return [...new Set([...report.missing, ...report.conflict])].sort();
 }
 
 /**
- * What a device does about the room's manifest.
+ * What a device does about the peers in its room.
  *
- * `reconcile` means one full resend. The relay keeps only the root and the folders, so a mismatch
- * names no note that could be pulled: the honest repair is "send everything once", not "fetch the
- * five notes". `report` is the end of the line — the divergence is real and a second resend against
- * the same peer state cannot fix it, so the panel says so and nothing loops.
+ * `reconcile` means one full resend, aimed at one peer. The relay keeps a row per device now, so
+ * the row that disagreed is the row the resend is for: `resendTo` names it (an old client has no
+ * device id, and the resend is the whole room's). `report` is the end of the line — this peer's
+ * state already got its resend and cannot be fixed by a second one, so the panel says so and
+ * nothing loops.
  */
 export interface ManifestDecision {
   action: 'none' | 'reconcile' | 'report';
+  /** The peer the verdict is about: the first diverged one, or the first peer when all agree. */
+  peer: PeerManifest | null;
   drift: DriftReport | null;
+  /** The device the resend is aimed at; `null` for an old client or when nothing is resent. */
+  resendTo: string | null;
 }
 
 /**
  * The decision, in the order that makes each step safe to repeat.
  *
- * `remote === null` is "nobody answered", not a mismatch: our own manifest is already written and
- * there is nothing to compare against. `reconciledRoot` is the anti-loop latch — the root this
- * device already resent against once.
+ * No peers is "nobody answered", not a mismatch: our own row is already written and there is
+ * nothing to compare against. `reconciledRoot` is the anti-loop latch — the peer root this device
+ * already resent against once.
+ *
+ * A row with no device id is the room's old single manifest: it never updates, nobody can be asked
+ * through it, and a resend aimed at it is bundles into the void. It is compared and reported as
+ * "no data about the peer", never acted on — and it cannot win the verdict over a named peer.
  */
 export function decideManifest(
   local: Manifest,
-  remote: WireManifest | null,
+  peers: PeerManifest[],
   state: { reconciledRoot: string | null; receiveOnly: boolean },
 ): ManifestDecision {
-  if (remote === null) return { action: 'none', drift: null };
+  if (peers.length === 0) return { action: 'none', peer: null, drift: null, resendTo: null };
 
-  const drift = diffWire(local, remote);
-  if (drift.rootMatch) return { action: 'none', drift };
-  if (state.receiveOnly) return { action: 'report', drift };
-  if (state.reconciledRoot === remote.root) return { action: 'report', drift };
-  return { action: 'reconcile', drift };
+  const divergedNamed = peers.find((peer) => peer.deviceId !== null && peer.root !== local.root);
+  if (divergedNamed) {
+    const drift = diffWire(local, divergedNamed);
+    if (state.receiveOnly || state.reconciledRoot === divergedNamed.root) {
+      return { action: 'report', peer: divergedNamed, drift, resendTo: null };
+    }
+    return { action: 'reconcile', peer: divergedNamed, drift, resendTo: divergedNamed.deviceId };
+  }
+
+  // Only the old client's row is left to disagree: that is a fact for the panel, not a job.
+  const peer = peers.find((candidate) => candidate.root !== local.root) ?? peers[0];
+  return { action: 'none', peer, drift: diffWire(local, peer), resendTo: null };
 }
 
 /**

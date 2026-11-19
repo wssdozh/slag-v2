@@ -12,7 +12,7 @@ test('auto-resolve only touches notes the neighbour could have refused', async (
   await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
 
   const outcomes = await page.evaluate(async () => {
-    const { decideResolve } = await import('/src/lib/sync/manifestResolve.ts');
+    const { decideResolve } = await import('/src/lib/sync/manifest/resolve.ts');
     const drift = (extra: string[]) => ({ rootMatch: false, folders: [], extra, missing: [], conflict: [] });
     const extra = ['old', 'fresh'];
     const updatedAt = new Map([['old', 1_000], ['fresh', 9_000]]);

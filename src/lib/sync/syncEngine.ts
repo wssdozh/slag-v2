@@ -33,8 +33,8 @@ import { Outbox } from './outbox/outbox';
 import { createSyncOpFromStorageEvent } from './entities/registry';
 import { syncErrorText } from './errorText';
 import { SyncTransport } from './transport';
-import { syncManifest } from './manifestSync';
-import { readManifestAutoCheck } from './manifestPrefs';
+import * as manifestSchedule from './manifest/schedule';
+import * as manifestSync from './manifest/sync';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
 import {
   applyAccountDevices,
@@ -186,8 +186,8 @@ export class SyncEngine {
    * neighbour, so it cannot be one it refused — `decideResolve` refuses to touch it.
    */
   public manifestResentAt: number | null = null;
-  private manifestTimer: ReturnType<typeof setTimeout> | null = null;
-  private manifestDeadline = 0;
+  /** The slow background check: it starts with the room and dies with it. */
+  private manifestHeartbeatInterval: ReturnType<typeof setInterval> | null = null;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
   public importBuffer: {
     items: SlagItem[];
@@ -356,7 +356,18 @@ export class SyncEngine {
       // Copied like the fields above: the panel holds this object, and a status the engine keeps
       // mutating under a render is how a listener sees half an update.
       manifest: manifest
-        ? { ...manifest, folders: [...manifest.folders], extra: [...manifest.extra], missing: [...manifest.missing] }
+        ? {
+            ...manifest,
+            folders: [...manifest.folders],
+            extra: [...manifest.extra],
+            missing: [...manifest.missing],
+            // Copied one level deeper than the rest: the panel holds this object across renders.
+            peers: manifest.peers.map((peer) => ({
+              ...peer,
+              extra: [...peer.extra],
+              missing: [...peer.missing],
+            })),
+          }
         : undefined,
     };
   }
@@ -368,7 +379,7 @@ export class SyncEngine {
    * snapshot every render reads as "it changed". This is the stable handle the panel subscribes to.
    */
   public getManifest(): ManifestStatus | null {
-    return this.status.manifest ?? null;
+    return manifestSync.getManifest(this);
   }
 
   public subscribe(listener: (status: SyncStatus) => void): () => void {
@@ -406,39 +417,17 @@ export class SyncEngine {
     return new Outbox(this.bookkeeping);
   }
 
-  /**
-   * One manifest check, on the earliest deadline anybody asked for.
-   *
-   * A push confirms in a burst; the room's row keeps only the latest root, so checking after every
-   * bundle would double the request rate and learn nothing new. `init` asks for it immediately —
-   * that is the check that catches a device that fell behind while it was asleep. `manual` is the
-   * button in the panel: it ignores the auto-check switch and the anti-loop latch, because a person
-   * pressing it is entitled to a real resend.
-   */
+  /** One manifest check, on the earliest deadline anybody asked for: see `manifest/schedule.ts`. */
   public scheduleManifestCheck(
     delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS,
     trigger: ManifestTrigger = 'push',
   ): void {
-    if (trigger !== 'manual' && !readManifestAutoCheck()) {
-      syncLog.debug('Сверка манифеста выключена в настройках хранилища');
-      return;
-    }
-    const deadline = Date.now() + delayMs;
-    if (this.manifestTimer) {
-      if (this.manifestDeadline <= deadline) return;
-      clearTimeout(this.manifestTimer);
-    }
-    this.manifestDeadline = deadline;
-    this.manifestTimer = setTimeout(() => {
-      this.manifestTimer = null;
-      this.manifestDeadline = 0;
-      void syncManifest(this, trigger, trigger === 'manual');
-    }, delayMs);
+    manifestSchedule.scheduleManifestCheck(this, delayMs, trigger);
   }
 
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
-    this.scheduleManifestCheck(0, 'manual');
+    manifestSchedule.requestManifestCheck(this);
   }
 
   /**
@@ -449,9 +438,7 @@ export class SyncEngine {
    * way. The trash is reversible; a delete would not be.
    */
   public trashRejectedNotes(ids: string[]): void {
-    if (ids.length === 0) return;
-    for (const id of ids) vault().moveToTrash(id);
-    syncLog.warn(`Убрал в корзину ${ids.length} заметок, которых сосед не принял: ${ids.join(', ')}`);
+    manifestSync.trashRejectedNotes(ids);
   }
 
   /**
@@ -1219,6 +1206,7 @@ export class SyncEngine {
   private startIntervals(): void {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
+    if (this.manifestHeartbeatInterval) clearInterval(this.manifestHeartbeatInterval);
 
     // Heartbeat ping: this is the only traffic an idle session should produce.
     this.pingInterval = setInterval(() => {
@@ -1227,6 +1215,15 @@ export class SyncEngine {
         this.ws.send(JSON.stringify({ type: 'ping', ts }));
       }
     }, SYNC_INTERVALS.WS_PING_INTERVAL_MS);
+
+    // A device that edits nothing still has to notice a peer that fell behind. One look at the
+    // room's rows on a slow clock; `scheduleManifestCheck` coalesces it with the push-driven asks,
+    // and a dark connection has nobody to ask through.
+    this.manifestHeartbeatInterval = setInterval(() => {
+      if (!this.config.enabled || !this.activeRoomId) return;
+      if (this.status.state === 'offline' || this.status.state === 'error') return;
+      this.scheduleManifestCheck(0, 'push');
+    }, SYNC_INTERVALS.MANIFEST_HEARTBEAT_MS);
 
     // Auto sync check: 15s for realtime (0), or periodic for battery saver
     if (this.config.autoSync) {
@@ -1326,9 +1323,9 @@ export class SyncEngine {
     this.pushDebounceTimer = null;
     this.pushDebounceDeadline = 0;
     this.pushDebounceTrailing = false;
-    if (this.manifestTimer) clearTimeout(this.manifestTimer);
-    this.manifestTimer = null;
-    this.manifestDeadline = 0;
+    if (this.manifestHeartbeatInterval) clearInterval(this.manifestHeartbeatInterval);
+    this.manifestHeartbeatInterval = null;
+    manifestSchedule.clearManifestCheck();
     // A new room is a new row: the root this device published belongs to the room it left.
     this.manifestPostedRoot = null;
     this.manifestReconcileRoot = null;

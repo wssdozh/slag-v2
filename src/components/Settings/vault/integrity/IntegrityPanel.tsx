@@ -3,6 +3,7 @@
 // подробно в модалке. Строки остаются строками, а не абзацами под каждой подписью.
 import React, { useState } from 'react';
 import type { Finding, IntegrityStatus } from '../../../../lib/vault/integrity/types';
+import { anonymousOnlyDrift } from '../../../../lib/sync/types';
 import type { ManifestStatus, ManifestTrigger } from '../../../../lib/sync/types';
 import { pluralRu } from '../../../../lib/time/dateUtils';
 import { InfoHint } from '../../../UI/InfoHint';
@@ -78,6 +79,9 @@ function serverState(remote: ManifestStatus | null): { value: string; tone: stri
   if (!remote) return { value: 'нет данных', tone: 'text-fg-dim' };
   if (remote.remoteRoot === null) return { value: 'не ответил', tone: 'text-fg-secondary' };
   if (remote.inSync) return { value: `сходится · ${remote.remoteRoot.slice(0, 8)}…`, tone: 'text-success' };
+  // Старая общая строка комнаты больше не обновляется: «разошлось с тем, кого нельзя спросить» —
+  // это отсутствие данных, а не красная тревога. Реальный разошедшийся сосед важнее и покажется ниже.
+  if (anonymousOnlyDrift(remote.peers)) return { value: 'нет данных о соседе', tone: 'text-fg-secondary' };
   if (remote.action === 'reconcile') return { value: 'разошлось — отправляю заново', tone: 'text-fg-secondary' };
   // The peer sent its leaves, so the drift can be named instead of shrugged at.
   if (remote.extra.length > 0) {

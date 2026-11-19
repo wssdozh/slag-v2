@@ -37,9 +37,15 @@ export const SYNC_INTERVALS = {
   PUSH_TIMEOUT_MS: 30000,
   // The room's manifest is a few kilobytes; a slow answer is a dead answer.
   MANIFEST_TIMEOUT_MS: 8000,
-  // After a confirmed push, one manifest round trip per burst is plenty: the relay's row keeps
+  // After a confirmed push, one manifest round trip per burst is plenty: the relay's rows keep
   // only the latest root anyway, and an edit every second must not double the request rate.
-  MANIFEST_CHECK_DEBOUNCE_MS: 5000,
+  MANIFEST_CHECK_DEBOUNCE_MS: 800,
+  // One look back after a full resend, so "sent it" becomes "it landed" without waiting for the
+  // next edit. Longer than the push it is waiting on.
+  MANIFEST_RECHECK_MS: 1500,
+  // A device that edits nothing still has to notice a peer that fell behind: one check on this
+  // slow clock while the connection is worth asking through.
+  MANIFEST_HEARTBEAT_MS: 30000,
 } as const;
 
 /**

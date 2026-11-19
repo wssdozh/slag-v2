@@ -3,7 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { Finding, IntegrityStatus, RepairPlan } from '../../lib/vault/integrity/types';
 import type { ManifestStatus } from '../../lib/sync/types';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { readManifestAutoCheck, readManifestAutoResolve, writeManifestAutoCheck, writeManifestAutoResolve } from '../../lib/sync/manifestPrefs';
+import { readManifestAutoCheck, readManifestAutoResolve, writeManifestAutoCheck, writeManifestAutoResolve } from '../../lib/sync/manifest/prefs';
 import { applyIntegrityRepair, runIntegrityCheck } from '../../lib/storage/integrityService';
 
 export interface UseIntegrity {
