@@ -2,14 +2,16 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { createHash } from 'node:crypto';
-import { planBootstrap, sealBootstrap } from '../src/lib/sync/notes/bootstrap.ts';
+import { planBootstrap, sealBootstrap, sealFolderRegistrySeed } from '../src/lib/sync/notes/bootstrap.ts';
 import { deriveNoteKeys, isNoteItem } from '../src/lib/sync/notes/wire.ts';
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
   devices: { type: 'string' }, room: { type: 'string' }, generation: { type: 'string' },
   'key-file': { type: 'string' }, out: { type: 'string' }, review: { type: 'string' }, decisions: { type: 'string' },
+  'reviewed-folders': { type: 'string' },
 } });
 const generation = Number(values.generation);
+if (values['reviewed-folders'] && !values.out) throw new Error('--reviewed-folders requires --out');
 if (!values.devices || !positionals.length) throw new Error('Usage: node scripts/note-bootstrap.mjs --devices device1,device2 snapshot1.json snapshot2.json');
 const required = values.devices.split(',').map((id) => id.trim());
 if (required.includes('') || new Set(required).size !== required.length) throw new Error('Invalid required devices list');
@@ -51,6 +53,9 @@ else if (values.out) {
   if (keyBytes.length !== 32) throw new Error('Expected 32-byte room vault key in base64');
   const vaultKey = await crypto.subtle.importKey('raw', keyBytes, 'AES-GCM', true, ['encrypt', 'decrypt']);
   const keys = await deriveNoteKeys(vaultKey, values.room);
-  const ops = await sealBootstrap(keys, values.room, generation, plan);
-  await writeFile(values.out, JSON.stringify({ room: values.room, generation, ops }), { flag: 'wx', mode: 0o600 });
+  const room = values.room;
+  const seed = values['reviewed-folders']
+    ? await sealFolderRegistrySeed(keys, room, generation, plan, JSON.parse(await readFile(values['reviewed-folders'], 'utf8')))
+    : { room, generation, ops: await sealBootstrap(keys, room, generation, plan) };
+  await writeFile(values.out, JSON.stringify(seed), { flag: 'wx', mode: 0o600 });
 }
