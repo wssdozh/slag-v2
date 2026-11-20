@@ -45,6 +45,7 @@ export interface VaultFilesDeps {
   getTrashKey(): string;
   /** The one write path for the folder list; `external` came from the disk and writes nothing back. */
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote' | 'external'): void;
+  hydrateRegistryFolders(folders: FolderMeta[]): void;
   attachments: AttachmentStore;
 }
 
@@ -189,10 +190,10 @@ export class VaultFiles {
       // one wait: the trash, the directory tree and the folder metadata never look at each other,
       // and running them in sequence was most of the start-up.
       const sideStartedAt = performance.now();
-      const [trashedItems, folderPaths, folderMeta] = await Promise.all([
+      const [trashedItems, folderPaths, folderState] = await Promise.all([
         this.scanTrashDir(),
         this.listFolderPaths(),
-        this.readFoldersMeta(),
+        this.readFolderState(),
       ]);
       const sideMs = performance.now() - sideStartedAt;
       this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
@@ -201,8 +202,10 @@ export class VaultFiles {
       // After the notes: a note that lands on disk creates its folder, and the list read before that
       // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
       // the list came from the disk, so there is nothing to write back to it.
-      const folders = folderMetaFor(folderPaths, folderMeta, DEFAULT_INBOX_FOLDER);
-      this.deps.persistFolders(folders, 'external');
+      const folders = folderState.authoritative ? folderState.folders
+        : folderMetaFor(folderPaths, folderState.folders, DEFAULT_INBOX_FOLDER);
+      if (folderState.authoritative) this.deps.hydrateRegistryFolders(folders);
+      else this.deps.persistFolders(folders, 'external');
       fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
 
       if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) {
@@ -262,17 +265,21 @@ export class VaultFiles {
 
   /** Folder metadata is optional for the index; an unreadable file must still block writes. */
   public async readFoldersMeta(): Promise<FolderMeta[]> {
+    return (await this.readFolderState()).folders;
+  }
+
+  private async readFolderState(): Promise<{ folders: FolderMeta[]; authoritative: boolean }> {
     const state = await this.readStateObject(this.getVaultStatePath()).catch((error: unknown) => {
       fsLog.warn('Could not read folder metadata:', error);
       return {} as Record<string, unknown>;
     });
-    if (!Array.isArray(state.folders)) return [];
+    if (!Array.isArray(state.folders)) return { folders: [], authoritative: false };
     const folders: FolderMeta[] = [];
     for (const entry of state.folders) {
       const folder = toFolderMeta(entry);
       if (folder) folders.push(folder);
     }
-    return folders;
+    return { folders, authoritative: state.registryFolderTree === true };
   }
 
   /**
@@ -284,9 +291,8 @@ export class VaultFiles {
    * file would throw away the description and icon it just wrote. Every other key is read back and
    * written as it was — the MCP server keeps its own there.
    */
-  public writeFolderMeta(folders: FolderMeta[]): Promise<void> {
+  public writeFolderMeta(folders: FolderMeta[], vault = this.vault, replace = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
-    const vault = this.vault;
     const statePath = this.getVaultStatePath(vault);
     return this.queueStateWrite(async () => {
       const state = await this.readStateObject(statePath);
@@ -296,12 +302,13 @@ export class VaultFiles {
         });
       }
       const byPath = new Map<string, FolderMeta>();
-      for (const entry of Array.isArray(state.folders) ? state.folders : []) {
+      for (const entry of !replace && Array.isArray(state.folders) ? state.folders : []) {
         const meta = toFolderMeta(entry);
         if (meta) byPath.set(meta.path, meta);
       }
       for (const folder of folders) byPath.set(folder.path, folder);
       state.folders = [...byPath.values()];
+      if (replace) state.registryFolderTree = true;
       await writeJsonAtomic(statePath, state);
     });
   }
@@ -786,7 +793,7 @@ export class VaultFiles {
       for (const { item, oldFolder } of movedItems) {
         await this.flushItemToDisk(item, oldFolder, item.filename, vault, strict);
       }
-      await this.removeFolderFromDisk(path, vault, strict);
+      await this.removeFolderFromDisk(path, vault);
       if (vault.id === this.vault.id) await this.flushStateToDisk();
     } catch (err) {
       fsLog.error(`Failed to complete disk deletion for folder "${path}":`, err);
@@ -805,7 +812,7 @@ export class VaultFiles {
           await this.flushItemToDisk(it, originalSub, it.filename, vault, strict);
         }
       }
-      await this.removeFolderFromDisk(oldPath, vault, strict);
+      await this.removeFolderFromDisk(oldPath, vault);
       if (vault.id === this.vault.id) await this.flushStateToDisk();
     } catch (err) {
       fsLog.error(`Failed to complete disk rename for folder "${oldPath}" to "${newPath}":`, err);
@@ -813,15 +820,17 @@ export class VaultFiles {
     }
   }
 
-  public async removeFolderFromDisk(folderPath: string, vault = this.vault, onlyEmpty = false): Promise<void> {
+  public async removeFolderFromDisk(folderPath: string, vault = this.vault): Promise<void> {
     if (!isTauri() || !folderPath || folderPath === DEFAULT_INBOX_FOLDER) return;
     try {
       const safeFolder = safeVaultRelativePath(folderPath);
       const notesBase = this.getVaultNotesPath(vault);
       const targetDir = `${notesBase}/${safeFolder}`;
       if (await exists(targetDir, { baseDir: BaseDirectory.AppData })) {
-        if (onlyEmpty && (await readDir(targetDir, { baseDir: BaseDirectory.AppData })).length > 0) return;
-        await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: !onlyEmpty });
+        // Directory membership is not permission to delete a note. Non-recursive removal also
+        // protects a file created by another writer between this check and the remove call.
+        if ((await readDir(targetDir, { baseDir: BaseDirectory.AppData })).length > 0) return;
+        await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: false });
         fsLog.info(`Removed folder directory from disk: ${targetDir}`);
       }
     } catch (err) {

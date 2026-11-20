@@ -253,6 +253,7 @@ async function stateFilesFor(vault: VaultMeta): Promise<StateSectionFiles> {
     getItemsKey: () => '',
     getTrashKey: () => '',
     persistFolders: () => {},
+    hydrateRegistryFolders: () => {},
     attachments: new AttachmentStore(() => ''),
   });
 }

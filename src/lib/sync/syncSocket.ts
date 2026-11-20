@@ -11,6 +11,7 @@ export interface SyncSocketHost {
   activeRoomId: string | null;
   transport: SyncTransport;
   noteGeneration?: number;
+  hasFolderTreeRegistry?: boolean;
   usesAccountSync(): boolean;
   getSyncVaultId(): string;
 }
@@ -23,6 +24,7 @@ export function connectSocket(store: SyncSocketHost): void {
     roomId: store.activeRoomId || '',
     enabled: store.config.enabled,
     noteGeneration: store.noteGeneration,
+    folderTree: store.hasFolderTreeRegistry,
     // A receive-only device never pushes over the socket, so its acks are the only upstream
     // traffic it has. Sending them over HTTP survives networks that swallow websocket uplink.
     ackOverHttp: store.config.localSyncMode === 'receive-only',

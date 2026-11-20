@@ -183,11 +183,7 @@ export function leavesToRequest(report: DriftReport, wire: WireBody): string[] {
 /**
  * What a device does about the peers in its room.
  *
- * `reconcile` means one full resend, aimed at one peer. The relay keeps a row per device now, so
- * the row that disagreed is the row the resend is for: `resendTo` names it (an old client has no
- * device id, and the resend is the whole room's). `report` is the end of the line — this peer's
- * state already got its resend and cannot be fixed by a second one, so the panel says so and
- * nothing loops.
+ * A mismatch is only a report, never permission to push or delete vault contents.
  */
 export interface ManifestDecision {
   action: 'none' | 'reconcile' | 'report';
@@ -201,28 +197,18 @@ export interface ManifestDecision {
 /**
  * The decision, in the order that makes each step safe to repeat.
  *
- * No peers is "nobody answered", not a mismatch: our own row is already written and there is
- * nothing to compare against. `reconciledRoot` is the anti-loop latch — the peer root this device
- * already resent against once.
- *
- * A row with no device id is the room's old single manifest: it never updates, nobody can be asked
- * through it, and a resend aimed at it is bundles into the void. It is compared and reported as
- * "no data about the peer", never acted on — and it cannot win the verdict over a named peer.
+ * No peers means nobody answered. An anonymous legacy row cannot outrank a named peer.
  */
 export function decideManifest(
   local: Manifest,
   peers: PeerManifest[],
-  state: { reconciledRoot: string | null; receiveOnly: boolean },
 ): ManifestDecision {
   if (peers.length === 0) return { action: 'none', peer: null, drift: null, resendTo: null };
 
   const divergedNamed = peers.find((peer) => peer.deviceId !== null && peer.root !== local.root);
   if (divergedNamed) {
     const drift = diffWire(local, divergedNamed);
-    if (state.receiveOnly || state.reconciledRoot === divergedNamed.root) {
-      return { action: 'report', peer: divergedNamed, drift, resendTo: null };
-    }
-    return { action: 'reconcile', peer: divergedNamed, drift, resendTo: divergedNamed.deviceId };
+    return { action: 'report', peer: divergedNamed, drift, resendTo: null };
   }
 
   // Only the old client's row is left to disagree: that is a fact for the panel, not a job.

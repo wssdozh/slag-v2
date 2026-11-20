@@ -1,7 +1,7 @@
 // Negotiate once per connection generation, then bind the replica to that vault and room.
 import type { VaultPort } from '../../storage/port';
 import { NoteChannel } from './channel.ts';
-import { enrolledNoteGeneration, loadNoteJournal } from './persistence.ts';
+import { enrolledFolderTree, enrolledNoteGeneration, loadNoteJournal } from './persistence.ts';
 import { NoteReplica } from './replica.ts';
 import type { NoteConflict } from './replica.ts';
 import { deriveNoteKeys } from './wire.ts';
@@ -13,7 +13,7 @@ export async function openNoteSession(options: {
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
   onResolution: (counts: { merged: number; conflicts: number }) => void;
   storeConflict: (conflict: NoteConflict) => Promise<void>;
-  hasPendingLegacyNotes: () => boolean;
+  hasPendingLegacyNotes: (folderTree: boolean) => boolean;
 }, captureOnly = false) {
   const localVaultId = options.port.getCurrentVault().id;
   const assertScope = () => {
@@ -38,16 +38,23 @@ export async function openNoteSession(options: {
   const keys = await deriveNoteKeys(options.key, options.roomId);
   assertScope();
   const initial = loadNoteJournal(stored, options.roomId, generation);
+  const folderTree = status ? status.folderTree === true : enrolledFolderTree(stored, options.roomId, generation);
+  const { applyAcceptedFolderTree, subscribeFolderTreeIntents } = options.port;
+  if (folderTree && (!applyAcceptedFolderTree || !subscribeFolderTreeIntents)) {
+    throw new Error('Локальное хранилище не поддерживает реестр папок');
+  }
   // A legacy outbox has no authoritative base revision. Replaying it would silently promote a
   // possibly stale copy; pulling over it would hide the very edit that stopped migration.
-  if (!captureOnly && !options.readOnly && options.hasPendingLegacyNotes()) {
-    throw new Error('В старой очереди остались правки заметок. Синхронизация приостановлена до их проверки');
+  if (!captureOnly && !options.readOnly && options.hasPendingLegacyNotes(folderTree)) {
+    throw new Error('В старой очереди остались неподтверждённые правки. Синхронизация приостановлена до их проверки');
   }
   const save = async (journal: typeof initial) => {
     assertScope();
-    await writeNoteRegistry.call(options.port, { version: 1, room: options.roomId, generation, journal });
+    await writeNoteRegistry.call(options.port, { version: 1, room: options.roomId, generation,
+      ...(folderTree ? { folderTree: true } : {}), journal });
   };
-  if (!captureOnly && enrolledNoteGeneration(stored, options.roomId) !== generation) await save(initial);
+  if (!captureOnly && (enrolledNoteGeneration(stored, options.roomId) !== generation
+      || enrolledFolderTree(stored, options.roomId, generation) !== folderTree)) await save(initial);
   assertScope();
   let verified = !captureOnly;
   const requireVerified = () => {
@@ -66,6 +73,10 @@ export async function openNoteSession(options: {
       assertScope();
       await options.storeConflict(conflict);
     },
+    applyFolderTree: folderTree && applyAcceptedFolderTree ? async (folders) => {
+      requireVerified();
+      await applyAcceptedFolderTree.call(options.port, folders);
+    } : undefined,
     apply: async (note) => {
       requireVerified();
       await applyAcceptedNote.call(options.port, note);
@@ -73,14 +84,16 @@ export async function openNoteSession(options: {
     },
   }, initial);
   const unsubscribe = subscribeNoteIntents.call(options.port, (changes) => replica.record(changes));
-  options.signal.addEventListener('abort', unsubscribe, { once: true });
-  return { replica, generation, verifyEnrollment: async (readOnly: boolean) => {
+  const unsubscribeFolders = folderTree && subscribeFolderTreeIntents
+    ? subscribeFolderTreeIntents.call(options.port, (folders, previous) => replica.recordFolderTree(folders, previous)) : undefined;
+  options.signal.addEventListener('abort', () => { unsubscribe(); unsubscribeFolders?.(); }, { once: true });
+  return { replica, generation, folderTree, verifyEnrollment: async (readOnly: boolean) => {
     const live = await channel.status();
     assertScope();
-    if (live.mode !== 'registry' || live.generation !== generation) {
+    if (live.mode !== 'registry' || live.generation !== generation || (live.folderTree === true) !== folderTree) {
       throw new Error('Режим или поколение реестра изменились; локальная очередь сохранена');
     }
-    if (!readOnly && options.hasPendingLegacyNotes()) throw new Error('В старой очереди остались правки заметок');
+    if (!readOnly && options.hasPendingLegacyNotes(folderTree)) throw new Error('В старой очереди остались неподтверждённые правки');
     replica.setReadOnly(readOnly);
     verified = true;
   } };

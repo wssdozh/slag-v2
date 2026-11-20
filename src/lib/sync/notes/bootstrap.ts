@@ -1,7 +1,7 @@
 // Runs on a trusted client (or local migration tool), never at the relay with decrypted notes.
-import type { SlagItem } from '../../../types/index.ts';
+import type { FolderMeta, SlagItem } from '../../../types/index.ts';
 import { relayNote, sameNote } from './merge.ts';
-import { opaqueNoteId, sealNote } from './wire.ts';
+import { FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote } from './wire.ts';
 import type { NoteKeys, NoteOp } from './wire.ts';
 
 export interface BootstrapCopy {
@@ -71,4 +71,14 @@ export async function sealBootstrap(keys: NoteKeys, room: string, generation: nu
       opId: crypto.randomUUID(), baseRevision: 0, kind: item === null ? 'delete' : 'create' }, id, item));
   }
   return operations;
+}
+
+/** The operator supplies the reviewed tree; snapshot absence never implies a folder deletion. */
+export async function sealFolderRegistrySeed(keys: NoteKeys, room: string, generation: number,
+  plan: ReturnType<typeof planBootstrap>, reviewedFolders: FolderMeta[]) {
+  const ops = await sealBootstrap(keys, room, generation, plan);
+  const folderTreeId = await opaqueNoteId(keys, FOLDER_TREE_ID);
+  ops.push(await sealFolderTree(keys, room, generation, { noteId: folderTreeId, opId: crypto.randomUUID(),
+    baseRevision: 0, kind: 'create' }, reviewedFolders));
+  return { room, generation, folderTreeId, ops };
 }

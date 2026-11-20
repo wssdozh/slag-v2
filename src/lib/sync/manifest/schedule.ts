@@ -44,8 +44,7 @@ function skipReason(engine: SyncEngine): string | null {
  * One manifest check, on the earliest deadline anybody asked for.
  *
  * `init` asks for it immediately — that is the check that catches a device that fell behind while
- * it was asleep. `manual` is the button in the panel: it ignores the auto-check switch and the
- * anti-loop latch, because a person pressing it is entitled to a real resend.
+ * it was asleep. `manual` ignores the automatic check setting and reports immediately.
  */
 export function scheduleManifestCheck(
   engine: SyncEngine,
@@ -72,11 +71,11 @@ export function scheduleManifestCheck(
       syncLog.debug(`Сверка манифеста пропущена: ${skip}`);
       return;
     }
-    void syncManifest(engine, trigger, trigger === 'manual');
+    void syncManifest(engine, trigger);
   }, next - Date.now());
 }
 
-/** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
+/** The panel's «сверить сейчас»: one check now. */
 export function requestManifestCheck(engine: SyncEngine): void {
   scheduleManifestCheck(engine, 0, 'manual');
 }

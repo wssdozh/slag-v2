@@ -25,7 +25,7 @@ export interface FolderStoreHost {
     deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[], vault?: VaultMeta, strict?: boolean): Promise<void>;
   };
   /** Remembers the list and hands its metadata to `state.json`. */
-  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): void;
+  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): Promise<void> | undefined;
   emitChange(event: StorageChangeEvent): void;
   persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined;
   queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void>;
@@ -86,7 +86,7 @@ export function renameFolderTree(
     }
     return f;
   });
-  store.persistFolders(folders, origin);
+  const folderWrite = store.persistFolders(folders, origin);
 
   // Update items belonging to this folder and its subfolders
   const previousItems = store.getItems();
@@ -100,8 +100,9 @@ export function renameFolderTree(
     }
     return it;
   });
-  const before = origin === 'local' ? store.persistNoteIntents(items
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(items
     .flatMap((item, index): NoteMutation[] => item === previousItems[index] ? [] : [{ id: item.id, kind: 'update', item, previous: previousItems[index] }])) : undefined;
+  const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), items);
 
@@ -218,7 +219,7 @@ export function describeFolder(
 export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): void {
   if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
   const folders = readFolders(store).filter(f => f.path !== path && !f.path.startsWith(path + '/'));
-  store.persistFolders(folders, origin);
+  const folderWrite = store.persistFolders(folders, origin);
 
   // Move orphan items to inbox
   const items = store.getItems();
@@ -232,9 +233,10 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
     }
     return it;
   });
-  const before = origin === 'local' ? store.persistNoteIntents(movedItems.map(({ item, oldFolder }) => ({
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(movedItems.map(({ item, oldFolder }) => ({
     id: item.id, kind: 'update', item, previous: { ...item, folder: oldFolder },
   }))) : undefined;
+  const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), updatedItems);
 

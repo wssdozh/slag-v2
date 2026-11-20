@@ -1,12 +1,54 @@
 import { test, expect } from '../support/selfhostFixture';
 
+test('a peer manifest missing a local task only reports and pulls', async ({ page }) => {
+  await page.route('**/manifest-regression', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+  await page.goto('/manifest-regression');
+  const result = await page.evaluate(async () => {
+    const { syncManifest } = await import('/src/lib/sync/manifest/sync.ts');
+    const { vault, setVaultPort } = await import('/src/lib/storage/port.ts');
+    const { writeManifestAutoResolve } = await import('/src/lib/sync/manifest/prefs.ts');
+    const port = vault();
+    const originalFetch = window.fetch;
+    const trashed: string[] = [];
+    let pulls = 0;
+    let pushes = 0;
+    const task = { id: 'local-task', type: 'task', title: 'offline task', content: '', updatedAt: 1, folder: 'Inbox' };
+    const peer = { deviceId: 'peer', root: 'peer-root', at: Date.now() + 30_000, folders: {}, leaves: {} };
+    const engine = {
+      initGeneration: 1, activeRoomId: 'test-room', currentVaultId: 'test-vault',
+      config: { deviceId: 'local', serverUrl: 'https://relay.invalid', localSyncMode: 'read-write' },
+      status: { manifest: null },
+      fetchPendingBundlesHttp: async () => { pulls++; },
+      scheduleDebouncedPush: () => { pushes++; },
+      usesAccountSync: () => false, notify: () => undefined,
+    };
+    writeManifestAutoResolve(true);
+    setVaultPort(Object.assign(Object.create(port), {
+      getItems: () => [task], getFolders: () => [], moveToTrash: (id: string) => trashed.push(id),
+    }));
+    window.fetch = async (_input, init) => init?.method === 'POST'
+      ? new Response(null, { status: 204 })
+      : Response.json({ v: 1, manifests: [peer] });
+    try {
+      await syncManifest(engine);
+      return { trashed, pulls, pushes, manifest: engine.status.manifest };
+    } finally {
+      window.fetch = originalFetch;
+      setVaultPort(null);
+    }
+  });
+  expect(result.manifest).toMatchObject({ action: 'report', extra: ['local-task'] });
+  expect(result.trashed).toEqual([]);
+  expect(result.pulls).toBe(1);
+  expect(result.pushes).toBe(0);
+});
+
 /**
  * The room answers with one manifest per device now, so a check is "my root against every peer's
  * root", not "my root against the room's single row".
  *
- * `decideManifest` is the whole policy, and these are the promises: every peer agrees is silence, a
- * diverged peer gets one resend aimed at it, the same peer root twice is a report, a receive-only
- * device never resends, and the room's old anonymous row can only ever say "no data". The answer
+ * `decideManifest` reports divergence without resending. The room's old anonymous row
+ * cannot outrank a named peer. The answer
  * formats are pinned beside it, because a relay older than this app answers one row for the room.
  * Two safety rules on auto-resolve are pinned at the end: a row without `at` (old relay) and a row
  * older than our resend mean "has not seen it yet", never "refused it".
@@ -33,7 +75,6 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
       root: string,
       overrides: Partial<Pick<Row, 'at' | 'leaves'>> = {},
     ): Row => ({ deviceId, at: null, root, folders: {}, leaves: {}, ...overrides });
-    const quiet = { reconciledRoot: null, receiveOnly: false };
     // Two peers, the second one behind; the first already agrees and must not win the verdict.
     const split = [peer('dev-a', 'root-local'), peer('dev-b', 'root-other')];
     // Notes this device holds and the peer's row does not: a refused note, if the row is current.
@@ -44,13 +85,11 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
     const stale = peer('dev-a', 'root-other', { leaves: { item_old: 'leaf-a' }, at: 4_000 });
 
     return {
-      split: decideManifest(local, split, quiet),
-      repeated: decideManifest(local, split, { reconciledRoot: 'root-other', receiveOnly: false }),
-      agreed: decideManifest(local, [peer('dev-a', 'root-local'), peer('dev-b', 'root-local')], quiet),
-      empty: decideManifest(local, [], quiet),
-      receiveOnly: decideManifest(local, split, { reconciledRoot: null, receiveOnly: true }),
-      anonymousOnly: decideManifest(local, [peer('dev-a', 'root-local'), peer(null, 'root-old')], quiet),
-      anonymousAndReal: decideManifest(local, [peer(null, 'root-old'), peer('dev-b', 'root-other')], quiet),
+      split: decideManifest(local, split),
+      agreed: decideManifest(local, [peer('dev-a', 'root-local'), peer('dev-b', 'root-local')]),
+      empty: decideManifest(local, []),
+      anonymousOnly: decideManifest(local, [peer('dev-a', 'root-local'), peer(null, 'root-old')]),
+      anonymousAndReal: decideManifest(local, [peer(null, 'root-old'), peer('dev-b', 'root-other')]),
       perDevice: parsePeerManifests({
         v: 1,
         manifests: [
@@ -72,19 +111,13 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
   });
 
   // Two peers, one behind: the diverged one is named, and it is who the resend is aimed at.
-  expect(outcomes.split.action).toBe('reconcile');
+  expect(outcomes.split.action).toBe('report');
   expect(outcomes.split.peer?.deviceId).toBe('dev-b');
-  expect(outcomes.split.resendTo).toBe('dev-b');
-  // The same peer root after a resend is a report, not a second resend.
-  expect(outcomes.repeated.action).toBe('report');
-  expect(outcomes.repeated.resendTo).toBeNull();
+  expect(outcomes.split.resendTo).toBeNull();
   // Every peer agrees with the local root: nothing to do, and the row is still named for the panel.
   expect(outcomes.agreed.action).toBe('none');
   expect(outcomes.agreed.drift?.rootMatch).toBe(true);
   expect(outcomes.empty).toEqual({ action: 'none', peer: null, drift: null, resendTo: null });
-  // A receive-only device reports a divergence and never resends.
-  expect(outcomes.receiveOnly.action).toBe('report');
-  expect(outcomes.receiveOnly.resendTo).toBeNull();
 
   // The old room-wide row disagrees, every named peer agrees: "no data", never a resend.
   expect(outcomes.anonymousOnly.action).toBe('none');
@@ -93,9 +126,9 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
   expect(outcomes.anonymousOnly.drift?.rootMatch).toBe(false);
   expect(outcomes.anonymousOnly.resendTo).toBeNull();
   // A named peer that disagrees outranks the anonymous one: the real divergence is the verdict.
-  expect(outcomes.anonymousAndReal.action).toBe('reconcile');
+  expect(outcomes.anonymousAndReal.action).toBe('report');
   expect(outcomes.anonymousAndReal.peer?.deviceId).toBe('dev-b');
-  expect(outcomes.anonymousAndReal.resendTo).toBe('dev-b');
+  expect(outcomes.anonymousAndReal.resendTo).toBeNull();
 
   // Both relay answers become peers: rows by device (with the row's own date), plus the old row.
   expect(outcomes.perDevice.map((entry: { deviceId: string | null }) => entry.deviceId))

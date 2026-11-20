@@ -24,7 +24,7 @@ test('registry startup refuses an unreviewed legacy note queue before installing
       subscribeNoteIntents: () => { subscribed = true; return () => { subscribed = false; }; },
     },
   };
-  await assert.rejects(openNoteSession(options), /старой очереди остались правки/);
+  await assert.rejects(openNoteSession(options), /старой очереди остались неподтверждённые правки/);
   assert.equal(subscribed, false);
   assert.equal(saved, undefined);
   dirty = false;
@@ -60,6 +60,47 @@ test('a room bound to the former vault cannot write into the new vault', async (
   currentId = 'old';
   await session.replica.record([{ id: item.id, kind: 'create', item }]);
   assert.equal(writes, 1);
+});
+
+test('folder writes are captured only after enrollment and on cold offline restart', async (t) => {
+  let enabled = false;
+  const fetch = t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.equal(new URL(url).searchParams.get('folderTree'), '1');
+    return Response.json({ mode: 'registry', generation: 1, head: 0, floor: 0, ...(enabled ? { folderTree: true } : {}) });
+  });
+  let saved;
+  let record;
+  const options = {
+    key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault', readOnly: false,
+    headers: () => ({}), hasPendingLegacyNotes: () => false, onError: (error) => { throw error; },
+    port: {
+      getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true,
+      readNoteRegistry: async () => saved, writeNoteRegistry: async (value) => { saved = value; },
+      applyAcceptedNote: async () => assert.fail('unexpected apply'), subscribeNoteIntents: () => () => {},
+      applyAcceptedFolderTree: async () => assert.fail('unexpected apply'),
+      subscribeFolderTreeIntents: (listener) => { record = listener; return () => { record = undefined; }; },
+    },
+  };
+  const start = async (offline = false) => {
+    const controller = new AbortController();
+    t.after(() => controller.abort());
+    return [await openNoteSession({ ...options, signal: controller.signal }, offline), controller];
+  };
+  const [legacy, old] = await start();
+  assert.equal(legacy.folderTree, false);
+  assert.equal(record, undefined);
+  old.abort();
+  enabled = true;
+  const [enrolled, online] = await start();
+  assert.equal(enrolled.folderTree, true);
+  online.abort();
+  assert.equal(record, undefined);
+  const [offline] = await start(true);
+  assert.equal(offline.folderTree, true);
+  const tree = [{ path: 'Projects', name: 'Projects', description: '', order: 0 }];
+  await record(tree, []);
+  assert.deepEqual(saved.journal.pending[0].item, tree);
+  assert.equal(fetch.mock.callCount(), 2);
 });
 
 test('cold offline capture persists an edit without talking to the relay', async (t) => {

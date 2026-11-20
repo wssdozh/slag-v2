@@ -1,6 +1,6 @@
 // HTTP catch-up and fallback share the room's existing account authorization.
 import { NOTE_BATCH_BYTES, parseNoteEvents, parseNoteHeads, parseNoteResults, parseNoteStatus } from './wire.ts';
-import type { NoteOp } from './wire.ts';
+import type { NoteOp, NoteStatus } from './wire.ts';
 
 export class NoteHttpError extends Error {
   readonly status: number;
@@ -25,7 +25,7 @@ export class NoteChannel {
 
   private async request(action: string, params: Record<string, string | number> = {}, body?: unknown): Promise<unknown> {
     this.options.signal.throwIfAborted();
-    const query = new URLSearchParams({ vault: this.options.vaultId });
+    const query = new URLSearchParams({ vault: this.options.vaultId, folderTree: '1' });
     for (const [key, value] of Object.entries(params)) query.set(key, String(value));
     const result = await fetch(`${this.options.serverUrl.replace(/\/+$/, '')}/api/rooms/${encodeURIComponent(this.options.roomId)}/${action}?${query}`, {
       method: body === undefined ? 'GET' : 'POST',
@@ -41,7 +41,7 @@ export class NoteChannel {
     return result.json() as Promise<unknown>;
   }
 
-  async status() {
+  async status(): Promise<NoteStatus> {
     try {
       return parseNoteStatus(await this.request('note-status'));
     } catch (error) {

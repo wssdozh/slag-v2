@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { archiveNoteConflict, keepRelayOnConflict, setKeepRelayOnConflict } from '../src/lib/sync/notes/conflicts.ts';
 import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
+import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
 
 const room = 'test-room';
 const generation = 1;
@@ -73,6 +74,44 @@ async function until(predicate) {
 }
 
 const change = (kind, item, id = item.id) => ({ kind, id, item });
+
+test('read-only folder writes cannot be mistaken for durable intent capture', async (t) => {
+  const server = relay();
+  const { replica, saved } = device(t, server, { readOnly: true, applyFolderTree: async () => assert.fail('unexpected apply') });
+  await assert.rejects(replica.recordFolderTree([], []), /недоступен для записи/);
+  assert.equal(saved(), undefined);
+  assert.equal(server.sends(), 0);
+});
+
+test('folder tree shares the journal, survives restart, and never overwrites a conflicting revision', async (t) => {
+  const server = relay();
+  const inbox = { path: 'Inbox', name: 'Inbox', description: '', order: 0 };
+  const projects = { path: 'Projects', name: 'Projects', description: '', order: 1 };
+  const base = [inbox, projects];
+  const reordered = [{ ...inbox, order: 1 }, { ...projects, order: 0 }];
+  const offlineChange = [inbox];
+  const aTrees = [];
+  const bTrees = [];
+  const a = device(t, server, { applyFolderTree: async (tree) => aTrees.push(tree) });
+  const b = device(t, server, { applyFolderTree: async (tree) => bTrees.push(tree) });
+  await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
+  await a.replica.recordFolderTree(base, []);
+  await until(() => bTrees.length === 1 && !a.replica.pendingCount);
+  server.pause();
+  await b.replica.recordFolderTree(offlineChange, base);
+  const journal = loadNoteJournal({ version: 1, room, generation, journal: b.saved() }, room, generation);
+  b.stop();
+  await a.replica.recordFolderTree(reordered, base);
+  await until(() => aTrees.length === 2 && !a.replica.pendingCount);
+  const resumed = device(t, server, { state: journal, applyFolderTree: async (tree) => bTrees.push(tree) });
+  await resumed.replica.catchUp();
+  await until(() => !resumed.replica.pendingCount);
+  assert.deepEqual(resumed.conflicts.map(({ item, fields }) => ({ item, fields })), [{ item: offlineChange, fields: ['folders'] }]);
+  assert.deepEqual(bTrees.at(-1), reordered);
+  assert.equal(server.events.length, 2);
+  assert.equal(new Set(server.events.map((event) => event.noteId)).size, 1);
+  assert.equal(a.local.size + b.local.size + resumed.local.size, 0);
+});
 
 test('batches immediate edits and catches up without further requests when idle', async (t) => {
   const server = relay();

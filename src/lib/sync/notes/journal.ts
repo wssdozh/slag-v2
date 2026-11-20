@@ -1,19 +1,29 @@
 // Pure transitions for an ordered queue of local intentions; disk and network stay outside.
-import type { SlagItem } from '../../../types/index.ts';
-import { relayNote, sameNote } from './merge.ts';
+import type { FolderMeta, SlagItem } from '../../../types/index.ts';
+import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
+import { sortFolders } from '../../vault/folderTree.ts';
+import { equal, relayNote, sameNote } from './merge.ts';
 
 export type JournalKind = 'create' | 'update' | 'delete' | 'restore';
-export interface NoteBase { revision: number; item: SlagItem | null }
+export type RegistryValue = SlagItem | FolderMeta[] | null;
+export interface NoteBase { revision: number; item: RegistryValue }
+
+export function sameRegistryValue(a: RegistryValue, b: RegistryValue): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return equal(sortFolders(a, DEFAULT_INBOX_FOLDER), sortFolders(b, DEFAULT_INBOX_FOLDER));
+  }
+  return !Array.isArray(a) && !Array.isArray(b) && sameNote(a, b);
+}
 export interface JournalAttempt {
   op: { opId: string; noteId: string; baseRevision: number; kind: JournalKind; sealed: { iv: string; ciphertext: string } };
-  item: SlagItem | null;
+  item: RegistryValue;
   conflicts: string[];
 }
 export interface NoteIntent {
   intentId: string;
   id: string;
   kind: JournalKind;
-  item: SlagItem | null;
+  item: RegistryValue;
   /** Undefined only when the device has not obtained this note's accepted base. */
   base?: NoteBase;
   /** If present, this edit was made over the optimistic predecessor, not the remote head. */
@@ -34,16 +44,17 @@ export function confirmedNote(state: NoteJournal, id: string): NoteBase | undefi
   return Object.hasOwn(state.confirmed, id) ? state.confirmed[id] : undefined;
 }
 
-export function recordNote(state: NoteJournal, change: Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item'> & { previous?: SlagItem }): NoteJournal {
-  const item = change.item ? relayNote(change.item) : null;
+export function recordNote(state: NoteJournal, change: Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item'> & { previous?: Exclude<RegistryValue, null> }): NoteJournal {
+  const normalize = (value: Exclude<RegistryValue, null>) => Array.isArray(value) ? value : relayNote(value);
+  const item = change.item ? normalize(change.item) : null;
   const index = state.pending.findLastIndex((entry) => entry.id === change.id);
   const previous = index >= 0 ? state.pending[index] : undefined;
-  if (previous && previous.kind === change.kind && sameNote(previous.item, item)) return state;
+  if (previous && previous.kind === change.kind && sameRegistryValue(previous.item, item)) return state;
   const confirmed = confirmedNote(state, change.id);
   const base = previous ? undefined : confirmed
-    ? { revision: confirmed.revision, item: change.previous && change.kind !== 'restore' ? relayNote(change.previous) : confirmed.item }
+    ? { revision: confirmed.revision, item: change.previous && change.kind !== 'restore' ? normalize(change.previous) : confirmed.item }
     : (change.kind === 'create' ? { revision: 0, item: null } : undefined);
-  if (!previous && change.kind === 'update' && base && sameNote(base.item, item)) return state;
+  if (!previous && change.kind === 'update' && base && sameRegistryValue(base.item, item)) return state;
   // An unsent create/restore can absorb typing without changing what transition it proves.
   if (previous && !previous.attempt && change.kind === 'update' && previous.item !== null) {
     return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, item } : entry) };

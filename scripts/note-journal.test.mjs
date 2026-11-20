@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mergeNote, sameNote } from '../src/lib/sync/notes/merge.ts';
-import { emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settleNote } from '../src/lib/sync/notes/journal.ts';
+import { emptyJournal, firstPerNote, recordNote, sameRegistryValue, setAttempt, setConfirmed, settleNote } from '../src/lib/sync/notes/journal.ts';
 
 const note = { id: 'note', type: 'note', title: 'title', content: 'one\ntwo\nthree\nfour\nfive', folder: 'inbox', tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
+
+test('a folder base survives disk rehydration without masking a real reorder', () => {
+  const a = { path: 'A', name: 'A', description: '', order: 1 };
+  const b = { path: 'B', name: 'B', description: '', order: 0 };
+  const rehydrated = [{ order: 0, path: 'B', name: 'B', description: '' }, a];
+  assert.equal(sameRegistryValue([a, b], rehydrated), true);
+  assert.equal(sameRegistryValue([a, b], [{ ...a, order: 0 }, { ...b, order: 1 }]), false);
+  assert.equal(sameRegistryValue([a, b], [a]), false);
+});
 
 test('an edit queued during canonical application keeps the snapshot the editor saw', () => {
   const remote = { ...note, folder: 'remote-folder' };

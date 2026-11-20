@@ -1,10 +1,15 @@
 // The authenticated relay sees routing metadata, never the note's identity or body.
-import type { SlagItem } from '../../../types/index.ts';
+import type { FolderMeta, SlagItem } from '../../../types/index.ts';
+import { safeVaultRelativePath } from '../../vault/safePath.ts';
+
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../../media/byteCodec.ts';
+
+export const FOLDER_TREE_ID = 'slag:folder-tree:v1';
+export type RegistryBody = { id: string; item: SlagItem | null } | { id: typeof FOLDER_TREE_ID; folders: FolderMeta[] };
 
 export type NoteKind = 'create' | 'update' | 'delete' | 'restore';
 export type NoteMode = 'legacy' | 'frozen' | 'registry';
-export interface NoteStatus { mode: NoteMode; generation: number; head: number; floor: number }
+export interface NoteStatus { mode: NoteMode; generation: number; head: number; floor: number; folderTree?: true }
 export interface NoteSealed { iv: string; ciphertext: string }
 export interface NoteOp {
   opId: string;
@@ -62,7 +67,9 @@ export function parseNoteStatus(value: unknown): NoteStatus {
   const input = record(value);
   const { mode } = input;
   if (mode !== 'legacy' && mode !== 'frozen' && mode !== 'registry') throw new Error('Invalid note registry mode');
-  return { mode, ...watermark(input) };
+  if (input.folderTree !== undefined && input.folderTree !== true) throw new Error('Invalid folder tree capability');
+  if (input.folderTree === true && mode !== 'registry') throw new Error('Folder tree requires registry mode');
+  return { mode, ...watermark(input), ...(input.folderTree === true ? { folderTree: true as const } : {}) };
 }
 
 export function parseNoteHead(value: unknown): NoteHead {
@@ -136,12 +143,21 @@ export async function opaqueNoteId(keys: NoteKeys, id: string): Promise<string> 
   return Array.from(mac, (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export async function sealNote(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, id: string, item: SlagItem | null): Promise<NoteOp> {
-  if ((op.kind === 'delete') !== (item === null) || (item && item.id !== id)) throw new Error('Invalid local note operation');
+export function sealNote(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, id: string, item: SlagItem | null): Promise<NoteOp> {
+  if (id === FOLDER_TREE_ID || (op.kind === 'delete') !== (item === null) || (item && item.id !== id)) throw new Error('Invalid local note operation');
+  return sealRegistryBody(keys, room, generation, op, { id, item });
+}
+
+export function sealFolderTree(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, folders: FolderMeta[]): Promise<NoteOp> {
+  return sealRegistryBody(keys, room, generation, op, { id: FOLDER_TREE_ID, folders: readFolderTree(folders, op.kind) });
+}
+
+async function sealRegistryBody(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, body: RegistryBody): Promise<NoteOp> {
+  if (await opaqueNoteId(keys, body.id) !== op.noteId) throw new Error('Local registry identity mismatch');
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: associatedData(room, generation, op) },
-    keys.bodyKey, encoder.encode(JSON.stringify({ id, item })),
+    keys.bodyKey, encoder.encode(JSON.stringify(body)),
   ));
   const encoded = bytesToBase64(ciphertext);
   if (encoded.length > NOTE_MAX_BYTES) throw new Error('Note exceeds registry size limit');
@@ -168,13 +184,46 @@ export function isNoteItem(value: unknown): value is SlagItem {
     });
 }
 
-export async function openNote(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<{ id: string; item: SlagItem | null }> {
+function isFolderMeta(value: unknown): value is FolderMeta {
+  const folder = record(value);
+  return typeof folder.path === 'string' && safeVaultRelativePath(folder.path) === folder.path
+    && folder.path.split('/').every((segment) => !segment.startsWith('.'))
+    && typeof folder.name === 'string' && typeof folder.description === 'string'
+    && (folder.icon === undefined || typeof folder.icon === 'string')
+    && (folder.order === undefined || (typeof folder.order === 'number' && Number.isFinite(folder.order)))
+    && (folder.showReferenceColumn === undefined || typeof folder.showReferenceColumn === 'boolean')
+    && (folder.kanbanColumns === undefined || (Array.isArray(folder.kanbanColumns)
+      && folder.kanbanColumns.every((raw: unknown) => {
+        const column = record(raw);
+        return typeof column.id === 'string' && typeof column.title === 'string'
+          && (column.statusMapping === undefined || ['backlog', 'todo', 'in_progress', 'done'].some((status) => status === column.statusMapping));
+      })));
+}
+
+export function readFolderTree(value: unknown, kind: NoteKind): FolderMeta[] {
+  if ((kind !== 'create' && kind !== 'update') || !Array.isArray(value) || !value.every(isFolderMeta)) {
+    throw new Error('Invalid encrypted folder tree');
+  }
+  if (new Set(value.map((folder) => folder.path.normalize('NFC').toLowerCase())).size !== value.length) {
+    throw new Error('Duplicate folder path in registry');
+  }
+  return value;
+}
+
+export async function openRegistryBody(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<RegistryBody> {
   const plaintext = await crypto.subtle.decrypt({
     name: 'AES-GCM', iv: toArrayBuffer(base64ToBytes(op.sealed.iv)), additionalData: associatedData(room, generation, op),
   }, keys.bodyKey, toArrayBuffer(base64ToBytes(op.sealed.ciphertext)));
-  const { id, item } = record(JSON.parse(decoder.decode(plaintext)));
-  if (typeof id !== 'string' || !id || await opaqueNoteId(keys, id) !== op.noteId) throw new Error('Encrypted note identity mismatch');
+  const { id, item, folders } = record(JSON.parse(decoder.decode(plaintext)));
+  if (typeof id !== 'string' || !id || await opaqueNoteId(keys, id) !== op.noteId) throw new Error('Encrypted registry identity mismatch');
+  if (id === FOLDER_TREE_ID) return { id, folders: readFolderTree(folders, op.kind) };
   if (op.kind === 'delete' && item === null) return { id, item };
   if (op.kind === 'delete' || !isNoteItem(item) || item.id !== id) throw new Error('Invalid encrypted note');
   return { id, item };
+}
+
+export async function openNote(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<{ id: string; item: SlagItem | null }> {
+  const body = await openRegistryBody(keys, room, generation, op);
+  if (!('item' in body)) throw new Error('Folder tree support is not enabled for this session');
+  return body;
 }

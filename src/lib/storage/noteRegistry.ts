@@ -1,4 +1,4 @@
-import type { SlagItem } from '../../types';
+import type { FolderMeta, SlagItem } from '../../types';
 
 export interface NoteMutation {
   id: string;
@@ -15,7 +15,11 @@ export interface AcceptedNote {
   discardLiveCopy?: true;
 }
 
+export type FolderTreeListener = (folders: FolderMeta[], previous: FolderMeta[]) => Promise<void>;
+
 export interface NoteRegistryStorage {
+  applyAcceptedFolderTree?(folders: FolderMeta[]): Promise<void>;
+  subscribeFolderTreeIntents?(listener: FolderTreeListener): () => void;
   readNoteRegistry(): Promise<unknown>;
   writeNoteRegistry(value: unknown): Promise<void>;
   writeNoteConflict(id: string, value: unknown): Promise<void>;

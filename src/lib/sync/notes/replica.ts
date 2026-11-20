@@ -1,12 +1,12 @@
 // Serializes local intents and canonical application, not the network. I/O is owned by the host.
-import type { SlagItem } from '../../../types/index.ts';
+import type { FolderMeta, SlagItem } from '../../../types/index.ts';
 import type { AcceptedNote, NoteMutation } from '../../storage/noteRegistry';
 import { NoteChannel } from './channel.ts';
-import { confirmedNote, emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settleNote } from './journal.ts';
-import type { JournalAttempt, NoteBase, NoteIntent, NoteJournal } from './journal.ts';
+import { confirmedNote, emptyJournal, firstPerNote, recordNote, sameRegistryValue, setAttempt, setConfirmed, settleNote } from './journal.ts';
+import type { JournalAttempt, NoteBase, NoteIntent, NoteJournal, RegistryValue } from './journal.ts';
 import { mergeNote, relayNote, sameNote } from './merge.ts';
 import { isNoteItem } from './wire.ts';
-import { NOTE_BATCH_BYTES, NOTE_BATCH_COUNT, openNote, opaqueNoteId, parseLiveNoteEvents, parseNoteResults, sealNote } from './wire.ts';
+import { FOLDER_TREE_ID, NOTE_BATCH_BYTES, NOTE_BATCH_COUNT, openRegistryBody, opaqueNoteId, parseLiveNoteEvents, parseNoteResults, readFolderTree, sealFolderTree, sealNote } from './wire.ts';
 import type { NoteHead, NoteKeys, NoteOp, NoteResult, NoteResults } from './wire.ts';
 
 export interface NoteConflict {
@@ -14,7 +14,7 @@ export interface NoteConflict {
   noteId: string;
   kind: NoteIntent['kind'];
   revision: number;
-  item: SlagItem | null;
+  item: RegistryValue;
   fields: string[];
   at: number;
 }
@@ -29,6 +29,7 @@ interface NoteReplicaHost {
   sendLive: (data: string) => boolean;
   save: (state: NoteJournal) => Promise<void>;
   apply: (note: AcceptedNote) => Promise<void>;
+  applyFolderTree?: (folders: FolderMeta[]) => Promise<void>;
   storeConflict: (conflict: NoteConflict) => Promise<void>;
   onError: (error: unknown) => void;
   onProgress: () => void;
@@ -39,15 +40,23 @@ const PUSH_DELAY_MS = 50;
 const RETRY_MS = 10_000;
 const WS_ACK_MS = 2_500;
 
-type Candidate = { item: SlagItem | null; kind: NoteOp['kind']; conflicts: string[]; skip?: true };
+type Candidate = { item: RegistryValue; kind: NoteOp['kind']; conflicts: string[]; skip?: true };
 
 function candidate(intent: NoteIntent, head: NoteBase | undefined): Candidate {
   const { base, kind, item } = intent;
   const current = head?.item ?? null;
   if (!base && !intent.attempt) throw new Error('Неизвестна исходная версия заметки; правка осталась в очереди');
-  if (sameNote(item, current) || (kind === 'update' && base && sameNote(base.item, item))) {
+  if (sameRegistryValue(item, current) || (kind === 'update' && base && sameRegistryValue(base.item, item))) {
     return { item: current, kind, conflicts: [], skip: true };
   }
+  if (intent.id === FOLDER_TREE_ID) {
+    if (base?.revision === (head?.revision ?? 0) && sameRegistryValue(base.item, current)) {
+      return { item, kind, conflicts: [] };
+    }
+    // A successor of an optimistic edit may have the new revision but not its accepted contents.
+    return { item: current, kind, conflicts: ['folders'], skip: true };
+  }
+  if (Array.isArray(item) || Array.isArray(current) || Array.isArray(base?.item)) throw new Error('Invalid note journal value');
   if (!head && kind === 'create') return { item, kind, conflicts: [] };
   if (!head) throw new Error('Эталон заметки не найден; правка осталась в очереди');
   if (kind === 'restore' && current === null && base?.revision === head.revision) return { item, kind, conflicts: [] };
@@ -131,6 +140,19 @@ export class NoteReplica {
     }
   }
 
+  recordFolderTree(folders: FolderMeta[], previous: FolderMeta[]): Promise<void> {
+    if (!this.host.applyFolderTree || this.host.readOnly) {
+      return Promise.reject(new Error('Реестр папок недоступен для записи'));
+    }
+    return this.enqueue(async () => {
+      const id = FOLDER_TREE_ID;
+      const kind = confirmedNote(this.state, id) || this.state.pending.some((entry) => entry.id === id) ? 'update' : 'create';
+      await this.persist(recordNote(this.state, { id, intentId: crypto.randomUUID(), kind,
+        item: readFolderTree(folders, kind), previous }));
+      this.schedule();
+    }).catch((err: unknown) => { this.error(err); throw err; });
+  }
+
   record(changes: NoteMutation[]): Promise<void> {
     if (this.host.readOnly) return Promise.resolve();
     const run = this.enqueue(async () => {
@@ -191,26 +213,37 @@ export class NoteReplica {
       revision, item: intent.item, fields, at: Date.now() });
   }
 
+  private async applyValue(id: string, item: RegistryValue, discardLiveCopy = false) {
+    if (id === FOLDER_TREE_ID) {
+      if (!this.host.applyFolderTree || !Array.isArray(item)) throw new Error('Folder tree support is not enabled for this session');
+      await this.host.applyFolderTree(item);
+    } else {
+      if (Array.isArray(item)) throw new Error('Invalid accepted note');
+      await this.host.apply({ id, item, ...(discardLiveCopy ? { discardLiveCopy: true as const } : {}) });
+    }
+  }
+
   private async settle(intent: NoteIntent, head: NoteBase, fields: string[]) {
     await this.retainConflict(intent, head.revision, fields);
     const next = settleNote(setConfirmed(this.state, intent.id, head), intent, head.revision);
     if (!next.pending.some((entry) => entry.id === intent.id)) {
       const current = confirmedNote(next, intent.id);
-      if (current) await this.host.apply({ id: intent.id, item: current.item,
-        ...(!current.item && intent.item && fields.length ? { discardLiveCopy: true as const } : {}),
-      });
+      if (current) await this.applyValue(intent.id, current.item, !current.item && !!intent.item && fields.length > 0);
     }
     await this.persist(next);
     if (fields.length) this.resolutions = { ...this.resolutions, conflicts: this.resolutions.conflicts + 1 };
     else if (intent.kind === 'update' && intent.base?.item && intent.item && head.item &&
-             !sameNote(intent.base.item, intent.item) && !sameNote(intent.item, head.item)) {
+             !sameRegistryValue(intent.base.item, intent.item) && !sameRegistryValue(intent.item, head.item)) {
       this.resolutions = { ...this.resolutions, merged: this.resolutions.merged + 1 };
     }
     this.staleCounts.delete(intent.intentId);
   }
 
   private async accept(head: NoteHead, applyKnown = false) {
-    const { id, item } = await openNote(this.host.keys, this.host.room, this.host.generation, head);
+    const body = await openRegistryBody(this.host.keys, this.host.room, this.host.generation, head);
+    if ('folders' in body && !this.host.applyFolderTree) throw new Error('Folder tree support is not enabled for this session');
+    const { id } = body;
+    const item = 'folders' in body ? body.folders : body.item;
     const base = { revision: head.revision, item };
     const own = this.state.pending.find((intent) => intent.attempt?.op.opId === head.opId);
     if (own) {
@@ -219,7 +252,7 @@ export class NoteReplica {
     }
     const next = setConfirmed(this.state, id, base);
     if ((next !== this.state || (applyKnown && confirmedNote(next, id)?.revision === head.revision))
-        && !next.pending.some((entry) => entry.id === id)) await this.host.apply({ id, item });
+        && !next.pending.some((entry) => entry.id === id)) await this.applyValue(id, item);
     await this.persist(next);
   }
 
@@ -322,10 +355,12 @@ export class NoteReplica {
               await this.settle(intent, head ?? { revision: 0, item: null }, next.conflicts);
               continue;
             }
-            const op = await sealNote(this.host.keys, this.host.room, this.host.generation, {
-              opId: crypto.randomUUID(), noteId: await opaqueNoteId(this.host.keys, intent.id),
-              baseRevision: head?.revision ?? 0, kind: next.kind,
-            }, intent.id, next.item);
+            const { keys, room, generation } = this.host;
+            const meta = { opId: crypto.randomUUID(), noteId: await opaqueNoteId(keys, intent.id),
+              baseRevision: head?.revision ?? 0, kind: next.kind };
+            const op = Array.isArray(next.item)
+              ? await sealFolderTree(keys, room, generation, meta, next.item)
+              : await sealNote(keys, room, generation, meta, intent.id, next.item);
             attempt = { op, item: next.item, conflicts: next.conflicts };
           }
           const size = JSON.stringify(attempt.op).length;

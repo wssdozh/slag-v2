@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { deriveNoteKeys, opaqueNoteId, openNote, parseNoteEvents, parseNoteResults, parseNoteStatus, sealNote } from '../src/lib/sync/notes/wire.ts';
+import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, openNote, openRegistryBody, parseNoteEvents, parseNoteResults, parseNoteStatus, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 
 const item = { id: 'private-note', type: 'note', title: 'private title', content: 'private content', folder: 'inbox', tags: [], attachments: [], createdAt: 1, updatedAt: 2 };
 
@@ -21,6 +21,21 @@ test('a note envelope authenticates the room, generation, and operation metadata
   await assert.rejects(openNote(keys, 'other-room', 1, head));
   const deletion = await sealNote(keys, 'room', 1, { noteId, opId: 'op-2', baseRevision: 1, kind: 'delete' }, item.id, null);
   assert.deepEqual(await openNote(keys, 'room', 1, { ...deletion, revision: 2 }), { id: item.id, item: null });
+});
+
+test('one sealed revision carries the whole folder tree, not a note or deletion', async () => {
+  const master = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const keys = await deriveNoteKeys(master, 'room');
+  const op = { noteId: await opaqueNoteId(keys, FOLDER_TREE_ID), opId: 'move-1', baseRevision: 7, kind: 'update' };
+  const folders = [{ path: 'Inbox', name: 'Inbox', description: '', order: 1 }, { path: 'Projects', name: 'Projects', description: '', order: 0 }];
+  const head = { ...await sealFolderTree(keys, 'room', 3, op, folders), revision: 8 };
+  assert.deepEqual(await openRegistryBody(keys, 'room', 3, head), { id: FOLDER_TREE_ID, folders });
+  assert.doesNotMatch(JSON.stringify(head), /Projects/);
+  await assert.rejects(openNote(keys, 'room', 3, head), /not enabled/);
+  await assert.rejects(openRegistryBody(keys, 'room', 4, head));
+  assert.throws(() => sealFolderTree(keys, 'room', 3, op, [...folders, { ...folders[0], path: 'inbox' }]), /Duplicate/);
+  assert.throws(() => sealFolderTree(keys, 'room', 3, op, [{ ...folders[0], path: '../outside' }]), /Unsafe/);
+  assert.throws(() => sealFolderTree(keys, 'room', 3, { ...op, kind: 'delete' }, []), /Invalid/);
 });
 
 test('invalid watermarks and malformed outcomes do not silently advance the cursor', () => {

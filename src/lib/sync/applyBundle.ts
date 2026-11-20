@@ -153,6 +153,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             }
           }
         } else if (ch.type === 'folder') {
+          if (engine.hasFolderTreeRegistry) continue;
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as FolderMeta;
             const idx = currentFolders.findIndex((f) => f.path === ch.id);

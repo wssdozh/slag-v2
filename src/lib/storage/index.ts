@@ -86,7 +86,7 @@ import {
   type VaultImportPayload,
 } from './vaultTransfer';
 import { notesRemovedByImport } from './noteRemoval';
-import type { AcceptedNote, NoteMutation } from './noteRegistry';
+import type { AcceptedNote, FolderTreeListener, NoteMutation } from './noteRegistry';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -134,6 +134,8 @@ export class StorageService {
   public currentVault: VaultMeta;
   private changeListeners: Set<StorageChangeListener> = new Set();
   private noteIntentListeners = new Set<(changes: NoteMutation[]) => Promise<void>>();
+  private folderTreeListeners = new Map<string, FolderTreeListener>();
+  private registryFolderVaults = new Set<string>();
   private noteFileWrite: Promise<void> = Promise.resolve();
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
@@ -149,6 +151,7 @@ export class StorageService {
     getItemsKey: () => this.getItemsKey(),
     getTrashKey: () => this.getTrashKey(),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
+    hydrateRegistryFolders: (folders) => this.hydrateRegistryFolders(folders),
     attachments: this.attachments,
   });
 
@@ -375,6 +378,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       });
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
+      const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
+      if (folders !== null) this.hydrateRegistryFolders(JSON.parse(folders) as FolderMeta[]);
       this.hydrated = true;
     }
   }
@@ -470,6 +475,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       // The vault is gone from the registry and the disk; what this session still remembered of
       // it must not become the content of a new vault that later reuses the id.
       forgetVaultFolders(vaultId);
+      this.registryFolderVaults.delete(vaultId);
+      this.folderTreeListeners.delete(vaultId);
+      if (!isTauri()) localStorage.removeItem(`slag_registry_folders_${vaultId}`);
       this.itemsIndex.delete(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
       this.itemsIndex.delete(`${STORAGE_KEYS.TRASH_PREFIX}${vaultId}`);
     }
@@ -498,13 +506,61 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * answers; `state.json` takes the metadata by path, never a verdict on what exists. An
    * `external` change came from the disk itself, so there is nothing to tell the disk back.
    */
-  public persistFolders(folders: FolderMeta[], origin: StorageOrigin): void {
+  public subscribeFolderTreeIntents(listener: FolderTreeListener): () => void {
+    const vaultId = this.currentVault.id;
+    this.registryFolderVaults.add(vaultId);
+    this.folderTreeListeners.set(vaultId, listener);
+    return () => {
+      if (this.folderTreeListeners.get(vaultId) === listener) this.folderTreeListeners.delete(vaultId);
+    };
+  }
+
+  public persistFolders(folders: FolderMeta[], origin: StorageOrigin): Promise<void> | undefined {
+    const vault = this.currentVault;
+    const previous = this.getFolders();
+    const hasRegistry = this.registryFolderVaults.has(vault.id);
+    if (hasRegistry && origin !== 'local') return;
+    const listener = this.folderTreeListeners.get(vault.id);
+    if (hasRegistry && !listener) {
+      throw new Error('Синхронизация папок ещё не готова; дерево не изменено');
+    }
     rememberFolders(this, folders);
-    if (isTauri() && origin !== 'external') {
-      void this.files.writeFolderMeta(folders).catch((err: unknown) => {
-        fsLog.warn('Failed to write folder metadata to state.json', { error: String(err) });
+    if (origin === 'external') return;
+    const next = this.getFolders();
+    const captured = listener?.(next, previous);
+    if (captured) {
+      const saved = captured.then(() => this.writeRegistryFolders(next, vault));
+      void saved.catch((error: unknown) => fsLog.error('Could not persist folder tree intent or metadata', error));
+      return saved;
+    } else if (isTauri()) {
+      void this.files.writeFolderMeta(folders, vault).catch((error: unknown) => {
+        fsLog.warn('Failed to write folder metadata to state.json', error);
       });
     }
+  }
+
+  private hydrateRegistryFolders(folders: FolderMeta[]): void {
+    this.registryFolderVaults.add(this.currentVault.id);
+    rememberFolders(this, folders);
+  }
+
+  private async writeRegistryFolders(folders: FolderMeta[], vault: VaultMeta): Promise<void> {
+    if (isTauri()) await this.files.writeFolderMeta(folders, vault, true);
+    else localStorage.setItem(`slag_registry_folders_${vault.id}`, JSON.stringify(folders));
+  }
+
+  public async applyAcceptedFolderTree(folders: FolderMeta[]): Promise<void> {
+    const vault = this.currentVault;
+    const previous = this.getFolders();
+    await this.writeRegistryFolders(folders, vault);
+    const present = new Set(folders.map((entry) => entry.path));
+    for (const entry of previous.slice().sort((a, b) => b.path.length - a.path.length)) {
+      if (!present.has(entry.path)) await this.files.removeFolderFromDisk(entry.path, vault);
+    }
+    if (this.currentVault.id !== vault.id) throw new Error('Vault changed while applying folder tree');
+    if (JSON.stringify(previous) !== JSON.stringify(this.getFolders())) return;
+    this.hydrateRegistryFolders(folders);
+    window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasFoldersChanged: true } }));
   }
 
   public saveFolder(folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
@@ -699,7 +755,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * `external`: the disk changed, not the person, and the relay must not hear its own echo.
    */
   private mergeDiskFolders(added: string[], removed: string[]): void {
-    if (added.length === 0 && removed.length === 0) return;
+    if (this.registryFolderVaults.has(this.currentVault.id) || (added.length === 0 && removed.length === 0)) return;
 
     const current = this.getFolders();
     const gone = new Set(removed);
@@ -917,12 +973,12 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         const nextFolderPaths = new Set(folders.map(f => f.path));
         for (const oldF of base.folders) {
           if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
-            await this.files.removeFolderFromDisk(oldF.path, vault, data.registryNotes === true);
+            await this.files.removeFolderFromDisk(oldF.path, vault);
           }
         }
       }
       // A synced folder lands the way one made here does: a directory, then its metadata.
-      this.persistFolders(folders, 'remote');
+      if (data.folders) this.persistFolders(folders, 'remote');
     }
     if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
 

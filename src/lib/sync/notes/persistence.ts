@@ -1,7 +1,7 @@
 // Registry state is scoped to a room generation; an old queue is never silently reset.
 import type { NoteJournal } from './journal.ts';
 import { emptyJournal } from './journal.ts';
-import { isNoteItem, parseNoteHead } from './wire.ts';
+import { FOLDER_TREE_ID, isNoteItem, parseNoteHead, readFolderTree } from './wire.ts';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid local note registry');
@@ -13,12 +13,18 @@ function integer(value: unknown): value is number {
 }
 
 function validItem(value: unknown, id: string): boolean {
+  if (id === FOLDER_TREE_ID) {
+    readFolderTree(value, 'update');
+    return true;
+  }
   return value === null || (isNoteItem(value) && value.id === id);
 }
 
 function validateBase(value: unknown, id: string) {
   const base = object(value);
-  if (!integer(base.revision) || !validItem(base.item, id)) throw new Error('Invalid persisted note base');
+  if (!integer(base.revision) || (!(id === FOLDER_TREE_ID && base.revision === 0 && base.item === null) && !validItem(base.item, id))) {
+    throw new Error('Invalid persisted note base');
+  }
 }
 
 export function enrolledNoteGeneration(value: unknown, room: string): number | undefined {
@@ -28,6 +34,10 @@ export function enrolledNoteGeneration(value: unknown, room: string): number | u
     throw new Error('Invalid local note registry enrollment');
   }
   if (envelope.room === room) return envelope.generation;
+}
+
+export function enrolledFolderTree(value: unknown, room: string, generation: number): boolean {
+  return enrolledNoteGeneration(value, room) === generation && object(value).folderTree === true;
 }
 
 export function loadNoteJournal(value: unknown, room: string, generation: number): NoteJournal {

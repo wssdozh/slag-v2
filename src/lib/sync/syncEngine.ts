@@ -119,16 +119,17 @@ export class SyncEngine {
   private noteAbort?: AbortController;
   private noteSession: Awaited<ReturnType<typeof openNoteSession>> = null;
   get noteGeneration() { return this.noteSession?.generation; }
+  get hasFolderTreeRegistry() { return this.noteSession?.folderTree === true; }
   public bundleQuery() {
     const query = new URLSearchParams({ vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId });
     if (this.noteGeneration) query.set('noteGeneration', String(this.noteGeneration));
+    if (this.hasFolderTreeRegistry) query.set('folderTree', '1');
     return query;
   }
   public isProcessingSync = false;
   public sequence = 1;
   public appliedBundleIds = new Set<string>();
   public batchUpdating = false;
-  public forceFullPush = false;
   /** Set by the headless node: it holds a copy and never sends its own state back. */
   public forceReceiveOnly = false;
   /** A first pull over a tunnel can take minutes; the app on a LAN never needs more than 30s. */
@@ -359,6 +360,7 @@ export class SyncEngine {
       // under us (the MCP server, another editor): pushing it would echo back through the relay
       // and the two devices would ping-pong the same bundle forever.
       if (event.origin === 'remote') return;
+      if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
       if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
         if (event.origin === 'external' && event.kind === 'item') {
           void this.noteSession.replica.recordExternal(event).catch((error: unknown) => this.reportNoteError(error));
@@ -454,7 +456,9 @@ export class SyncEngine {
   }
 
   public getBundleOutbox() {
-    return this.getOutbox().pending().filter((op) => !this.noteGeneration || (op.kind !== 'item' && op.kind !== 'trash'));
+    return this.getOutbox().pending().filter((op) =>
+      (!this.noteGeneration || (op.kind !== 'item' && op.kind !== 'trash'))
+      && (!this.hasFolderTreeRegistry || op.kind !== 'folder'));
   }
 
   public getOutbox(): Outbox {
@@ -473,17 +477,6 @@ export class SyncEngine {
   public requestManifestCheck(): void {
     if (this.noteSession) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
     else manifestSchedule.requestManifestCheck(this);
-  }
-
-  /**
-   * Moves notes the neighbour refused to the trash, and says so in the log.
-   *
-   * `origin: 'local'` on purpose: the engine ignores remote-origin writes so two devices cannot
-   * echo each other, and this deletion has to travel — the person's own `deleteItem` goes the same
-   * way. The trash is reversible; a delete would not be.
-   */
-  public trashRejectedNotes(ids: string[]): void {
-    manifestSync.trashRejectedNotes(ids);
   }
 
   /**
@@ -765,9 +758,9 @@ export class SyncEngine {
       // workspace over under a name the storage read never looked at, so a profile (and every
       // other workspace field) from another device never landed.
       await vault().importSyncedVaultData({
-        items: this.noteGeneration ? undefined : buffered.items,
-        folders: buffered.folders,
-        removedIds: this.noteGeneration ? undefined : buffered.removedIds,
+        items: !this.noteGeneration && buffered.detail.items ? buffered.items : undefined,
+        folders: !this.hasFolderTreeRegistry && buffered.detail.folders ? buffered.folders : undefined,
+        removedIds: !this.noteGeneration && buffered.detail.items ? buffered.removedIds : undefined,
         registryNotes: Boolean(this.noteGeneration),
         workspaceState: buffered.workspaceState,
       });
@@ -1041,7 +1034,8 @@ export class SyncEngine {
         },
         storeConflict: (conflict: import('./notes/replica').NoteConflict) =>
           archiveNoteConflict(this.currentVaultId, conflict, port.writeNoteConflict?.bind(port)),
-        hasPendingLegacyNotes: () => this.getOutbox().pending().some(({ kind }) => kind === 'item' || kind === 'trash'),
+        hasPendingLegacyNotes: (folderTree: boolean) => this.getOutbox().pending().some(({ kind }) =>
+           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')),
       });
       if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
         const roomId = await accountRoom(vaultId);
@@ -1431,10 +1425,8 @@ export class SyncEngine {
         }
         if (!page) return;
         if (cursor > 0 && page.oldest > 0 && cursor + 1 < page.oldest) {
-          // The cursor points before the oldest bundle the relay still keeps: everything in
-          // between expired, so a delta can never close the gap — resend the full state once.
-          syncLog.warn(`Sync cursor ${cursor} is older than relay history (${page.oldest}): scheduling a full resend`);
-          this.forceFullPush = true;
+          // Missing transport history cannot make this client's local snapshot authoritative.
+          syncLog.warn(`Sync cursor ${cursor} is older than relay history (${page.oldest}): pulling retained bundles only`);
         }
         for (const item of page.bundles) {
           if (generation !== this.initGeneration) return;

@@ -1,7 +1,7 @@
 import type { PendingPush, SyncEngine } from './syncEngine';
 import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
-import { loadSentHashes, loadStateHash, requireSyncSectionFlushed, saveSentHashes, saveStateHash } from './localBookkeeping';
+import { loadSentHashes, loadStateHash, requireSyncSectionFlushed, saveStateHash } from './localBookkeeping';
 import { deletionsFromOutbox } from './itemDeletions';
 import { accountClient } from './account';
 import { vault } from '../storage/port';
@@ -52,7 +52,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
       const registry = Boolean(engine.noteGeneration);
       const items = !registry || engine.canPackAttachment() ? stripAttachmentData(vault().getItems()) : [];
-      const folders = vault().getFolders();
+      const folders = engine.hasFolderTreeRegistry ? [] : vault().getFolders();
       const workspaceState = vault().getWorkspaceState();
       const pendingOps = engine.getBundleOutbox();
 
@@ -63,12 +63,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // An attachment pass has nothing to do with the note state hash: it must get past the
       // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
       // A request for missing bytes changes no note either, so it opens the gate the same way.
-      // A forced full push is the same story and used to be the bug: the flag was read below this
-      // return, so a vault that agreed with its own checkpoint never resent anything — neither
-      // after a manifest divergence nor after the relay admitted its history no longer covers our
-      // cursor. The gate asked "did anything change locally", and the answer was no.
       if (
-        !engine.forceFullPush &&
         !engine.canPackAttachment() &&
         !engine.hasPendingAttachmentRequests() &&
         lastSyncedHash === stateHash &&
@@ -87,13 +82,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       const changes: SyncChangeItem[] = [];
       // Only entities whose hash differs from what this room already received go out;
       // sending the whole vault on every keystroke is what kept pushes at 60 changes.
-      let sentHashes = loadSentHashes(engine.bookkeeping);
-      if (engine.forceFullPush) {
-        engine.forceFullPush = false;
-        sentHashes = {};
-        engine.entityHashes.clear();
-        saveSentHashes(engine.bookkeeping, {});
-      }
+      const sentHashes = loadSentHashes(engine.bookkeeping);
       const packedHashes: Record<string, string> = {};
       const pack = (key: string, hash: string, change: SyncChangeItem) => {
         if (sentHashes[key] === hash) return;

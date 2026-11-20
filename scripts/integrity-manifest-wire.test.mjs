@@ -219,10 +219,8 @@ test('describeWire says when the leaves were not sent', () => {
 
 // --- what a device does about it ------------------------------------------------------------
 
-const quiet = { reconciledRoot: null, receiveOnly: false };
-
 test('a matching root asks for nothing', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a')], quiet);
+  const decision = decideManifest(manifest(), [peer('dev-a')]);
 
   assert.equal(decision.action, 'none');
   assert.equal(decision.peer?.deviceId, 'dev-a');
@@ -231,7 +229,7 @@ test('a matching root asks for nothing', () => {
 });
 
 test('a device that got no answer does not call that a mismatch', () => {
-  assert.deepEqual(decideManifest(manifest(), [], quiet), {
+  assert.deepEqual(decideManifest(manifest(), []), {
     action: 'none',
     peer: null,
     drift: null,
@@ -239,17 +237,17 @@ test('a device that got no answer does not call that a mismatch', () => {
   });
 });
 
-test('a diverged peer root is resent once, at that peer', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a'), peer('dev-b', { root: 'root-b' })], quiet);
+test('a fresh divergence reports the named peer without authorizing a resend', () => {
+  const decision = decideManifest(manifest(), [peer('dev-a'), peer('dev-b', { root: 'root-b' })]);
 
-  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.action, 'report');
   assert.equal(decision.peer?.deviceId, 'dev-b');
-  assert.equal(decision.resendTo, 'dev-b');
+  assert.equal(decision.resendTo, null);
   assert.equal(decision.drift?.rootMatch, false);
 });
 
 test('an old client is compared but never resent to', () => {
-  const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' })], quiet);
+  const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' })]);
 
   assert.equal(decision.action, 'none');
   assert.equal(decision.peer?.deviceId, null);
@@ -258,46 +256,27 @@ test('an old client is compared but never resent to', () => {
 });
 
 test('a named peer that disagrees outranks the old client', () => {
-  const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' }), peer('dev-a', { root: 'root-c' })], quiet);
+  const decision = decideManifest(manifest(), [peer(null, { root: 'root-b' }), peer('dev-a', { root: 'root-c' })]);
 
-  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.action, 'report');
   assert.equal(decision.peer?.deviceId, 'dev-a');
-  assert.equal(decision.resendTo, 'dev-a');
-});
-
-test('the same peer root is never resent against twice', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a', { root: 'root-b' })], {
-    reconciledRoot: 'root-b',
-    receiveOnly: false,
-  });
-
-  assert.equal(decision.action, 'report');
   assert.equal(decision.resendTo, null);
 });
 
-test('a fresh peer state is worth another look after the latch was set on an older one', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a', { root: 'root-c' })], {
-    reconciledRoot: 'root-b',
-    receiveOnly: false,
-  });
-
-  assert.equal(decision.action, 'reconcile');
-});
-
-test('a receive-only device reports a divergence and never resends', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a', { root: 'root-b' })], {
-    reconciledRoot: null,
-    receiveOnly: true,
-  });
-
-  assert.equal(decision.action, 'report');
-  assert.equal(decision.resendTo, null);
+test('a task absent from fresh, repeated and newer peer snapshots stays only a diagnostic extra', () => {
+  const local = manifest({ leaves: { 'local-task': 'local-leaf' } });
+  for (const root of ['root-b', 'root-b', 'root-c']) {
+    const decision = decideManifest(local, [peer('dev-a', { root, leaves: {} })]);
+    assert.equal(decision.action, 'report');
+    assert.deepEqual(decision.drift?.extra, ['local-task']);
+    assert.equal(decision.resendTo, null);
+  }
 });
 
 test('a remote without leaves still decides on the root', () => {
-  const decision = decideManifest(manifest(), [peer('dev-a', { root: 'root-b', leaves: undefined })], quiet);
+  const decision = decideManifest(manifest(), [peer('dev-a', { root: 'root-b', leaves: undefined })]);
 
-  assert.equal(decision.action, 'reconcile');
+  assert.equal(decision.action, 'report');
   assert.deepEqual(decision.drift?.missing, []);
   assert.deepEqual(decision.drift?.conflict, []);
 });
