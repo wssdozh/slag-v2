@@ -16,6 +16,7 @@ test('registry startup refuses an unreviewed legacy note queue before installing
     key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault',
     readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => dirty,
     port: {
+      getCurrentVault: () => ({ id: 'local-vault' }),
       isHydrated: () => true, readNoteRegistry: async () => undefined,
       writeNoteRegistry: async () => assert.fail('negotiation must not replace the journal'),
       applyAcceptedNote: async () => assert.fail('negotiation must not overwrite local files'),
@@ -29,4 +30,30 @@ test('registry startup refuses an unreviewed legacy note queue before installing
   assert.equal(subscribed, true);
   controller.abort();
   assert.equal(subscribed, false);
+});
+
+test('a room bound to the former vault cannot write into the new vault', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ mode: 'registry', generation: 1, head: 0, floor: 0 }));
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  let currentId = 'old';
+  let writes = 0;
+  const session = await openNoteSession({
+    key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault',
+    readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => false, onError: () => {},
+    port: {
+      getCurrentVault: () => ({ id: currentId }),
+      isHydrated: () => true, readNoteRegistry: async () => undefined,
+      writeNoteRegistry: async () => { writes++; },
+      applyAcceptedNote: async () => assert.fail('unexpected apply'),
+      subscribeNoteIntents: () => () => {},
+    },
+  });
+  const item = { id: 'one', type: 'note', title: 'one', folder: 'inbox', content: 'test', updatedAt: 1, createdAt: 1, tags: [], attachments: [] };
+  currentId = 'other';
+  await assert.rejects(session.replica.record([{ id: item.id, kind: 'create', item }]), /Vault changed/);
+  assert.equal(writes, 0);
+  currentId = 'old';
+  await session.replica.record([{ id: item.id, kind: 'create', item }]);
+  assert.equal(writes, 1);
 });

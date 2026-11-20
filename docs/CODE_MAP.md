@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110189**, зон: **48**.
+Модулей: **628**, строк: **110224**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
 | `src/types/index.ts` | 686 | 225 |
 
-## e2e (playwright) — 132 файлов, 24576 строк
+## e2e (playwright) — 132 файлов, 24598 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -630,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10051 строк
+## src/lib/sync — 46 файлов, 10064 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -665,7 +665,7 @@
 | `notes/merge.ts` | 147 | 3 | relayNote, sameNote, mergeNote | Three-way merge of decrypted note data. The caller, not this function, handle… |
 | `notes/persistence.ts` | 60 | 1 | loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
 | `notes/replica.ts` | 417 | 3 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
-| `notes/session.ts` | 48 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/session.ts` | 61 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/wire.ts` | 181 | 9 | NoteKind, NoteMode, NoteStatus, NoteSealed, NoteOp, +20 | The authenticated relay sees routing metadata, never the note's identity or b… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
