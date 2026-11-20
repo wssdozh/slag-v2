@@ -1,0 +1,70 @@
+# Artifacts only. Never signs with the release key or publishes a release.
+name: note registry staging
+on:
+  push:
+    branches: [feat/note-replica]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: note-registry-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    if: github.ref == 'refs/heads/feat/note-replica'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: npm run check && npm run test:scripts
+      - name: Android SDK
+        shell: bash
+        run: |
+          set -eu
+          manager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          (yes | "$manager" --licenses >/dev/null) || true
+          "$manager" --install 'ndk;27.0.12077973' 'platforms;android-37.0' 'build-tools;37.0.0'
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+      - name: Isolate staging app on the device
+        run: |
+          app=src-tauri/gen/android/app
+          # Keep the Kotlin namespace for JNI, but use a separate package/UID/data directory.
+          sed -i 's/applicationId = "com.slag.notes"/applicationId = "com.slag.notes.staging"/' "$app/build.gradle.kts"
+          sed -i 's/"SLAG"/"SLAG staging"/g' "$app/src/main/res/values/strings.xml"
+          sed -i 's/android:scheme="slag"/android:scheme="slag-staging"/' "$app/src/main/AndroidManifest.xml"
+      - name: Build and verify staging APK
+        run: |
+          npx tauri android build --ci --debug --apk --target aarch64
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*debug.apk' -print -quit)
+          test -n "$apk"
+          tools="$ANDROID_HOME/build-tools/37.0.0"
+          "$tools/aapt" dump badging "$apk" | grep "^package: name='com.slag.notes.staging' "
+          "$tools/apksigner" verify "$apk"
+          cp "$apk" "$RUNNER_TEMP/SLAG-staging.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slag-staging-android
+          path: ${{ runner.temp }}/SLAG-staging.apk
+          if-no-files-found: error
+          retention-days: 7
