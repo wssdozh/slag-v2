@@ -45,10 +45,7 @@ export interface VaultPort extends Partial<NoteRegistryStorage> {
   getWorkspaceState(): WorkspaceState;
   getMemory(): MemoryItem[];
   saveMemory(items: MemoryItem[], origin?: ChangeOrigin): boolean;
-  /**
-   * Takes a note to `.trash/`, with the tombstone and the outbox op that keep it deleted. The only
-   * deletion sync is allowed, and only for notes the neighbour refused.
-   */
+  /** Explicit local deletion to `.trash/`; a reconciliation mismatch is not a deletion. */
   moveToTrash(id: string): void;
 
   importSyncedVaultData(data: SyncedVaultData): Promise<void>;

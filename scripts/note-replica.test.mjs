@@ -3,7 +3,7 @@ import { setTimeout as wait } from 'node:timers/promises';
 import { test } from 'node:test';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { archiveNoteConflict, keepRelayOnConflict, setKeepRelayOnConflict } from '../src/lib/sync/notes/conflicts.ts';
-import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
+import { deriveNoteKeys, FOLDER_TREE_ID } from '../src/lib/sync/notes/wire.ts';
 import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
 
 const room = 'test-room';
@@ -74,6 +74,19 @@ async function until(predicate) {
 }
 
 const change = (kind, item, id = item.id) => ({ kind, id, item });
+
+test('a confirmed task missing from a disk watch is not an explicit deletion', async (t) => {
+  const server = relay();
+  const { replica, saved } = device(t, server);
+  const task = note('task', { type: 'task' });
+  await replica.catchUp();
+  await replica.record([change('create', task)]);
+  await until(() => saved().cursor === 1 && replica.pendingCount === 0);
+  await replica.recordExternal({ id: task.id, action: 'delete', previous: task });
+  assert.equal(replica.pendingCount, 0);
+  assert.equal(saved().confirmed[task.id].item.type, 'task');
+  assert.equal(server.sends(), 1);
+});
 
 test('read-only folder writes cannot be mistaken for durable intent capture', async (t) => {
   const server = relay();
@@ -258,7 +271,9 @@ test('conflict policy defaults to archive and opting in is per vault', async () 
   await archiveNoteConflict('vault-a', entry, write);
   assert.equal(keepRelayOnConflict('vault-b'), false);
   await archiveNoteConflict('vault-b', entry, write);
-  assert.deepEqual(archived, [['intent', entry], ['intent', entry]]);
+  const tree = { intentId: 'tree', noteId: FOLDER_TREE_ID, item: [{ path: 'Rejected' }], fields: ['folders'] };
+  await archiveNoteConflict('vault-a', tree, write);
+  assert.deepEqual(archived, [['intent', entry], ['intent', entry], ['tree', tree]]);
   await assert.rejects(archiveNoteConflict('vault-b', entry, async () => { throw new Error('disk full'); }), /disk full/);
 });
 

@@ -164,10 +164,8 @@ export class NoteReplica {
   }
 
   recordExternal(event: { id: string; action: string; payload?: SlagItem; previous?: SlagItem }): Promise<void> {
-    if (event.action === 'delete') {
-      if (!confirmedNote(this.state, event.id)?.item) return Promise.resolve();
-      return this.record([{ id: event.id, kind: 'delete', item: null, previous: event.previous }]);
-    }
+    // A watcher reports a missing path, not an explicit delete. An atomic rename,
+    // unreadable file, or a folder move must never mint a registry tombstone.
     if ((event.action !== 'upsert' && event.action !== 'conflict') || !event.payload) return Promise.resolve();
     const item = relayNote(event.payload);
     if (!isNoteItem(item) || item.id !== event.id) return Promise.reject(new Error('Invalid note from disk watcher'));

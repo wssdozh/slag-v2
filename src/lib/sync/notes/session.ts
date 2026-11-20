@@ -4,7 +4,7 @@ import { NoteChannel } from './channel.ts';
 import { enrolledFolderTree, enrolledNoteGeneration, loadNoteJournal } from './persistence.ts';
 import { NoteReplica } from './replica.ts';
 import type { NoteConflict } from './replica.ts';
-import { deriveNoteKeys } from './wire.ts';
+import { deriveNoteKeys, FOLDER_TREE_ID } from './wire.ts';
 
 export async function openNoteSession(options: {
   serverUrl: string; roomId: string; vaultId: string; key: CryptoKey; signal: AbortSignal;
@@ -56,6 +56,14 @@ export async function openNoteSession(options: {
   if (!captureOnly && (enrolledNoteGeneration(stored, options.roomId) !== generation
       || enrolledFolderTree(stored, options.roomId, generation) !== folderTree)) await save(initial);
   assertScope();
+  // A crash can happen after the journal commit but before the optimistic tree reaches
+  // state.json. Restore the journal projection before subscribing to another local edit.
+  if (folderTree && applyAcceptedFolderTree) {
+    const tree = initial.pending.findLast((intent) => intent.id === FOLDER_TREE_ID)?.item
+      ?? initial.confirmed[FOLDER_TREE_ID]?.item;
+    if (Array.isArray(tree)) await applyAcceptedFolderTree.call(options.port, tree);
+    assertScope();
+  }
   let verified = !captureOnly;
   const requireVerified = () => {
     assertScope();

@@ -70,6 +70,7 @@ test('folder writes are captured only after enrollment and on cold offline resta
   });
   let saved;
   let record;
+  const projections = [];
   const options = {
     key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault', readOnly: false,
     headers: () => ({}), hasPendingLegacyNotes: () => false, onError: (error) => { throw error; },
@@ -77,7 +78,7 @@ test('folder writes are captured only after enrollment and on cold offline resta
       getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true,
       readNoteRegistry: async () => saved, writeNoteRegistry: async (value) => { saved = value; },
       applyAcceptedNote: async () => assert.fail('unexpected apply'), subscribeNoteIntents: () => () => {},
-      applyAcceptedFolderTree: async () => assert.fail('unexpected apply'),
+      applyAcceptedFolderTree: async (tree) => { projections.push(tree); },
       subscribeFolderTreeIntents: (listener) => { record = listener; return () => { record = undefined; }; },
     },
   };
@@ -95,11 +96,19 @@ test('folder writes are captured only after enrollment and on cold offline resta
   assert.equal(enrolled.folderTree, true);
   online.abort();
   assert.equal(record, undefined);
-  const [offline] = await start(true);
+  const [offline, offlineController] = await start(true);
   assert.equal(offline.folderTree, true);
   const tree = [{ path: 'Projects', name: 'Projects', description: '', order: 0 }];
   await record(tree, []);
   assert.deepEqual(saved.journal.pending[0].item, tree);
+  const intentId = saved.journal.pending[0].intentId;
+  offlineController.abort();
+  // Simulate the process dying immediately after journal commit: the folder projection
+  // has never happened despite the intent being durable.
+  assert.deepEqual(projections, []);
+  await start(true);
+  assert.deepEqual(projections, [tree]);
+  assert.equal(saved.journal.pending[0].intentId, intentId);
   assert.equal(fetch.mock.callCount(), 2);
 });
 
