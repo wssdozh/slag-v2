@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolve } from 'node:path';
 import { createServer, connect } from 'node:net';
+import { archiveNoteConflict, setKeepRelayOnConflict } from '../src/lib/sync/notes/conflicts.ts';
 import { NoteChannel } from '../src/lib/sync/notes/channel.ts';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
@@ -76,6 +77,8 @@ try {
     const attempts = [];
     let saved;
     const errors = [];
+    const archives = [];
+    const policy = `smoke-vault-${i}`;
     const ws = new WebSocket(`${url.replace('http:', 'ws:')}/ws/${room}?${new URLSearchParams({ vault, token: tokens[i], device: `device-${i + 1}`, noteGeneration: generation, backlog: 'http' })}`);
     sockets.add(ws);
     const replica = new NoteReplica({ room, generation, keys, signal, readOnly: false, channel: {
@@ -89,14 +92,15 @@ try {
       return true;
     },
     apply: async ({ id, item }) => local.set(id, item), save: async (state) => { saved = structuredClone(state); },
-    storeConflict: async () => assert.fail('unexpected conflict'), onProgress() {}, onError: (error) => errors.push(error.message) }, initial);
+    storeConflict: (entry) => archiveNoteConflict(policy, entry, async (_id, conflict) => { archives.push(conflict); }),
+    onProgress() {}, onError: (error) => errors.push(error.message) }, initial);
     ws.addEventListener('message', ({ data }) => {
       const message = JSON.parse(data);
       if (!ignoreReply && (message.type === 'note_events' || message.type === 'note_results')) replica.handleMessage(message);
     });
     await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
     await replica.catchUp();
-    return { replica, local, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
+    return { replica, local, errors, attempts, archives, policy, ignoreReply: (value = true) => { ignoreReply = value; },
       stats: () => ({ reads, posts, pushes }), saved: () => saved, close: () => { controller.abort(); ws.close(); } };
   }
   async function until(matches) {
@@ -168,6 +172,20 @@ try {
   await until(() => [author, reader].every((device) => device.replica.pendingCount === 0 &&
     device.local.get(id)?.title === parallelTitle.title && device.local.get(id)?.content === parallelContent.content));
   assert.equal(author.attempts.length + reader.attempts.length - attemptsBeforeRace, 3, 'one writer must retry stale CAS');
+  assert.deepEqual([...author.archives, ...reader.archives], []);
+  for (const keepRelay of [false, true]) {
+    setKeepRelayOnConflict(reader.policy, keepRelay);
+    const base = author.local.get(id);
+    const canonical = { ...base, title: `canonical ${keepRelay}` };
+    const rejected = { ...base, title: `rejected ${keepRelay}`, content: `compatible ${keepRelay}` };
+    await author.replica.record([{ id, kind: 'update', item: canonical, previous: base }]);
+    await until(() => reader.local.get(id)?.title === canonical.title && author.replica.pendingCount === 0);
+    await reader.replica.record([{ id, kind: 'update', item: rejected, previous: base }]);
+    await until(() => reader.replica.pendingCount === 0 && author.local.get(id)?.content === rejected.content);
+    assert.equal(author.local.get(id).title, canonical.title);
+    assert.deepEqual(reader.local.get(id), author.local.get(id));
+    assert.deepEqual(reader.archives.map(({ fields, item }) => [fields, item.title]), [[['title'], 'rejected false']]);
+  }
   assert.deepEqual([...author.errors, ...reader.errors], []);
   const p95Ms = Math.round(timings.sort((a, b) => a - b)[Math.ceil(timings.length * 0.95) - 1]);
   assert.ok(p95Ms <= 1000, `loopback p95 ${p95Ms}ms`);
