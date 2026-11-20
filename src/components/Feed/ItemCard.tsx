@@ -308,7 +308,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
   // exception is the open OCR panel: prose needs a column, not a 200px strip.
   const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
-  const hasFloatingActions = isVoiceBubble || isFileBubble || isPictureBubble || shape === 'video';
+  const hasFloatingActions = !isArticle;
 
   const handleImageClick = useCallback((img: SlagAttachment) => {
     if (onImageClick) {
@@ -452,6 +452,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
   const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
+  const isCompactText = !isArticle && !hasBottomMeta && !item.replyToId &&
+    !item.attachments.length && !item.subtasks?.length && repliesCount === 0;
 
   // The step before the card is a number, so its style object outlives the list's re-renders.
   const cardStyle = useMemo<React.CSSProperties | undefined>(
@@ -542,19 +544,19 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           transition: swipeOffset ? 'none' : CARD_TRANSITION,
           ...cardStyle,
         }}
-        className={`group relative flex flex-col ${
+        className={`group relative ${isCompactText && !isTask ? 'block' : `flex ${isCompactText ? 'flex-row items-end' : 'flex-col'}`} ${
           isVoiceBubble || isFileBubble
             ? 'gap-0 max-w-sm sm:max-w-md'
             : isPictureBubble || shape === 'video'
               ? 'gap-0 w-fit max-w-full'
-              : 'gap-1.5 w-full'
+              : `${isCompactText ? 'gap-3' : 'gap-1.5'} w-fit max-w-full`
         } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
-        {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
+        {/* Text and media keep their full width; only articles reserve an inside action. */}
         <ItemCardActions
           isFloating={hasFloatingActions}
           isArticle={isArticle}
@@ -572,7 +574,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {/* Main Content Area */}
       {isTask ? (
         /* Task Variant */
-        <div className="flex flex-col gap-2 pt-0.5">
+        <div className="flex min-w-0 flex-col gap-2 pt-0.5">
           <div className="flex items-start gap-2.5">
             <button
               onClick={() => toggleTaskComplete(item.id)}
@@ -583,7 +585,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               <TaskStatusMark done={item.status === 'done'} className="w-4 h-4" />
             </button>
 
-            <div className="flex-1 min-w-0 pr-14 sm:pr-16">
+            <div className="min-w-0">
               <h3
                 className={`text-base font-medium leading-snug tracking-tight ${
                   item.status === 'done'
@@ -645,9 +647,19 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           if (!textToRender) return null;
 
           return (
-            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              <div className="text-sm text-fg-soft leading-relaxed font-normal">
-                <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
+            <div className="min-w-0">
+              <div className="flow-root text-xs text-fg-soft leading-relaxed font-normal">
+                <CardMarkdown
+                  content={textToRender}
+                  onWikiLinkClick={scrollToItem}
+                  className={isCompactText ? 'inline [&>p:last-child]:inline [&>p:last-child]:mb-0' : undefined}
+                  {...attachmentMarkdownProps}
+                />
+                {isCompactText && (
+                  <span data-testid="item-time" className="float-right ml-3 whitespace-nowrap text-2xs font-mono leading-[1lh] text-fg-muted select-none">
+                    {formattedTime}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -691,10 +703,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       />
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
-      {shouldRenderBottomBar && (
+      {shouldRenderBottomBar && !(isCompactText && !isTask) && (
         <div
           data-testid="item-meta-row"
-          className="flex items-center gap-2 pt-1 min-h-[16px] w-full select-none"
+          className={`flex items-center gap-2 select-none ${isCompactText ? 'shrink-0 pb-0.5' : 'pt-1 min-h-[16px] w-full'}`}
         >
           {hasBottomMeta ? (
             <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
@@ -782,9 +794,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 );
               })()}
             </div>
-          ) : (
-            <div />
-          )}
+          ) : null}
 
           {!isVoiceBubble && (
             <span className="text-2xs font-mono text-fg-muted select-none ml-auto shrink-0 leading-none">
