@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: note-registry-staging-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   android:
@@ -53,6 +53,7 @@ jobs:
           sed -i 's/applicationId = "com.slag.notes"/applicationId = "com.slag.notes.staging.r${{ github.run_id }}"/' "$app/build.gradle.kts"
           sed -i 's/"SLAG"/"SLAG staging"/g' "$app/src/main/res/values/strings.xml"
           sed -i -e 's/<application$/<application android:allowBackup="false"/' -e 's/android:scheme="slag"/android:scheme="slag-staging"/' "$app/src/main/AndroidManifest.xml"
+          sed -i '/^[[:space:]]*updater::update_/d; /^[[:space:]]*if let Some((target, pid)) = updater::is_apply_update_args(&args) {/,+3d' src-tauri/src/lib.rs
           sed -i "s|export const DEFAULT_SYNC_SERVER_URL = .*|export const DEFAULT_SYNC_SERVER_URL = 'http://127.0.0.1:18320';|" src/config/sync.ts
           node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
@@ -117,6 +118,7 @@ jobs:
           sed -i "s/\"com.slag.notes\"/\"$id\"/g" src-tauri/src/{secure_store,lib,platform}.rs
           sed -i "s/com\.slag\.notes\./$id./g; s/=com\.slag\.notes$/=$id/" src-tauri/src/platform.rs
           sed -i '/^[[:space:]]*platform::auto_adapt_system();/d; /^[[:space:]]*updater::cleanup_leftovers();/d; /^[[:space:]]*deeplink::register_scheme();/d; /^[[:space:]]*if let Err(err) = app.global_shortcut().register(hotkey) {/,+2d; /^[[:space:]]*let hotkey = Shortcut::new(/,+3d' src-tauri/src/lib.rs
+          sed -i '/^[[:space:]]*updater::update_/d; /^[[:space:]]*if let Some((target, pid)) = updater::is_apply_update_args(&args) {/,+3d' src-tauri/src/lib.rs
           sed -i "s|export const DEFAULT_SYNC_SERVER_URL = .*|export const DEFAULT_SYNC_SERVER_URL = 'http://127.0.0.1:18320';|" src/config/sync.ts
           STAGING_ID="$id" node --input-type=module <<'JS'
           import { readFileSync, writeFileSync } from 'node:fs';
