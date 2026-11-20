@@ -78,3 +78,62 @@ jobs:
           path: ${{ runner.temp }}/SLAG-staging.apk
           if-no-files-found: error
           retention-days: 7
+
+  desktop:
+    if: github.ref == 'refs/heads/feat/note-replica'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            binary: slag-v2.exe
+          - os: ubuntu-22.04
+            platform: linux
+            binary: slag-v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev
+      - run: pnpm install --frozen-lockfile
+      - name: Isolate desktop staging identity
+        shell: bash
+        run: |
+          set -eu
+          id='com.slag.notes.staging.r${{ github.run_id }}'
+          sed -i "s/\"com.slag.notes\"/\"$id\"/g" src-tauri/src/{secure_store,lib,platform}.rs
+          sed -i "s/com\.slag\.notes\./$id./g; s/=com\.slag\.notes$/=$id/" src-tauri/src/platform.rs
+          sed -i '/^[[:space:]]*platform::auto_adapt_system();/d; /^[[:space:]]*updater::cleanup_leftovers();/d; /^[[:space:]]*deeplink::register_scheme();/d; /^[[:space:]]*if let Err(err) = app.global_shortcut().register(hotkey) {/,+2d; /^[[:space:]]*let hotkey = Shortcut::new(/,+3d' src-tauri/src/lib.rs
+          sed -i "s|export const DEFAULT_SYNC_SERVER_URL = .*|export const DEFAULT_SYNC_SERVER_URL = 'http://127.0.0.1:18320';|" src/config/sync.ts
+          STAGING_ID="$id" node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'src-tauri/tauri.conf.json';
+          const conf = JSON.parse(readFileSync(path, 'utf8'));
+          conf.identifier = process.env.STAGING_ID;
+          conf.productName = 'SLAG staging';
+          for (const win of conf.app.windows) win.title = 'SLAG staging';
+          for (const key of ['csp', 'devCsp']) {
+            conf.app.security[key] = conf.app.security[key].replace(/connect-src [^;]+/, "connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:18320 ws://127.0.0.1:18320");
+          }
+          writeFileSync(path, JSON.stringify(conf));
+          JS
+      - run: pnpm exec tauri build --ci --no-bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slag-staging-${{ matrix.platform }}
+          path: src-tauri/target/release/${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 7
