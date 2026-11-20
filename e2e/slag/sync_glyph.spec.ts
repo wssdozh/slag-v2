@@ -1,95 +1,59 @@
 import { test, expect } from '../support/selfhostFixture';
 
-const SHOT_DIR = 'test-results/screenshots';
-
-/**
- * The rail's sync glyph is the first place a person looks for "is it fine".
- *
- * One arrow for every state used to answer that with a colour nobody has memorised. These checks
- * pin the shape, not the class: `data-icon` is the registry name, so a rewritten palette does not
- * silently turn a divergence into a check mark.
- */
-test('the sidebar glyph names the sync state', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 1000 });
+test('the sidebar keeps ordinary exchange quiet and opens the last known device reports on hover', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
-
-  const button = page.locator('[data-testid="sidebar-sync-btn"]');
-  await expect(button).toBeVisible();
-
-  const apply = async (patch: Record<string, unknown>) => {
-    await page.evaluate(async (next) => {
-      const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
-      Object.assign(syncEngine.status, next);
-      syncEngine.notify();
-    }, patch);
-  };
-
-  // Connecting: the only state that spins.
-  await apply({ state: 'syncing', manifest: undefined });
+  const button = page.getByTestId('sidebar-sync-btn');
+  const panel = page.getByTestId('sidebar-sync-status');
+  const icon = button.locator('[data-icon]');
+  await expect(button).toBeVisible({ timeout: 120_000 });
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.config.trustedDevices = [
+      { id: 'phone', name: 'телефон', platform: 'mobile', isCurrent: false, pairedAt: '', lastSeenAt: '' },
+      { id: 'laptop', name: 'ноутбук', platform: 'desktop', isCurrent: false, pairedAt: '', lastSeenAt: '' },
+    ];
+    Object.assign(syncEngine.status, {
+      state: 'connected', authRequired: false,
+      manifest: { at: '2026-11-20T10:58:00Z', root: 'pc', remoteRoot: 'older', inSync: false, action: 'report', trigger: 'push', folders: [], extra: [], missing: [], peers: [
+        { deviceId: 'phone', anonymous: false, root: 'older', inSync: false, at: Date.parse('2026-11-20T10:57:00Z'), extra: [], missing: [] },
+        { deviceId: null, anonymous: true, root: 'legacy', inSync: false, extra: [], missing: [] },
+      ] },
+    });
+    syncEngine.notify();
+  });
+  await expect(icon).toHaveAttribute('data-icon', 'system.sync');
+  const normalClass = await icon.getAttribute('class');
+  const changeState = (state: string) => page.evaluate(async (next) => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    Object.assign(syncEngine.status, { state: next });
+    syncEngine.notify();
+  }, state);
+  await changeState('syncing');
   await expect(button).toHaveAttribute('data-sync-state', 'syncing');
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.sync');
-
-  // Both copies agree.
-  await apply({ state: 'connected', manifest: undefined });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncOk');
-  await expect(button).toHaveAttribute('title', /Синхронизировано/);
-
-  // Connected, yet the last comparison says the vaults differ — the case a spinner cannot show.
-  await apply({
-    state: 'connected',
-    manifest: {
-      at: new Date().toISOString(),
-      root: 'aaaa1111',
-      remoteRoot: 'bbbb2222',
-      inSync: false,
-      folders: [],
-      extra: ['item_left_behind'],
-      missing: [],
-      action: 'report',
-      trigger: 'push',
-      peers: [{ deviceId: 'peer-device', anonymous: false, root: 'bbbb2222', inSync: false, extra: ['item_left_behind'], missing: [] }],
-    },
-  });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncDiverged');
-  await expect(button).toHaveAttribute('title', /Копии разошлись/);
-  await expect(button.locator('[data-icon]')).toHaveClass(/text-danger/);
-
-  // The room's old frozen row disagrees forever: "no data about the peer", not an alert.
-  await apply({
-    state: 'connected',
-    manifest: {
-      at: new Date().toISOString(),
-      root: 'aaaa1111',
-      remoteRoot: 'cccc3333',
-      inSync: false,
-      folders: [],
-      extra: [],
-      missing: [],
-      action: 'none',
-      trigger: 'push',
-      peers: [{ deviceId: null, anonymous: true, root: 'cccc3333', inSync: false, extra: [], missing: [] }],
-    },
-  });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.sync');
-  await expect(button).toHaveAttribute('title', /нет данных о соседе/);
-  await expect(button.locator('[data-icon]')).toHaveClass(/text-fg-secondary/);
-
-  await page.waitForTimeout(250);
-  await page.screenshot({ path: `${SHOT_DIR}/sidebar-sync-diverged.png`, clip: { x: 0, y: 860, width: 260, height: 140 } });
-
-  // No relay at all.
-  await apply({ state: 'offline', manifest: undefined, authRequired: false, isAuthenticated: false });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncOffline');
-  await expect(button).toHaveAttribute('title', /офлайн/);
-
-  // Broken, not merely absent.
-  await apply({ state: 'error', error: 'Сервер не ответил' });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncError');
-  await expect(button).toHaveAttribute('title', /Ошибка синхронизации: Сервер не ответил/);
-
-  // Switched off.
-  await apply({ state: 'idle', error: null, manifest: undefined });
-  await expect(button.locator('[data-icon]')).toHaveAttribute('data-icon', 'system.syncIdle');
-  await expect(button).toHaveAttribute('title', /выключена/);
+  await expect(icon).toHaveClass(normalClass!);
+  await expect(panel).toBeHidden();
+  await button.hover();
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText('телефон', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Копии различались')).toBeVisible();
+  await expect(panel.getByText('Сводка:', { exact: false })).toBeVisible();
+  await expect(panel.getByText('ноутбук', { exact: true })).toBeVisible();
+  await expect(panel.getByText('Нет сохранённой сводки')).toBeVisible();
+  await expect(panel.getByText('Есть старая сводка без имени устройства.')).toBeVisible();
+  await panel.hover();
+  await expect(panel).toHaveCSS('opacity', '1');
+  await page.screenshot({ path: 'test-results/screenshots/sidebar-sync-status.png', clip: { x: 0, y: 585, width: 380, height: 315 } });
+  await page.mouse.move(800, 400);
+  await expect(panel).toBeHidden();
+  await button.focus();
+  await expect(panel).toBeVisible();
+  await button.press('Escape');
+  await expect(panel).toBeHidden();
+  await button.press('Enter');
+  await expect(panel).toBeVisible();
+  await page.getByTestId('sidebar-sync-open-settings').click();
+  await expect(page.getByTestId('settings-tab-sync')).toBeVisible();
+  await changeState('error');
+  await expect(icon).toHaveAttribute('data-icon', 'system.syncError');
 });

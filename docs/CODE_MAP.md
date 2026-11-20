@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110520**, зон: **48**.
+Модулей: **630**, строк: **110536**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,7 +12,7 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1736 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1558 | 25 |
+| `src/lib/sync/syncEngine.ts` | 1560 | 26 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/storage/index.ts` | 1020 | 44 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
 | `src/types/index.ts` | 686 | 225 |
 
-## e2e (playwright) — 132 файлов, 24761 строк
+## e2e (playwright) — 133 файлов, 24754 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -313,13 +313,14 @@
 | `vault/usageTone.ts` | 20 | 2 | SEGMENT_TONE, toneOf, MEDIA_SEGMENT_IDS | Tones for the storage ring: one token pair per sector, no colour invented in … |
 | `VaultSettingsTab.tsx` | 76 | 1 | VaultSettingsTab | The vault tab: the disk, the backups, the way out. On a desktop the rail owns… |
 
-## src/components/Sidebar — 3 файлов, 628 строк
+## src/components/Sidebar — 4 файлов, 644 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `FolderTree.tsx` | 356 | 1 | FolderTree | Nested folder tree in the sidebar: expand, select, and drag — a note lands in… |
-| `Sidebar.tsx` | 191 | 1 | Sidebar | Left rail: vault switcher, folder tree, inbox, sync state and settings shortc… |
-| `syncGlyph.ts` | 81 | 1 | SyncGlyph, syncGlyph | The rail's sync glyph: one shape per state. |
+| `Sidebar.tsx` | 175 | 1 | Sidebar | Left rail: vault switcher, folder tree, inbox, sync state and settings shortc… |
+| `syncGlyph.ts` | 26 | 1 | syncGlyph | Keep the rail quiet during background traffic; comparison details belong in t… |
+| `SyncStatusButton.tsx` | 87 | 1 | SyncStatusButton | The sidebar shows saved comparison data; it never infers device presence from… |
 
 ## src/components/UI — 37 файлов, 6728 строк
 
@@ -333,7 +334,7 @@
 | `DatePickerPopover.tsx` | 305 | 1 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
 | `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
-| `icons/Icon.tsx` | 109 | 146 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
+| `icons/Icon.tsx` | 109 | 147 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
 | `icons/icons.ts` | 522 | 19 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 87 | 1 | InfoHintProps, InfoHint | One question mark for every explanation in the app. |
@@ -630,7 +631,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10165 строк
+## src/lib/sync — 46 файлов, 10172 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -652,12 +653,12 @@
 | `itemDeletions.ts` | 33 | 1 | ItemDeletion, deletionsFromOutbox | Which notes a push announces as gone. |
 | `localBookkeeping.ts` | 550 | 6 | SYNC_SECTION, SyncScope, stateHashKey, tombstonesKey, sentHashesKey, +33 | What this device sent, knows and deleted — read from `state.json`'s `sync` se… |
 | `manifest/channel.ts` | 244 | 5 | WIRE_VERSION, MAX_WIRE_BYTES, WireBody, PeerManifest, toWire, +9 | How a manifest crosses the wire: shape, validation, comparison. |
-| `manifest/peers.ts` | 142 | 2 | manifestRoomUrl, parsePeerManifests, readPeerManifests, requestMissingNotes | Who else in this room published a root, and what to ask them for. |
+| `manifest/peers.ts` | 143 | 2 | manifestRoomUrl, parsePeerManifests, readPeerManifests, requestMissingNotes | Who else in this room published a root, and what to ask them for. |
 | `manifest/prefs.ts` | 30 | 3 | readManifestAutoCheck, writeManifestAutoCheck, readManifestAutoResolve, writeManifestAutoResolve | Whether this device compares its vault root with the room on its own, and whe… |
 | `manifest/publish.ts` | 37 | 1 | publishManifest | Writes this device's own manifest row into the room. |
 | `manifest/resolve.ts` | 76 | 1 | RESOLVE_MAX, ResolveInput, decideResolve, resolveRejected | What to do with the notes the room says it does not have. |
 | `manifest/schedule.ts` | 91 | 1 | scheduleManifestCheck, requestManifestCheck, clearManifestCheck | When the room is compared: one timer, the earliest deadline anybody asked for. |
-| `manifest/sync.ts` | 121 | 2 | trashRejectedNotes, getManifest, syncManifest | The room's own copy of this vault's manifest: build → peers → decide → react … |
+| `manifest/sync.ts` | 123 | 2 | trashRejectedNotes, getManifest, syncManifest | The room's own copy of this vault's manifest: build → peers → decide → react … |
 | `notes/bootstrap.ts` | 75 | 0 | BootstrapCopy, planBootstrap, sealBootstrap | Runs on a trusted client (or local migration tool), never at the relay with d… |
 | `notes/channel.ts` | 68 | 2 | NoteHttpError, NoteChannel | HTTP catch-up and fallback share the room's existing account authorization. |
 | `notes/conflicts.ts` | 14 | 2 | keepRelayOnConflict, setKeepRelayOnConflict, archiveNoteConflict |  |
@@ -673,12 +674,12 @@
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
 | `pushBundle.ts` | 370 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1558 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 1560 | 26 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 46 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
 | `transport.ts` | 279 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
-| `types.ts` | 211 | 31 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
+| `types.ts` | 213 | 31 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
 | `vaultSharing.ts` | 85 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
 
 ## src/lib/tasks — 2 файлов, 166 строк

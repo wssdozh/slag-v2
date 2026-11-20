@@ -1517,6 +1517,8 @@ export class SyncEngine {
     this.activeVaultKey = null;
     this.activeRoomId = null;
     this.status.currentRoomId = null;
+    this.status.manifest = undefined;
+    this.status.lastSyncTime = null;
     this.status.state = 'idle';
     this.notify();
   }

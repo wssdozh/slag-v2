@@ -8,7 +8,7 @@ import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import type { SyncStatus } from '../../lib/sync/types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Icon } from '../UI/icons/Icon';
-import { syncGlyph } from './syncGlyph';
+import { SyncStatusButton } from './SyncStatusButton';
 export const Sidebar: React.FC = () => {
   const {
     vault,
@@ -55,7 +55,6 @@ export const Sidebar: React.FC = () => {
   }, [isVaultDropdownOpen]);
 
   const inboxItemsCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
-  const glyph = syncGlyph(syncStatus);
 
   return (
     <aside
@@ -148,22 +147,7 @@ export const Sidebar: React.FC = () => {
           position="bottom"
         />
 
-        {/* Sync Status button: the glyph itself carries the state, no status dot on top of it */}
-        <button
-          onClick={() => openSettingsModal('sync')}
-          className="p-1.5 rounded hover:bg-tint-6 transition-colors shrink-0 cursor-pointer"
-          title={glyph.title}
-          aria-label={glyph.title}
-          data-testid="sidebar-sync-btn"
-          data-sync-state={syncStatus.state}
-        >
-          <Icon
-            name={glyph.name}
-            size="md"
-            tone="inherit"
-            className={`transition-colors ${glyph.className}`}
-          />
-        </button>
+        <SyncStatusButton status={syncStatus} vaultId={vault.syncId ?? vault.id} onSettings={() => openSettingsModal('sync')} />
 
         {/* Logs HUD button */}
         <button

@@ -35,7 +35,7 @@ function manifestStatus(
     peers: peers.map((peer): ManifestPeerStatus => {
       const drift = diffWire(local, peer);
       return {
-        deviceId: peer.deviceId, anonymous: peer.deviceId === null, root: peer.root,
+        deviceId: peer.deviceId, anonymous: peer.deviceId === null, at: peer.at, root: peer.root,
         inSync: drift.rootMatch, extra: drift.extra, missing: drift.missing,
       };
     }),
@@ -70,7 +70,8 @@ export async function syncManifest(
   if (generation !== engine.initGeneration) return;
 
   // Read the peers BEFORE publishing: a POST first leaves this device reading its own row back.
-  const peers = await readPeerManifests(engine);
+  const observedPeers = await readPeerManifests(engine);
+  const peers = observedPeers ?? [];
   if (generation !== engine.initGeneration) return;
 
   const wire = toWire(local);
@@ -98,7 +99,7 @@ export async function syncManifest(
     if (generation !== engine.initGeneration) return;
     if (published) engine.manifestPostedRoot = local.root;
   }
-  engine.status.manifest = manifestStatus(local, peers, decision, trigger);
+  if (observedPeers) engine.status.manifest = manifestStatus(local, observedPeers, decision, trigger);
   engine.notify();
 
   // Named notes are asked for by id; the answer is an ordinary bundle, not a second path in.
@@ -108,7 +109,8 @@ export async function syncManifest(
   }
 
   if (!published) syncLog.debug(`${describeWire(wire)} не записан; сверка подождёт следующей попытки`);
-  else if (peers.length === 0) syncLog.info(`${describeWire(wire)} записан; других устройств в комнате пока нет`);
+  else if (observedPeers === null) return;
+  else if (peers.length === 0) syncLog.info(`${describeWire(wire)} записан; сводок других устройств пока нет`);
   else if (decision.action === 'none') syncLog.info(`${describeWire(wire)}; корень сходится с соседями`);
   // Debug, not warn: a device that cannot converge writes this every check interval.
   else if (decision.action === 'report') syncLog.debug(`${describeWire(wire)}; корень расходится с соседом`);

@@ -65,6 +65,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     const sidebarSyncBtn = page.locator('[data-testid="sidebar-sync-btn"]');
     await expect(sidebarSyncBtn).toBeVisible({ timeout: 10000 });
     await sidebarSyncBtn.click();
+    await page.getByTestId('sidebar-sync-open-settings').click();
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
@@ -97,7 +98,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     await expect(pairModal).not.toBeVisible();
 
     // Close settings modal to inspect sidebar
-    const closeSettingsBtn = settingsModal.locator('button').first();
+    const closeSettingsBtn = settingsModal.getByRole('button', { name: 'Закрыть', exact: true });
     await closeSettingsBtn.click();
 
     // Verify current vault name in sidebar is now 'Удалённые проекты 🔒'
@@ -111,6 +112,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
 
     // 6. Test Scenario 2: Repeat pairing with the SAME vaultId (should MERGE, not create a 3rd vault)
     await sidebarSyncBtn.click();
+    await page.getByTestId('sidebar-sync-open-settings').click();
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
     await settingsModal.getByTestId('settings-tab-devices').click();
     await pairBtn.click();
@@ -194,6 +196,7 @@ test.describe('Sync Vault Isolation and Merge Flow', () => {
     // Open settings, switch to the "Устройства" tab and open the pair modal
     const sidebarSyncBtn = page.locator('[data-testid="sidebar-sync-btn"]');
     await sidebarSyncBtn.click();
+    await page.getByTestId('sidebar-sync-open-settings').click();
 
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await settingsModal.getByTestId('settings-tab-devices').click();

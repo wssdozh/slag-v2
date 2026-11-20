@@ -42,8 +42,9 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       fullPage: false,
     });
 
-    // 3. Clicking sidebar-sync-btn directly opens Settings on "Синхронизация" tab
+    // 3. The status panel links to the sync tab.
     await sidebarSyncBtn.click();
+    await page.getByTestId('sidebar-sync-open-settings').click();
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 

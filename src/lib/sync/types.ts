@@ -40,6 +40,8 @@ export interface ManifestPeerStatus {
   deviceId: string | null;
   /** True for the room's frozen single row: compared, never acted on. */
   anonymous: boolean;
+  /** When the relay saved this report, not when the device was last online. */
+  at?: number | null;
   root: string;
   inSync: boolean;
   extra: string[];

@@ -83,19 +83,20 @@ export function parsePeerManifests(raw: unknown): PeerManifest[] {
 /**
  * The other devices' manifests, or an empty list when there is nothing to compare against.
  *
- * `204` is "you already have the latest syncId", `404` is "nobody published yet": both mean the
- * room answered nothing, and neither is worth an error in the panel.
+ * `null` means no new observation (not modified or a failed read). A 404 for a missing
+ * manifest is an empty room, not a transport failure.
  */
-export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifest[]> {
+export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifest[] | null> {
   try {
     const response = await fetch(manifestRoomUrl(engine, engine.config.deviceId), {
       headers: authHeaders(engine),
       signal: AbortSignal.timeout(SYNC_INTERVALS.MANIFEST_TIMEOUT_MS),
     });
-    if (response.status === 204 || response.status === 404) return [];
+    if (response.status === 204) return null;
+    if (response.status === 404) return [];
     if (!response.ok) {
       syncLog.debug(`Манифесты соседей не прочитаны: HTTP ${response.status}`);
-      return [];
+      return null;
     }
     // A row naming this device is this device: comparing it with ourselves is the "in sync" lie
     // that shipped in dev.37, so it never counts as a peer.
@@ -104,7 +105,7 @@ export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifes
     );
   } catch (error) {
     syncLog.debug('Манифесты соседей не прочитаны: сервер не ответил', { error: String(error) });
-    return [];
+    return null;
   }
 }
 
