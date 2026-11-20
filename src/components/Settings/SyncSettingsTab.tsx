@@ -5,12 +5,26 @@ import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
+import { keepRelayOnConflict, setKeepRelayOnConflict } from '../../lib/sync/notes/conflicts';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
+  const [, renderConflictSetting] = useState(0);
+  const vaultId = syncEngine.currentVaultId;
+  const keepRelay = keepRelayOnConflict(vaultId);
+
+  const changeConflictSetting = async (enabled: boolean) => {
+    if (enabled && !await confirmAction({
+      title: 'Не сохранять отклонённые правки?',
+      description: 'Совместимые правки по-прежнему объединятся. При настоящем конфликте останется версия релея, а отвергнутая правка не попадёт в локальную историю. Уже сохранённая история не удалится.',
+      confirmLabel: 'Оставлять версию релея', isDestructive: true,
+    })) return;
+    setKeepRelayOnConflict(vaultId, enabled);
+    renderConflictSetting((revision) => revision + 1);
+  };
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
@@ -94,6 +108,13 @@ export const SyncSettingsTab: React.FC = () => {
           { value: '10', label: '10 мин', testId: 'sync-interval-10' },
           { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
         ]} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Конфликты заметок">
+        <SettingsRow label="В конфликте оставлять версию релея"
+          description={keepRelay ? 'Отклонённые правки не сохраняются. Совместимые правки объединяются.' : 'Отклонённые правки сохраняются в локальной истории, а не в ленте.'}
+          right={<SettingsSwitch checked={keepRelay} onChange={(enabled) => void changeConflictSetting(enabled)} label="В конфликте оставлять версию релея" />}
+        />
       </SettingsGroup>
 
       <SettingsGroup title="Безопасность">

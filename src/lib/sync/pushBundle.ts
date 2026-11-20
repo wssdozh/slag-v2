@@ -50,12 +50,13 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
     try {
       // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
       // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
-      const items = stripAttachmentData(vault().getItems());
+      const registry = Boolean(engine.noteGeneration);
+      const items = !registry || engine.canPackAttachment() ? stripAttachmentData(vault().getItems()) : [];
       const folders = vault().getFolders();
       const workspaceState = vault().getWorkspaceState();
-      const pendingOps = engine.getOutbox().pending();
+      const pendingOps = engine.getBundleOutbox();
 
-      const stateHash = await computeStateRootHash(items, folders);
+      const stateHash = await computeStateRootHash(registry ? [] : items, folders);
       if (generation !== engine.initGeneration) return;
       const lastSyncedHash = loadStateHash(engine.bookkeeping);
 
@@ -103,7 +104,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // Stringify + SHA-256 of every note on every keystroke is the only O(vault) work in
       // the push path (11 ms at 50 notes, 182 ms at 5000). `updatedAt` is bumped by every
       // storage mutation, so it is a cheap change signature: hash only what moved.
-      for (const item of items) {
+      for (const item of registry ? [] : items) {
         const cacheKey = `item:${item.id}`;
         const sig = `${item.updatedAt ?? 0}:${item.title?.length ?? 0}:${item.content?.length ?? 0}`;
         const cached = engine.entityHashes.get(cacheKey);
@@ -241,7 +242,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       }
       // A note that exists is not deleted, whatever the ledger says: the tombstone only ever guards
       // a stale copy from coming back.
-      for (const id of items.map((it) => it.id)) {
+      for (const id of (registry ? [] : items).map((it) => it.id)) {
         delete tombstones[id];
       }
 

@@ -4,7 +4,8 @@ import type { AcceptedNote, NoteMutation } from '../../storage/noteRegistry';
 import { NoteChannel } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settleNote } from './journal.ts';
 import type { JournalAttempt, NoteBase, NoteIntent, NoteJournal } from './journal.ts';
-import { mergeNote, sameNote } from './merge.ts';
+import { mergeNote, relayNote, sameNote } from './merge.ts';
+import { isNoteItem } from './wire.ts';
 import { NOTE_BATCH_BYTES, NOTE_BATCH_COUNT, openNote, opaqueNoteId, parseLiveNoteEvents, parseNoteResults, sealNote } from './wire.ts';
 import type { NoteHead, NoteKeys, NoteOp, NoteResult, NoteResults } from './wire.ts';
 
@@ -19,7 +20,7 @@ export interface NoteConflict {
 }
 
 interface NoteReplicaHost {
-  channel: NoteChannel;
+  channel: Pick<NoteChannel, 'events' | 'heads' | 'send'>;
   room: string;
   generation: number;
   keys: NoteKeys;
@@ -43,7 +44,9 @@ function candidate(intent: NoteIntent, head: NoteBase | undefined): Candidate {
   const { base, kind, item } = intent;
   const current = head?.item ?? null;
   if (!base && !intent.attempt) throw new Error('Неизвестна исходная версия заметки; правка осталась в очереди');
-  if (sameNote(item, current)) return { item, kind, conflicts: [], skip: true };
+  if (sameNote(item, current) || (kind === 'update' && base && sameNote(base.item, item))) {
+    return { item: current, kind, conflicts: [], skip: true };
+  }
   if (!head && kind === 'create') return { item, kind, conflicts: [] };
   if (!head) throw new Error('Эталон заметки не найден; правка осталась в очереди');
   if (kind === 'restore' && current === null && base?.revision === head.revision) return { item, kind, conflicts: [] };
@@ -61,14 +64,19 @@ export class NoteReplica {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private sending = false;
   private pulling: Promise<void> | undefined;
+  private pullRetry: ReturnType<typeof setTimeout> | undefined;
   private results: { id: string; receive: (value: NoteResults | null) => void } | undefined;
   private ready = false;
+  private applyingBatch = false;
   private staleCounts = new Map<string, number>();
 
-  constructor(private readonly host: NoteReplicaHost, state = emptyJournal()) {
+  private readonly host: NoteReplicaHost;
+  constructor(host: NoteReplicaHost, state = emptyJournal()) {
+    this.host = host;
     this.state = state;
     host.signal.addEventListener('abort', () => {
       clearTimeout(this.timer);
+      clearTimeout(this.pullRetry);
       this.results?.receive(null);
     }, { once: true });
   }
@@ -87,8 +95,25 @@ export class NoteReplica {
   private async persist(state: NoteJournal) {
     this.host.signal.throwIfAborted();
     if (state === this.state) return;
-    await this.host.save(state);
+    if (!this.applyingBatch) await this.host.save(state);
     this.state = state;
+  }
+
+  // One durable snapshot per frame/page. A write failure rolls the cursor and journal back;
+  // addressed disk application and conflict archival can safely replay the same operations.
+  private async batch(apply: () => Promise<void>) {
+    const original = this.state;
+    this.applyingBatch = true;
+    try {
+      await apply();
+      this.host.signal.throwIfAborted();
+      if (this.state !== original) await this.host.save(this.state);
+    } catch (error) {
+      this.state = original;
+      throw error;
+    } finally {
+      this.applyingBatch = false;
+    }
   }
 
   record(changes: NoteMutation[]): Promise<void> {
@@ -99,6 +124,18 @@ export class NoteReplica {
       this.schedule();
     });
     return run.catch((err: unknown) => { this.error(err); throw err; });
+  }
+
+  recordExternal(event: { id: string; action: string; payload?: SlagItem; previous?: SlagItem }): Promise<void> {
+    if (event.action === 'delete') {
+      if (!confirmedNote(this.state, event.id)?.item) return Promise.resolve();
+      return this.record([{ id: event.id, kind: 'delete', item: null, previous: event.previous }]);
+    }
+    if ((event.action !== 'upsert' && event.action !== 'conflict') || !event.payload) return Promise.resolve();
+    const item = relayNote(event.payload);
+    if (!isNoteItem(item) || item.id !== event.id) return Promise.reject(new Error('Invalid note from disk watcher'));
+    const head = confirmedNote(this.state, event.id);
+    return this.record([{ id: event.id, kind: head ? 'update' : 'create', item, previous: event.previous }]);
   }
 
   private error(error: unknown) {
@@ -123,9 +160,13 @@ export class NoteReplica {
       }
       const data = parseLiveNoteEvents(message);
       if (data.generation !== this.host.generation) return;
-      void this.applyEvents(data.events).then((gap) => gap ? this.catchUp() : undefined).catch((err: unknown) => this.error(err));
+      void this.applyEvents(data.events).then((gap) => gap ? this.catchUp() : undefined).catch((err: unknown) => {
+        this.error(err);
+        this.retryPull();
+      });
     } catch (err) {
       this.error(err);
+      this.retryPull();
     }
   }
 
@@ -161,20 +202,34 @@ export class NoteReplica {
 
   private async applyEvents(events: NoteHead[]): Promise<boolean> {
     let gap = false;
-    await this.enqueue(async () => {
+    await this.enqueue(() => this.batch(async () => {
       for (const head of events) {
         if (head.revision <= this.state.cursor) continue;
         if (head.revision !== this.state.cursor + 1) { gap = true; break; }
         await this.accept(head);
         await this.persist({ ...this.state, cursor: head.revision });
       }
-    });
+    }));
     return gap;
   }
 
+  private retryPull() {
+    if (this.pullRetry || this.host.signal.aborted) return;
+    this.pullRetry = setTimeout(() => {
+      this.pullRetry = undefined;
+      void this.catchUp().catch((error: unknown) => this.error(error));
+    }, RETRY_MS);
+  }
+
   catchUp(manual = false): Promise<void> {
-    if (this.pulling) return this.pulling;
-    this.pulling = this.pull(manual).finally(() => { this.pulling = undefined; });
+    if (this.pulling) return manual ? this.pulling.then(() => this.catchUp(true)) : this.pulling;
+    this.pulling = this.pull(manual).then(() => {
+      clearTimeout(this.pullRetry);
+      this.pullRetry = undefined;
+    }, (error: unknown) => {
+      this.retryPull();
+      throw error;
+    }).finally(() => { this.pulling = undefined; });
     return this.pulling;
   }
 
@@ -184,7 +239,7 @@ export class NoteReplica {
       const page = await this.host.channel.heads(this.host.generation, after, since, through);
       if (page.generation !== this.host.generation) throw new Error('Wrong registry generation');
       if (page.floor > through) return false;
-      await this.enqueue(async () => {
+      await this.enqueue(() => this.batch(async () => {
         let previous = after;
         for (const head of page.heads) {
           if (head.noteId <= previous || head.revision <= since || head.revision > through) throw new Error('Invalid registry scan order');
@@ -192,7 +247,7 @@ export class NoteReplica {
           previous = head.noteId;
         }
         if (page.next !== null && (page.next <= after || page.next !== previous)) throw new Error('Registry scan did not advance');
-      });
+      }));
       if (page.next === null) break;
       after = page.next;
     }
@@ -225,6 +280,7 @@ export class NoteReplica {
     let operations: NoteOp[] = [];
     let firstError: unknown;
     await this.enqueue(async () => {
+      const attempts = new Map<string, JournalAttempt>();
       const planned: NoteOp[] = [];
       let bytes = 0;
       for (const intent of firstPerNote(this.state)) {
@@ -246,7 +302,7 @@ export class NoteReplica {
           }
           const size = JSON.stringify(attempt.op).length;
           if (planned.length && bytes + size > NOTE_BATCH_BYTES) break;
-          if (!intent.attempt) await this.persist(setAttempt(this.state, intent.intentId, attempt));
+          if (!intent.attempt) attempts.set(intent.intentId, attempt);
           planned.push(attempt.op);
           bytes += size;
           if (planned.length === NOTE_BATCH_COUNT) break;
@@ -254,6 +310,10 @@ export class NoteReplica {
           firstError ??= err;
         }
       }
+      if (attempts.size) await this.persist({ ...this.state, pending: this.state.pending.map((intent) => {
+        const attempt = attempts.get(intent.intentId);
+        return attempt ? { ...intent, attempt } : intent;
+      }) });
       operations = planned;
     });
     if (firstError && !operations.length) throw firstError;

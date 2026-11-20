@@ -84,10 +84,10 @@ export class SyncTransport {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
-  public send(data: string | Uint8Array): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(data instanceof Uint8Array ? data.slice().buffer : data);
-    }
+  public send(data: string | Uint8Array): boolean {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(data instanceof Uint8Array ? data.slice().buffer : data);
+    return true;
   }
 
   public async sendAck(options: SendAckOptions): Promise<void> {

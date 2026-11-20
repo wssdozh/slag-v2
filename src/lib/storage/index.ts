@@ -98,15 +98,13 @@ import {
 export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 
 /**
- * Who wrote the change. `local` is the app's own edit and the only value the sync engine packs
- * into an operation; `remote` is an incoming bundle; `external` is a file that changed on disk
- * under us — the MCP server, an outside editor — and is never re-pushed, or the relay would echo
- * the same note back and the two devices would ping-pong it forever.
+ * `local` came from the app, `remote` from sync, `external` from the disk watcher. Registry
+ * rooms may turn an external note edit into an intent if it differs from the known note.
  */
 export type StorageOrigin = 'local' | 'remote' | 'external';
 
 export type StorageChangeEvent =
-  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; origin?: StorageOrigin }
+  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: StorageOrigin }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: StorageOrigin }
@@ -246,10 +244,17 @@ export class StorageService {
     return Promise.all([...this.noteIntentListeners].map((listener) => listener(changes))).then(() => undefined);
   }
 
+  private serializeNoteWrite(write: () => Promise<void>): Promise<void> {
+    const run = this.noteFileWrite.then(write, write);
+    this.noteFileWrite = run;
+    return run;
+  }
+
   public queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void> {
     if (!before) return write();
-    const run = Promise.all([before, this.noteFileWrite.catch(() => undefined)]).then(write);
-    this.noteFileWrite = run;
+    // Enter the disk queue only after the journal is durable. A remote apply can itself hold the
+    // journal lock; awaiting an uncommitted intent in the disk queue would deadlock both.
+    const run = before.then(() => this.serializeNoteWrite(write));
     void run.catch((error: unknown) => fsLog.error('Could not persist note intent or note file', error));
     return run;
   }
@@ -266,8 +271,18 @@ export class StorageService {
     else localStorage.setItem(`slag_note_registry_${this.currentVault.id}`, JSON.stringify(value));
   }
 
-  public async applyAcceptedNote({ id, item }: AcceptedNote): Promise<void> {
+  public async writeNoteConflict(id: string, value: unknown): Promise<void> {
+    if (isTauri()) await this.files.writeNoteConflict(this.currentVault, id, value);
+    else localStorage.setItem(`slag_note_conflict_${this.currentVault.id}_${id}`, JSON.stringify(value));
+  }
+
+  public applyAcceptedNote(note: AcceptedNote): Promise<void> {
     const vault = this.currentVault;
+    return this.serializeNoteWrite(() => this.writeAcceptedNote(note, vault));
+  }
+
+  private async writeAcceptedNote({ id, item }: AcceptedNote, vault: VaultMeta): Promise<void> {
+    if (vault.id !== this.currentVault.id) throw new Error('Vault changed before applying note');
     const previous = this.getItemById(id);
     if (!item && !previous) return;
     const applied = item ? { ...item, filename: getSafeNoteFilename(item.title, id) } : null;
@@ -547,7 +562,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     }
 
     const before = origin === 'local' ? this.persistNoteIntents([{
-      id: updatedItem.id, kind: restoring ? 'restore' : oldItem ? 'update' : 'create', item: updatedItem,
+      id: updatedItem.id, kind: restoring ? 'restore' : oldItem ? 'update' : 'create', item: updatedItem, previous: oldItem,
     }]) : undefined;
     const vault = this.currentVault;
     this.attachments.persistNew([updatedItem]);
@@ -615,7 +630,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       }
     }
     const before = origin === 'local' ? this.persistNoteIntents([...saveMap.values()].map((item) => ({
-      id: item.id, kind: oldItemsMap.has(item.id) ? 'update' : 'create', item,
+      id: item.id, kind: oldItemsMap.has(item.id) ? 'update' : 'create', item, previous: oldItemsMap.get(item.id),
     }))) : undefined;
     const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);
@@ -658,17 +673,17 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const cached = byId.get(item.id);
       if (cached && cached.updatedAt === item.updatedAt && cached.content === item.content) continue;
       byId.set(item.id, item);
-      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, origin: 'external' });
+      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, previous: cached, origin: 'external' });
     }
 
     let removed = 0;
     for (const relativePath of missing) {
       const normalized = relativePath.replace(/\\/g, '/');
       const gone = current.find(item => `${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename ?? ''}` === normalized);
-      if (!gone) continue;
+      if (!gone || parsed.some((item) => item.id === gone.id)) continue;
       byId.delete(gone.id);
       removed++;
-      events.push({ kind: 'item', action: 'delete', id: gone.id, origin: 'external' });
+      events.push({ kind: 'item', action: 'delete', id: gone.id, previous: gone, origin: 'external' });
     }
 
     if (events.length === 0) return { updated: 0, removed: 0 };

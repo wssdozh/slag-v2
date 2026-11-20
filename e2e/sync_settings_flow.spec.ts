@@ -73,6 +73,17 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       fullPage: false,
     });
 
+    const conflictSwitch = settingsModal.getByRole('switch', { name: 'В конфликте оставлять версию релея' });
+    await expect(conflictSwitch).not.toBeChecked();
+    await conflictSwitch.click();
+    await expect(page.getByText('Не сохранять отклонённые правки?', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Оставлять версию релея', exact: true }).click();
+    await expect(conflictSwitch).toBeChecked();
+    await conflictSwitch.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'test-results/screenshots/sync-note-conflicts.png' });
+    await conflictSwitch.click();
+    await expect(conflictSwitch).not.toBeChecked();
+
     // 6. Test Background Sync Interval (Battery Saver)
     const intervalSelect = settingsModal.locator('[data-testid="sync-interval-select"]');
     await expect(intervalSelect).toBeVisible();

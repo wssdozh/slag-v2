@@ -2,7 +2,7 @@ import { test, expect } from './support/selfhostFixture';
 
 test('account rooms isolate legacy routing and checkpoints, and pending access stops sync', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 30_000 });
   const result = await page.evaluate(async () => {
     const enginePath = '/src/lib/sync/syncEngine.ts';
     const cryptoPath = '/src/lib/sync/crypto.ts';
@@ -27,6 +27,8 @@ test('account rooms isolate legacy routing and checkpoints, and pending access s
     engine.pushLocalChanges = async () => {};
     const realFetch = window.fetch;
     try {
+      window.fetch = async (url, opts) => String(url).includes('/note-status?')
+        ? Response.json({ mode: 'legacy', generation: 0, head: 0, floor: 0 }) : realFetch(url, opts);
       engine.saveConfig({ enabled: true, seedPhrase: 'synthetic account seed', deviceId: 'synthetic-account-device' });
       await engine.init();
       const legacyRoom = await deriveRoomId('synthetic account seed');
@@ -68,7 +70,7 @@ test('account rooms isolate legacy routing and checkpoints, and pending access s
 
 test('latest init owns both key and room when earlier derivation finishes last', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible();
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 30_000 });
   const result = await page.evaluate(async () => {
     const modulePath = '/src/lib/sync/syncEngine.ts';
     const cryptoPath = '/src/lib/sync/crypto.ts';

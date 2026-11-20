@@ -1,0 +1,57 @@
+// Runs on a trusted client (or local migration tool), never at the relay with decrypted notes.
+import type { SlagItem } from '../../../types/index.ts';
+import { relayNote, sameNote } from './merge.ts';
+import { opaqueNoteId, sealNote } from './wire.ts';
+import type { NoteKeys, NoteOp } from './wire.ts';
+
+export interface BootstrapCopy {
+  deviceId: string;
+  hydrated: boolean;
+  pendingIds: readonly string[];
+  live: readonly SlagItem[];
+  tombstones: readonly string[];
+  trash: readonly SlagItem[];
+}
+
+export function planBootstrap(requiredDevices: readonly string[], copies: readonly BootstrapCopy[]) {
+  const blockers: { reason: string; id: string }[] = [];
+  const candidates = new Map<string, SlagItem | null>();
+  const matchingTrash = new Map<string, SlagItem[]>();
+  const seen = new Set<string>();
+  const explicitDeletes = new Set(copies.flatMap((copy) => [...copy.tombstones]));
+  for (const copy of copies) {
+    if (!copy.hydrated || seen.has(copy.deviceId)) blockers.push({ reason: 'invalid_snapshot', id: copy.deviceId });
+    seen.add(copy.deviceId);
+    for (const id of copy.pendingIds) blockers.push({ reason: 'pending_intent', id });
+    for (const item of copy.trash) {
+      if (!explicitDeletes.has(item.id)) blockers.push({ reason: 'unproven_deletion', id: item.id });
+      const alternatives = matchingTrash.get(item.id) ?? [];
+      alternatives.push(item);
+      matchingTrash.set(item.id, alternatives);
+    }
+    for (const item of copy.live) {
+      const previous = candidates.get(item.id);
+      if (previous && !sameNote(previous, item)) blockers.push({ reason: 'divergent_live', id: item.id });
+      else candidates.set(item.id, relayNote(item));
+    }
+  }
+  for (const id of requiredDevices) if (!seen.has(id)) blockers.push({ reason: 'missing_device', id });
+  for (const id of explicitDeletes) {
+    const live = candidates.get(id);
+    // Equal trash proves the live copy is the deleted body, but cannot prove the absence of an
+    // explicit restore. Require operator review rather than deciding by device clocks.
+    if (live) blockers.push({ reason: matchingTrash.get(id)?.some((copy) => sameNote(copy, live)) ? 'review_restore_provenance' : 'delete_vs_live', id });
+    else candidates.set(id, null);
+  }
+  return { blockers, candidates };
+}
+
+export async function sealBootstrap(keys: NoteKeys, room: string, generation: number, plan: ReturnType<typeof planBootstrap>): Promise<NoteOp[]> {
+  if (plan.blockers.length) throw new Error('Миграция заблокирована: есть непроверенные копии');
+  const operations: NoteOp[] = [];
+  for (const [id, item] of plan.candidates) {
+    operations.push(await sealNote(keys, room, generation, { noteId: await opaqueNoteId(keys, id),
+      opId: crypto.randomUUID(), baseRevision: 0, kind: item === null ? 'delete' : 'create' }, id, item));
+  }
+  return operations;
+}

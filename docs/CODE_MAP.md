@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **617**, строк: **108714**, зон: **48**.
+Модулей: **628**, строк: **110122**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,21 +12,21 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1736 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1471 | 25 |
+| `src/lib/sync/syncEngine.ts` | 1528 | 25 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/storage/index.ts` | 924 | 44 |
+| `src/lib/storage/index.ts` | 1020 | 44 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
 | `src/lib/storage/settingsStore.ts` | 900 | 5 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
+| `src/lib/storage/vaultFiles.ts` | 837 | 2 |
 | `src/components/Feed/ItemCard.tsx` | 815 | 1 |
 | `src/context/AppContext.tsx` | 795 | 71 |
-| `src/lib/storage/vaultFiles.ts` | 788 | 2 |
 | `src/mcp/vault.ts` | 780 | 6 |
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
-| `src/types/index.ts` | 686 | 219 |
+| `src/types/index.ts` | 686 | 225 |
 
-## e2e (playwright) — 131 файлов, 24479 строк
+## e2e (playwright) — 132 файлов, 24576 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -260,7 +260,7 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 434 | 2 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
-## src/components/Settings — 48 файлов, 5425 строк
+## src/components/Settings — 48 файлов, 5446 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -297,7 +297,7 @@
 | `SecretKeyField.tsx` | 49 | 1 | SecretKeyField | One-line secret input with a per-field reveal toggle and no autocorrect. |
 | `SettingsUI.tsx` | 307 | 30 | SettingsGroup, SettingsDivider, SettingsRow, SettingsSwitch, SettingsSelect, +2 | Settings' shared building blocks: group cards, rows, dividers, switches, sele… |
 | `ShortcutsSettingsTab.tsx` | 101 | 1 | ShortcutsSettingsTab | The hotkey catalogue, rendered from the same table the keydown handler reads. |
-| `SyncSettingsTab.tsx` | 110 | 1 | SyncSettingsTab | The sync channel: status, server address, schedule; account and devices sit n… |
+| `SyncSettingsTab.tsx` | 131 | 1 | SyncSettingsTab | The sync channel: status, server address, schedule; account and devices sit n… |
 | `UiSettingsTab.tsx` | 102 | 1 | UiSettingsTab | How it looks: accent, fonts, density, panel widths and the mobile dock. |
 | `UpdatesSettingsTab.tsx` | 326 | 1 | UpdatesSettingsTab | The "Обновления" tab: what is installed, what is on GitHub, and the one butto… |
 | `vault/BackupSection.tsx` | 129 | 1 | BackupSection | «бэкапы»: the daily autobackup setting and the restore points it produces. |
@@ -552,7 +552,7 @@
 | `audioSession.ts` | 330 | 2 | PLAYBACK_SPEEDS, AudioSessionSnapshot, subscribeAudioSession, getAudioSessionSnapshot, setAudioQueue, +14 | The one player: its element, its Web Audio graph and its state live outside e… |
 | `audioSpectrum.ts` | 439 | 3 | OrbFeatures, ORB_SILENCE, ORB_FFT_SIZE, createSpectrumReader | Features for the liquid orb. |
 | `blobToDataUrl.ts` | 16 | 2 | blobToDataUrl | A blob as a `data:` URL. |
-| `byteCodec.ts` | 42 | 6 | bytesToBase64, base64ToBytes, dataUrlToBytes, toArrayBuffer | Bytes to base64 and back without a Buffer, for crypto and file payloads in th… |
+| `byteCodec.ts` | 42 | 7 | bytesToBase64, base64ToBytes, dataUrlToBytes, toArrayBuffer | Bytes to base64 and back without a Buffer, for crypto and file payloads in th… |
 | `deviceGallery.ts` | 39 | 1 | getGalleryAccess, requestGalleryAccess, listDeviceMedia, DeviceMediaItem, DeviceMediaKind | Lists photos and videos from the Android media store, which the webview canno… |
 | `enrichment/dispatch.ts` | 299 | 4 | canEnrichAttachments, enrichAttachment, enrichItemAttachments | Picks a transport per attachment type, tries the role's connection first, the… |
 | `enrichment/gemini.ts` | 60 | 1 | analyzeImageGemini, transcribeAudioGemini | Native Gemini generateContent: the only transport that reads audio inline ins… |
@@ -593,35 +593,36 @@
 | `secretStore.ts` | 266 | 8 | SECRET_KEYS, SecretBackend, installSecretBackend, initSecretStore, getCachedSecret, +3 | One place for sync secrets at rest. Desktop uses the OS keychain; a build wit… |
 | `updateChannel.ts` | 27 | 2 | DEFAULT_UPDATE_CHANNEL, UPDATE_CHANNEL_OPTIONS, normalizeUpdateChannel, readUpdateChannel, writeUpdateChannel | Which release stream this install follows. The choice is device-local on purp… |
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
-| `writeJsonAtomic.ts` | 32 | 2 | writeJsonAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
+| `writeJsonAtomic.ts` | 32 | 3 | writeJsonAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
 
-## src/lib/storage — 29 файлов, 6385 строк
+## src/lib/storage — 30 файлов, 6564 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 3 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
 | `attachments.ts` | 312 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
-| `folderStore.ts` | 244 | 1 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 924 | 44 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `folderStore.ts` | 255 | 1 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
+| `index.ts` | 1020 | 44 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 158 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 159 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
 | `integrityStore.ts` | 90 | 1 | encodeIndex, decodeIndex, encodeLeaves, decodeLeaves, integrityDir, +4 | The integrity index: a tiny inline summary, a bulk leaves file, and the codec… |
 | `legacyJson.ts` | 18 | 3 | parseLegacyJson | The JSON an older build left in the webview profile. Every module that moves … |
 | `legacyProfile.ts` | 438 | 1 | LegacyVaultSection, LegacyVaultKey, LegacyKeySplit, splitLegacyKeys, importLegacyProfile | The one-off move off the webview profile. |
+| `noteRegistry.ts` | 20 | 6 | NoteMutation, AcceptedNote, NoteRegistryStorage |  |
 | `noteRemoval.ts` | 25 | 1 | notesRemovedByImport | Which files a synced import takes off the disk. |
-| `port.ts` | 81 | 8 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
-| `prefs.ts` | 214 | 24 | PrefsBackend, PrefsProfileBackend, initPrefs, getPref, setPref, +3 | Preferences: the one place settings live, wherever they came from. |
+| `port.ts` | 83 | 9 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
+| `prefs.ts` | 214 | 25 | PrefsBackend, PrefsProfileBackend, initPrefs, getPref, setPref, +3 | Preferences: the one place settings live, wherever they came from. |
 | `prefsBackend.browser.ts` | 42 | 1 | prefsBackend | Browser settings: `localStorage`, the same keys and the same strings that wer… |
 | `prefsBackend.native.ts` | 60 | 1 | prefsBackend | Native settings: one JSON object of key → string in `<AppData>/settings.json`. |
 | `settingsStore.ts` | 900 | 5 | SettingsStateFiles, SettingsStoreHost, hydrateSettings, flushDraftWrites, installDraftFlushGuards, +21 | The small per-vault things a reload must not lose: composer and fullscreen dr… |
 | `stateSections.ts` | 489 | 3 | STATE_SECTIONS, ComposerDraftMap, FullscreenDraftMap, TelegramThreadEntry, DraftsSection, +24 | The shape of what a vault's `state.json` keeps for `settingsStore`: drafts, t… |
 | `syncReconcile.ts` | 160 | 1 | SyncedVaultSnapshot, StagedSyncImport, ReconciledSyncImport, reconcileSyncedVault | A bundle is written from a snapshot: the user keeps typing while it travels t… |
-| `trashStore.ts` | 79 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
+| `trashStore.ts` | 80 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 788 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultFiles.ts` | 837 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 181 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
@@ -629,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 37 файлов, 8882 строк
+## src/lib/sync — 46 файлов, 9993 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -637,7 +638,7 @@
 | `accountCrypto.ts` | 266 | 6 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
 | `accountTypes.ts` | 217 | 13 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +19 | Shapes of the relay account API: plans, devices, vault grants and invitations. |
 | `apiBase.ts` | 5 | 4 | apiBase | The relay address without trailing slashes: every request path starts with on… |
-| `applyBundle.ts` | 461 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
+| `applyBundle.ts` | 463 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 7 | 2 | attachmentSignature | Cheap identity for an attachment: name plus size, enough to spot a stale copy. |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
 | `crypto.ts` | 181 | 13 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
@@ -657,17 +658,26 @@
 | `manifest/resolve.ts` | 76 | 1 | RESOLVE_MAX, ResolveInput, decideResolve, resolveRejected | What to do with the notes the room says it does not have. |
 | `manifest/schedule.ts` | 91 | 1 | scheduleManifestCheck, requestManifestCheck, clearManifestCheck | When the room is compared: one timer, the earliest deadline anybody asked for. |
 | `manifest/sync.ts` | 121 | 2 | trashRejectedNotes, getManifest, syncManifest | The room's own copy of this vault's manifest: build → peers → decide → react … |
+| `notes/bootstrap.ts` | 58 | 0 | BootstrapCopy, planBootstrap, sealBootstrap | Runs on a trusted client (or local migration tool), never at the relay with d… |
+| `notes/channel.ts` | 68 | 2 | NoteHttpError, NoteChannel | HTTP catch-up and fallback share the room's existing account authorization. |
+| `notes/conflicts.ts` | 14 | 2 | keepRelayOnConflict, setKeepRelayOnConflict, archiveNoteConflict |  |
+| `notes/journal.ts` | 80 | 4 | JournalKind, NoteBase, JournalAttempt, NoteIntent, NoteJournal, +7 | Pure transitions for an ordered queue of local intentions; disk and network s… |
+| `notes/merge.ts` | 147 | 3 | relayNote, sameNote, mergeNote | Three-way merge of decrypted note data. The caller, not this function, handle… |
+| `notes/persistence.ts` | 60 | 1 | loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
+| `notes/replica.ts` | 391 | 3 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/session.ts` | 41 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/wire.ts` | 181 | 9 | NoteKind, NoteMode, NoteStatus, NoteSealed, NoteOp, +20 | The authenticated relay sees routing metadata, never the note's identity or b… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `presence.ts` | 28 | 1 | DevicePresence, devicePresence | Who is actually on the line right now. The relay touches a device's `lastSeen… |
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
-| `pushBundle.ts` | 375 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
+| `pushBundle.ts` | 376 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1471 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 1528 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
-| `syncSocket.ts` | 44 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
+| `syncSocket.ts` | 46 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
-| `transport.ts` | 270 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
+| `transport.ts` | 279 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
 | `types.ts` | 211 | 31 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
 | `vaultSharing.ts` | 85 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
 
@@ -759,5 +769,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 686 | 219 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 686 | 225 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

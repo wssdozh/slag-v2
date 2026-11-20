@@ -101,7 +101,7 @@ export function renameFolderTree(
     return it;
   });
   const before = origin === 'local' ? store.persistNoteIntents(items
-    .filter((item, index) => item !== previousItems[index]).map((item) => ({ id: item.id, kind: 'update', item }))) : undefined;
+    .flatMap((item, index): NoteMutation[] => item === previousItems[index] ? [] : [{ id: item.id, kind: 'update', item, previous: previousItems[index] }])) : undefined;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), items);
 
@@ -232,8 +232,8 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
     }
     return it;
   });
-  const before = origin === 'local' ? store.persistNoteIntents(movedItems.map(({ item }) => ({
-    id: item.id, kind: 'update', item,
+  const before = origin === 'local' ? store.persistNoteIntents(movedItems.map(({ item, oldFolder }) => ({
+    id: item.id, kind: 'update', item, previous: { ...item, folder: oldFolder },
   }))) : undefined;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), updatedItems);

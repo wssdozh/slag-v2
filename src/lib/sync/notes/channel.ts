@@ -3,17 +3,25 @@ import { NOTE_BATCH_BYTES, parseNoteEvents, parseNoteHeads, parseNoteResults, pa
 import type { NoteOp } from './wire.ts';
 
 export class NoteHttpError extends Error {
-  constructor(readonly status: number, readonly code: string) {
+  readonly status: number;
+  readonly code: string;
+  constructor(status: number, code: string) {
     super(`Note registry: HTTP ${status}${code ? ` (${code})` : ''}`);
+    this.status = status;
+    this.code = code;
   }
 }
 
+interface NoteChannelOptions {
+  serverUrl: string; roomId: string; vaultId: string;
+  headers: (includeJson: boolean) => Record<string, string>;
+  signal: AbortSignal;
+}
+
 export class NoteChannel {
-  constructor(private readonly options: {
-    serverUrl: string; roomId: string; vaultId: string;
-    headers: (includeJson: boolean) => Record<string, string>;
-    signal: AbortSignal;
-  }) {}
+  private readonly options: NoteChannelOptions;
+  constructor(options: NoteChannelOptions) { this.options = options; }
+
 
   private async request(action: string, params: Record<string, string | number> = {}, body?: unknown): Promise<unknown> {
     this.options.signal.throwIfAborted();

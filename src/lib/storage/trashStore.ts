@@ -45,7 +45,7 @@ export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | '
   if (!item) return;
 
   const vault = store.currentVault;
-  const before = origin === 'local' ? store.persistNoteIntents([{ id, kind: 'delete', item: null }]) : undefined;
+  const before = origin === 'local' ? store.persistNoteIntents([{ id, kind: 'delete', item: null, previous: item }]) : undefined;
   // Remove from active items
   const remaining = items.filter(i => i.id !== id);
   store.cacheItems(store.getItemsKey(), remaining);

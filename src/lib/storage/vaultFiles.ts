@@ -1,6 +1,7 @@
 import type { FolderMeta, KanbanColumn, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
+import { writeJsonAtomic } from '../platform/writeJsonAtomic';
 import {
   readTextFile,
   readDir,
@@ -339,13 +340,19 @@ export class VaultFiles {
   }
 
   public writeRegistryState(vault: VaultMeta, value: unknown): Promise<void> {
-    const path = `${this.getVaultDir(vault)}/note-registry.json`;
+    return this.writeNoteSyncJson(this.getVaultDir(vault), 'note-registry.json', value);
+  }
+
+  public writeNoteConflict(vault: VaultMeta, id: string, value: unknown): Promise<void> {
+    if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid conflict id');
+    return this.writeNoteSyncJson(`${this.getVaultDir(vault)}/.note-conflicts`, `${id}.json`, value);
+  }
+
+  private writeNoteSyncJson(dir: string, name: string, value: unknown): Promise<void> {
+    const path = `${dir}/${name}`;
     return this.queueStateWrite(async () => {
-      const baseDir = BaseDirectory.AppData;
-      const tmp = `${path}.tmp`;
-      await mkdir(this.getVaultDir(vault), { baseDir, recursive: true });
-      await writeTextFile(tmp, JSON.stringify(value), { baseDir });
-      await rename(tmp, path, { oldPathBaseDir: baseDir, newPathBaseDir: baseDir });
+      await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
+      await writeJsonAtomic(path, value);
     });
   }
 
@@ -387,8 +394,7 @@ export class VaultFiles {
    * Reads the notes under these vault-relative paths back into items, without touching the index.
    * The caller owns the merge: this class knows the on-disk format, not what an index is.
    *
-   * A path that cannot be read lands in `missing` — a folder of someone else's vault, a file
-   * deleted between the sweep and the read. Deciding that a note is gone is the caller's call.
+   * Only a path confirmed absent lands in `missing`. Failure to read an existing file is not a deletion.
    */
   public async reloadNotesFromDisk(relativePaths: string[]): Promise<{ items: SlagItem[]; missing: string[] }> {
     const notesBase = this.getVaultNotesPath();
@@ -399,8 +405,8 @@ export class VaultFiles {
       let safe: string;
       try {
         safe = safeVaultRelativePath(relativePath);
-      } catch {
-        missing.push(relativePath);
+      } catch (error) {
+        fsLog.warn('Ignored invalid path from vault watcher', error);
         continue;
       }
       const slash = safe.lastIndexOf('/');
@@ -411,8 +417,9 @@ export class VaultFiles {
         const parsed = parseMarkdownToItem(content, filename.replace(/\.md$/, ''), folder);
         parsed.filename = filename;
         items.push(parsed);
-      } catch {
-        missing.push(relativePath);
+      } catch (error) {
+        if (!(await exists(`${notesBase}/${safe}`, { baseDir: BaseDirectory.AppData }))) missing.push(relativePath);
+        else fsLog.warn('Unable to read existing note from vault watcher', error);
       }
     }
 
@@ -628,8 +635,16 @@ export class VaultFiles {
       const targetDir = `${notesBase}/${folder}`;
       await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
-      const newFilename = safeVaultRelativePath(this.claimNoteFilename(item, folder));
+      const baseDir = BaseDirectory.AppData;
+      let newFilename = safeVaultRelativePath(this.claimNoteFilename(item, folder));
       if (newFilename.includes('/')) throw new Error('Invalid note filename');
+      if (strict) {
+        const base = newFilename;
+        for (let n = 1; await exists(`${targetDir}/${newFilename}`, { baseDir }) &&
+          !(await this.fileBelongsTo(`${targetDir}/${newFilename}`, item.id, true)); n++) {
+          newFilename = withIdSuffix(n === 1 ? base : `${base.slice(0, -3)}-${n}.md`, item.id);
+        }
+      }
       item.filename = newFilename;
       const newPath = `${targetDir}/${newFilename}`;
 
@@ -643,19 +658,21 @@ export class VaultFiles {
 
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item);
-      await writeTextFile(newPath, content, { baseDir: BaseDirectory.AppData });
-      await this.deps.attachments.persistAll(item);
+      if (strict) {
+        const tmp = `${newPath}.${crypto.randomUUID()}.tmp`;
+        await writeTextFile(tmp, content, { baseDir });
+        await rename(tmp, newPath, { oldPathBaseDir: baseDir, newPathBaseDir: baseDir });
+      } else await writeTextFile(newPath, content, { baseDir });
+      if (vault.id === this.vault.id) await this.deps.attachments.persistAll(item);
 
       // The old path may be somebody else's file when two notes shared a title, so a rename
       // only deletes a file that is really this note.
-      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id)) {
+      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id, strict)) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
-      if (legacyOldPath && legacyOldPath !== newPath && !protectedPaths.has(legacyOldPath) && await exists(legacyOldPath, { baseDir: BaseDirectory.AppData })) {
-        await remove(legacyOldPath, { baseDir: BaseDirectory.AppData });
-      }
-      if (legacyTargetPath && legacyTargetPath !== newPath && !protectedPaths.has(legacyTargetPath) && await exists(legacyTargetPath, { baseDir: BaseDirectory.AppData })) {
-        await remove(legacyTargetPath, { baseDir: BaseDirectory.AppData });
+      for (const path of new Set([legacyOldPath, legacyTargetPath])) {
+        if (path && path !== newPath && !protectedPaths.has(path) &&
+          await (strict ? this.fileBelongsTo(path, item.id, true) : exists(path, { baseDir }))) await remove(path, { baseDir });
       }
 
     } catch (err) {

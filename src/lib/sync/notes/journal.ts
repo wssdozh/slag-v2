@@ -34,19 +34,22 @@ export function confirmedNote(state: NoteJournal, id: string): NoteBase | undefi
   return Object.hasOwn(state.confirmed, id) ? state.confirmed[id] : undefined;
 }
 
-export function recordNote(state: NoteJournal, change: Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item'>): NoteJournal {
+export function recordNote(state: NoteJournal, change: Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item'> & { previous?: SlagItem }): NoteJournal {
   const item = change.item ? relayNote(change.item) : null;
   const index = state.pending.findLastIndex((entry) => entry.id === change.id);
   const previous = index >= 0 ? state.pending[index] : undefined;
   if (previous && previous.kind === change.kind && sameNote(previous.item, item)) return state;
-  const base = previous ? undefined : confirmedNote(state, change.id)
-    ?? (change.kind === 'create' ? { revision: 0, item: null } : undefined);
+  const confirmed = confirmedNote(state, change.id);
+  const base = previous ? undefined : confirmed
+    ? { revision: confirmed.revision, item: change.previous && change.kind !== 'restore' ? relayNote(change.previous) : confirmed.item }
+    : (change.kind === 'create' ? { revision: 0, item: null } : undefined);
   if (!previous && change.kind === 'update' && base && sameNote(base.item, item)) return state;
   // An unsent create/restore can absorb typing without changing what transition it proves.
   if (previous && !previous.attempt && change.kind === 'update' && previous.item !== null) {
     return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, item } : entry) };
   }
-  return { ...state, pending: [...state.pending, { ...change, item, base, predecessor: previous?.intentId }] };
+  return { ...state, pending: [...state.pending, { id: change.id, intentId: change.intentId, kind: change.kind,
+    item, base, predecessor: previous?.intentId }] };
 }
 
 export function firstPerNote(state: NoteJournal): NoteIntent[] {

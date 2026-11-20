@@ -5,6 +5,17 @@ import { emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settl
 
 const note = { id: 'note', type: 'note', title: 'title', content: 'one\ntwo\nthree\nfour\nfive', folder: 'inbox', tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
 
+test('an edit queued during canonical application keeps the snapshot the editor saw', () => {
+  const remote = { ...note, folder: 'remote-folder' };
+  const state = setConfirmed(emptyJournal(), note.id, { revision: 2, item: remote });
+  const local = { ...note, title: 'local-title' };
+  const [intent] = recordNote(state, { id: note.id, intentId: 'late', kind: 'update', item: local, previous: note }).pending;
+  const result = mergeNote(intent.base.item, intent.item, remote);
+  assert.deepEqual(result.conflicts, []);
+  assert.equal(result.item.folder, remote.folder);
+  assert.equal(result.item.title, local.title);
+});
+
 test('can merge disjoint ranges and fields while keeping only the conflicting remote range', () => {
   const local = { ...note, title: 'mine', content: 'ONE\ntwo\nlocal three\nfour\nfive', tags: ['one'] };
   const remote = { ...note, folder: 'moved', content: 'one\ntwo\nremote three\nfour\nFIVE', tags: ['two'] };

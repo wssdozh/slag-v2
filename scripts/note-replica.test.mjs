@@ -1,0 +1,160 @@
+import assert from 'node:assert/strict';
+import { setTimeout as wait } from 'node:timers/promises';
+import { test } from 'node:test';
+import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
+import { archiveNoteConflict, keepRelayOnConflict, setKeepRelayOnConflict } from '../src/lib/sync/notes/conflicts.ts';
+import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
+
+const room = 'test-room';
+const generation = 1;
+const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+const keys = await deriveNoteKeys(key, room);
+const note = (id, changes = {}) => ({ id, type: 'note', title: 'title', content: 'base', folder: 'Inbox', attachments: [], tags: [], createdAt: 1, updatedAt: 1, ...changes });
+
+function relay() {
+  const events = [];
+  const revisions = new Map();
+  const receipts = new Map();
+  const clients = new Set();
+  let sends = 0;
+  let drop = false;
+  let paused = false;
+  let floor = 0;
+  const view = {
+    events: async (_generation, since) => ({ generation, floor, head: events.length, events: events.filter((event) => event.revision > Math.max(since, floor)) }),
+    heads: async (_generation, after, since, through) => ({ generation, floor, head: events.length, next: null,
+      heads: [...revisions.values()].filter((head) => head.noteId > after && head.revision > since && head.revision <= through).sort((a, b) => a.noteId.localeCompare(b.noteId)) }),
+    send: async (_generation, requestId, ops) => {
+      sends++;
+      const fresh = [];
+      const results = ops.map((op) => {
+        const current = revisions.get(op.noteId);
+        if (receipts.has(op.opId)) return receipts.get(op.opId);
+        if (op.baseRevision !== (current?.revision ?? 0)) return { opId: op.opId, status: 'stale', current: current ?? null };
+        const head = { ...op, revision: events.length + 1 };
+        events.push(head);
+        revisions.set(op.noteId, head);
+        fresh.push(head);
+        const result = { opId: op.opId, status: 'accepted', revision: head.revision };
+        receipts.set(op.opId, result);
+        return result;
+      });
+      if (drop) { drop = false; throw new Error('lost response'); }
+      if (!paused && fresh.length) for (const replica of clients) replica.handleMessage({ type: 'note_events', generation, events: fresh });
+      return { type: 'note_results', requestId, generation, results };
+    },
+  };
+  return { view, clients, events, sends: () => sends, lose: () => { drop = true; }, pause: () => { paused = true; }, prune: () => { floor = events.length; } };
+}
+
+function device(t, server, options = {}) {
+  const controller = new AbortController();
+  const local = new Map();
+  const errors = [];
+  const conflicts = [];
+  let saved;
+  const replica = new NoteReplica({ channel: server.view, room, generation, keys, signal: controller.signal, readOnly: false,
+    sendLive: () => false, save: async (state) => { saved = structuredClone(state); },
+    apply: async ({ id, item }) => { local.set(id, item); }, storeConflict: async (entry) => { conflicts.push(entry); },
+    onProgress: () => undefined, onError: (error) => errors.push(error), ...options,
+  }, options.state);
+  server.clients.add(replica);
+  const stop = () => { controller.abort(); server.clients.delete(replica); };
+  t.after(stop);
+  return { replica, local, conflicts, errors, stop, saved: () => saved };
+}
+
+async function until(predicate) {
+  const deadline = Date.now() + 2_000;
+  while (!predicate()) {
+    assert.ok(Date.now() < deadline, 'condition did not settle');
+    await wait(10);
+  }
+}
+
+const change = (kind, item, id = item.id) => ({ kind, id, item });
+
+test('batches immediate edits and catches up without further requests when idle', async (t) => {
+  const server = relay();
+  const a = device(t, server);
+  const b = device(t, server);
+  await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
+  await a.replica.record(Array.from({ length: 30 }, (_, i) => change('create', note(`n-${i}`))));
+  await until(() => b.local.size === 30 && a.replica.pendingCount === 0);
+  await wait(80);
+  assert.equal(server.sends(), 1);
+  assert.deepEqual(a.errors, []);
+  assert.deepEqual(b.errors, []);
+});
+
+test('stale operation merges independent fields; true conflict archives only the rejected local copy', async (t) => {
+  const server = relay();
+  const a = device(t, server);
+  const b = device(t, server);
+  await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
+  const base = note('one');
+  await a.replica.record([change('create', base)]);
+  await until(() => b.local.has(base.id));
+  server.pause();
+  await a.replica.record([change('update', { ...base, title: 'relay', content: 'new' })]);
+  await until(() => server.events.length === 2);
+  await b.replica.record([change('update', { ...base, title: 'rejected', folder: 'moved' })]);
+  await until(() => b.conflicts.length === 1 && b.replica.pendingCount === 0);
+  assert.equal(b.local.get(base.id).title, 'relay');
+  assert.equal(b.local.get(base.id).content, 'new');
+  assert.equal(b.local.get(base.id).folder, 'moved');
+  assert.deepEqual(b.conflicts[0].fields, ['title']);
+  assert.equal(b.conflicts[0].item.title, 'rejected');
+});
+
+test('a failed local apply does not advance the durable cursor and can replay', async (t) => {
+  const server = relay();
+  const a = device(t, server);
+  await a.replica.catchUp();
+  await a.replica.record([change('create', note('disk'))]);
+  await until(() => server.events.length === 1);
+  let diskFailed = true;
+  const applied = [];
+  const b = device(t, server, { apply: async (entry) => {
+    if (diskFailed) throw new Error('disk full');
+    applied.push(entry);
+  } });
+  await assert.rejects(b.replica.catchUp(), /disk full/);
+  assert.equal(b.saved(), undefined);
+  diskFailed = false;
+  await b.replica.catchUp();
+  assert.equal(b.saved().cursor, 1);
+  assert.equal(applied[0].id, 'disk');
+});
+
+test('conflict policy defaults to archive and opting in is per vault', async () => {
+  const archived = [];
+  const write = async (...args) => { archived.push(args); };
+  const entry = { intentId: 'intent', noteId: 'one', item: note('one'), fields: ['title'] };
+  assert.equal(keepRelayOnConflict('vault-a'), false);
+  await archiveNoteConflict('vault-a', entry, write);
+  setKeepRelayOnConflict('vault-a', true);
+  await archiveNoteConflict('vault-a', entry, write);
+  assert.equal(keepRelayOnConflict('vault-b'), false);
+  await archiveNoteConflict('vault-b', entry, write);
+  assert.deepEqual(archived, [['intent', entry], ['intent', entry]]);
+  await assert.rejects(archiveNoteConflict('vault-b', entry, async () => { throw new Error('disk full'); }), /disk full/);
+});
+
+test('acceptance with lost reply survives restart and expired feed', async (t) => {
+  const server = relay();
+  const a = device(t, server);
+  await a.replica.catchUp();
+  server.lose();
+  await a.replica.record([change('create', note('persist'))]);
+  await until(() => a.errors.length === 1);
+  assert.equal(a.saved().pending.length, 1);
+  const saved = a.saved();
+  a.stop();
+  server.prune();
+  const b = device(t, server, { state: saved });
+  await b.replica.catchUp();
+  assert.equal(b.replica.pendingCount, 0);
+  assert.equal(b.local.get('persist').content, 'base');
+  assert.equal(server.events.length, 1);
+});

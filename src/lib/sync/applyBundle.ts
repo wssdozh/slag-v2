@@ -130,7 +130,9 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       const tombstones = loadTombstones(engine.bookkeeping);
       let tombstonesDirty = false;
 
+      const registry = Boolean(engine.noteGeneration);
       for (const ch of bundle.changes) {
+        if (registry && (ch.type === 'item' || ch.type === 'trash')) continue;
         if (ch.type === 'item') {
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as SlagItem;
@@ -186,7 +188,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
               currentFolders.push(...remaining);
               hasFoldersChanged = true;
               // Reroute child items to inbox
-              for (let i = 0; i < currentItems.length; i++) {
+              for (let i = 0; !registry && i < currentItems.length; i++) {
                 if (currentItems[i].folder === folderPath || currentItems[i].folder.startsWith(folderPath + '/')) {
                   currentItems[i] = { ...currentItems[i], folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
                   hasItemsChanged = true;
@@ -209,7 +211,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
                   hasFoldersChanged = true;
                 }
               }
-              for (let i = 0; i < currentItems.length; i++) {
+              for (let i = 0; !registry && i < currentItems.length; i++) {
                 if (currentItems[i].folder === oldPath) {
                   currentItems[i] = { ...currentItems[i], folder: updatedFolder.path, updatedAt: Date.now() };
                   hasItemsChanged = true;
