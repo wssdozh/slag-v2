@@ -66,17 +66,29 @@ asyncio.run(create())`, db, room]);
   const shared = page.heads[opened.findIndex(({ id }) => id === 'shared')];
   const edit = await sealNote(keys, room, generation, { noteId: shared.noteId, opId: crypto.randomUUID(),
     baseRevision: shared.revision, kind: 'update' }, 'shared', { ...note('shared'), content: 'after restart' });
-  const submit = () => python(['-c', `import json, sys
+  const submit = (op, sender = 'device-1') => python(['-c', `import json, sys
 from store import RelayDatabase
 db = RelayDatabase(sys.argv[1])
 owner = db.conn.execute('SELECT owner_account_id FROM vaults JOIN rooms ON vaults.id = rooms.vault_id WHERE room_id = ?', (sys.argv[2],)).fetchone()[0]
-print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), 'device-1', owner, 20000000, [json.loads(sys.argv[4])])))`, db, room, String(generation), JSON.stringify(edit)]);
-  const [accepted, events] = submit();
+print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), sys.argv[5], owner, 20000000, [json.loads(sys.argv[4])])))`, db, room, String(generation), JSON.stringify(op), sender]);
+  const [accepted, events] = submit(edit);
   assert.deepEqual(accepted, [{ opId: edit.opId, status: 'accepted', revision: 13 }]);
   assert.equal((await openNote(keys, room, generation, events[0])).item.content, 'after restart');
-  assert.deepEqual(submit(), [accepted, []]);
-  assert.deepEqual(admin('status'), { mode: 'registry', generation, head: 13, floor: 12 });
-  process.stdout.write('isolated cutover: 11 ambiguous copies blocked; 1 live + 11 tombstones; post-cutover edit and receipt survived reopening SQLite\n');
+  assert.deepEqual(submit(edit), [accepted, []]);
+  const transition = (kind, baseRevision, item) => sealNote(keys, room, generation,
+    { noteId: shared.noteId, opId: crypto.randomUUID(), kind, baseRevision }, 'shared', item);
+  const stale = await transition('update', 13, { ...note('shared'), content: 'offline copy' });
+  const deleted = await transition('delete', 13, null);
+  assert.equal(submit(deleted)[0][0].revision, 14);
+  // Every submit reopens the same database in a new process.
+  const [[rejected], unexpected] = submit(stale, 'device-2');
+  assert.equal(rejected.status, 'stale');
+  assert.equal(rejected.current.kind, 'delete');
+  assert.deepEqual(unexpected, []);
+  assert.deepEqual(admin('status'), { mode: 'registry', generation, head: 14, floor: 12 });
+  const restored = await transition('restore', 14, note('shared'));
+  assert.equal(submit(restored)[0][0].revision, 15);
+  process.stdout.write('isolated cutover: 11 ambiguous copies blocked; edit, receipt and explicit deletion survived reopening SQLite; stale update rejected, explicit restore accepted\n');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

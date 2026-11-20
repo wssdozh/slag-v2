@@ -83,29 +83,34 @@ export class McpVault {
   }
 
   public async readState(): Promise<VaultStateData> {
-    if (existsSync(this.config.statePath)) {
-      try {
-        const raw = await fs.readFile(this.config.statePath, 'utf-8');
-        return JSON.parse(raw);
-      } catch {
-        return {};
-      }
+    let raw: string;
+    try {
+      raw = await fs.readFile(this.config.statePath, 'utf-8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {};
+      throw error;
     }
-    return {};
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid vault state');
+    return value as VaultStateData;
   }
 
   public async writeState(data: VaultStateData): Promise<void> {
     const current = await this.readState();
-    const updated = {
-      ...current,
-      ...data,
-      updatedAt: Date.now(),
-    };
-    await fs.writeFile(this.config.statePath, JSON.stringify(updated, null, 2), 'utf-8');
+    const updated = { ...current, ...data, updatedAt: Date.now() };
+    const temp = `${this.config.statePath}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.writeFile(temp, JSON.stringify(updated, null, 2), 'utf-8');
+      await fs.rename(temp, this.config.statePath);
+    } catch (error) {
+      await fs.rm(temp, { force: true }).catch(() => undefined);
+      throw error;
+    }
   }
 
   public async getFolders(): Promise<FolderMeta[]> {
-    const state = await this.readState();
+    // A broken metadata file must not prevent discovery of the actual folders on disk.
+    const state = await this.readState().catch((): VaultStateData => ({}));
     const stateFolders = (Array.isArray(state.folders) ? state.folders : [])
       .filter((folder): folder is FolderMeta =>
         Boolean(folder) && typeof folder.path === 'string' && isSafeVaultRelativePath(folder.path));

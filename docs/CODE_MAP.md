@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110332**, зон: **48**.
+Модулей: **628**, строк: **110520**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,21 +12,21 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1736 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1559 | 25 |
+| `src/lib/sync/syncEngine.ts` | 1558 | 25 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/storage/index.ts` | 1020 | 44 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
 | `src/lib/storage/settingsStore.ts` | 900 | 5 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
-| `src/lib/storage/vaultFiles.ts` | 838 | 2 |
+| `src/lib/storage/vaultFiles.ts` | 865 | 2 |
 | `src/components/Feed/ItemCard.tsx` | 815 | 1 |
 | `src/context/AppContext.tsx` | 795 | 71 |
-| `src/mcp/vault.ts` | 780 | 6 |
+| `src/mcp/vault.ts` | 785 | 6 |
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
 | `src/types/index.ts` | 686 | 225 |
 
-## e2e (playwright) — 132 файлов, 24645 строк
+## e2e (playwright) — 132 файлов, 24761 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -595,7 +595,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 35 | 3 | writeJsonAtomic, writeAppDataTextAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
 
-## src/lib/storage — 30 файлов, 6570 строк
+## src/lib/storage — 30 файлов, 6597 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -622,7 +622,7 @@
 | `trashStore.ts` | 80 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 838 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultFiles.ts` | 865 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 181 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
@@ -630,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10125 строк
+## src/lib/sync — 46 файлов, 10165 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -638,7 +638,7 @@
 | `accountCrypto.ts` | 266 | 6 | AccountIdentity, generateAccountIdentity, signDeviceChallenge, getOrCreateDeviceIdentity, renameStoredDevice, +3 | Derives account and device keys, and wraps one vault key for one specific dev… |
 | `accountTypes.ts` | 217 | 13 | AccountInfo, AccountDevice, VaultGrant, AccountVault, VaultInvitation, +19 | Shapes of the relay account API: plans, devices, vault grants and invitations. |
 | `apiBase.ts` | 5 | 4 | apiBase | The relay address without trailing slashes: every request path starts with on… |
-| `applyBundle.ts` | 463 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
+| `applyBundle.ts` | 466 | 1 | persistIncomingBundle, mergeAssistantPrompt | What a bundle from the relay actually does to the vault: tombstones, staged |
 | `attachmentSignature.ts` | 7 | 2 | attachmentSignature | Cheap identity for an attachment: name plus size, enough to spot a stale copy. |
 | `bip39Words.ts` | 2052 | 1 | BIP39_WORDS | Standard BIP-39 English wordlist (2048 words) |
 | `crypto.ts` | 181 | 13 | generateMnemonic, validateMnemonic, deriveVaultKey, deriveRoomId, encryptBundle, +5 | Generates a cryptographically secure 12-word recovery seed phrase |
@@ -650,7 +650,7 @@
 | `errorText.ts` | 16 | 1 | syncErrorText | What the status row says when a request dies before the relay answers. |
 | `index.ts` | 6 | 3 | * from ./types, * from ./crypto, * from ./pairing, * from ./syncEngine | Barrel: re-exports the sync protocol, crypto, pairing and engine for lib/sync… |
 | `itemDeletions.ts` | 33 | 1 | ItemDeletion, deletionsFromOutbox | Which notes a push announces as gone. |
-| `localBookkeeping.ts` | 533 | 6 | SYNC_SECTION, SyncScope, stateHashKey, tombstonesKey, sentHashesKey, +32 | What this device sent, knows and deleted — read from `state.json`'s `sync` se… |
+| `localBookkeeping.ts` | 550 | 6 | SYNC_SECTION, SyncScope, stateHashKey, tombstonesKey, sentHashesKey, +33 | What this device sent, knows and deleted — read from `state.json`'s `sync` se… |
 | `manifest/channel.ts` | 244 | 5 | WIRE_VERSION, MAX_WIRE_BYTES, WireBody, PeerManifest, toWire, +9 | How a manifest crosses the wire: shape, validation, comparison. |
 | `manifest/peers.ts` | 142 | 2 | manifestRoomUrl, parsePeerManifests, readPeerManifests, requestMissingNotes | Who else in this room published a root, and what to ask them for. |
 | `manifest/prefs.ts` | 30 | 3 | readManifestAutoCheck, writeManifestAutoCheck, readManifestAutoResolve, writeManifestAutoResolve | Whether this device compares its vault root with the room on its own, and whe… |
@@ -667,13 +667,13 @@
 | `notes/replica.ts` | 419 | 4 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/session.ts` | 88 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/wire.ts` | 181 | 9 | NoteKind, NoteMode, NoteStatus, NoteSealed, NoteOp, +20 | The authenticated relay sees routing metadata, never the note's identity or b… |
-| `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
+| `outbox/outbox.ts` | 74 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
 | `presence.ts` | 28 | 1 | DevicePresence, devicePresence | Who is actually on the line right now. The relay touches a device's `lastSeen… |
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
-| `pushBundle.ts` | 376 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
+| `pushBundle.ts` | 370 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1559 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 1558 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 46 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
@@ -731,7 +731,7 @@
 | `stats.ts` | 67 | 2 | VaultStats, collectExistingTags, computeVaultStats | Read-only counters and tag tallies, with the inbox treated as the whole vault. |
 | `vaultDisplay.ts` | 24 | 5 | getVaultDisplayName | Names a vault for the UI, adding a short id suffix only when two names collid… |
 
-## src/mcp — 11 файлов, 2158 строк
+## src/mcp — 11 файлов, 2163 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -745,7 +745,7 @@
 | `serverInfo.ts` | 16 | 1 | SERVER_INFO | What a host shows beside the tools: a name and a version alone leave the serv… |
 | `tools.ts` | 480 | 3 | registerMcpTools | MCP tools that read and write notes, tasks, folders and attachments in a vaul… |
 | `types.ts` | 101 | 3 | McpVaultConfig, VaultStateData, NoteMatch, SaveNoteSchema, GetNoteSchema, +7 | Zod schemas and vault shapes the MCP tools accept, with their user-facing des… |
-| `vault.ts` | 780 | 6 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
+| `vault.ts` | 785 | 6 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
 
 ## src/node — 5 файлов, 897 строк
 

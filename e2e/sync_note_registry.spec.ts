@@ -141,7 +141,7 @@ test('two browser vaults receive accepted notes through the registry, not legacy
         throw new Error('frozen bundle was treated as delivered');
       }
       const replay = { bundleId: 'replay-regression', encrypted: { bundleId: 'replay-regression' },
-        settled: false, stateHash: 'synthetic-hash', packedHashes: {}, tombstones: {}, opIds: [], changes: 0 };
+        settled: false, stateHash: 'synthetic-hash', packedHashes: {}, opIds: [], changes: 0 };
       await syncEngine.deliverPushOverHttp(replay);
       if (!replay.settled) throw new Error('explicit replay receipt did not confirm delivery');
     });

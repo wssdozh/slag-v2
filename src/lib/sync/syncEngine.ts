@@ -13,7 +13,7 @@ import {
   saveSentHashes,
   clearSyncLedgers,
   hydrateSyncSection,
-  saveTombstones,
+  requireSyncSectionFlushed,
   SYNC_SECTION,
   loadAttachmentRequests,
   markAttachmentRequestSent as stampAttachmentRequest,
@@ -95,7 +95,6 @@ export interface PendingPush {
   frame: Uint8Array<ArrayBuffer>;
   stateHash: string;
   packedHashes: Record<string, string>;
-  tombstones: Record<string, number>;
   opIds: string[];
   changes: number;
   settled: boolean;
@@ -772,6 +771,7 @@ export class SyncEngine {
         registryNotes: Boolean(this.noteGeneration),
         workspaceState: buffered.workspaceState,
       });
+      await requireSyncSectionFlushed();
     } catch (error) {
       // Nothing reached the disk, so the relay must not be told this burst is done: dropping
       // the ids makes a re-delivery apply again instead of being skipped as "already applied".
@@ -806,7 +806,8 @@ export class SyncEngine {
       try {
         await this.sendAck(bundleId);
       } catch (error) {
-        // An unconfirmed ACK only means another delivery; the state is already on disk.
+        // Allow another delivery to retry; the state is already on disk.
+        this.appliedBundleIds.delete(bundleId);
         syncLog.warn(`Failed to ACK applied bundle ${bundleId}:`, error);
       }
     }
@@ -826,11 +827,11 @@ export class SyncEngine {
    * of the vault that replaced it.
    */
   private syncSectionStore(vaultId: string): SyncSectionStore {
+    const meta = storage.getCurrentVault();
+    if (meta.id !== vaultId) throw new Error('Хранилище сменилось до чтения журнала');
     return {
-      read: () => storage.files.readStateSection(SYNC_SECTION),
-      write: (patch) => (this.currentVaultId === vaultId
-        ? storage.files.writeStateSection(SYNC_SECTION, patch)
-        : Promise.resolve()),
+      read: () => storage.files.readStateSection(SYNC_SECTION, meta, true),
+      write: (patch) => storage.files.writeStateSection(SYNC_SECTION, patch, meta, true),
     };
   }
 
@@ -842,30 +843,33 @@ export class SyncEngine {
    * The web build and the headless node have no disk: `hydrateSyncSection` is not even asked, and
    * every ledger keeps answering from the storage it answered from before.
    */
-  private async hydrateSyncState(): Promise<void> {
+  private async hydrateSyncState(generation: number): Promise<boolean> {
     const vaultId = this.currentVaultId;
+    const isCurrent = () => generation === this.initGeneration && vaultId === this.currentVaultId;
     try {
       const seed = await getSecret(SECRET_KEYS.vaultSeed(vaultId));
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
 
       let section: Record<string, unknown> | null = null;
       if (isTauri()) {
-        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId));
-        if (outcome.error) {
-          syncLog.warn('The sync ledgers stay in the fallback keys, state.json did not take them:', outcome.error);
-        }
+        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId), isCurrent);
+        if (!outcome.persisted) throw new Error('Не удалось загрузить журнал синхронизации', { cause: outcome.error });
         section = outcome.section;
       }
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
 
       const config = await hydrateConfig(this, vaultId, seed, section);
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
       this.config = config;
       this.status.subscription = computeSubscription(this);
+      return true;
     } catch (error) {
-      // A secret store that will not answer is not a crash: the seed check below reports it, and
-      // an empty config falls back to the keys this build used before the file existed.
+      if (!isCurrent()) return false;
       syncLog.error(`Could not read the sync state of vault ${vaultId}:`, error);
+      this.status.state = 'error';
+      this.status.error = 'Синхронизация остановлена: журнал хранилища не удалось прочитать или сохранить.';
+      this.notify();
+      return false;
     }
   }
 
@@ -924,6 +928,10 @@ export class SyncEngine {
    */
   public async retrySync(): Promise<void> {
     this.clearRetryTimer();
+    if (!this.activeRoomId) {
+      await this.init();
+      return;
+    }
     // Unconditional: an error left over from a connection that is back is the whole reason the
     // panel kept saying "Ошибка" after the server answered a health check.
     this.status.error = null;
@@ -934,7 +942,7 @@ export class SyncEngine {
       this.scheduleRetry();
       return;
     }
-    if (this.status.initialSync.state === 'error' || !this.activeRoomId) {
+    if (this.status.initialSync.state === 'error') {
       await this.init();
       return;
     }
@@ -969,15 +977,8 @@ export class SyncEngine {
     }
     syncLog.info(`SyncEngine switching to vault: ${vaultId}`);
     this.disconnect();
-    const generation = this.initGeneration;
     this.currentVaultId = vaultId;
-    // The new vault's own config and ledgers before anything is told about it: a save that lands
-    // between a switch and its hydration would otherwise write this vault's keys into that file.
-    await this.hydrateSyncState();
-    if (generation !== this.initGeneration) return;
-    this.status.subscription = computeSubscription(this);
     this.status.currentRoomId = null;
-    this.notify();
     await this.init();
   }
 
@@ -988,8 +989,7 @@ export class SyncEngine {
     const startedAt = performance.now();
     // The vault's own sync state — config, seed, ledgers — before anything decides whether sync
     // can run at all: `enabled` and the seed phrase are fields of that config.
-    await this.hydrateSyncState();
-    if (generation !== this.initGeneration) return;
+    if (!await this.hydrateSyncState(generation) || generation !== this.initGeneration) return;
     const seedPhrase = this.config.seedPhrase;
     const initial = isInitialSyncPending(this.currentVaultId);
     if (initial) syncLog.info('Initial sync started', { vaultId: this.currentVaultId });
@@ -1222,7 +1222,7 @@ export class SyncEngine {
   }
 
   
-  /** Commits a confirmed push: hashes, tombstones and the outbox advance only once the relay has it. */
+  /** Commits delivery by op ID, never by replacing the deletion ledger with a snapshot. */
   private commitPush(pending: PendingPush): void {
     if (pending.settled) return;
     pending.settled = true;
@@ -1234,7 +1234,6 @@ export class SyncEngine {
 
     saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
-    saveTombstones(this.bookkeeping, pending.tombstones);
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();
     this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';

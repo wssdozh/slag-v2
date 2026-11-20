@@ -147,11 +147,11 @@ export class VaultFiles {
       if (legacyStateExists) {
         const mainStateExists = await exists('vaults/main/state.json', { baseDir: BaseDirectory.AppData });
         if (!mainStateExists) {
-          const stateContent = await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
+          const state = this.parseStateStrict(await readTextFile('state.json', { baseDir: BaseDirectory.AppData }));
           await mkdir('vaults/main', { baseDir: BaseDirectory.AppData, recursive: true });
-          await writeTextFile('vaults/main/state.json', stateContent, { baseDir: BaseDirectory.AppData });
+          await writeJsonAtomic('vaults/main/state.json', state);
+          await remove('state.json', { baseDir: BaseDirectory.AppData });
         }
-        await remove('state.json', { baseDir: BaseDirectory.AppData });
       }
     } catch (err) {
       fsLog.warn('Legacy vault migration error:', err);
@@ -260,9 +260,12 @@ export class VaultFiles {
     await mkdir(`${this.getVaultNotesPath()}/${safe}`, { baseDir: BaseDirectory.AppData, recursive: true });
   }
 
-  /** The folder metadata `state.json` holds. Absent, broken or junk answers "none". */
+  /** Folder metadata is optional for the index; an unreadable file must still block writes. */
   public async readFoldersMeta(): Promise<FolderMeta[]> {
-    const state = await this.readStateObject();
+    const state = await this.readStateObject(this.getVaultStatePath()).catch((error: unknown) => {
+      fsLog.warn('Could not read folder metadata:', error);
+      return {} as Record<string, unknown>;
+    });
     if (!Array.isArray(state.folders)) return [];
     const folders: FolderMeta[] = [];
     for (const entry of state.folders) {
@@ -283,9 +286,15 @@ export class VaultFiles {
    */
   public writeFolderMeta(folders: FolderMeta[]): Promise<void> {
     if (!isTauri()) return Promise.resolve();
+    const vault = this.vault;
+    const statePath = this.getVaultStatePath(vault);
     return this.queueStateWrite(async () => {
-      for (const folder of folders) await this.ensureFolderOnDisk(folder.path);
-      const state = await this.readStateObject();
+      const state = await this.readStateObject(statePath);
+      for (const folder of folders) {
+        await mkdir(`${this.getVaultNotesPath(vault)}/${safeVaultRelativePath(folder.path)}`, {
+          baseDir: BaseDirectory.AppData, recursive: true,
+        });
+      }
       const byPath = new Map<string, FolderMeta>();
       for (const entry of Array.isArray(state.folders) ? state.folders : []) {
         const meta = toFolderMeta(entry);
@@ -293,20 +302,22 @@ export class VaultFiles {
       }
       for (const folder of folders) byPath.set(folder.path, folder);
       state.folders = [...byPath.values()];
-      await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+      await writeJsonAtomic(statePath, state);
     });
   }
 
-  /**
-   * One section of `state.json`: the one ledger a wipe of the webview profile cannot be allowed to
-   * eat, the drafts, whatever keeps its own corner. A missing file, a missing section and a section
-   * of the wrong shape all answer "empty".
-   */
-  public async readStateSection(name: string): Promise<Record<string, unknown>> {
+  public async readStateSection(name: string, vault = this.vault, strict = false): Promise<Record<string, unknown>> {
+    const statePath = this.getVaultStatePath(vault);
+    await this.stateWrite.catch(() => undefined);
     try {
-      const state = await this.readStateObject();
-      return asStateObject(state[name]);
+      const state = await this.readStateObject(statePath);
+      const section = state[name];
+      if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
+        throw new Error(`Invalid vault state section: ${name}`);
+      }
+      return asStateObject(section);
     } catch (err) {
+      if (strict) throw err;
       fsLog.warn(`Failed to read the "${name}" section of state.json:`, err);
       return {};
     }
@@ -317,14 +328,20 @@ export class VaultFiles {
    * own keys — as it is. It goes through the same queue as the folder writer: several writers, one
    * file, one read-merge-write at a time.
    */
-  public writeStateSection(name: string, patch: Record<string, unknown>): Promise<void> {
+  public writeStateSection(name: string, patch: Record<string, unknown>, vault = this.vault, strict = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
+    const statePath = this.getVaultStatePath(vault);
     return this.queueStateWrite(async () => {
       try {
-        const state = await this.readStateObject();
-        state[name] = { ...asStateObject(state[name]), ...patch };
-        await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+        const state = await this.readStateObject(statePath);
+        const section = state[name];
+        if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
+          throw new Error(`Invalid vault state section: ${name}`);
+        }
+        state[name] = { ...asStateObject(section), ...patch };
+        await writeJsonAtomic(statePath, state);
       } catch (err) {
+        if (strict) throw err;
         fsLog.warn(`Failed to write the "${name}" section of state.json:`, err);
       }
     });
@@ -361,24 +378,32 @@ export class VaultFiles {
     return value as Record<string, unknown>;
   }
 
-  /**
-   * `state.json` as it sits on disk: a missing file is an empty state. A broken one is copied aside
-   * before anything writes over it — the file holds the MCP server's own keys too, and the next
-   * write would otherwise be the last time they existed.
-   */
-  private async readStateObject(): Promise<Record<string, unknown>> {
-    const statePath = this.getVaultStatePath();
-    if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) return {};
-    const text = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
-    let parsed: unknown;
+  /** A first run has no file. An existing unreadable file is not an empty journal. */
+  private async readStateObject(statePath: string): Promise<Record<string, unknown>> {
+    let text: string;
     try {
-      parsed = JSON.parse(text);
-    } catch (err) {
-      fsLog.error('state.json is not valid JSON, keeping a copy before the next write:', err);
-      await this.backupBrokenState(statePath, text);
+      text = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
+    } catch (error) {
+      // Tauri exposes the Rust I/O error as text. Only file/path-not-found is a first run;
+      // plugin-fs `exists` also returns false on permissions errors.
+      if (!/\(os error [23]\)$/.test(String(error))) throw error;
+      if (statePath === 'vaults/main/state.json') {
+        try {
+          await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
+        } catch (legacyError) {
+          if (/\(os error [23]\)$/.test(String(legacyError))) return {};
+          throw legacyError;
+        }
+        throw new Error('Не завершён перенос state.json в основное хранилище');
+      }
       return {};
     }
-    return asStateObject(parsed);
+    try {
+      return this.parseStateStrict(text);
+    } catch (err) {
+      await this.backupBrokenState(statePath, text);
+      throw new Error('state.json повреждён', { cause: err });
+    }
   }
 
   private async backupBrokenState(statePath: string, text: string): Promise<void> {
@@ -741,11 +766,13 @@ export class VaultFiles {
    */
   public flushStateToDisk(): Promise<void> {
     if (!isTauri()) return Promise.resolve();
+    const statePath = this.getVaultStatePath();
+    const workspace = this.deps.getWorkspaceState();
     return this.queueStateWrite(async () => {
       try {
-        const state = await this.readStateObject();
-        state.workspace = this.deps.getWorkspaceState();
-        await writeTextFile(this.getVaultStatePath(), JSON.stringify(state, null, 2), { baseDir: BaseDirectory.AppData });
+        const state = await this.readStateObject(statePath);
+        state.workspace = workspace;
+        await writeJsonAtomic(statePath, state);
       } catch (err) {
         fsLog.warn(`Failed to flush state.json to disk:`, err);
       }

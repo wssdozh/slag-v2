@@ -9,7 +9,7 @@ import { createServer, connect } from 'node:net';
 import { archiveNoteConflict, setKeepRelayOnConflict } from '../src/lib/sync/notes/conflicts.ts';
 import { NoteChannel } from '../src/lib/sync/notes/channel.ts';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
-import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
+import { deriveNoteKeys, sealNote } from '../src/lib/sync/notes/wire.ts';
 
 const relay = spawn('python', ['-u', '-c', `import asyncio, json, sys
 from test_note_registry import TestNoteRegistry, ROOM, VAULT, QUOTA
@@ -17,8 +17,17 @@ async def main():
     test = TestNoteRegistry()
     await test.asyncSetUp()
     try:
-        tokens = await test.setup_room()
-        test.db.activate_note_room(ROOM, test.generation, [], test.account_id, QUOTA)
+        identity, owner, _, laptop = await test.two_devices()
+        with test.server.db.conn:
+            test.server.db.conn.execute("UPDATE accounts SET plan = 'smile' WHERE account_id = ?", (identity['accountId'],))
+        _, phone = await test.add_active_device(identity, owner, 'device-3')
+        await test.accepted_vault(owner, laptop)
+        await test.accepted_vault(owner, phone, 'device-3')
+        test.db = test.server.db
+        test.db.touch_room(ROOM, VAULT)
+        test.generation = test.db.freeze_note_room(ROOM)
+        tokens = [owner, laptop, phone]
+        test.db.activate_note_room(ROOM, test.generation, [], identity['accountId'], QUOTA)
         print(json.dumps(dict(url=test.base, room=ROOM, vault=VAULT, generation=test.generation, tokens=tokens)), flush=True)
         await asyncio.to_thread(sys.stdin.readline)
     finally:
@@ -140,8 +149,23 @@ try {
   const edited = note(id, 'updated before deletion');
   await author.replica.record([{ id, kind: 'update', item: edited }]);
   await until(() => reader.local.get(id)?.content === edited.content && author.replica.pendingCount === 0);
+  const phone = await device(2);
+  assert.equal(phone.local.get(id)?.content, edited.content);
+  const phoneChannel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal: stop.signal,
+    headers: (json) => ({ Authorization: `Bearer ${tokens[2]}`, ...(json && { 'Content-Type': 'application/json' }) }) });
+  const phoneHead = (await phoneChannel.events(generation, 41)).events[0];
+  const stale = await sealNote(keys, room, generation, { noteId: phoneHead.noteId, opId: crypto.randomUUID(),
+    baseRevision: phoneHead.revision, kind: 'update' }, id, { ...edited, content: 'offline phone copy' });
+  phone.close();
   await author.replica.record([{ id, kind: 'delete', item: null }]);
   await until(() => reader.local.get(id) === null && author.replica.pendingCount === 0);
+  const answer = await phoneChannel.send(generation, 'stale-phone', [stale]);
+  assert.equal(answer.results[0].status, 'stale');
+  assert.equal(answer.results[0].current.kind, 'delete');
+  assert.deepEqual((await phoneChannel.events(generation, 43)).events, []);
+  const freshPhone = await device(2);
+  assert.equal(freshPhone.local.get(id), null);
+  freshPhone.close();
   await reader.replica.record([{ id, kind: 'restore', item: edited }]);
   await until(() => author.local.get(id)?.content === edited.content && reader.replica.pendingCount === 0);
   assert.equal(reader.saved().cursor, 44);

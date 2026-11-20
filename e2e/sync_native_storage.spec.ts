@@ -76,6 +76,95 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
   await page.screenshot({ path: 'test-results/screenshots/sync-native-persistence.png' });
 });
 
+test('native sync refuses a corrupt journal until it can re-read a valid one', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
+  const result = await page.evaluate(async () => {
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    return withSyncHarness(async ({ engine, storage, init }) => {
+      const meta = storage.getCurrentVault();
+      const path = storage.files.getVaultStatePath(meta);
+      const other = { ...meta, id: 'isolated-test-vault' };
+      const otherPath = storage.files.getVaultStatePath(other);
+      const good = JSON.stringify({ sync: { tombstones: { removed: 100 } }, untouched: true });
+      const files = new Map<string, string>();
+      let rejectRename = false;
+      let network = 0;
+      window.fetch = async () => { network++; return Response.json({ bundles: [] }); };
+      window.__TAURI_INTERNALS__ = { invoke: async (cmd: string, args: { path: string; oldPath: string; newPath: string } | Uint8Array, options?: { headers: { path: string } }) => {
+        if (cmd === 'plugin:fs|write_text_file' && options) {
+          files.set(decodeURIComponent(options.headers.path), new TextDecoder().decode(args as Uint8Array));
+          return;
+        }
+        const p = args as { path: string; oldPath: string; newPath: string };
+        if (cmd === 'plugin:fs|exists') return files.has(p.path);
+        if (cmd === 'plugin:fs|read_text_file') {
+          if (!files.has(p.path)) throw new Error('file not found (os error 2)');
+          return [...new TextEncoder().encode(files.get(p.path))];
+        }
+        if (cmd === 'plugin:fs|remove') { files.delete(p.path); return; }
+        if (cmd === 'plugin:fs|rename') {
+          if (rejectRename) throw new Error('replacement failed');
+          files.set(p.newPath, files.get(p.oldPath)!);
+          files.delete(p.oldPath);
+          return;
+        }
+        throw new Error(`unexpected invoke ${cmd}`);
+      } };
+      try {
+        files.set(path, good);
+        window.isTauri = true;
+        rejectRename = true;
+        let rejected = false;
+        try { await storage.files.writeStateSection('sync', { cursor: { room: 7 } }, meta, true); }
+        catch { rejected = true; }
+        const priorFileKept = rejected && files.get(path) === good && ![...files.keys()].some((p) => p.endsWith('.tmp'));
+        rejectRename = false;
+        await Promise.all([
+          storage.files.writeStateSection('sync', { cursor: { room: 7 } }, meta, true),
+          storage.files.writeStateSection('sync', { tombstones: { other: 200 } }, other, true),
+        ]);
+        const replaced = JSON.parse(files.get(path)!);
+        const isolated = replaced.untouched && replaced.sync.cursor.room === 7 && replaced.sync.tombstones.removed === 100
+          && JSON.parse(files.get(otherPath)!).sync.tombstones.other === 200;
+        window.isTauri = false; // Seed the existing browser test backend before enabling mock IPC.
+        await init('synthetic journal seed');
+        window.isTauri = true;
+        network = 0;
+        const blocked: boolean[] = [];
+        for (const bad of ['', '{"sync":', '{"sync":{"tombstones":[]}}']) {
+          files.set(path, bad);
+          await engine.init();
+          await engine.retrySync();
+          await engine.pushLocalChanges();
+          blocked.push(!engine.activeRoomId && engine.getStatus().state === 'error' && network === 0 && files.get(path) === bad);
+        }
+        files.set(path, good);
+        await engine.retrySync();
+        const resumed = Boolean(engine.activeRoomId) && network > 0;
+        let acks = 0;
+        engine.sendAck = async () => { acks++; };
+        const bundle = { bundleId: 'native-delete', roomId: engine.activeRoomId, fromDeviceId: 'another-device', sequence: 1,
+          stateRootHash: 'x', timestamp: new Date().toISOString(), changes: [
+            { id: 'already-absent', type: 'item', action: 'delete', version: 1, hash: '100', payload: { deletedAt: 100 } },
+          ] };
+        const { persistIncomingBundle } = await import(/* @vite-ignore */ '/src/lib/sync/applyBundle.ts');
+        rejectRename = true;
+        let failed = false;
+        try { await persistIncomingBundle(engine, bundle); } catch { failed = true; }
+        const noAckOnFailedWrite = failed && acks === 0 && !engine.appliedBundleIds.has(bundle.bundleId);
+        rejectRename = false;
+        await engine.init();
+        await persistIncomingBundle(engine, bundle);
+        const ackAfterRepair = acks === 1 && JSON.parse(files.get(path)!).sync.tombstones['already-absent'] === 100;
+        return { priorFileKept, isolated, blocked, resumed, noAckOnFailedWrite, ackAfterRepair };
+      } finally { delete window.__TAURI_INTERNALS__; delete window.isTauri; }
+    });
+  });
+  expect(result).toEqual({ priorFileKept: true, isolated: true, blocked: [true, true, true], resumed: true,
+    noAckOnFailedWrite: true, ackAfterRepair: true });
+});
+
 test('two notes with one title land in two files', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {

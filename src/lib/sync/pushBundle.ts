@@ -1,7 +1,7 @@
 import type { PendingPush, SyncEngine } from './syncEngine';
 import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
-import { loadSentHashes, loadStateHash, loadTombstones, saveSentHashes, saveStateHash } from './localBookkeeping';
+import { loadSentHashes, loadStateHash, requireSyncSectionFlushed, saveSentHashes, saveStateHash } from './localBookkeeping';
 import { deletionsFromOutbox } from './itemDeletions';
 import { accountClient } from './account';
 import { vault } from '../storage/port';
@@ -228,9 +228,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // so — the trash moved it, the watcher saw the file vanish — never because the list this
       // moment is short: the index reads empty for the first second of every start, and
       // `syncedIds` minus that list once sent "eighty-four notes deleted" to every device.
-      const tombstones = loadTombstones(engine.bookkeeping);
       for (const { id, deletedAt } of deletionsFromOutbox(pendingOps)) {
-        if (deletedAt > (tombstones[id] ?? 0)) tombstones[id] = deletedAt;
         changes.push({
           id,
           type: 'item',
@@ -239,11 +237,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
           hash: String(deletedAt),
           payload: { deletedAt },
         });
-      }
-      // A note that exists is not deleted, whatever the ledger says: the tombstone only ever guards
-      // a stale copy from coming back.
-      for (const id of (registry ? [] : items).map((it) => it.id)) {
-        delete tombstones[id];
       }
 
       // Pack folder mutations, trash operations, and drafts from Outbox
@@ -317,7 +310,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         frame: encodeBundleFrame(encrypted),
         stateHash,
         packedHashes,
-        tombstones: { ...tombstones },
         opIds: pendingOps.map((o) => o.opId),
         changes: changes.length,
         settled: false,
@@ -328,6 +320,8 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         `Queued bundle ${pending.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${engine.activeRoomId.slice(0, 10)}...`
       );
 
+      if (generation !== engine.initGeneration) return;
+      await requireSyncSectionFlushed();
       if (generation !== engine.initGeneration) return;
       engine.pendingPushes.set(pending.bundleId, pending);
       if (attachmentRequest) {
