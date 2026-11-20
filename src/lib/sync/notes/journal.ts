@@ -1,6 +1,6 @@
 // Pure transitions for an ordered queue of local intentions; disk and network stay outside.
-import type { SlagItem } from '../../types/index.ts';
-import { relayNote, sameNote } from './noteMerge.ts';
+import type { SlagItem } from '../../../types/index.ts';
+import { relayNote, sameNote } from './merge.ts';
 
 export type JournalKind = 'create' | 'update' | 'delete' | 'restore';
 export interface NoteBase { revision: number; item: SlagItem | null }

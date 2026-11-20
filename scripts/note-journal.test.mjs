@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeNote, sameNote } from '../src/lib/sync/noteMerge.ts';
-import { emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settleNote } from '../src/lib/sync/noteJournal.ts';
+import { mergeNote, sameNote } from '../src/lib/sync/notes/merge.ts';
+import { emptyJournal, firstPerNote, recordNote, setAttempt, setConfirmed, settleNote } from '../src/lib/sync/notes/journal.ts';
 
 const note = { id: 'note', type: 'note', title: 'title', content: 'one\ntwo\nthree\nfour\nfive', folder: 'inbox', tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
 

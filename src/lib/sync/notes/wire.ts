@@ -1,0 +1,180 @@
+// The authenticated relay sees routing metadata, never the note's identity or body.
+import type { SlagItem } from '../../../types/index.ts';
+import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../../media/byteCodec.ts';
+
+export type NoteKind = 'create' | 'update' | 'delete' | 'restore';
+export type NoteMode = 'legacy' | 'frozen' | 'registry';
+export interface NoteStatus { mode: NoteMode; generation: number; head: number; floor: number }
+export interface NoteSealed { iv: string; ciphertext: string }
+export interface NoteOp {
+  opId: string;
+  noteId: string;
+  baseRevision: number;
+  kind: NoteKind;
+  sealed: NoteSealed;
+}
+export interface NoteHead extends NoteOp { revision: number }
+export type NoteResult = { opId: string; status: 'accepted'; revision: number }
+  | { opId: string; status: 'stale'; current: NoteHead | null }
+  | { opId: string; status: 'rejected'; code: string };
+export interface NoteEvents { generation: number; head: number; floor: number; events: NoteHead[] }
+export interface NoteHeads { generation: number; head: number; floor: number; heads: NoteHead[]; next: string | null }
+export interface NoteResults { type: 'note_results'; requestId: string; generation: number; results: NoteResult[] }
+
+export const NOTE_BATCH_COUNT = 100;
+export const NOTE_BATCH_BYTES = 2_000_000;
+export const NOTE_MAX_BYTES = 12_000_000;
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder('utf-8', { fatal: true });
+const opaqueId = /^[a-f0-9]{64}$/;
+const opId = /^[A-Za-z0-9_-]{1,128}$/;
+
+function record(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid note registry record');
+  return value as Record<string, unknown>;
+}
+
+function integer(value: unknown, minimum = 0): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < minimum) throw new Error('Invalid note registry revision');
+  return value;
+}
+
+function string(value: unknown, pattern: RegExp): string {
+  if (typeof value !== 'string' || !pattern.test(value)) throw new Error('Invalid note registry field');
+  return value;
+}
+
+function records<T>(value: unknown, parse: (value: unknown) => T): T[] {
+  if (!Array.isArray(value) || value.length > NOTE_BATCH_COUNT) throw new Error('Invalid note registry page');
+  return value.map(parse);
+}
+
+function watermark(value: Record<string, unknown>) {
+  const generation = integer(value.generation);
+  const head = integer(value.head);
+  const floor = integer(value.floor);
+  if (floor > head) throw new Error('Invalid note registry watermark');
+  return { generation, head, floor };
+}
+
+export function parseNoteStatus(value: unknown): NoteStatus {
+  const input = record(value);
+  const { mode } = input;
+  if (mode !== 'legacy' && mode !== 'frozen' && mode !== 'registry') throw new Error('Invalid note registry mode');
+  return { mode, ...watermark(input) };
+}
+
+export function parseNoteHead(value: unknown): NoteHead {
+  const input = record(value);
+  const { kind } = input;
+  if (kind !== 'create' && kind !== 'update' && kind !== 'delete' && kind !== 'restore') throw new Error('Invalid note operation kind');
+  const sealed = record(input.sealed);
+  const revision = integer(input.revision, 1);
+  const baseRevision = integer(input.baseRevision);
+  if (baseRevision >= revision) throw new Error('Invalid note operation base');
+  const ciphertext = sealed.ciphertext;
+  if (typeof ciphertext !== 'string' || ciphertext.length < 24 || ciphertext.length > NOTE_MAX_BYTES) throw new Error('Invalid encrypted note size');
+  return {
+    kind, revision, baseRevision, noteId: string(input.noteId, opaqueId), opId: string(input.opId, opId),
+    sealed: { iv: string(sealed.iv, /^[A-Za-z0-9+/]{16}$/), ciphertext },
+  };
+}
+
+export function parseNoteEvents(value: unknown): NoteEvents {
+  const input = record(value);
+  return { ...watermark(input), events: records(input.events, parseNoteHead) };
+}
+
+export function parseLiveNoteEvents(value: unknown): Pick<NoteEvents, 'generation' | 'events'> {
+  const input = record(value);
+  if (input.type !== 'note_events') throw new Error('Invalid live note event');
+  return { generation: integer(input.generation, 1), events: records(input.events, parseNoteHead) };
+}
+
+export function parseNoteHeads(value: unknown): NoteHeads {
+  const input = record(value);
+  return { ...watermark(input), heads: records(input.heads, parseNoteHead), next: input.next === null ? null : string(input.next, opaqueId) };
+}
+
+export function parseNoteResults(value: unknown): NoteResults {
+  const input = record(value);
+  if (input.type !== 'note_results') throw new Error('Invalid note registry response');
+  return {
+    type: input.type,
+    generation: integer(input.generation, 1),
+    requestId: string(input.requestId, opId),
+    results: records(input.results, (raw): NoteResult => {
+      const result = record(raw);
+      const id = string(result.opId, opId);
+      if (result.status === 'accepted') return { opId: id, status: result.status, revision: integer(result.revision, 1) };
+      if (result.status === 'stale') return { opId: id, status: result.status, current: result.current === null ? null : parseNoteHead(result.current) };
+      if (result.status === 'rejected') return { opId: id, status: result.status, code: string(result.code, /^[a-z0-9_]{1,64}$/) };
+      throw new Error('Invalid note operation result');
+    }),
+  };
+}
+
+function associatedData(room: string, generation: number, op: Pick<NoteOp, 'opId' | 'noteId' | 'kind' | 'baseRevision'>) {
+  return encoder.encode(JSON.stringify(['slag-note-v1', room, generation, op.opId, op.noteId, op.kind, op.baseRevision]));
+}
+
+export async function deriveNoteKeys(vaultKey: CryptoKey, room: string) {
+  const source = await crypto.subtle.importKey('raw', await crypto.subtle.exportKey('raw', vaultKey), 'HKDF', false, ['deriveKey']);
+  const params = (purpose: string) => ({ name: 'HKDF', hash: 'SHA-256', salt: encoder.encode(room), info: encoder.encode(`slag-note-v1:${purpose}`) });
+  const [idKey, bodyKey] = await Promise.all([
+    crypto.subtle.deriveKey(params('id'), source, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']),
+    crypto.subtle.deriveKey(params('body'), source, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']),
+  ]);
+  return { idKey, bodyKey };
+}
+
+export type NoteKeys = Awaited<ReturnType<typeof deriveNoteKeys>>;
+
+export async function opaqueNoteId(keys: NoteKeys, id: string): Promise<string> {
+  const mac = new Uint8Array(await crypto.subtle.sign('HMAC', keys.idKey, encoder.encode(id)));
+  return Array.from(mac, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function sealNote(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, id: string, item: SlagItem | null): Promise<NoteOp> {
+  if ((op.kind === 'delete') !== (item === null) || (item && item.id !== id)) throw new Error('Invalid local note operation');
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: associatedData(room, generation, op) },
+    keys.bodyKey, encoder.encode(JSON.stringify({ id, item })),
+  ));
+  const encoded = bytesToBase64(ciphertext);
+  if (encoded.length > NOTE_MAX_BYTES) throw new Error('Note exceeds registry size limit');
+  return { ...op, sealed: { iv: bytesToBase64(iv), ciphertext: encoded } };
+}
+
+export function isNoteItem(value: unknown): value is SlagItem {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === 'string' && item.id.length > 0
+    && (item.type === 'note' || item.type === 'task' || item.type === 'article')
+    && typeof item.title === 'string' && typeof item.content === 'string' && typeof item.folder === 'string'
+    && typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
+    && typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt)
+    && Array.isArray(item.tags) && item.tags.every((tag: unknown) => typeof tag === 'string')
+    && Array.isArray(item.attachments) && item.attachments.every((attachment: unknown) => {
+      if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return false;
+      const metadata = attachment as Record<string, unknown>;
+      return typeof metadata.id === 'string' && typeof metadata.name === 'string'
+        && typeof metadata.relativePath === 'string' && typeof metadata.mimeType === 'string'
+        && (metadata.type === 'image' || metadata.type === 'audio' || metadata.type === 'video' || metadata.type === 'file')
+        && typeof metadata.size === 'number' && Number.isFinite(metadata.size) && metadata.size >= 0
+        && metadata.dataUrl === undefined;
+    });
+}
+
+export async function openNote(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<{ id: string; item: SlagItem | null }> {
+  const plaintext = await crypto.subtle.decrypt({
+    name: 'AES-GCM', iv: toArrayBuffer(base64ToBytes(op.sealed.iv)), additionalData: associatedData(room, generation, op),
+  }, keys.bodyKey, toArrayBuffer(base64ToBytes(op.sealed.ciphertext)));
+  const { id, item } = record(JSON.parse(decoder.decode(plaintext)));
+  if (typeof id !== 'string' || !id || await opaqueNoteId(keys, id) !== op.noteId) throw new Error('Encrypted note identity mismatch');
+  if (op.kind === 'delete' && item === null) return { id, item };
+  if (op.kind === 'delete' || !isNoteItem(item) || item.id !== id) throw new Error('Invalid encrypted note');
+  return { id, item };
+}

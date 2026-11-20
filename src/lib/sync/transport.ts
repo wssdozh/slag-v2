@@ -14,6 +14,8 @@ export interface TransportCallbacks {
   onPing?: (pingMs: number) => void;
   onServerAck?: (bundleId: string) => void;
   onBundle: (bundlePayload: unknown) => Promise<void> | void;
+  onNoteMessage?: (message: unknown) => void;
+  onRoomModeChanged?: () => void;
   /** The bot got a question: answer it from this device, or nobody will. The reporter lets the
    * relay rewrite the status bubble when the model actually starts working. */
   onAssistantQuestion?: (
@@ -36,6 +38,7 @@ export interface TransportOptions {
   vaultId: string;
   roomId: string;
   enabled: boolean;
+  noteGeneration?: number;
   /**
    * Acknowledge over HTTP instead of the socket. Some networks pass a websocket downstream and
    * drop the upstream half: bundles arrive, acks never do, and the relay re-sends the page
@@ -97,7 +100,9 @@ export class SyncTransport {
     const roomId = options.roomId;
     if (!roomId) return;
     const serverUrl = options.serverUrl.replace(/\/+$/, '');
-    const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?vault=${encodeURIComponent(options.vaultId)}`, {
+    const query = new URLSearchParams({ vault: options.vaultId });
+    if (this.currentOptions?.noteGeneration) query.set('noteGeneration', String(this.currentOptions.noteGeneration));
+    const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?${query}`, {
       method: 'POST',
       headers: options.authHeaders(true),
       body: JSON.stringify({ deviceId: options.deviceId, bundleIds: [options.bundleId] }),
@@ -137,6 +142,7 @@ export class SyncTransport {
         vault: options.vaultId,
         backlog: 'http',
       });
+      if (options.noteGeneration) authParams.set('noteGeneration', String(options.noteGeneration));
       const token = accountClient.getToken(options.serverUrl);
       if (token) authParams.set('token', token);
       const fullWsUrl = `${baseWsUrl}/ws/${options.roomId}?${authParams.toString()}`;
@@ -211,6 +217,8 @@ export class SyncTransport {
         }
       } else if (msg.type === 'bundle') {
         await this.callbacks.onBundle(msg.bundle);
+      } else if (msg.type === 'note_events' || msg.type === 'note_results') {
+        this.callbacks.onNoteMessage?.(msg);
       } else if (msg.type === 'assistant_probe' && typeof msg.id === 'string') {
         // The relay is electing one device to answer. Two facts decide it: how fast this socket
         // replies, and whether this device could run a model at all.
@@ -239,7 +247,8 @@ export class SyncTransport {
       } else if (msg.type === 'error') {
         // A replayed bundle is not a refusal: the relay already holds that id, which is exactly
         // what the HTTP fallback wanted, and the duplicate is harmless by design.
-        if (msg.code === 'bundle_replay') syncLog.debug('Relay already has this bundle (bundle_replay)');
+        if (msg.code === 'note_upgrade_required' || msg.code === 'note_room_frozen') this.callbacks.onRoomModeChanged?.();
+        else if (msg.code === 'bundle_replay') syncLog.debug('Relay already has this bundle (bundle_replay)');
         else syncLog.warn(`Relay refused a message: ${msg.code ?? 'unknown'}`);
       }
     } catch (e) {

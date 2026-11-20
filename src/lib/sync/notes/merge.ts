@@ -1,5 +1,5 @@
 // Three-way merge of decrypted note data. The caller, not this function, handles conflicts.
-import type { SlagAttachment, SlagItem } from '../../types/index.ts';
+import type { SlagAttachment, SlagItem } from '../../../types/index.ts';
 
 function equal(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true;
