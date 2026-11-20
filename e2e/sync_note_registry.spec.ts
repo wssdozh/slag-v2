@@ -6,13 +6,21 @@ test('two browser vaults receive accepted notes through the registry, not legacy
   const events: Array<Record<string, unknown>> = [];
   let pushes = 0;
   let pulls = 0;
+  let registryActive = false;
+  let upgrades = 0;
   try {
     for (const view of [page, second]) {
       await view.route(`${serverUrl}/**`, async (route) => {
         const url = new URL(route.request().url());
         const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
         if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
-        if (url.pathname.endsWith('/note-status')) return route.fulfill({ headers, json: { mode: 'registry', generation: 1, head: events.length, floor: 0 } });
+        if (url.pathname.endsWith('/note-status')) return route.fulfill({ headers, json: {
+          mode: registryActive ? 'registry' : 'legacy', generation: Number(registryActive), head: events.length, floor: 0,
+        } });
+        if (registryActive && url.pathname.endsWith('/bundles') && url.searchParams.get('noteGeneration') !== '1') {
+          upgrades++;
+          return route.fulfill({ status: 409, headers, json: { error: 'note_upgrade_required' } });
+        }
         if (url.pathname.endsWith('/note-events')) {
           pulls++;
           return route.fulfill({ headers, json: { generation: 1, head: events.length, floor: 0, events: events.slice(Number(url.searchParams.get('since'))) } });
@@ -20,6 +28,10 @@ test('two browser vaults receive accepted notes through the registry, not legacy
         return route.fulfill({ headers, json: { bundles: [], head: 0, oldest: 0, authRequired: false } });
       });
       await view.routeWebSocket(/127\.0\.0\.1:18321\/ws\//, (socket) => {
+        if (!registryActive) {
+          socket.send(JSON.stringify({ type: 'welcome', connectedDevices: 1 }));
+          return;
+        }
         if (new URL(socket.url()).searchParams.get('noteGeneration') !== '1') return socket.close();
         clients.add(socket);
         socket.send(JSON.stringify({ type: 'welcome', connectedDevices: clients.size }));
@@ -58,8 +70,18 @@ test('two browser vaults receive accepted notes through the registry, not legacy
         syncEngine.getSyncVaultId = () => vault.syncId;
         syncEngine.saveConfig({ enabled: true, seedPhrase: 'synthetic registry seed', serverUrl, deviceId, autoSync: false });
         await syncEngine.init();
-        if (!syncEngine.noteGeneration) throw new Error(syncEngine.getStatus().error ?? 'registry not connected');
+        if (i && !syncEngine.noteGeneration) throw new Error(syncEngine.getStatus().error ?? 'registry not connected');
       }, { i, serverUrl });
+      if (i === 0) {
+        registryActive = true;
+        await view.evaluate(async () => {
+          const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+          if (syncEngine.noteGeneration) throw new Error('expected legacy before refresh');
+          await syncEngine.retrySync();
+          if (syncEngine.noteGeneration !== 1) throw new Error(syncEngine.getStatus().error ?? 'refresh did not renegotiate registry');
+        });
+        expect(upgrades).toBe(1);
+      }
     }
     await expect.poll(() => clients.size).toBe(2);
     const started = performance.now();
