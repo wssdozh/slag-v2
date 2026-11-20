@@ -86,6 +86,7 @@ import {
   type VaultImportPayload,
 } from './vaultTransfer';
 import { notesRemovedByImport } from './noteRemoval';
+import type { AcceptedNote, NoteMutation } from './noteRegistry';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -116,6 +117,8 @@ export type StorageChangeEvent =
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
 
+
+
 /** What a sweep of `notes/` reports: note paths that changed or went, folders that came or left. */
 export interface VaultDiskChange {
   changed: string[];
@@ -132,6 +135,8 @@ const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
 export class StorageService {
   public currentVault: VaultMeta;
   private changeListeners: Set<StorageChangeListener> = new Set();
+  private noteIntentListeners = new Set<(changes: NoteMutation[]) => Promise<void>>();
+  private noteFileWrite: Promise<void> = Promise.resolve();
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
   public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -229,6 +234,67 @@ export class StorageService {
   public subscribeChanges(listener: StorageChangeListener): () => void {
     this.changeListeners.add(listener);
     return () => this.changeListeners.delete(listener);
+  }
+
+  public subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void {
+    this.noteIntentListeners.add(listener);
+    return () => this.noteIntentListeners.delete(listener);
+  }
+
+  public persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined {
+    if (!changes.length || !this.noteIntentListeners.size) return;
+    return Promise.all([...this.noteIntentListeners].map((listener) => listener(changes))).then(() => undefined);
+  }
+
+  public queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void> {
+    if (!before) return write();
+    const run = Promise.all([before, this.noteFileWrite.catch(() => undefined)]).then(write);
+    this.noteFileWrite = run;
+    void run.catch((error: unknown) => fsLog.error('Could not persist note intent or note file', error));
+    return run;
+  }
+
+  public readNoteRegistry(): Promise<unknown> {
+    return isTauri() ? this.files.readRegistryState(this.currentVault) : Promise.resolve().then(() => {
+      const value = localStorage.getItem(`slag_note_registry_${this.currentVault.id}`);
+      return value === null ? undefined : JSON.parse(value) as unknown;
+    });
+  }
+
+  public async writeNoteRegistry(value: unknown): Promise<void> {
+    if (isTauri()) await this.files.writeRegistryState(this.currentVault, value);
+    else localStorage.setItem(`slag_note_registry_${this.currentVault.id}`, JSON.stringify(value));
+  }
+
+  public async applyAcceptedNote({ id, item }: AcceptedNote): Promise<void> {
+    const vault = this.currentVault;
+    const previous = this.getItemById(id);
+    if (!item && !previous) return;
+    const applied = item ? { ...item, filename: getSafeNoteFilename(item.title, id) } : null;
+    if (applied) {
+      if (item?.id !== id) throw new Error('Canonical note id mismatch');
+      safeVaultRelativePath(id);
+      safeVaultRelativePath(applied.folder || DEFAULT_INBOX_FOLDER);
+      await this.files.flushItemToDisk(applied, previous?.folder, previous?.filename, vault, true);
+      const trashed = this.getTrashItems().find((entry) => entry.id === id);
+      if (trashed) await this.files.removeTrashCopy(trashed, trashed.filename, vault);
+    } else if (previous) {
+      await this.files.removeItemFromDisk(previous, vault, true);
+    }
+    if (vault.id !== this.currentVault.id) throw new Error('Vault changed while applying note');
+    // Do not replace a local optimistic state that appeared during the async write. Its intent will
+    // be reapplied against this revision by the journal, not arbitrated here by a timestamp.
+    const live = this.getItemById(id);
+    if (JSON.stringify(live) !== JSON.stringify(previous)) return;
+    const items = this.getItems().filter((entry) => entry.id !== id);
+    if (applied) items.unshift(applied);
+    const key = this.getItemsKey();
+    if (!isTauri()) localStorage.setItem(key, JSON.stringify(stripAttachmentData(items)));
+    this.itemsIndex.set(key, stripAttachmentData(items));
+    const trash = this.getTrashItems();
+    if (!applied && previous) this.cacheTrash([previous, ...trash.filter((entry) => entry.id !== id)]);
+    else if (trash.some((entry) => entry.id === id)) this.cacheTrash(trash.filter((entry) => entry.id !== id));
+    this.emitChange({ kind: 'item', action: applied ? 'upsert' : 'delete', id, payload: applied ?? undefined, origin: 'remote' });
   }
 
   public emitChange(event: StorageChangeEvent): void {
@@ -461,7 +527,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.getItems().find(i => i.id === id);
   }
 
-  public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local'): SlagItem {
+  public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local', restoring = false): SlagItem {
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
@@ -480,6 +546,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
+    const before = origin === 'local' ? this.persistNoteIntents([{
+      id: updatedItem.id, kind: restoring ? 'restore' : oldItem ? 'update' : 'create', item: updatedItem,
+    }]) : undefined;
+    const vault = this.currentVault;
     this.attachments.persistNew([updatedItem]);
     this.cacheItems(this.getItemsKey(), items);
 
@@ -487,10 +557,14 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
       // A local edit is the only one that can be stale: a remote bundle is applied state, and a
       // note without a file behind it has nothing to lose.
-      if (origin === 'local' && oldItem && oldFilename) {
+      if (before) {
+        void this.queueNoteFileWrite(() => restoring ? this.files.restoreItemOnDisk(updatedItem, vault, true)
+          : this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true), before);
+      } else if (origin === 'local' && oldItem && oldFilename) {
         void this.flushGuarded(updatedItem, oldItem, oldFilename);
       } else {
-        void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+        if (!restoring) void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+        else void this.files.restoreItemOnDisk(updatedItem, vault);
       }
     }
 
@@ -540,15 +614,21 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         updated.unshift(item);
       }
     }
+    const before = origin === 'local' ? this.persistNoteIntents([...saveMap.values()].map((item) => ({
+      id: item.id, kind: oldItemsMap.has(item.id) ? 'update' : 'create', item,
+    }))) : undefined;
+    const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);
     this.cacheItems(this.getItemsKey(), updated);
 
     if (isTauri()) {
-      for (const it of saveMap.values()) {
-        const old = oldItemsMap.get(it.id);
-        const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
-        void this.files.flushItemToDisk(it, old?.folder, oldFilename);
-      }
+      void this.queueNoteFileWrite(async () => {
+        for (const it of saveMap.values()) {
+          const old = oldItemsMap.get(it.id);
+          const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
+          await this.files.flushItemToDisk(it, old?.folder, oldFilename, vault, !!before);
+        }
+      }, before);
     }
 
     for (const it of saveMap.values()) {
@@ -766,6 +846,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     folders?: FolderMeta[];
     removedIds?: string[];
     workspaceState?: WorkspaceState;
+    registryNotes?: boolean;
   }): Promise<void> {
     const vault = this.currentVault;
     const base = {
@@ -821,7 +902,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         const nextFolderPaths = new Set(folders.map(f => f.path));
         for (const oldF of base.folders) {
           if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
-            await this.files.removeFolderFromDisk(oldF.path);
+            await this.files.removeFolderFromDisk(oldF.path, vault, data.registryNotes === true);
           }
         }
       }

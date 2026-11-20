@@ -12,6 +12,7 @@ import type {
 } from '../../types';
 import type { StorageChangeEvent } from './index';
 import { storage } from './index';
+import type { NoteRegistryStorage } from './noteRegistry';
 
 export type ChangeOrigin = 'local' | 'remote';
 
@@ -25,9 +26,10 @@ export interface SyncedVaultData {
    */
   removedIds?: string[];
   workspaceState?: WorkspaceState;
+  registryNotes?: boolean;
 }
 
-export interface VaultPort {
+export interface VaultPort extends Partial<NoteRegistryStorage> {
   getCurrentVault(): VaultMeta;
   getVaults(): VaultMeta[];
   ensureVaultSyncId(vaultId: string): string;

@@ -6,6 +6,7 @@ import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { AttachmentStore } from './attachments';
 import type { StorageChangeEvent } from '.';
+import type { NoteMutation } from './noteRegistry';
 
 const fsLog = logger.scope('FS');
 
@@ -15,11 +16,12 @@ export interface TrashStoreHost {
   currentVault: VaultMeta;
   attachments: AttachmentStore;
   files: {
-    removeItemFromDisk(item: SlagItem): Promise<void>;
-    restoreItemOnDisk(item: SlagItem): Promise<void>;
+    removeItemFromDisk(item: SlagItem, vault?: VaultMeta, strict?: boolean): Promise<void>;
   };
   getItems(): SlagItem[];
-  saveItem(item: SlagItem, origin?: 'local' | 'remote'): SlagItem;
+  saveItem(item: SlagItem, origin?: 'local' | 'remote', restoring?: boolean): SlagItem;
+  persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined;
+  queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void>;
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
   /** The snapshot of `.trash/` as the host keeps it: memory, and the web build's localStorage. */
@@ -42,6 +44,8 @@ export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | '
   const item = items.find(i => i.id === id);
   if (!item) return;
 
+  const vault = store.currentVault;
+  const before = origin === 'local' ? store.persistNoteIntents([{ id, kind: 'delete', item: null }]) : undefined;
   // Remove from active items
   const remaining = items.filter(i => i.id !== id);
   store.cacheItems(store.getItemsKey(), remaining);
@@ -53,7 +57,7 @@ export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | '
   fsLog.info(`Moved "${item.title || item.id}" to .trash`);
 
   if (isTauri()) {
-    void store.files.removeItemFromDisk(item);
+    void store.queueNoteFileWrite(() => store.files.removeItemFromDisk(item, vault, !!before), before);
   }
   store.emitChange({ kind: 'item', action: 'delete', id, payload: item, origin });
 }
@@ -67,12 +71,9 @@ export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'loc
   store.cacheTrash(trash.filter(i => i.id !== id));
 
   // Restore to active items
-  store.saveItem(item, origin);
+  store.saveItem(item, origin, true);
   fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
 
-  if (isTauri()) {
-    void store.files.restoreItemOnDisk(item);
-  }
   store.emitChange({ kind: 'trash', action: 'restore', id: item.id, payload: item, origin });
   return item;
 }

@@ -6,6 +6,7 @@ import {
   readDir,
   mkdir,
   remove,
+  rename,
   exists,
   BaseDirectory,
   writeTextFile,
@@ -329,6 +330,31 @@ export class VaultFiles {
     });
   }
 
+  /** Registry data is not a cache. Never replace corrupt state or hide a failed rename. */
+  public async readRegistryState(vault: VaultMeta): Promise<unknown> {
+    const path = `${this.getVaultDir(vault)}/note-registry.json`;
+    await this.stateWrite.catch(() => undefined); // Read the last committed copy after a failed write.
+    if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return undefined;
+    return this.parseStateStrict(await readTextFile(path, { baseDir: BaseDirectory.AppData }));
+  }
+
+  public writeRegistryState(vault: VaultMeta, value: unknown): Promise<void> {
+    const path = `${this.getVaultDir(vault)}/note-registry.json`;
+    return this.queueStateWrite(async () => {
+      const baseDir = BaseDirectory.AppData;
+      const tmp = `${path}.tmp`;
+      await mkdir(this.getVaultDir(vault), { baseDir, recursive: true });
+      await writeTextFile(tmp, JSON.stringify(value), { baseDir });
+      await rename(tmp, path, { oldPathBaseDir: baseDir, newPathBaseDir: baseDir });
+    });
+  }
+
+  private parseStateStrict(text: string): Record<string, unknown> {
+    const value: unknown = JSON.parse(text);
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid vault state');
+    return value as Record<string, unknown>;
+  }
+
   /**
    * `state.json` as it sits on disk: a missing file is an empty state. A broken one is copied aside
    * before anything writes over it — the file holds the MCP server's own keys too, and the next
@@ -583,12 +609,13 @@ export class VaultFiles {
   }
 
   /** A file on disk is this note's only if its frontmatter says so. */
-  private async fileBelongsTo(path: string, id: string): Promise<boolean> {
+  private async fileBelongsTo(path: string, id: string, strict = false): Promise<boolean> {
     try {
       if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return false;
       const text = await readTextFile(path, { baseDir: BaseDirectory.AppData });
-      return text.includes(`id: ${id}\n`) || text.includes(`id: ${id}\r`) || text.endsWith(`id: ${id}`);
-    } catch {
+      return parseMarkdownToItem(text, '').id === id;
+    } catch (error) {
+      if (strict) throw error;
       return false;
     }
   }
@@ -650,9 +677,9 @@ export class VaultFiles {
         ? `${notesBase}/${targetFolder}/${item.id}.md`
         : '';
 
-      const pathToRemove = (await exists(notePath, { baseDir: BaseDirectory.AppData }))
-        ? notePath
-        : ((legacyPath && await exists(legacyPath, { baseDir: BaseDirectory.AppData })) ? legacyPath : null);
+      const baseDir = BaseDirectory.AppData;
+      const owns = (path: string) => strict ? this.fileBelongsTo(path, item.id, true) : exists(path, { baseDir });
+      const pathToRemove = (await owns(notePath)) ? notePath : (legacyPath && await owns(legacyPath) ? legacyPath : null);
 
       if (pathToRemove) {
         await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
@@ -666,23 +693,27 @@ export class VaultFiles {
     }
   }
 
-  public async restoreItemOnDisk(item: SlagItem): Promise<void> {
+  public async restoreItemOnDisk(item: SlagItem, vault: VaultMeta = this.vault, strict = false): Promise<void> {
     if (!isTauri()) return;
     try {
-      const trashBase = this.getVaultTrashPath();
-      const filename = safeVaultRelativePath(item.filename || getSafeNoteFilename(item.title, item.id));
-      if (filename.includes('/')) throw new Error('Invalid note filename');
-      const safeId = isSafeVaultRelativePath(item.id) ? item.id : null;
-      // A copy may sit under the plain name, under the id-suffixed one, or under the old id name.
-      for (const candidate of [filename, withIdSuffix(filename, item.id), ...(safeId ? [`${safeId}.md`] : [])]) {
-        if (await exists(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData })) {
-          await remove(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData });
-          break;
-        }
-      }
-      await this.flushItemToDisk(item);
+      const filenameInTrash = item.filename;
+      await this.flushItemToDisk(item, undefined, undefined, vault, true);
+      await this.removeTrashCopy(item, filenameInTrash, vault);
     } catch (err) {
       fsLog.error(`Failed to restore note ${item.id} on disk:`, err);
+      if (strict) throw err;
+    }
+  }
+
+  public async removeTrashCopy(item: SlagItem, previousFilename: string | undefined, vault: VaultMeta): Promise<void> {
+    if (!isTauri()) return;
+    const trashBase = this.getVaultTrashPath(vault);
+    const filename = safeVaultRelativePath(previousFilename || getSafeNoteFilename(item.title, item.id));
+    if (filename.includes('/')) throw new Error('Invalid note filename');
+    const safeId = isSafeVaultRelativePath(item.id) ? item.id : null;
+    for (const candidate of new Set([filename, withIdSuffix(filename, item.id), ...(safeId ? [`${safeId}.md`] : [])])) {
+      const path = `${trashBase}/${candidate}`;
+      if (await this.fileBelongsTo(path, item.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
     }
   }
 
@@ -703,23 +734,22 @@ export class VaultFiles {
     });
   }
 
-  public async deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void> {
+  public async deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[], vault = this.vault, strict = false): Promise<void> {
     if (!isTauri()) return;
     try {
       // 1. Move notes to Inbox on disk and remove old note files from deleted folder
       for (const { item, oldFolder } of movedItems) {
-        await this.flushItemToDisk(item, oldFolder, item.filename);
+        await this.flushItemToDisk(item, oldFolder, item.filename, vault, strict);
       }
-      // 2. Remove deleted folder directory recursively from disk
-      await this.removeFolderFromDisk(path);
-      // 3. Persist updated state.json to disk
-      await this.flushStateToDisk();
+      await this.removeFolderFromDisk(path, vault, strict);
+      if (vault.id === this.vault.id) await this.flushStateToDisk();
     } catch (err) {
       fsLog.error(`Failed to complete disk deletion for folder "${path}":`, err);
+      if (strict) throw err;
     }
   }
 
-  public async renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[]): Promise<void> {
+  public async renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[], vault = this.vault, strict = false): Promise<void> {
     if (!isTauri()) return;
     try {
       for (const it of items) {
@@ -727,24 +757,26 @@ export class VaultFiles {
           const originalSub = it.folder === newPath
             ? oldPath
             : oldPath + it.folder.slice(newPath.length);
-          await this.flushItemToDisk(it, originalSub, it.filename);
+          await this.flushItemToDisk(it, originalSub, it.filename, vault, strict);
         }
       }
-      await this.removeFolderFromDisk(oldPath);
-      await this.flushStateToDisk();
+      await this.removeFolderFromDisk(oldPath, vault, strict);
+      if (vault.id === this.vault.id) await this.flushStateToDisk();
     } catch (err) {
       fsLog.error(`Failed to complete disk rename for folder "${oldPath}" to "${newPath}":`, err);
+      if (strict) throw err;
     }
   }
 
-  public async removeFolderFromDisk(folderPath: string): Promise<void> {
+  public async removeFolderFromDisk(folderPath: string, vault = this.vault, onlyEmpty = false): Promise<void> {
     if (!isTauri() || !folderPath || folderPath === DEFAULT_INBOX_FOLDER) return;
     try {
       const safeFolder = safeVaultRelativePath(folderPath);
-      const notesBase = this.getVaultNotesPath();
+      const notesBase = this.getVaultNotesPath(vault);
       const targetDir = `${notesBase}/${safeFolder}`;
       if (await exists(targetDir, { baseDir: BaseDirectory.AppData })) {
-        await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
+        if (onlyEmpty && (await readDir(targetDir, { baseDir: BaseDirectory.AppData })).length > 0) return;
+        await remove(targetDir, { baseDir: BaseDirectory.AppData, recursive: !onlyEmpty });
         fsLog.info(`Removed folder directory from disk: ${targetDir}`);
       }
     } catch (err) {
