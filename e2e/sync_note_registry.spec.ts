@@ -8,12 +8,16 @@ test('two browser vaults receive accepted notes through the registry, not legacy
   let pulls = 0;
   let registryActive = false;
   let upgrades = 0;
+  let holdHealth = false;
+  let releaseHealth = () => {};
+  const pendingHealth = new Promise<void>((resolve) => { releaseHealth = resolve; });
   try {
     for (const view of [page, second]) {
       await view.route(`${serverUrl}/**`, async (route) => {
         const url = new URL(route.request().url());
         const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
         if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
+        if (view === page && url.pathname === '/health' && holdHealth) await pendingHealth;
         if (url.pathname.endsWith('/note-status')) return route.fulfill({ headers, json: {
           mode: registryActive ? 'registry' : 'legacy', generation: Number(registryActive), head: events.length, floor: 0,
         } });
@@ -99,7 +103,34 @@ test('two browser vaults receive accepted notes through the registry, not legacy
     }) });
     expect(pushes).toBe(1);
     expect(pulls).toBeLessThanOrEqual(4);
+
+    holdHealth = true;
+    const health = page.waitForRequest(`${serverUrl}/health`);
+    const restarting = page.evaluate(async () => {
+      const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+      await syncEngine.init();
+    });
+    await health;
+    await page.evaluate(async () => {
+      const { storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+      const item = storage.getItemById('registry-0');
+      storage.saveItem({ ...item, content: 'captured before network negotiation' });
+    });
+    await expect.poll(() => page.evaluate(async () => {
+      const { storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+      const local = await storage.readNoteRegistry();
+      return local.journal.pending.length;
+    })).toBe(1);
+    expect(events).toHaveLength(10);
+    releaseHealth();
+    await restarting;
+    await expect.poll(() => second.evaluate(async () => {
+      const { storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+      return storage.getItemById('registry-0')?.content;
+    })).toBe('captured before network negotiation');
+    expect(events).toHaveLength(11);
   } finally {
+    releaseHealth();
     await second.close();
   }
 });
