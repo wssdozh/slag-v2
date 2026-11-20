@@ -1,7 +1,7 @@
 // Test-only cutover using an ephemeral relay database and synthetic snapshots. Loopback only.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { deriveNoteKeys, openNote } from '../src/lib/sync/notes/wire.ts';
@@ -38,16 +38,21 @@ asyncio.run(create())`, db, room]);
   const noteCopies = Array.from({ length: 11 }, (_, i) => note(`stale-${i}`));
   await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [note('shared'), ...noteCopies], trash: [] }));
   await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [note('shared')], trash: noteCopies }));
-  const command = ['scripts/note-bootstrap.mjs', '--devices', 'pc,laptop', ...snaps];
-  assert.throws(() => node(command), (err) => err.status === 2 && JSON.parse(err.stdout).blockers.review_restore_provenance === 11);
+  const command = ['scripts/note-bootstrap.mjs', '--devices', 'pc,laptop', '--room', room, '--generation', String(generation), ...snaps];
+  const ledgerPath = join(dir, 'review.json');
+  assert.throws(() => node([...command, '--review', ledgerPath]), (err) => err.status === 2 && JSON.parse(err.stdout).blockers.review_restore_provenance === 11);
   assert.equal(admin('status').mode, 'frozen');
-  // The fixture defines these copies as stale; the tool itself must not infer that from clocks.
-  await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [note('shared')], trash: [] }));
+  const ledger = JSON.parse(await readFile(ledgerPath, 'utf8'));
+  assert.equal(ledger.blockers.length, 11);
+  // The fixture defines these copies as stale; never edit the input snapshots to resolve this.
+  ledger.decisions = noteCopies.map(({ id }) => ({ id, action: 'delete', evidence: 'fixture: explicit delete and no restore' }));
+  await writeFile(ledgerPath, JSON.stringify(ledger));
+  assert.throws(() => node([...command, '--generation', String(generation + 1), '--decisions', ledgerPath]), (err) => err.status === 1 && /different snapshot or room generation/.test(err.stderr));
   const secret = join(dir, 'key.b64');
   const seed = join(dir, 'seed.json');
   const vaultKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
   await writeFile(secret, Buffer.from(await crypto.subtle.exportKey('raw', vaultKey)).toString('base64'), { mode: 0o600 });
-  const report = node([...command, '--room', room, '--generation', String(generation), '--key-file', secret, '--out', seed]);
+  const report = node([...command, '--decisions', ledgerPath, '--key-file', secret, '--out', seed]);
   assert.deepEqual(report, { devices: 2, candidates: 12, blockers: {} });
   assert.deepEqual(admin('activate', '--seed', seed, '--confirm-room', room), { mode: 'registry', generation, head: 12, floor: 12 });
   const page = python(['-c', 'import json, sys; from store import RelayDatabase; print(json.dumps(RelayDatabase(sys.argv[1]).note_heads(sys.argv[2], int(sys.argv[3]), "", 0, 12, 2000000)))', db, room, String(generation)]);

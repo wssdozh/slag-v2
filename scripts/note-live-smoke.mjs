@@ -5,6 +5,7 @@ import { once } from 'node:events';
 import { createInterface } from 'node:readline';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolve } from 'node:path';
+import { createServer, connect } from 'node:net';
 import { NoteChannel } from '../src/lib/sync/notes/channel.ts';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { deriveNoteKeys } from '../src/lib/sync/notes/wire.ts';
@@ -22,14 +23,46 @@ async def main():
     finally:
         await test.asyncTearDown()
 asyncio.run(main())`], { cwd: resolve(process.argv[2] ?? '../slag-relay/.worktrees/note-registry'), stdio: ['pipe', 'pipe', 'inherit'] });
+const rttMs = Number(process.env.SLAG_SMOKE_RTT_MS ?? 0);
+assert.ok(Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 100);
 const sockets = new Set();
+const proxyConnections = new Set();
+let proxy;
 const stop = new AbortController();
 const exit = once(relay, 'exit');
 try {
   const lines = createInterface({ input: relay.stdout });
   const [text] = await once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
-  const { url, room, vault, generation, tokens } = JSON.parse(text);
-  assert.equal(new URL(url).hostname, '127.0.0.1');
+  const { url: upstream, room, vault, generation, tokens } = JSON.parse(text);
+  const endpoint = new URL(upstream);
+  assert.equal(endpoint.hostname, '127.0.0.1');
+  let url = upstream;
+  if (rttMs) {
+    // Delay packets in each direction equally, without serializing the delays of packets in a batch.
+    proxy = createServer({ allowHalfOpen: true }, (client) => {
+      const server = connect({ port: Number(endpoint.port), host: endpoint.hostname, allowHalfOpen: true });
+      for (const [from, to] of [[client, server], [server, client]]) {
+        proxyConnections.add(from);
+        const timers = new Set();
+        from.on('data', (bytes) => {
+          const timer = setTimeout(() => { timers.delete(timer); if (!to.destroyed) to.write(bytes); }, rttMs / 2);
+          timers.add(timer);
+        });
+        from.on('end', () => {
+          const timer = setTimeout(() => { timers.delete(timer); if (!to.destroyed) to.end(); }, rttMs / 2);
+          timers.add(timer);
+        });
+        from.on('error', () => { from.destroy(); to.destroy(); });
+        from.on('close', () => {
+          proxyConnections.delete(from);
+          for (const timer of timers) clearTimeout(timer);
+        });
+      }
+    });
+    proxy.listen(0, '127.0.0.1');
+    await once(proxy, 'listening');
+    url = `http://127.0.0.1:${proxy.address().port}`;
+  }
   const keys = await deriveNoteKeys(await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']), room);
   async function device(i, initial, local = new Map()) {
     const controller = new AbortController();
@@ -126,10 +159,12 @@ try {
   assert.deepEqual([...author.errors, ...reader.errors], []);
   const p95Ms = Math.round(timings.sort((a, b) => a - b)[Math.ceil(timings.length * 0.95) - 1]);
   assert.ok(p95Ms <= 1000, `loopback p95 ${p95Ms}ms`);
-  process.stdout.write(`${JSON.stringify({ samples: timings.length, p95Ms, burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, p95Ms, burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
 } finally {
   stop.abort();
   for (const ws of sockets) ws.close();
+  for (const connection of proxyConnections) connection.destroy();
+  proxy?.close();
   relay.stdin.end();
   await exit;
 }

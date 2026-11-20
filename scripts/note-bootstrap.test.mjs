@@ -23,10 +23,16 @@ test('offline bootstrap collapses identical live notes and keeps explicit tombst
 
 test('migration refuses missing devices, pending ops, and apparent stale copies without restore provenance', () => {
   const copies = Array.from({ length: 11 }, (_, i) => note(`stale-${i}`));
-  const plan = planBootstrap(['pc', 'laptop', 'phone'], [
+  const inputs = [
     snapshot('pc', { live: copies, pendingIds: ['unsent'] }),
     snapshot('laptop', { trash: copies, tombstones: copies.map(({ id }) => id) }),
-  ]);
+  ];
+  const plan = planBootstrap(['pc', 'laptop', 'phone'], inputs);
   assert.equal(plan.blockers.filter(({ reason }) => reason === 'review_restore_provenance').length, 11);
   assert.deepEqual(plan.blockers.filter(({ reason }) => reason !== 'review_restore_provenance').map(({ reason }) => reason), ['pending_intent', 'missing_device']);
+  const reviewed = planBootstrap(['pc', 'laptop', 'phone'], inputs, new Map(copies.map(({ id }, i) => [id, i === 0 ? 'keep' : 'delete'])));
+  assert.deepEqual(reviewed.blockers.map(({ reason }) => reason), ['pending_intent', 'missing_device']);
+  assert.equal(reviewed.candidates.get('stale-0').id, 'stale-0');
+  assert.equal(reviewed.candidates.get('stale-1'), null);
+  assert.ok(planBootstrap(['pc'], inputs).blockers.some(({ reason, id }) => reason === 'invalid_snapshot' && id === 'laptop'));
 });

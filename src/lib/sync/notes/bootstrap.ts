@@ -13,14 +13,16 @@ export interface BootstrapCopy {
   trash: readonly SlagItem[];
 }
 
-export function planBootstrap(requiredDevices: readonly string[], copies: readonly BootstrapCopy[]) {
+/** Explicit, local decisions for a frozen snapshot set. No inference from timestamps. */
+export function planBootstrap(requiredDevices: readonly string[], copies: readonly BootstrapCopy[], decisions: ReadonlyMap<string, 'delete' | 'keep'> = new Map()) {
   const blockers: { reason: string; id: string }[] = [];
   const candidates = new Map<string, SlagItem | null>();
   const matchingTrash = new Map<string, SlagItem[]>();
   const seen = new Set<string>();
+  const required = new Set(requiredDevices);
   const explicitDeletes = new Set(copies.flatMap((copy) => [...copy.tombstones]));
   for (const copy of copies) {
-    if (!copy.hydrated || seen.has(copy.deviceId)) blockers.push({ reason: 'invalid_snapshot', id: copy.deviceId });
+    if (!copy.hydrated || !required.has(copy.deviceId) || seen.has(copy.deviceId)) blockers.push({ reason: 'invalid_snapshot', id: copy.deviceId });
     seen.add(copy.deviceId);
     for (const id of copy.pendingIds) blockers.push({ reason: 'pending_intent', id });
     for (const item of copy.trash) {
@@ -36,12 +38,21 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
     }
   }
   for (const id of requiredDevices) if (!seen.has(id)) blockers.push({ reason: 'missing_device', id });
+  const eligibleDecisions = new Set<string>();
   for (const id of explicitDeletes) {
     const live = candidates.get(id);
     // Equal trash proves the live copy is the deleted body, but cannot prove the absence of an
     // explicit restore. Require operator review rather than deciding by device clocks.
-    if (live) blockers.push({ reason: matchingTrash.get(id)?.some((copy) => sameNote(copy, live)) ? 'review_restore_provenance' : 'delete_vs_live', id });
-    else candidates.set(id, null);
+    const matchesTrash = live && matchingTrash.get(id)?.some((copy) => sameNote(copy, live));
+    if (matchesTrash) eligibleDecisions.add(id);
+    const decision = decisions.get(id);
+    if (!live || (matchesTrash && decision === 'delete')) candidates.set(id, null);
+    else if (!(matchesTrash && decision === 'keep')) blockers.push({ reason: matchesTrash ? 'review_restore_provenance' : 'delete_vs_live', id });
+  }
+  for (const id of decisions.keys()) {
+    if (!eligibleDecisions.has(id)) {
+      blockers.push({ reason: 'invalid_decision', id });
+    }
   }
   return { blockers, candidates };
 }
