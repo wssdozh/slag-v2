@@ -25,6 +25,9 @@ test('two browser vaults receive accepted notes through the registry, not legacy
           upgrades++;
           return route.fulfill({ status: 409, headers, json: { error: 'note_upgrade_required' } });
         }
+        if (url.pathname.endsWith('/bundle') && route.request().method() === 'POST') {
+          return route.fulfill({ status: 409, headers, json: { error: 'note_room_frozen' } });
+        }
         if (url.pathname.endsWith('/note-events')) {
           pulls++;
           return route.fulfill({ headers, json: { generation: 1, head: events.length, floor: 0, events: events.slice(Number(url.searchParams.get('since'))) } });
@@ -129,6 +132,14 @@ test('two browser vaults receive accepted notes through the registry, not legacy
       return storage.getItemById('registry-0')?.content;
     })).toBe('captured before network negotiation');
     expect(events).toHaveLength(11);
+    await page.evaluate(async () => {
+      const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+      const pending = { bundleId: 'frozen-regression', encrypted: {}, settled: false };
+      await syncEngine.deliverPushOverHttp(pending);
+      if (pending.settled || !syncEngine.getStatus().error?.includes('409')) {
+        throw new Error('frozen bundle was treated as delivered');
+      }
+    });
   } finally {
     releaseHealth();
     await second.close();

@@ -1274,9 +1274,8 @@ export class SyncEngine {
         signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) {
-        if (response.status === 409) {
-          // ponytail: relay dedups by bundle_id; replay means it is already delivered.
-        } else if (response.status === 401 || response.status === 403) {
+        // Replays already return 200. A 409 can be a cutover barrier and must not ACK the outbox.
+        if (response.status === 401 || response.status === 403) {
           retryable = false;
           this.disconnect();
           throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
