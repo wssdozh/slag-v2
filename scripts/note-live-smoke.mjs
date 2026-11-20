@@ -156,6 +156,18 @@ try {
   await until(() => author.local.has('small-99') && reader.replica.pendingCount === 0);
   assert.equal(reader.stats().pushes - pushesBefore, 1);
   assert.equal(reader.stats().reads + author.stats().reads, readsBefore);
+  // Two writers start from the same accepted revision. The stale writer must preserve both edits.
+  const attemptsBeforeRace = author.attempts.length + reader.attempts.length;
+  const shared = reader.local.get(id);
+  const parallelTitle = { ...shared, title: 'title from first writer' };
+  const parallelContent = { ...shared, content: 'body from second writer' };
+  await Promise.all([
+    author.replica.record([{ id, kind: 'update', item: parallelTitle, previous: shared }]),
+    reader.replica.record([{ id, kind: 'update', item: parallelContent, previous: shared }]),
+  ]);
+  await until(() => [author, reader].every((device) => device.replica.pendingCount === 0 &&
+    device.local.get(id)?.title === parallelTitle.title && device.local.get(id)?.content === parallelContent.content));
+  assert.equal(author.attempts.length + reader.attempts.length - attemptsBeforeRace, 3, 'one writer must retry stale CAS');
   assert.deepEqual([...author.errors, ...reader.errors], []);
   const p95Ms = Math.round(timings.sort((a, b) => a - b)[Math.ceil(timings.length * 0.95) - 1]);
   assert.ok(p95Ms <= 1000, `loopback p95 ${p95Ms}ms`);
