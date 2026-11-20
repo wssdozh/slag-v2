@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { deriveNoteKeys, openNote } from '../src/lib/sync/notes/wire.ts';
+import { deriveNoteKeys, openNote, sealNote } from '../src/lib/sync/notes/wire.ts';
 
 const relay = resolve(process.argv[2] ?? '../slag-relay/.worktrees/note-registry');
 const dir = await mkdtemp(join(tmpdir(), 'slag-cutover-'));
@@ -60,7 +60,21 @@ asyncio.run(create())`, db, room]);
   const opened = await Promise.all(page.heads.map((entry) => openNote(keys, room, generation, entry)));
   assert.equal(opened.filter(({ item }) => item).length, 1);
   assert.equal(opened.filter(({ item }) => !item).length, 11);
-  process.stdout.write('isolated cutover: 11 ambiguous copies blocked; 1 live + 11 explicit tombstones verified after resolving the fixture\n');
+  // Start fresh processes against the activated DB: prove CAS and immutable replay survive reopen.
+  const shared = page.heads[opened.findIndex(({ id }) => id === 'shared')];
+  const edit = await sealNote(keys, room, generation, { noteId: shared.noteId, opId: crypto.randomUUID(),
+    baseRevision: shared.revision, kind: 'update' }, 'shared', { ...note('shared'), content: 'after restart' });
+  const submit = () => python(['-c', `import json, sys
+from store import RelayDatabase
+db = RelayDatabase(sys.argv[1])
+owner = db.conn.execute('SELECT owner_account_id FROM vaults JOIN rooms ON vaults.id = rooms.vault_id WHERE room_id = ?', (sys.argv[2],)).fetchone()[0]
+print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), 'device-1', owner, 20000000, [json.loads(sys.argv[4])])))`, db, room, String(generation), JSON.stringify(edit)]);
+  const [accepted, events] = submit();
+  assert.deepEqual(accepted, [{ opId: edit.opId, status: 'accepted', revision: 13 }]);
+  assert.equal((await openNote(keys, room, generation, events[0])).item.content, 'after restart');
+  assert.deepEqual(submit(), [accepted, []]);
+  assert.deepEqual(admin('status'), { mode: 'registry', generation, head: 13, floor: 12 });
+  process.stdout.write('isolated cutover: 11 ambiguous copies blocked; 1 live + 11 tombstones; post-cutover edit and receipt survived reopening SQLite\n');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }
