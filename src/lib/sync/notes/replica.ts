@@ -66,6 +66,7 @@ export class NoteReplica {
   private sending = false;
   private pulling: Promise<void> | undefined;
   private pullRetry: ReturnType<typeof setTimeout> | undefined;
+  private observedRevision = 0;
   private results: { id: string; receive: (value: NoteResults | null) => void } | undefined;
   private ready = false;
   private applyingBatch = false;
@@ -172,6 +173,7 @@ export class NoteReplica {
       }
       const data = parseLiveNoteEvents(message);
       if (data.generation !== this.host.generation) return;
+      for (const { revision } of data.events) this.observedRevision = Math.max(this.observedRevision, revision);
       void this.applyEvents(data.events).then((gap) => gap ? this.catchUp() : undefined).catch((err: unknown) => {
         this.error(err);
         this.retryPull();
@@ -280,6 +282,7 @@ export class NoteReplica {
     let scan = manual;
     for (;;) {
       const cursor = this.state.cursor;
+      const observedBeforeRead = this.observedRevision;
       const page = await this.host.channel.events(this.host.generation, cursor);
       if (page.generation !== this.host.generation || page.head < cursor) throw new Error('Invalid registry cursor');
       if (scan || cursor < page.floor) {
@@ -287,8 +290,12 @@ export class NoteReplica {
         continue;
       }
       if (await this.applyEvents(page.events)) throw new Error('Registry page has a gap');
-      if (this.state.cursor >= page.head) break;
-      if (this.state.cursor <= cursor) throw new Error('Registry page did not advance');
+      if (this.state.cursor >= Math.max(page.head, this.observedRevision)) break;
+      // A later WS event may arrive while an older HTTP snapshot is in flight. Its gap can
+      // join this pull, but the pull must not end against the snapshot that preceded that gap.
+      if (this.state.cursor <= cursor && Math.max(page.head, observedBeforeRead) > cursor) {
+        throw new Error('Registry page did not advance');
+      }
     }
     this.ready = true;
     this.host.onProgress();

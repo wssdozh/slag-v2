@@ -138,6 +138,34 @@ for (const keepRelay of [false, true]) test(`relay deletion wins against an edit
   assert.equal(server.events.length, 2);
 });
 
+test('a live gap arriving during an older HTTP response is caught up without another event', async (t) => {
+  const server = relay();
+  const writer = device(t, server);
+  await writer.replica.catchUp();
+  server.pause();
+  const started = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  let reads = 0;
+  const reader = device(t, server, { channel: { ...server.view, events: async (...args) => {
+    const snapshot = await server.view.events(...args);
+    if (++reads === 1) {
+      started.resolve();
+      await release.promise;
+    }
+    return snapshot;
+  } } });
+  const catchUp = reader.replica.catchUp();
+  await started.promise;
+  await writer.replica.record(['first', 'last'].map((id) => change('create', note(id))));
+  await until(() => server.events.length === 2);
+  reader.replica.handleMessage({ type: 'note_events', generation, events: [server.events[1]] });
+  release.resolve();
+  await catchUp;
+  assert.deepEqual([...reader.local.keys()], ['first', 'last']);
+  assert.equal(reader.saved().cursor, 2);
+  assert.equal(reads, 2);
+});
+
 test('a failed local apply does not advance the durable cursor and can replay', async (t) => {
   const server = relay();
   const a = device(t, server);

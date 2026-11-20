@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110172**, зон: **48**.
+Модулей: **628**, строк: **110179**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -630,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10034 строк
+## src/lib/sync — 46 файлов, 10041 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -664,7 +664,7 @@
 | `notes/journal.ts` | 80 | 4 | JournalKind, NoteBase, JournalAttempt, NoteIntent, NoteJournal, +7 | Pure transitions for an ordered queue of local intentions; disk and network s… |
 | `notes/merge.ts` | 147 | 3 | relayNote, sameNote, mergeNote | Three-way merge of decrypted note data. The caller, not this function, handle… |
 | `notes/persistence.ts` | 60 | 1 | loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
-| `notes/replica.ts` | 410 | 3 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/replica.ts` | 417 | 3 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/session.ts` | 48 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/wire.ts` | 181 | 9 | NoteKind, NoteMode, NoteStatus, NoteSealed, NoteOp, +20 | The authenticated relay sees routing metadata, never the note's identity or b… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
