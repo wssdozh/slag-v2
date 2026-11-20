@@ -50,16 +50,26 @@ jobs:
         run: |
           app=src-tauri/gen/android/app
           # Keep the Kotlin namespace for JNI, but use a separate package/UID/data directory.
-          sed -i 's/applicationId = "com.slag.notes"/applicationId = "com.slag.notes.staging"/' "$app/build.gradle.kts"
+          sed -i 's/applicationId = "com.slag.notes"/applicationId = "com.slag.notes.staging.r${{ github.run_id }}"/' "$app/build.gradle.kts"
           sed -i 's/"SLAG"/"SLAG staging"/g' "$app/src/main/res/values/strings.xml"
-          sed -i 's/android:scheme="slag"/android:scheme="slag-staging"/' "$app/src/main/AndroidManifest.xml"
+          sed -i -e 's/<application$/<application android:allowBackup="false"/' -e 's/android:scheme="slag"/android:scheme="slag-staging"/' "$app/src/main/AndroidManifest.xml"
+          sed -i "s|export const DEFAULT_SYNC_SERVER_URL = .*|export const DEFAULT_SYNC_SERVER_URL = 'http://127.0.0.1:18320';|" src/config/sync.ts
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = 'src-tauri/tauri.conf.json';
+          const conf = JSON.parse(readFileSync(path, 'utf8'));
+          for (const key of ['csp', 'devCsp']) {
+            conf.app.security[key] = conf.app.security[key].replace(/connect-src [^;]+/, "connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:18320 ws://127.0.0.1:18320");
+          }
+          writeFileSync(path, JSON.stringify(conf));
+          JS
       - name: Build and verify staging APK
         run: |
           npx tauri android build --ci --debug --apk --target aarch64
           apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*debug.apk' -print -quit)
           test -n "$apk"
           tools="$ANDROID_HOME/build-tools/37.0.0"
-          "$tools/aapt" dump badging "$apk" | grep "^package: name='com.slag.notes.staging' "
+          "$tools/aapt" dump badging "$apk" | grep -F "package: name='com.slag.notes.staging.r${{ github.run_id }}' "
           "$tools/apksigner" verify "$apk"
           cp "$apk" "$RUNNER_TEMP/SLAG-staging.apk"
       - uses: actions/upload-artifact@v4
