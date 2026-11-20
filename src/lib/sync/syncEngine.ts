@@ -1319,7 +1319,7 @@ export class SyncEngine {
     // A device that edits nothing still has to notice a peer that fell behind. One look at the
     // room's rows on a slow clock; `scheduleManifestCheck` coalesces it with the push-driven asks,
     // and a dark connection has nobody to ask through.
-    this.manifestHeartbeatInterval = setInterval(() => {
+    this.manifestHeartbeatInterval = this.noteGeneration ? null : setInterval(() => {
       if (!this.config.enabled || !this.activeRoomId) return;
       if (this.status.state === 'offline' || this.status.state === 'error') return;
       this.scheduleManifestCheck(0, 'push');
