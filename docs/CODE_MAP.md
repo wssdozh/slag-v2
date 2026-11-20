@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110224**, зон: **48**.
+Модулей: **628**, строк: **110275**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,7 +12,7 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1736 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1542 | 25 |
+| `src/lib/sync/syncEngine.ts` | 1555 | 25 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/storage/index.ts` | 1020 | 44 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
@@ -630,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10064 строк
+## src/lib/sync — 46 файлов, 10115 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -663,9 +663,9 @@
 | `notes/conflicts.ts` | 14 | 2 | keepRelayOnConflict, setKeepRelayOnConflict, archiveNoteConflict |  |
 | `notes/journal.ts` | 80 | 4 | JournalKind, NoteBase, JournalAttempt, NoteIntent, NoteJournal, +7 | Pure transitions for an ordered queue of local intentions; disk and network s… |
 | `notes/merge.ts` | 147 | 3 | relayNote, sameNote, mergeNote | Three-way merge of decrypted note data. The caller, not this function, handle… |
-| `notes/persistence.ts` | 60 | 1 | loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
-| `notes/replica.ts` | 417 | 3 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
-| `notes/session.ts` | 61 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/persistence.ts` | 69 | 1 | enrolledNoteGeneration, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
+| `notes/replica.ts` | 419 | 4 | NoteConflict, NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/session.ts` | 88 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/wire.ts` | 181 | 9 | NoteKind, NoteMode, NoteStatus, NoteSealed, NoteOp, +20 | The authenticated relay sees routing metadata, never the note's identity or b… |
 | `outbox/outbox.ts` | 47 | 1 | Outbox | Queues unsent sync operations per vault, compacting repeats of the same entit… |
 | `pairing.ts` | 171 | 2 | createPairingSession, claimPairingSession, approvePairingSession, approveAccountPairingSession, rejectPairingSession, +2 | Creates a new 5-minute pairing session with a 6-digit PIN on the relay server |
@@ -673,7 +673,7 @@
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
 | `pushBundle.ts` | 376 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1542 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 1555 | 25 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 46 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |

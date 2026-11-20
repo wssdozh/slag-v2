@@ -1012,6 +1012,44 @@ export class SyncEngine {
       this.status.state = 'syncing';
       this.notify();
 
+      const port = vault();
+      const serverUrl = apiBase(this.config.serverUrl);
+      const vaultId = port.getCurrentVault().syncId;
+      const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
+      if (generation !== this.initGeneration) return;
+      const accountRoom = async (id: string) =>
+        `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', id, legacyRoomId]))).slice(0, 32)}`;
+      const controller = this.noteAbort = new AbortController();
+      const noteOptions = (roomId: string, syncVaultId: string) => ({
+        serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
+        signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
+        readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
+        onError: (error: unknown) => this.reportNoteError(error), onProgress: () => {
+          this.status.lastSyncTime = new Date().toLocaleTimeString();
+          this.notify();
+        },
+        onResolution: ({ merged, conflicts }: { merged: number; conflicts: number }) => syncLog.info('Note registry resolutions', {
+          merged, conflicts, conflictShare: conflicts / (merged + conflicts),
+        }),
+        onApplied: ({ item }: { item: SlagItem | null }) => {
+          window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
+          for (const attachment of item?.attachments ?? []) {
+            void port.hasAttachmentBytes(attachment.id, attachment.relativePath).then((present) => {
+              if (!controller.signal.aborted && !present) this.requestAttachmentBytes(attachment);
+            }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
+          }
+        },
+        storeConflict: (conflict: import('./notes/replica').NoteConflict) =>
+          archiveNoteConflict(this.currentVaultId, conflict, port.writeNoteConflict?.bind(port)),
+        hasPendingLegacyNotes: () => this.getOutbox().pending().some(({ kind }) => kind === 'item' || kind === 'trash'),
+      });
+      if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
+        const roomId = await accountRoom(vaultId);
+        if (generation !== this.initGeneration) return;
+        const capture = await openNoteSession(noteOptions(roomId, vaultId), true);
+        if (generation !== this.initGeneration) return;
+        this.noteSession = capture;
+      }
       const canSync = await refreshServerAuth(this);
       if (generation !== this.initGeneration) return;
       if (!canSync) {
@@ -1047,39 +1085,14 @@ export class SyncEngine {
         }
       }
 
-      const [vaultKey, legacyRoomId] = await Promise.all([
-        deriveVaultKey(seedPhrase),
-        deriveRoomId(seedPhrase),
-      ]);
+      const syncVaultId = this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId;
+      const roomId = this.usesAccountSync() ? await accountRoom(syncVaultId) : legacyRoomId;
       if (generation !== this.initGeneration) return;
-      // Never claim an anonymous legacy room: it has no authenticated owner metadata.
-      const roomId = this.usesAccountSync()
-        ? `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', this.getSyncVaultId(), legacyRoomId]))).slice(0, 32)}`
-        : legacyRoomId;
-      if (generation !== this.initGeneration) return;
-      const controller = this.noteAbort = new AbortController();
-      const noteSession = this.usesAccountSync() ? await openNoteSession({
-        serverUrl: apiBase(this.config.serverUrl), roomId, vaultId: this.getSyncVaultId(), key: vaultKey,
-        signal: controller.signal, port: vault(), headers: (json) => authHeaders(this, json),
-        readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message) => this.transport.send(message),
-        onError: (error) => this.reportNoteError(error), onProgress: () => {
-          this.status.lastSyncTime = new Date().toLocaleTimeString();
-          this.notify();
-        },
-        onResolution: ({ merged, conflicts }) => syncLog.info('Note registry resolutions', {
-          merged, conflicts, conflictShare: conflicts / (merged + conflicts),
-        }),
-        onApplied: ({ item }) => {
-          window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
-          for (const attachment of item?.attachments ?? []) {
-            void vault().hasAttachmentBytes(attachment.id, attachment.relativePath).then((present) => {
-              if (!controller.signal.aborted && !present) this.requestAttachmentBytes(attachment);
-            }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
-          }
-        },
-        storeConflict: (conflict) => archiveNoteConflict(this.currentVaultId, conflict, vault().writeNoteConflict?.bind(vault())),
-        hasPendingLegacyNotes: () => this.getOutbox().pending().some(({ kind }) => kind === 'item' || kind === 'trash'),
-      }) : null;
+      const noteSession = this.noteSession ?? (this.usesAccountSync() ? await openNoteSession(noteOptions(roomId, syncVaultId)) : null);
+      if (this.noteSession) {
+        if (!this.usesAccountSync() || syncVaultId !== vaultId) throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
+        await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
+      }
       if (generation !== this.initGeneration) return;
       this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;

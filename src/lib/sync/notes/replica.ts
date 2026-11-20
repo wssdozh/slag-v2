@@ -87,6 +87,8 @@ export class NoteReplica {
 
   get pendingCount() { return this.state.pending.length; }
 
+  setReadOnly(readOnly: boolean) { this.host.readOnly = readOnly; }
+
   private enqueue(task: () => Promise<void>): Promise<void> {
     const run = this.chain.then(async () => {
       this.host.signal.throwIfAborted();

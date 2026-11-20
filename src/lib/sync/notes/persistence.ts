@@ -21,6 +21,15 @@ function validateBase(value: unknown, id: string) {
   if (!integer(base.revision) || !validItem(base.item, id)) throw new Error('Invalid persisted note base');
 }
 
+export function enrolledNoteGeneration(value: unknown, room: string): number | undefined {
+  if (value === undefined) return;
+  const envelope = object(value);
+  if (envelope.version !== 1 || !integer(envelope.generation) || envelope.generation === 0) {
+    throw new Error('Invalid local note registry enrollment');
+  }
+  if (envelope.room === room) return envelope.generation;
+}
+
 export function loadNoteJournal(value: unknown, room: string, generation: number): NoteJournal {
   if (value === undefined) return emptyJournal();
   const envelope = object(value);

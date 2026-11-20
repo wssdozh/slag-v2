@@ -12,19 +12,21 @@ test('registry startup refuses an unreviewed legacy note queue before installing
   const controller = new AbortController();
   let subscribed = false;
   let dirty = true;
+  let saved;
   const options = {
     key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault',
     readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => dirty,
     port: {
       getCurrentVault: () => ({ id: 'local-vault' }),
-      isHydrated: () => true, readNoteRegistry: async () => undefined,
-      writeNoteRegistry: async () => assert.fail('negotiation must not replace the journal'),
+      isHydrated: () => true, readNoteRegistry: async () => saved,
+      writeNoteRegistry: async (value) => { saved = value; },
       applyAcceptedNote: async () => assert.fail('negotiation must not overwrite local files'),
       subscribeNoteIntents: () => { subscribed = true; return () => { subscribed = false; }; },
     },
   };
   await assert.rejects(openNoteSession(options), /старой очереди остались правки/);
   assert.equal(subscribed, false);
+  assert.equal(saved, undefined);
   dirty = false;
   assert.equal((await openNoteSession(options)).generation, 1);
   assert.equal(subscribed, true);
@@ -50,10 +52,39 @@ test('a room bound to the former vault cannot write into the new vault', async (
     },
   });
   const item = { id: 'one', type: 'note', title: 'one', folder: 'inbox', content: 'test', updatedAt: 1, createdAt: 1, tags: [], attachments: [] };
+  assert.equal(writes, 1); // Initial enrollment, before the relay goes offline.
+  writes = 0;
   currentId = 'other';
   await assert.rejects(session.replica.record([{ id: item.id, kind: 'create', item }]), /Vault changed/);
   assert.equal(writes, 0);
   currentId = 'old';
   await session.replica.record([{ id: item.id, kind: 'create', item }]);
   assert.equal(writes, 1);
+});
+
+test('cold offline capture persists an edit without talking to the relay', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => Response.json({ mode: 'registry', generation: 2, head: 0, floor: 0 }));
+  const controller = new AbortController();
+  t.after(() => controller.abort());
+  let saved = { version: 1, room: 'room', generation: 1, journal: { cursor: 0, confirmed: {}, pending: [] } };
+  let record;
+  const options = {
+    key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault',
+    readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => false, onError: () => {},
+    port: {
+      getCurrentVault: () => ({ id: 'local' }),
+      isHydrated: () => true, readNoteRegistry: async () => saved,
+      writeNoteRegistry: async (value) => { saved = value; },
+      applyAcceptedNote: async () => assert.fail('unexpected apply'),
+      subscribeNoteIntents: (listener) => { record = listener; return () => {}; },
+    },
+  };
+  assert.equal(await openNoteSession({ ...options, roomId: 'other' }, true), null);
+  const capture = await openNoteSession(options, true);
+  const item = { id: 'one', type: 'note', title: 'one', folder: 'inbox', content: 'test', updatedAt: 1, createdAt: 1, tags: [], attachments: [] };
+  await record([{ id: item.id, kind: 'create', item }]);
+  assert.equal(saved.journal.pending[0].item.content, 'test');
+  assert.equal(fetch.mock.callCount(), 0);
+  await assert.rejects(capture.verifyEnrollment(false), /поколение/);
+  assert.equal(saved.journal.pending.length, 1);
 });
