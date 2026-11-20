@@ -947,6 +947,10 @@ export class SyncEngine {
       this.notify();
       await pushLocalChanges(this);
     } catch (error) {
+      if (error instanceof Error && error.message === 'note_upgrade_required') {
+        await this.init();
+        return;
+      }
       if (this.noteSession) this.reportNoteError(error);
       // The legacy pull reported itself to the status and already asked for the next attempt.
     }
@@ -1359,9 +1363,15 @@ export class SyncEngine {
         headers: authHeaders(this),
         signal: controller.signal,
       });
-      if (generation !== this.initGeneration || !res.ok) {
-        controller.abort();
-        if (generation !== this.initGeneration) return null;
+      if (generation !== this.initGeneration) return null;
+      if (!res.ok) {
+        if (res.status === 409 && this.usesAccountSync()) {
+          const body: unknown = await res.json().catch(() => null);
+          if (generation !== this.initGeneration) return null;
+          if (body && typeof body === 'object' && 'error' in body && body.error === 'note_upgrade_required') {
+            throw new Error('note_upgrade_required');
+          }
+        }
         throw new Error(`Sync pull failed: HTTP ${res.status}`);
       }
       // The first bundle can exceed the page budget. Use the actual response size when known.
