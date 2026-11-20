@@ -13,6 +13,7 @@ export async function openNoteSession(options: {
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
   onResolution: (counts: { merged: number; conflicts: number }) => void;
   storeConflict: (conflict: NoteConflict) => Promise<void>;
+  hasPendingLegacyNotes: () => boolean;
 }) {
   const channel = new NoteChannel(options);
   const status = await channel.status();
@@ -27,6 +28,11 @@ export async function openNoteSession(options: {
   const keys = await deriveNoteKeys(options.key, options.roomId);
   const initial = loadNoteJournal(await readNoteRegistry.call(options.port), options.roomId, status.generation);
   options.signal.throwIfAborted();
+  // A legacy outbox has no authoritative base revision. Replaying it would silently promote a
+  // possibly stale copy; pulling over it would hide the very edit that stopped migration.
+  if (!options.readOnly && options.hasPendingLegacyNotes()) {
+    throw new Error('В старой очереди остались правки заметок. Синхронизация приостановлена до их проверки');
+  }
   const replica = new NoteReplica({ ...options, channel, keys, generation: status.generation, room: options.roomId,
     save: (journal) => writeNoteRegistry.call(options.port, { version: 1, room: options.roomId, generation: status.generation, journal }),
     apply: async (note) => {

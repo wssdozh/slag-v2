@@ -1074,6 +1074,7 @@ export class SyncEngine {
           }
         },
         storeConflict: (conflict) => archiveNoteConflict(this.currentVaultId, conflict, vault().writeNoteConflict?.bind(vault())),
+        hasPendingLegacyNotes: () => this.getOutbox().pending().some(({ kind }) => kind === 'item' || kind === 'trash'),
       }) : null;
       if (generation !== this.initGeneration) return;
       this.noteSession = noteSession;
