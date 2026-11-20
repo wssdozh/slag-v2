@@ -22,6 +22,22 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/manifest-regression');
 });
 
+test('one cross-parent drag captures one complete folder tree', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { moveFolderTree, rememberFolders, readFolders } = await import('/manifest-regression.mjs');
+    const writes = [];
+    const host = {
+      currentVault: { id: 'drag-vault' }, getItems: () => [], getItemsKey: () => 'items',
+      persistNoteIntents: () => {}, cacheItems: () => {}, emitChange: () => {},
+      persistFolders: (folders) => { writes.push(folders); rememberFolders(host, folders); },
+    };
+    rememberFolders(host, ['A', 'A/child', 'B', 'C'].map((path, order) => ({ path, name: path.split('/').at(-1), description: '', order })));
+    const result = moveFolderTree(host, 'A/child', 'B', 'into');
+    return { result, writes: writes.length, paths: readFolders(host).map(({ path }) => path) };
+  });
+  expect(result).toEqual({ result: { ok: true, path: 'B/child' }, writes: 1, paths: ['A', 'B', 'B/child', 'C'] });
+});
+
 test('a peer manifest missing a local task only reports and pulls', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { syncManifest, vault, setVaultPort, writeManifestAutoResolve } = await import('/manifest-regression.mjs');

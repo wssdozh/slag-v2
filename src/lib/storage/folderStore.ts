@@ -70,7 +70,8 @@ export function renameFolderTree(
   store: FolderStoreHost,
   oldPath: string,
   updatedFolder: FolderMeta,
-  origin: 'local' | 'remote' = 'local'
+  origin: 'local' | 'remote' = 'local',
+  orderedPaths?: string[],
 ): void {
   if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
 
@@ -86,7 +87,9 @@ export function renameFolderTree(
     }
     return f;
   });
-  const folderWrite = store.persistFolders(folders, origin);
+  const ranks = new Map(orderedPaths?.map((path, index) => [path, index]));
+  const folderWrite = store.persistFolders(folders.map((folder) =>
+    ranks.has(folder.path) ? { ...folder, order: ranks.get(folder.path) } : folder), origin);
 
   // Update items belonging to this folder and its subfolders
   const previousItems = store.getItems();
@@ -111,6 +114,13 @@ export function renameFolderTree(
     void store.queueNoteFileWrite(() => store.files.renameFolderOnDisk(oldPath, updatedFolder.path, items, vault, !!before), before);
   }
   store.emitChange({ kind: 'folder', action: 'rename', id: updatedFolder.path, payload: updatedFolder, oldPath, origin });
+  // Legacy still needs per-path ordering events; registry only captures the final tree above.
+  for (const folder of folders) {
+    const order = ranks.get(folder.path);
+    if (folder.path !== updatedFolder.path && order !== undefined && order !== folder.order) {
+      store.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: { ...folder, order }, origin });
+    }
+  }
 }
 
 /**
@@ -189,9 +199,10 @@ export function moveFolderTree(
   if (nextPath !== movedPath) {
     const movedFolder: FolderMeta = { ...moved, path: nextPath, name: folderName(nextPath) };
     if (rank >= 0) movedFolder.order = rank;
-    renameFolderTree(store, movedPath, movedFolder, 'local');
+    renameFolderTree(store, movedPath, movedFolder, 'local', order);
+  } else {
+    applyFolderOrder(store, order);
   }
-  applyFolderOrder(store, order);
   return { ok: true, path: nextPath };
 }
 

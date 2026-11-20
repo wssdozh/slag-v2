@@ -1,3 +1,4 @@
+export { moveFolderTree, rememberFolders, readFolders } from '../../src/lib/storage/folderStore';
 export { syncManifest } from '../../src/lib/sync/manifest/sync';
 export { vault, setVaultPort } from '../../src/lib/storage/port';
 export { writeManifestAutoResolve } from '../../src/lib/sync/manifest/prefs';
