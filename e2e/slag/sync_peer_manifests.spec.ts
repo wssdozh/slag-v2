@@ -1,12 +1,30 @@
+import { build } from 'vite';
 import { test, expect } from '../support/selfhostFixture';
 
-test('a peer manifest missing a local task only reports and pulls', async ({ page }) => {
+// Bundle only these modules. The dev server's cold dependency optimizer stalls on this graph
+// before the test enters syncManifest; neither the app shell nor its CSS are needed here.
+let moduleCode: string;
+test.beforeAll(async () => {
+  const result = await build({
+    configFile: false, logLevel: 'error',
+    build: { write: false, lib: { entry: 'e2e/support/manifestEntry.ts', formats: ['es'], fileName: 'manifest-test' },
+      rolldownOptions: { output: { codeSplitting: false } } },
+  });
+  const outputs = Array.isArray(result) ? result : [result];
+  const chunks = outputs.flatMap((entry) => 'output' in entry ? entry.output : []).filter((entry) => entry.type === 'chunk');
+  expect(chunks).toHaveLength(1);
+  moduleCode = chunks[0].code;
+});
+
+test.beforeEach(async ({ page }) => {
   await page.route('**/manifest-regression', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+  await page.route('**/manifest-regression.mjs', (route) => route.fulfill({ contentType: 'text/javascript', body: moduleCode }));
   await page.goto('/manifest-regression');
+});
+
+test('a peer manifest missing a local task only reports and pulls', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { syncManifest } = await import('/src/lib/sync/manifest/sync.ts');
-    const { vault, setVaultPort } = await import('/src/lib/storage/port.ts');
-    const { writeManifestAutoResolve } = await import('/src/lib/sync/manifest/prefs.ts');
+    const { syncManifest, vault, setVaultPort, writeManifestAutoResolve } = await import('/manifest-regression.mjs');
     const port = vault();
     const originalFetch = window.fetch;
     const trashed: string[] = [];
@@ -54,13 +72,8 @@ test('a peer manifest missing a local task only reports and pulls', async ({ pag
  * older than our resend mean "has not seen it yet", never "refused it".
  */
 test('a manifest check decides per peer, not against one room row', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
-
   const outcomes = await page.evaluate(async () => {
-    const { decideManifest } = await import('/src/lib/sync/manifest/channel.ts');
-    const { parsePeerManifests } = await import('/src/lib/sync/manifest/peers.ts');
-    const { resolveRejected } = await import('/src/lib/sync/manifest/resolve.ts');
+    const { decideManifest, parsePeerManifests, resolveRejected } = await import('/manifest-regression.mjs');
 
     type Row = {
       deviceId: string | null;
