@@ -32,6 +32,7 @@ interface NoteReplicaHost {
   storeConflict: (conflict: NoteConflict) => Promise<void>;
   onError: (error: unknown) => void;
   onProgress: () => void;
+  onResolution?: (counts: { merged: number; conflicts: number }) => void;
 }
 
 const PUSH_DELAY_MS = 50;
@@ -68,6 +69,8 @@ export class NoteReplica {
   private results: { id: string; receive: (value: NoteResults | null) => void } | undefined;
   private ready = false;
   private applyingBatch = false;
+  private resolutions = { merged: 0, conflicts: 0 };
+  private reported = this.resolutions;
   private staleCounts = new Map<string, number>();
 
   private readonly host: NoteReplicaHost;
@@ -84,9 +87,16 @@ export class NoteReplica {
   get pendingCount() { return this.state.pending.length; }
 
   private enqueue(task: () => Promise<void>): Promise<void> {
-    const run = this.chain.then(() => {
+    const run = this.chain.then(async () => {
       this.host.signal.throwIfAborted();
-      return task();
+      try {
+        await task();
+      } finally {
+        if (this.reported !== this.resolutions) {
+          this.reported = this.resolutions;
+          this.host.onResolution?.(this.resolutions);
+        }
+      }
     });
     this.chain = run.catch(() => undefined);
     return run;
@@ -103,6 +113,7 @@ export class NoteReplica {
   // addressed disk application and conflict archival can safely replay the same operations.
   private async batch(apply: () => Promise<void>) {
     const original = this.state;
+    const resolutions = this.resolutions;
     this.applyingBatch = true;
     try {
       await apply();
@@ -110,6 +121,7 @@ export class NoteReplica {
       if (this.state !== original) await this.host.save(this.state);
     } catch (error) {
       this.state = original;
+      this.resolutions = resolutions;
       throw error;
     } finally {
       this.applyingBatch = false;
@@ -185,6 +197,11 @@ export class NoteReplica {
       });
     }
     await this.persist(next);
+    if (fields.length) this.resolutions = { ...this.resolutions, conflicts: this.resolutions.conflicts + 1 };
+    else if (intent.kind === 'update' && intent.base?.item && intent.item && head.item &&
+             !sameNote(intent.base.item, intent.item) && !sameNote(intent.item, head.item)) {
+      this.resolutions = { ...this.resolutions, merged: this.resolutions.merged + 1 };
+    }
     this.staleCounts.delete(intent.intentId);
   }
 

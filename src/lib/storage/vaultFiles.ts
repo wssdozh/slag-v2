@@ -1,13 +1,12 @@
 import type { FolderMeta, KanbanColumn, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
-import { writeJsonAtomic } from '../platform/writeJsonAtomic';
+import { writeAppDataTextAtomic, writeJsonAtomic } from '../platform/writeJsonAtomic';
 import {
   readTextFile,
   readDir,
   mkdir,
   remove,
-  rename,
   exists,
   BaseDirectory,
   writeTextFile,
@@ -605,12 +604,13 @@ export class VaultFiles {
   }
 
   /** Two notes deleted under one title must not share one copy in `.trash/`. */
-  private async freeTrashFilename(filename: string, id: string): Promise<string> {
-    const trashBase = this.getVaultTrashPath();
-    if (!(await exists(`${trashBase}/${filename}`, { baseDir: BaseDirectory.AppData }))) return filename;
-    let candidate = withIdSuffix(filename, id);
-    for (let n = 2; await exists(`${trashBase}/${candidate}`, { baseDir: BaseDirectory.AppData }); n += 1) {
-      candidate = withIdSuffix(`${filename.replace(/\.md$/, '')}-${n}`, id);
+  private async freeTrashFilename(trashBase: string, filename: string, id: string, strict: boolean): Promise<string> {
+    const options = { baseDir: BaseDirectory.AppData };
+    let candidate = filename;
+    for (let n = 1; await exists(`${trashBase}/${candidate}`, options); n++) {
+      // A replay after writing trash but before deleting the source must not make another copy.
+      if (strict && await this.fileBelongsTo(`${trashBase}/${candidate}`, id, true)) break;
+      candidate = withIdSuffix(n === 1 ? filename : `${filename.slice(0, -3)}-${n}.md`, id);
     }
     return candidate;
   }
@@ -658,11 +658,8 @@ export class VaultFiles {
 
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item);
-      if (strict) {
-        const tmp = `${newPath}.${crypto.randomUUID()}.tmp`;
-        await writeTextFile(tmp, content, { baseDir });
-        await rename(tmp, newPath, { oldPathBaseDir: baseDir, newPathBaseDir: baseDir });
-      } else await writeTextFile(newPath, content, { baseDir });
+      if (strict) await writeAppDataTextAtomic(newPath, content);
+      else await writeTextFile(newPath, content, { baseDir });
       if (vault.id === this.vault.id) await this.deps.attachments.persistAll(item);
 
       // The old path may be somebody else's file when two notes shared a title, so a rename
@@ -702,7 +699,9 @@ export class VaultFiles {
         if (!discardLiveCopy) {
           await mkdir(trashBase, { baseDir, recursive: true });
           const content = await readTextFile(pathToRemove, { baseDir });
-          await writeTextFile(`${trashBase}/${await this.freeTrashFilename(filename, item.id)}`, content, { baseDir });
+          const trashPath = `${trashBase}/${await this.freeTrashFilename(trashBase, filename, item.id, strict)}`;
+          if (strict) await writeAppDataTextAtomic(trashPath, content);
+          else await writeTextFile(trashPath, content, { baseDir });
         }
         await remove(pathToRemove, { baseDir });
       }

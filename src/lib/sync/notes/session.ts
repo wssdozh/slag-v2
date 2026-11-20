@@ -11,6 +11,7 @@ export async function openNoteSession(options: {
   port: VaultPort; headers: (json: boolean) => Record<string, string>; readOnly: boolean;
   sendLive: (message: string) => boolean; onProgress: () => void; onError: (error: unknown) => void;
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
+  onResolution: (counts: { merged: number; conflicts: number }) => void;
   storeConflict: (conflict: NoteConflict) => Promise<void>;
 }) {
   const channel = new NoteChannel(options);

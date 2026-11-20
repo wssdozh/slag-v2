@@ -90,7 +90,8 @@ test('batches immediate edits and catches up without further requests when idle'
 test('stale operation merges independent fields; true conflict archives only the rejected local copy', async (t) => {
   const server = relay();
   const a = device(t, server);
-  const b = device(t, server);
+  const resolutions = [];
+  const b = device(t, server, { onResolution: (counts) => resolutions.push(counts) });
   await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
   const base = note('one');
   await a.replica.record([change('create', base)]);
@@ -98,12 +99,17 @@ test('stale operation merges independent fields; true conflict archives only the
   server.pause();
   await a.replica.record([change('update', { ...base, title: 'relay', content: 'new' })]);
   await until(() => server.events.length === 2);
-  await b.replica.record([change('update', { ...base, title: 'rejected', folder: 'moved' })]);
+  await b.replica.record([change('update', { ...base, tags: ['local'] })]);
+  await until(() => b.replica.pendingCount === 0 && resolutions.length === 1);
+  assert.deepEqual(resolutions[0], { merged: 1, conflicts: 0 });
+  assert.deepEqual(b.local.get(base.id).tags, ['local']);
+  await b.replica.record([{ ...change('update', { ...base, title: 'rejected', folder: 'moved' }), previous: base }]);
   await until(() => b.conflicts.length === 1 && b.replica.pendingCount === 0);
   assert.equal(b.local.get(base.id).title, 'relay');
   assert.equal(b.local.get(base.id).content, 'new');
   assert.equal(b.local.get(base.id).folder, 'moved');
   assert.deepEqual(b.conflicts[0].fields, ['title']);
+  assert.deepEqual(resolutions.at(-1), { merged: 1, conflicts: 1 });
   assert.equal(b.conflicts[0].item.title, 'rejected');
 });
 
@@ -150,6 +156,29 @@ test('a failed local apply does not advance the durable cursor and can replay', 
   await b.replica.catchUp();
   assert.equal(b.saved().cursor, 1);
   assert.equal(applied[0].id, 'disk');
+});
+
+test('cursor write failure replays the entire applied page after restart', async (t) => {
+  const server = relay();
+  const a = device(t, server);
+  await a.replica.catchUp();
+  server.pause();
+  await a.replica.record(['one', 'two'].map((id) => change('create', note(id))));
+  await until(() => server.events.length === 2);
+  const disk = new Map();
+  let failed = false;
+  const reader = device(t, server, {
+    apply: async ({ id, item }) => { disk.set(id, item); },
+    save: async () => { failed = true; throw new Error('cursor rename failed'); },
+  });
+  await assert.rejects(reader.replica.catchUp(), /cursor rename failed/);
+  assert.equal(failed, true);
+  assert.deepEqual([...disk.keys()], ['one', 'two']);
+  reader.stop();
+  const restarted = device(t, server);
+  await restarted.replica.catchUp();
+  assert.deepEqual([...restarted.local], [...disk]);
+  assert.equal(restarted.saved().cursor, 2);
 });
 
 test('conflict policy defaults to archive and opting in is per vault', async () => {

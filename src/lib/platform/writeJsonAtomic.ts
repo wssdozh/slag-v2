@@ -15,16 +15,19 @@ import { BaseDirectory, remove, rename, writeTextFile } from '@tauri-apps/plugin
 
 /** Write-then-rename, pretty-printed: how a JSON file that must survive a crash is replaced. */
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
-  const temp = `${file}.${crypto.randomUUID().slice(0, 8)}.tmp`;
-  await writeTextFile(temp, JSON.stringify(value, null, 2), { baseDir: BaseDirectory.AppData });
+  await writeAppDataTextAtomic(file, JSON.stringify(value, null, 2));
+}
+
+export async function writeAppDataTextAtomic(file: string, text: string): Promise<void> {
+  const temp = `${file}.${crypto.randomUUID()}.tmp`;
+  await writeTextFile(temp, text, { baseDir: BaseDirectory.AppData });
   try {
     await rename(temp, file, {
       oldPathBaseDir: BaseDirectory.AppData,
       newPathBaseDir: BaseDirectory.AppData,
     });
   } catch (err) {
-    // The snapshot did not land, so the file beside it is rubbish: leave it there and the next
-    // boot reads a stray temp as "some settings" and copies it around.
+    // Keep the old snapshot and remove the failed temporary replacement.
     await remove(temp, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
     throw err;
   }

@@ -1062,6 +1062,9 @@ export class SyncEngine {
           this.status.lastSyncTime = new Date().toLocaleTimeString();
           this.notify();
         },
+        onResolution: ({ merged, conflicts }) => syncLog.info('Note registry resolutions', {
+          merged, conflicts, conflictShare: conflicts / (merged + conflicts),
+        }),
         onApplied: ({ item }) => {
           window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
           for (const attachment of item?.attachments ?? []) {
