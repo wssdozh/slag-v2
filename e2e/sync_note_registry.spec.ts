@@ -26,7 +26,8 @@ test('two browser vaults receive accepted notes through the registry, not legacy
           return route.fulfill({ status: 409, headers, json: { error: 'note_upgrade_required' } });
         }
         if (url.pathname.endsWith('/bundle') && route.request().method() === 'POST') {
-          return route.fulfill({ status: 409, headers, json: { error: 'note_room_frozen' } });
+          const { bundleId } = route.request().postDataJSON();
+          return route.fulfill({ status: 409, headers, json: { error: bundleId === 'replay-regression' ? 'bundle_replay' : 'note_room_frozen' } });
         }
         if (url.pathname.endsWith('/note-events')) {
           pulls++;
@@ -139,6 +140,10 @@ test('two browser vaults receive accepted notes through the registry, not legacy
       if (pending.settled || !syncEngine.getStatus().error?.includes('409')) {
         throw new Error('frozen bundle was treated as delivered');
       }
+      const replay = { bundleId: 'replay-regression', encrypted: { bundleId: 'replay-regression' },
+        settled: false, stateHash: 'synthetic-hash', packedHashes: {}, tombstones: {}, opIds: [], changes: 0 };
+      await syncEngine.deliverPushOverHttp(replay);
+      if (!replay.settled) throw new Error('explicit replay receipt did not confirm delivery');
     });
   } finally {
     releaseHealth();
