@@ -19,7 +19,7 @@ test('feed cards hug content and keep a shared left edge', async ({ page }, test
   expect(long).not.toBeNull();
   expect(short!.width).toBeLessThan(medium!.width);
   expect(medium!.width).toBeLessThan(long!.width);
-  expect(short!.height).toBeLessThan(45);
+  expect(short!.height).toBeLessThan(34);
   expect(medium!.height).toBeCloseTo(short!.height, 0);
   expect(long!.y - medium!.y - medium!.height).toBeCloseTo(6, 0);
   expect(short!.x).toBeCloseTo(long!.x, 0);
@@ -28,7 +28,7 @@ test('feed cards hug content and keep a shared left edge', async ({ page }, test
     expect(time).not.toBeNull();
     const box = boxes[index]!;
     expect(box.x + box.width - time!.x - time!.width).toBeCloseTo(12, 0);
-    expect(box.y + box.height - time!.y - time!.height).toBeCloseTo(12, 0);
+    expect(box.y + box.height - time!.y - time!.height).toBeCloseTo(4, 0);
   }
   await page.screenshot({ path: 'test-results/screenshots/feed-content-width.png', fullPage: true });
 });

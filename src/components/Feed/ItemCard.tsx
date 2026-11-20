@@ -550,7 +550,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             : isPictureBubble || shape === 'video'
               ? 'gap-0 w-fit max-w-full'
               : `${isCompactText ? 'gap-3' : 'gap-1.5'} w-fit max-w-full`
-        } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
+        } ${isCompactText ? 'px-2.5 sm:px-3 py-1.5' : 'p-2.5 sm:p-3'} rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
             : 'bg-surface hover:bg-surface-hover'
@@ -656,7 +656,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   {...attachmentMarkdownProps}
                 />
                 {isCompactText && (
-                  <span data-testid="item-time" className="float-right ml-3 whitespace-nowrap text-2xs font-mono leading-[1lh] text-fg-muted select-none">
+                  <span data-testid="item-time" className="relative top-0.5 float-right ml-3 whitespace-nowrap text-2xs font-mono leading-[1lh] text-fg-muted select-none">
                     {formattedTime}
                   </span>
                 )}
