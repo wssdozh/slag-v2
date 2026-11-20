@@ -281,7 +281,7 @@ export class StorageService {
     return this.serializeNoteWrite(() => this.writeAcceptedNote(note, vault));
   }
 
-  private async writeAcceptedNote({ id, item }: AcceptedNote, vault: VaultMeta): Promise<void> {
+  private async writeAcceptedNote({ id, item, discardLiveCopy }: AcceptedNote, vault: VaultMeta): Promise<void> {
     if (vault.id !== this.currentVault.id) throw new Error('Vault changed before applying note');
     const previous = this.getItemById(id);
     if (!item && !previous) return;
@@ -294,7 +294,7 @@ export class StorageService {
       const trashed = this.getTrashItems().find((entry) => entry.id === id);
       if (trashed) await this.files.removeTrashCopy(trashed, trashed.filename, vault);
     } else if (previous) {
-      await this.files.removeItemFromDisk(previous, vault, true);
+      await this.files.removeItemFromDisk(previous, vault, true, discardLiveCopy);
     }
     if (vault.id !== this.currentVault.id) throw new Error('Vault changed while applying note');
     // Do not replace a local optimistic state that appeared during the async write. Its intent will
@@ -307,8 +307,8 @@ export class StorageService {
     if (!isTauri()) localStorage.setItem(key, JSON.stringify(stripAttachmentData(items)));
     this.itemsIndex.set(key, stripAttachmentData(items));
     const trash = this.getTrashItems();
-    if (!applied && previous) this.cacheTrash([previous, ...trash.filter((entry) => entry.id !== id)]);
-    else if (trash.some((entry) => entry.id === id)) this.cacheTrash(trash.filter((entry) => entry.id !== id));
+    if (!applied && previous && !discardLiveCopy) this.cacheTrash([previous, ...trash.filter((entry) => entry.id !== id)]);
+    else if (applied && trash.some((entry) => entry.id === id)) this.cacheTrash(trash.filter((entry) => entry.id !== id));
     this.emitChange({ kind: 'item', action: applied ? 'upsert' : 'delete', id, payload: applied ?? undefined, origin: 'remote' });
   }
 

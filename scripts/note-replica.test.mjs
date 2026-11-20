@@ -107,6 +107,31 @@ test('stale operation merges independent fields; true conflict archives only the
   assert.equal(b.conflicts[0].item.title, 'rejected');
 });
 
+for (const keepRelay of [false, true]) test(`relay deletion wins against an edit (keep relay: ${keepRelay})`, async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const writes = [];
+  const archives = [];
+  const vault = `delete-conflict-${keepRelay}`;
+  setKeepRelayOnConflict(vault, keepRelay);
+  const peer = device(t, server, {
+    apply: async (entry) => { writes.push(entry); },
+    storeConflict: (entry) => archiveNoteConflict(vault, entry, async (_id, conflict) => { archives.push(conflict); }),
+  });
+  await Promise.all([author.replica.catchUp(), peer.replica.catchUp()]);
+  const base = note('deleted');
+  await author.replica.record([change('create', base)]);
+  await until(() => writes.length === 1);
+  server.pause();
+  await author.replica.record([change('delete', null, base.id)]);
+  await until(() => server.events.length === 2);
+  await peer.replica.record([change('update', { ...base, content: 'local rejected copy' })]);
+  await until(() => peer.replica.pendingCount === 0);
+  assert.deepEqual(writes.at(-1), { id: base.id, item: null, discardLiveCopy: true });
+  assert.deepEqual(archives.map(({ item }) => item.content), keepRelay ? [] : ['local rejected copy']);
+  assert.equal(server.events.length, 2);
+});
+
 test('a failed local apply does not advance the durable cursor and can replay', async (t) => {
   const server = relay();
   const a = device(t, server);

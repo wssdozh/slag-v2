@@ -681,7 +681,7 @@ export class VaultFiles {
     }
   }
 
-  public async removeItemFromDisk(item: SlagItem, vault: VaultMeta = this.vault, strict = false): Promise<void> {
+  public async removeItemFromDisk(item: SlagItem, vault: VaultMeta = this.vault, strict = false, discardLiveCopy = false): Promise<void> {
     if (!isTauri()) return;
     try {
       const notesBase = this.getVaultNotesPath(vault);
@@ -699,10 +699,12 @@ export class VaultFiles {
       const pathToRemove = (await owns(notePath)) ? notePath : (legacyPath && await owns(legacyPath) ? legacyPath : null);
 
       if (pathToRemove) {
-        await mkdir(trashBase, { baseDir: BaseDirectory.AppData, recursive: true });
-        const content = await readTextFile(pathToRemove, { baseDir: BaseDirectory.AppData });
-        await writeTextFile(`${trashBase}/${await this.freeTrashFilename(filename, item.id)}`, content, { baseDir: BaseDirectory.AppData });
-        await remove(pathToRemove, { baseDir: BaseDirectory.AppData });
+        if (!discardLiveCopy) {
+          await mkdir(trashBase, { baseDir, recursive: true });
+          const content = await readTextFile(pathToRemove, { baseDir });
+          await writeTextFile(`${trashBase}/${await this.freeTrashFilename(filename, item.id)}`, content, { baseDir });
+        }
+        await remove(pathToRemove, { baseDir });
       }
     } catch (err) {
       fsLog.error(`Failed to remove note ${item.id} from disk:`, err);

@@ -180,7 +180,9 @@ export class NoteReplica {
     const next = settleNote(setConfirmed(this.state, intent.id, head), intent, head.revision);
     if (!next.pending.some((entry) => entry.id === intent.id)) {
       const current = confirmedNote(next, intent.id);
-      if (current) await this.host.apply({ id: intent.id, item: current.item });
+      if (current) await this.host.apply({ id: intent.id, item: current.item,
+        ...(!current.item && intent.item && fields.length ? { discardLiveCopy: true as const } : {}),
+      });
     }
     await this.persist(next);
     this.staleCounts.delete(intent.intentId);

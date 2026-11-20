@@ -8,7 +8,12 @@ export interface NoteMutation {
   previous?: SlagItem;
 }
 
-export interface AcceptedNote { id: string; item: SlagItem | null }
+export interface AcceptedNote {
+  id: string;
+  item: SlagItem | null;
+  /** The live copy is a rejected edit, not the deleted revision. Do not move it to trash. */
+  discardLiveCopy?: true;
+}
 
 export interface NoteRegistryStorage {
   readNoteRegistry(): Promise<unknown>;
