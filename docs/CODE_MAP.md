@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **628**, строк: **110275**, зон: **48**.
+Модулей: **628**, строк: **110312**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
 | `src/types/index.ts` | 686 | 225 |
 
-## e2e (playwright) — 132 файлов, 24598 строк
+## e2e (playwright) — 132 файлов, 24629 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -630,7 +630,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 46 файлов, 10115 строк
+## src/lib/sync — 46 файлов, 10121 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -658,7 +658,7 @@
 | `manifest/resolve.ts` | 76 | 1 | RESOLVE_MAX, ResolveInput, decideResolve, resolveRejected | What to do with the notes the room says it does not have. |
 | `manifest/schedule.ts` | 91 | 1 | scheduleManifestCheck, requestManifestCheck, clearManifestCheck | When the room is compared: one timer, the earliest deadline anybody asked for. |
 | `manifest/sync.ts` | 121 | 2 | trashRejectedNotes, getManifest, syncManifest | The room's own copy of this vault's manifest: build → peers → decide → react … |
-| `notes/bootstrap.ts` | 69 | 0 | BootstrapCopy, planBootstrap, sealBootstrap | Runs on a trusted client (or local migration tool), never at the relay with d… |
+| `notes/bootstrap.ts` | 75 | 0 | BootstrapCopy, planBootstrap, sealBootstrap | Runs on a trusted client (or local migration tool), never at the relay with d… |
 | `notes/channel.ts` | 68 | 2 | NoteHttpError, NoteChannel | HTTP catch-up and fallback share the room's existing account authorization. |
 | `notes/conflicts.ts` | 14 | 2 | keepRelayOnConflict, setKeepRelayOnConflict, archiveNoteConflict |  |
 | `notes/journal.ts` | 80 | 4 | JournalKind, NoteBase, JournalAttempt, NoteIntent, NoteJournal, +7 | Pure transitions for an ordered queue of local intentions; disk and network s… |

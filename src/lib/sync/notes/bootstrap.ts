@@ -20,6 +20,9 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
   const matchingTrash = new Map<string, SlagItem[]>();
   const seen = new Set<string>();
   const required = new Set(requiredDevices);
+  if (!required.size || required.has('') || required.size !== requiredDevices.length) {
+    blockers.push({ reason: 'invalid_writer_list', id: '' });
+  }
   const explicitDeletes = new Set(copies.flatMap((copy) => [...copy.tombstones]));
   for (const copy of copies) {
     if (!copy.hydrated || !required.has(copy.deviceId) || seen.has(copy.deviceId)) blockers.push({ reason: 'invalid_snapshot', id: copy.deviceId });
@@ -31,7 +34,10 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
       alternatives.push(item);
       matchingTrash.set(item.id, alternatives);
     }
+    const liveIds = new Set<string>();
     for (const item of copy.live) {
+      if (liveIds.has(item.id)) blockers.push({ reason: 'duplicate_live_id', id: item.id });
+      liveIds.add(item.id);
       const previous = candidates.get(item.id);
       if (previous && !sameNote(previous, item)) blockers.push({ reason: 'divergent_live', id: item.id });
       else candidates.set(item.id, relayNote(item));

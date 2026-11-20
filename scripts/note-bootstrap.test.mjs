@@ -6,6 +6,14 @@ import { deriveNoteKeys, openNote } from '../src/lib/sync/notes/wire.ts';
 const snapshot = (deviceId, extras) => ({ deviceId, hydrated: true, pendingIds: [], live: [], tombstones: [], trash: [], ...extras });
 const note = (id, content = 'copy') => ({ id, type: 'note', title: 'title', folder: 'Inbox', content, createdAt: 1, updatedAt: 1, tags: [], attachments: [] });
 
+test('migration refuses empty writer lists and duplicate IDs within a snapshot', () => {
+  assert.deepEqual(planBootstrap([], []).blockers, [{ reason: 'invalid_writer_list', id: '' }]);
+  const live = [note('duplicate'), note('duplicate')];
+  assert.deepEqual(planBootstrap(['pc'], [snapshot('pc', { live })]).blockers, [
+    { reason: 'duplicate_live_id', id: 'duplicate' },
+  ]);
+});
+
 test('offline bootstrap collapses identical live notes and keeps explicit tombstones', async () => {
   const shared = note('same');
   const old = note('deleted');
