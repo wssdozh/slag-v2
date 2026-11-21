@@ -117,6 +117,30 @@ test('folder projection publishes nothing on partial write and replays the compl
   expect(result.writes).toEqual(['one', 'two', 'one', 'two', 'remove:Old']);
 });
 
+test('folder replay removes both physical copies left by an interrupted move', async ({ page }) => {
+  const remaining = await page.evaluate(async () => {
+    const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');
+    const store = new StorageService();
+    store.currentVault = { id: 'projection-duplicate-test', name: 'Projection duplicate test' };
+    rememberFolders(store, [{ path: 'Old', name: 'Old' }, { path: 'New', name: 'New' }]);
+    window.isTauri = true;
+    const item = { id: 'one', type: 'note', title: 'one', folder: 'New', content: '', tags: [], createdAt: 1, updatedAt: 2 };
+    const copies = new Map([['New/one.md', { ...item, filename: 'one.md' }],
+      ['Old/one.md', { ...item, folder: 'Old', filename: 'one.md', updatedAt: 1 }]]);
+    try {
+      store.files.readStateSection = async () => ({ one: true });
+      store.files.writeStateSection = async () => {};
+      store.files.readProjectionCopies = async () => [...copies.values()];
+      store.files.flushItemToDisk = async (value) => { copies.set(`${value.folder}/${value.filename}`, value); };
+      store.files.removeProjectionCopy = async (value) => { copies.delete(`${value.folder}/${value.filename}`); };
+      // Old remains in the tree, so removing the whole folder cannot mask the duplicate.
+      await store.applyAcceptedFolderGroup([{ id: item.id, item }], undefined);
+      return [...copies.keys()];
+    } finally { delete window.isTauri; }
+  });
+  expect(remaining).toEqual(['New/one.md']);
+});
+
 test('an enrolled folder action journals its cascade without optimistic writes', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');

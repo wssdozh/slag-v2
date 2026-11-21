@@ -436,15 +436,26 @@ export class StorageService {
     const missing = notes.filter(({ id }) => !previousItems.has(id)).map(({ id }) => id);
     const fenced = isTauri() && missing.length ? await this.files.readStateSection('pendingFolderProjection', vault, true) : {};
     const recover = new Set(missing.filter((id) => Object.hasOwn(fenced, id)));
-    const diskCopies = new Map(recover.size
-      ? (await this.files.readProjectionCopies(vault, recover)).map((item) => [item.id, item]) : []);
+    const diskCopies = new Map<string, SlagItem[]>();
+    for (const copy of recover.size ? await this.files.readProjectionCopies(vault, recover) : []) {
+      const copies = diskCopies.get(copy.id);
+      if (copies) copies.push(copy);
+      else diskCopies.set(copy.id, [copy]);
+    }
     const written = new Map<string, SlagItem | null>();
     // Disk replacements are replayable from the old cursor. Publish no partial indexes or events
     // if any replacement or the final tree write fails.
     for (const note of notes) {
       assertVault();
-      const previous = previousItems.get(note.id) ?? diskCopies.get(note.id);
-      if (note.item || previous) written.set(note.id, await this.writeAcceptedNote(note, previous, previousTrash.get(note.id), vault));
+      const copies = diskCopies.get(note.id) ?? [];
+      const previous = previousItems.get(note.id) ?? copies[0];
+      if (note.item || previous) {
+        const applied = await this.writeAcceptedNote(note, previous, previousTrash.get(note.id), vault);
+        for (const copy of copies) {
+          if (!applied || copy.folder !== applied.folder || copy.filename !== applied.filename) await this.files.removeProjectionCopy(copy, vault);
+        }
+        written.set(note.id, applied);
+      }
     }
     assertVault();
     if (folders) await this.writeAcceptedFolderProjection(folders, previousFolders, vault);
@@ -462,7 +473,7 @@ export class StorageService {
       if (applied) {
         trashChanged = trash.delete(id) || trashChanged;
       } else {
-        const removed = previous ?? diskCopies.get(id);
+        const removed = previous ?? diskCopies.get(id)?.[0];
         if (removed && !discardLiveCopy) { trash.set(id, removed); trashChanged = true; }
       }
       events.push({ kind: 'item', action: applied ? 'upsert' : 'delete', id, payload: applied ?? undefined, origin: 'remote' });

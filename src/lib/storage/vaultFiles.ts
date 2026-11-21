@@ -555,6 +555,14 @@ export class VaultFiles {
     return (await this.scanNotesDir(this.getVaultNotesPath(vault), vault, true)).filter(({ id }) => ids.has(id));
   }
 
+  public async removeProjectionCopy(copy: SlagItem, vault: VaultMeta): Promise<void> {
+    const folder = copy.folder ? `${safeVaultRelativePath(copy.folder)}/` : '';
+    const filename = safeVaultRelativePath(copy.filename || '');
+    if (filename.includes('/') || !filename.endsWith('.md')) throw new Error('Invalid projection filename');
+    const path = `${this.getVaultNotesPath(vault)}/${folder}${filename}`;
+    if (await this.fileBelongsTo(path, copy.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
+  }
+
   private async scanNotesDir(dirPath: string, vault = this.vault, strict = false): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
@@ -614,6 +622,11 @@ export class VaultFiles {
         } else if (entry.name.endsWith('.md')) {
           const parsed = parsedByName.get(entry.name);
           if (!parsed) continue;
+          if (strict) {
+            // Recovery needs physical paths, including both copies if a move stopped after write.
+            items.push({ ...parsed, folder: normalized === notesBase ? '' : folderPart });
+            continue;
+          }
           const existingIdx = firstIndexById.get(parsed.id);
           if (existingIdx !== undefined) {
             if ((parsed.updatedAt || 0) > (items[existingIdx].updatedAt || 0)) {
@@ -734,12 +747,13 @@ export class VaultFiles {
     try {
       const notesBase = this.getVaultNotesPath(vault);
       const trashBase = this.getVaultTrashPath(vault);
-      const targetFolder = safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
+      // The strict recovery scanner uses an empty folder for a physical file at notes root.
+      const targetDir = strict && item.folder === '' ? notesBase : `${notesBase}/${safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER)}`;
       const filename = safeVaultRelativePath(item.filename || getSafeNoteFilename(item.title, item.id));
       if (filename.includes('/')) throw new Error('Invalid note filename');
-      const notePath = `${notesBase}/${targetFolder}/${filename}`;
+      const notePath = `${targetDir}/${filename}`;
       const legacyPath = isSafeVaultRelativePath(item.id)
-        ? `${notesBase}/${targetFolder}/${item.id}.md`
+        ? `${targetDir}/${item.id}.md`
         : '';
 
       const baseDir = BaseDirectory.AppData;
