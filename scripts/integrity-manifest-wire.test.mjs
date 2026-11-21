@@ -7,7 +7,6 @@ import {
   decideManifest,
   describeWire,
   diffWire,
-  leavesToRequest,
   parseWire,
   toWire,
   wireFromText,
@@ -171,30 +170,6 @@ test('diffWire speaks about both sides of a folder, not just the changed hash', 
   );
 
   assert.deepEqual(report.folders, ['Новая', 'Пропала']);
-});
-
-test('leavesToRequest asks for missing plus conflict, sorted and unique', () => {
-  const report = {
-    rootMatch: false,
-    folders: [],
-    missing: ['item_3', 'item_1'],
-    extra: ['item_9'],
-    conflict: ['item_2', 'item_3'],
-  };
-
-  assert.deepEqual(leavesToRequest(report, wire()), ['item_1', 'item_2', 'item_3']);
-});
-
-test('leavesToRequest asks for nothing when the remote sent no leaves', () => {
-  const report = {
-    rootMatch: false,
-    folders: [],
-    missing: ['item_1'],
-    extra: [],
-    conflict: ['item_2'],
-  };
-
-  assert.deepEqual(leavesToRequest(report, wire({ leaves: undefined })), []);
 });
 
 test('describeWire logs counts and version, never a hash', () => {

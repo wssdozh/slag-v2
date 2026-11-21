@@ -170,17 +170,6 @@ export function diffWire(local: Manifest, remote: WireBody): DriftReport {
 }
 
 /**
- * The ids worth pulling down: the ones only the remote has, plus the disputed ones.
- *
- * Empty when the remote sent no leaves — there is nothing to name, and an empty request is a
- * truthful "ask me again with leaves" rather than a list of guesses.
- */
-export function leavesToRequest(report: DriftReport, wire: WireBody): string[] {
-  if (wire.leaves === undefined) return [];
-  return [...new Set([...report.missing, ...report.conflict])].sort();
-}
-
-/**
  * What a device does about the peers in its room.
  *
  * A mismatch is only a report, never permission to push or delete vault contents.
