@@ -101,6 +101,7 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
           onOpenLightbox={(images, index) => openLightbox(images, index)}
           onSelectTag={tag => (onSelectTag ? onSelectTag(tag) : setActiveTagFilter(tag))}
           variant={variant === 'screen' ? 'mobile' : 'desktop'}
+          compact={variant === 'dock'}
         />
       </div>
     </div>

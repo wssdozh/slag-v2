@@ -13,6 +13,7 @@ export interface FolderMediaTabsProps {
   onSelectTag?: (tag: string) => void;
   variant?: 'desktop' | 'mobile';
   className?: string;
+  compact?: boolean;
 }
 
 export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
@@ -21,6 +22,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
   onSelectTag,
   variant = 'desktop',
   className = '',
+  compact = false,
 }) => {
   const [activeTab, setActiveTabState] = useState<FolderMediaTabId>(() => {
     return storage.getWorkspaceState().folderMediaTab || 'media';
@@ -147,17 +149,20 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
               data-media-tab={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`relative pb-1 px-2 text-2xs font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              className={`relative pb-1 ${compact ? 'px-1.5' : 'px-2'} text-2xs font-medium transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'text-white'
                   : 'text-fg-muted hover:text-fg-tertiary'
               }`}
             >
               <span>{tab.label}</span>
-              {tab.count > 0 && (
-                <span className={`text-3xs font-mono px-1 py-0.2 rounded ${
-                  activeTab === tab.id ? 'bg-tint-10 text-fg-tertiary' : 'bg-tint-4 text-fg-muted'
-                }`}>
+              {((compact && tab.id !== 'tags') || tab.count > 0) && (
+                <span
+                  data-testid={compact ? `folder-stat-${tab.id}-value` : undefined}
+                  className={`text-3xs font-mono ${compact ? 'text-fg-secondary' : `px-1 py-0.2 rounded ${
+                    activeTab === tab.id ? 'bg-tint-10 text-fg-tertiary' : 'bg-tint-4 text-fg-muted'
+                  }`}`}
+                >
                   {tab.count}
                 </span>
               )}
