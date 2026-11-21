@@ -59,6 +59,19 @@ test('import: only the named ids leave, and only when they are still absent', ()
     'an id this device never had is nothing to remove');
 });
 
+test('import: a snapshot staged before a local save cannot hide the new note', () => {
+  const existing = { id: 'existing', updatedAt: 1 };
+  const created = { id: 'created-during-staging', updatedAt: 2 };
+  const deleted = { id: 'explicitly-deleted', updatedAt: 1 };
+  // The disk import sampled its baseline after the save, so there is no drift during persistence.
+  const base = { items: [existing, created, deleted], folders: [], workspace: {} };
+  const result = reconcileSyncedVault({
+    base, current: base,
+    incoming: { items: [existing], folders: [], removedIds: [deleted.id] },
+  });
+  assert.deepEqual(result.items, [existing, created]);
+});
+
 test('import: an explicit remote delete survives unrelated drift without hiding unmentioned notes', () => {
   const deleted = { id: 'deleted', updatedAt: 1 };
   const restored = { id: 'restored', updatedAt: 3 };

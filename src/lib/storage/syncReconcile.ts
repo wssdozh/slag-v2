@@ -101,8 +101,11 @@ export function reconcileSyncedVault(input: {
     !sameJson(base.folders, current.folders) ||
     !sameJson(base.workspace, current.workspace);
   if (!drifted) {
-    // The common case: nothing moved, so the staged result is already the answer.
-    return { items: incoming.items, folders: incoming.folders, workspace, localWins: [], dropped: [], drifted };
+    // The staged snapshot can predate `base`: a local note may have arrived before disk import
+    // even began. Keep unmentioned notes in the index just as the disk write keeps their files.
+    const mentioned = new Set([...incoming.items.map(({ id }) => id), ...incoming.removedIds ?? []]);
+    const items = [...incoming.items, ...current.items.filter(({ id }) => !mentioned.has(id))];
+    return { items, folders: incoming.folders, workspace, localWins: [], dropped: [], drifted };
   }
 
   const baseById = new Map(base.items.map((item) => [item.id, item]));

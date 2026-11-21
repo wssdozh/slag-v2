@@ -67,6 +67,20 @@ test('legacy restore applies on a peer despite the old trash timestamp', async (
   expect(result.tombstones).toEqual({});
 });
 
+test('a legacy import staged before a local save keeps the new note in the live index', async ({ page }) => {
+  const ids = await page.evaluate(async () => {
+    const { StorageService } = await import('/manifest-regression.mjs');
+    const storage = new StorageService();
+    await storage.saveItem({ id: 'legacy-incoming', title: 'Incoming', type: 'note', folder: 'Входящие' });
+    const staged = storage.getItems();
+    const created = await storage.saveItem({ id: 'legacy-local', title: 'Saved here', type: 'note', folder: 'Входящие' });
+    await storage.importSyncedVaultData({ items: staged });
+    const pickId = ({ id }: { id: string }) => id;
+    return { surviving: storage.getItems().map(pickId), expected: [...staged.map(pickId), created.id] };
+  });
+  expect(ids.surviving).toEqual(ids.expected);
+});
+
 test('folder projection publishes nothing on partial write and replays the complete group', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');
