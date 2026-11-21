@@ -55,6 +55,28 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
 
   await panel.getByTestId('integrity-verify').click();
   await expect(section.getByRole('status')).toContainText('доступна в приложении', { timeout: 15000 });
+
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.noteSession = { generation: 1, replica: { catchUp: async (force: boolean) => {
+      document.documentElement.dataset.testRegistryRefresh = String(force);
+    } } };
+    syncEngine.notify();
+  });
+  const refresh = panel.getByTestId('integrity-registry-refresh');
+  await expect(refresh).toBeDisabled();
+  await expect(panel.getByTestId('integrity-autocheck')).toHaveCount(0);
+  await expect(panel.getByTestId('integrity-server-info')).toHaveCount(0);
+  await expect(panel.getByTestId('integrity-verify')).toBeEnabled();
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.activeRoomId = 'test-room';
+    syncEngine.notify();
+  });
+  await expect(refresh).toBeEnabled();
+  await refresh.click();
+  await expect(page.locator('html')).toHaveAttribute('data-test-registry-refresh', 'true');
+  await page.screenshot({ path: `${SHOT_DIR}/vault-integrity-registry.png` });
 });
 
 test('a named divergence is only diagnostic', async ({ page }) => {

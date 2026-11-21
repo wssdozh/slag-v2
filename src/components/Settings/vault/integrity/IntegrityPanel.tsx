@@ -17,6 +17,7 @@ export interface IntegrityPanelProps {
   lastScan: string | null;       // ISO или null
   /** Последняя сверка с комнатой: её ведёт движок синка, сканер её не трогает. */
   remote: ManifestStatus | null;
+  registryMode: 'inactive' | 'starting' | 'ready';
   /** Автосверка после запуска и после отправки. Выключена — остаётся только кнопка. */
   autoCheck: boolean;
   onToggleAutoCheck(next: boolean): void;
@@ -95,6 +96,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   busy,
   lastScan,
   remote,
+  registryMode,
   autoCheck,
   onToggleAutoCheck,
   onCheckServer,
@@ -122,7 +124,18 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
       {/* ── сервер ─────────────────────────────────────── */}
-      <SettingsGroup
+      {registryMode !== 'inactive' ? (
+        <SettingsGroup title="Реестр синхронизации">
+          <SettingsRow
+            label="Перечитать реестр"
+            description={registryMode === 'starting' ? 'Дождитесь подключения к реестру' : 'Загрузить подтверждённые версии с релея'}
+            onClick={onCheckServer}
+            disabled={busy || registryMode !== 'ready'}
+            chevron
+            testId="integrity-registry-refresh"
+          />
+        </SettingsGroup>
+      ) : <SettingsGroup
         title="Сверка с сервером"
         action={
           <InfoHint
@@ -166,7 +179,7 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
           chevron
           testId="integrity-server-check"
         />
-      </SettingsGroup>
+      </SettingsGroup>}
 
       {/* ── диск ───────────────────────────────────────── */}
       <SettingsGroup

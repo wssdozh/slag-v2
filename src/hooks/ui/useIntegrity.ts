@@ -15,6 +15,7 @@ export interface UseIntegrity {
   message: string | null;
   /** The last comparison with the room. `null` until the engine has run one. */
   remote: ManifestStatus | null;
+  registryMode: 'inactive' | 'starting' | 'ready';
   /** Whether the engine compares on its own. Off means only the button asks. */
   autoCheck: boolean;
   setAutoCheck(next: boolean): void;
@@ -39,6 +40,9 @@ export function useIntegrity(): UseIntegrity {
   // The engine keeps the same object between checks, so this reads the room's answer without
   // copying it per render and without the panel having to press «сверить» to see it.
   const remote = useSyncExternalStore(subscribeToEngine, () => syncEngine.getManifest(), () => null);
+  const registryMode = useSyncExternalStore(subscribeToEngine,
+    () => syncEngine.noteGeneration === undefined ? 'inactive' : syncEngine.activeRoomId ? 'ready' : 'starting',
+    () => 'inactive' as const);
   // Lazy initial state, not an effect: the switch has to show the stored answer on the first frame.
   const [autoCheck, setAutoCheckState] = useState(readManifestAutoCheck);
 
@@ -107,6 +111,7 @@ export function useIntegrity(): UseIntegrity {
     lastScan,
     message,
     remote,
+    registryMode,
     autoCheck,
     setAutoCheck,
     checkServer,

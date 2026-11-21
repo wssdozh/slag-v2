@@ -7,7 +7,7 @@ import { IntegrityPanel } from './IntegrityPanel';
 
 export const IntegritySection: React.FC = () => {
   const {
-    busy, findings, status, lastScan, message, remote,
+    busy, findings, status, lastScan, message, remote, registryMode,
     autoCheck, setAutoCheck, checkServer, verify, repair,
   } = useIntegrity();
   return (
@@ -18,6 +18,7 @@ export const IntegritySection: React.FC = () => {
         busy={busy}
         lastScan={lastScan}
         remote={remote}
+        registryMode={registryMode}
         autoCheck={autoCheck}
         onToggleAutoCheck={setAutoCheck}
         onCheckServer={checkServer}

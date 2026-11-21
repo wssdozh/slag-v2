@@ -1113,6 +1113,7 @@ export class SyncEngine {
         const capture = await openNoteSession(noteOptions(roomId, vaultId), true);
         if (generation !== this.initGeneration) return;
         this.noteSession = capture;
+        if (capture) this.notify();
       }
       const canSync = await refreshServerAuth(this);
       if (generation !== this.initGeneration) return;
@@ -1165,6 +1166,7 @@ export class SyncEngine {
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
+      if (noteSession) this.notify();
 
       // The tombstone ledger is in memory by now, from the hydrate at the top of init: a pull that
       // started without it would accept a stale copy of a note this device deleted. Nothing is
