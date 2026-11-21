@@ -115,62 +115,16 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
           title="Нажмите, чтобы перейти к закрепленному сообщению (ПКМ — контекстное меню)"
         >
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            {/* Left Indicator Track (Telegram-style vertical dashes / chips with shadow fade transition) */}
-            <div
-              className="flex flex-col gap-0.5 justify-center py-0.5 h-7 shrink-0 relative overflow-hidden"
-              style={
-                effectivePinnedItems.length > 5
-                  ? {
-                      maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
-                      WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)',
-                    }
-                  : undefined
-              }
-              title={`Закреплено записей: ${effectivePinnedItems.length}`}
-            >
-              {effectivePinnedItems.length === 1 ? (
-                <div className="w-0.5 h-6 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.5)]" />
-              ) : (
-                effectivePinnedItems.slice(0, Math.min(effectivePinnedItems.length, 6)).map((it, idx) => {
-                  const isActive = idx === safeIndex;
-                  return (
-                    <div
-                      key={it.id}
-                      className={`w-0.5 rounded-full transition-colors duration-200 ${
-                        isActive
-                          ? 'h-2.5 bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.6)]'
-                          : 'h-1 bg-tint-20'
-                      }`}
-                    />
-                  );
-                })
-              )}
-            </div>
-
-            {/* Thumbnail or Type Icon Box */}
-            {firstImage ? (
-              <img
-                src={firstImageSrc}
-                alt="Превью"
-                className="w-7 h-7 rounded-md object-cover shrink-0 border border-tint-8"
-              />
-            ) : (
-              <div className="w-7 h-7 rounded-md bg-tint-4 border border-tint-6 flex items-center justify-center shrink-0">
-                {currentPinnedItem.type === 'task' ? (
-                  <Icon name="entity.task" size="sm" tone="warning" />
-                ) : currentPinnedItem.type === 'article' ? (
-                  <Icon name="entity.article" size="sm" tone="accent" />
-                ) : (
-                  <Icon name="entity.note" size="sm" />
-                )}
-              </div>
+            <Icon name="action.pin" size="md" tone="inherit" className="shrink-0 text-fg-secondary" />
+            {firstImageSrc && (
+              <img src={firstImageSrc} alt="Превью" className="size-7 shrink-0 rounded-md object-cover" />
             )}
 
             {/* Content Preview */}
             <div className="flex-1 min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-xs font-semibold text-blue-400 truncate">
-                  Закреплённое сообщение
+                <span className="text-2xs font-medium text-fg-secondary truncate">
+                  Закреплено
                 </span>
                 {effectivePinnedItems.length > 1 && (
                   <span className="text-3xs font-mono text-fg-muted shrink-0">
@@ -178,7 +132,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
                   </span>
                 )}
               </div>
-              <span className="text-2xs text-fg-tertiary truncate leading-tight mt-0.5 font-normal">
+              <span className="text-xs text-fg-primary truncate leading-tight mt-0.5 font-normal">
                 {previewText}
               </span>
             </div>
@@ -193,7 +147,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
             }}
             className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
               isPinnedOnlyFilter
-                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm'
+                ? 'bg-tint-10 text-fg-primary'
                 : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-8'
             }`}
             title={
@@ -202,6 +156,7 @@ export const PinnedBanner: React.FC<{ className?: string }> = ({ className = '' 
                 : `Показать только закрепленные (${effectivePinnedItems.length})`
             }
             aria-label="Фильтр закрепленных записей"
+            aria-pressed={isPinnedOnlyFilter}
           >
             <Icon name="action.pin" size="sm" tone="inherit" className="rotate-45 shrink-0" />
             <div className="flex flex-col gap-0.5 shrink-0">
