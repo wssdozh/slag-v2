@@ -1155,6 +1155,9 @@ export class SyncEngine {
         await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
       }
       if (generation !== this.initGeneration) return;
+      // Journal edits found on disk before the incoming feed can replace their files.
+      await noteSession?.captureColdNoteEdits();
+      if (generation !== this.initGeneration) return;
       this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;

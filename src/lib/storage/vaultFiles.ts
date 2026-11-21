@@ -553,8 +553,10 @@ export class VaultFiles {
     return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
-  public async readProjectionCopies(vault: VaultMeta, ids: Set<string>): Promise<SlagItem[]> {
-    return (await this.scanNotesDir(this.getVaultNotesPath(vault), vault, true)).filter(({ id }) => ids.has(id));
+  public async readProjectionCopies(vault: VaultMeta, ids: Set<string>, requireExplicitId = false): Promise<SlagItem[]> {
+    const path = this.getVaultNotesPath(vault);
+    if (requireExplicitId && !(await exists(path, { baseDir: BaseDirectory.AppData }))) return [];
+    return (await this.scanNotesDir(path, vault, true, requireExplicitId)).filter(({ id }) => ids.has(id));
   }
 
   public async removeProjectionCopy(copy: SlagItem, vault: VaultMeta): Promise<void> {
@@ -565,7 +567,7 @@ export class VaultFiles {
     if (await this.fileBelongsTo(path, copy.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
   }
 
-  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false): Promise<SlagItem[]> {
+  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, requireExplicitId = false): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
@@ -589,7 +591,7 @@ export class VaultFiles {
             try {
               const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
               const fallbackId = entry.name.replace(/\.md$/, '');
-              const parsed = parseMarkdownToItem(content, fallbackId, folderPart);
+              const parsed = parseMarkdownToItem(content, requireExplicitId ? '' : fallbackId, folderPart);
               parsed.filename = entry.name;
               return [entry.name, parsed] as const;
             } catch (e) {
@@ -614,7 +616,7 @@ export class VaultFiles {
           // files. Walking into them would put deleted notes back in the feed — and the folder
           // list skips them too, so a note from there would land in a folder nothing draws.
           if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const nested = await this.scanNotesDir(subPath, vault, strict);
+          const nested = await this.scanNotesDir(subPath, vault, strict, requireExplicitId);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
               firstIndexById.set(nestedItem.id, items.length);

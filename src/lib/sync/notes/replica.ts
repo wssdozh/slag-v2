@@ -325,6 +325,32 @@ export class NoteReplica {
     return run.catch((err: unknown) => { this.error(err); throw err; });
   }
 
+  captureColdNoteEdits(readCopies: (ids: Set<string>) => Promise<SlagItem[]>): Promise<void> {
+    if (this.host.readOnly) return Promise.resolve();
+    return this.enqueue(async () => {
+      const state = this.state;
+      const pending = new Set(state.pending.map(({ id }) => id));
+      const live = new Map(Object.entries(state.confirmed).flatMap(([id, { item }]) =>
+        isNoteItem(item) && !pending.has(id) ? [[id, item] as const] : []));
+      if (!live.size) return;
+      const copies = await readCopies(new Set(live.keys()));
+      this.host.signal.throwIfAborted();
+      const counts = new Map<string, number>();
+      for (const { id } of copies) counts.set(id, (counts.get(id) ?? 0) + 1);
+      const body = (content: string) => content.replace(/\r\n/g, '\n').trim();
+      let next = state;
+      for (const copy of copies) {
+        const previous = live.get(copy.id);
+        if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder
+            || previous.title !== copy.title || previous.type !== copy.type || body(previous.content) === body(copy.content)) continue;
+        // Keep the confirmed base. A newer remote revision must conflict, not rebase this edit.
+        next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous,
+          item: { ...previous, content: copy.content } });
+      }
+      await this.persist(next);
+    });
+  }
+
   recordExternal(event: { id: string; action: string; payload?: SlagItem; previous?: SlagItem }): Promise<void> {
     // A watcher reports a missing path, not an explicit delete. An atomic rename,
     // unreadable file, or a folder move must never mint a registry tombstone.

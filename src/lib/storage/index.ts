@@ -394,6 +394,15 @@ export class StorageService {
     });
   }
 
+  public async readRegistryNoteCopies(ids: Set<string>): Promise<SlagItem[]> {
+    if (!isTauri() || !ids.size) return [];
+    const vault = this.currentVault;
+    const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
+    const eligible = new Set([...ids].filter((id) => !Object.hasOwn(fenced, id)));
+    if (!eligible.size) return [];
+    return this.files.readProjectionCopies(vault, eligible, true);
+  }
+
   public async hasIncompleteFolderProjection(): Promise<boolean> {
     if (!isTauri()) return false;
     return Object.keys(await this.files.readStateSection('pendingFolderProjection', this.currentVault, true)).length > 0;

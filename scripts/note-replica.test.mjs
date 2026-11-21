@@ -73,6 +73,39 @@ async function until(predicate) {
 
 const change = (kind, item, id = item.id) => ({ kind, id, item });
 
+test('cold disk edits use the last durable base, never a newer relay revision', async (t) => {
+  const expectCapture = async (stale) => {
+    const server = relay();
+    const source = device(t, server);
+    await source.replica.catchUp();
+    for (const id of ['edited', 'duplicate', 'missing']) await source.replica.record([change('create', note(id))]);
+    await until(() => source.saved()?.cursor === 3 && !source.replica.pendingCount);
+    const before = source.saved();
+    if (stale) {
+      await source.replica.record([change('update', note('edited', { content: 'newer relay' }))]);
+      await until(() => source.saved().cursor === 4);
+    }
+    const cold = device(t, server, { state: before });
+    await cold.replica.captureColdNoteEdits(async (ids) => {
+      assert.deepEqual([...ids].sort(), ['duplicate', 'edited', 'missing']);
+      return [note('edited', { content: 'external body', updatedAt: 900 }),
+        note('duplicate', { content: 'ambiguous' }), note('duplicate'), note('unknown')];
+    });
+    const [intent] = cold.saved().pending;
+    assert.equal(cold.saved().pending.length, 1);
+    assert.equal(intent.kind, 'update');
+    assert.deepEqual(intent.base, before.confirmed.edited);
+    await cold.replica.catchUp();
+    await until(() => !cold.replica.pendingCount && cold.saved().cursor === 4);
+    assert.equal(server.events.length, 4);
+    assert.equal(cold.saved().confirmed.edited.item.content, stale ? 'newer relay' : 'external body');
+    assert.equal(cold.conflicts.length, stale ? 1 : 0);
+    if (stale) assert.equal(cold.conflicts[0].item.content, 'external body');
+  };
+  await expectCapture(false);
+  await expectCapture(true);
+});
+
 test('attachment upload must succeed before a durable attempt or revision is created', async (t) => {
   const server = relay();
   const attachment = { id: 'asset', name: 'asset', type: 'file', mimeType: 'application/octet-stream', size: 4, relativePath: '.attachments/asset' };

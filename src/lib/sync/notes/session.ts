@@ -195,6 +195,12 @@ export async function openNoteSession(options: {
   options.signal.addEventListener('abort', () => { unsubscribe(); unsubscribeFolders?.(); unsubscribeShared?.(); }, { once: true });
   if (status) replica.noteRelayHead(status.head);
   return { replica, generation, folderTree, atomicGroups, sharedRecords, registryMedia,
+    captureColdNoteEdits: () => replica.captureColdNoteEdits(async (ids) => {
+      requireVerified();
+      const copies = await options.port.readRegistryNoteCopies?.(ids) ?? [];
+      requireVerified();
+      return copies;
+    }),
     get progress() {
       const progress = replica.progress;
       return { ...progress, relayHead: verified ? progress.relayHead : null,

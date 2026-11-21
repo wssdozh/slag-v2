@@ -21,6 +21,7 @@ export type FolderGroupListener = (changes: NoteMutation[], folders: FolderMeta[
 export interface NoteRegistryStorage {
   applyAcceptedFolderTree?(folders: FolderMeta[]): Promise<void>;
   hasIncompleteFolderProjection?(): Promise<boolean>;
+  readRegistryNoteCopies?(ids: Set<string>): Promise<SlagItem[]>;
   applyAcceptedFolderGroup?(notes: AcceptedNote[], folders: FolderMeta[] | undefined): Promise<void>;
   subscribeFolderTreeIntents?(listener: FolderTreeListener, group?: FolderGroupListener): () => void;
   readNoteRegistry(): Promise<unknown>;
