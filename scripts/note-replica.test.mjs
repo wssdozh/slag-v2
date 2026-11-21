@@ -219,6 +219,34 @@ test('an overtaken editor snapshot survives restart without a relay write', asyn
   assert.equal(server.sends(), 2);
 });
 
+test('a repeated editor clear already queued for a shared draft does not archive an empty conflict', async (t) => {
+  const { sharedRegistryId } = await import('../src/lib/sync/notes/sharedBody.ts');
+  const server = relay();
+  const id = sharedRegistryId('composer', 'Inbox');
+  const applyShared = async () => {};
+  const author = device(t, server, { applyShared });
+  const draft = { content: 'confirmed draft', updatedAt: 1 };
+  await author.replica.catchUp();
+  await author.replica.recordShared(id, draft, null);
+  await until(() => author.replica.pendingCount === 0);
+  const state = author.saved();
+  author.stop();
+  const offline = device(t, server, { state, applyShared });
+  await offline.replica.recordShared(id, null, draft);
+  const [clear] = offline.saved().pending;
+  await offline.replica.recordSharedBatch(() => [{ id, value: null, previous: null, keepAlternative: true }]);
+  assert.deepEqual(offline.saved().pending, [clear]);
+  assert.deepEqual(offline.conflicts, []);
+  const restarted = loadNoteJournal({ version: 1, room, generation, journal: offline.saved() }, room, generation);
+  offline.stop();
+  const resumed = device(t, server, { state: restarted, applyShared });
+  await resumed.replica.catchUp();
+  await until(() => resumed.replica.pendingCount === 0);
+  assert.equal(resumed.saved().confirmed[id].item, null);
+  assert.equal(server.sends(), 2);
+  assert.deepEqual(resumed.conflicts, []);
+});
+
 test('concurrent fact edits collect against the preceding durable local projection', async (t) => {
   const { sharedRegistryId } = await import('../src/lib/sync/notes/sharedBody.ts');
   const { memorySharedMutations } = await import('../src/lib/storage/sharedProjection.ts');

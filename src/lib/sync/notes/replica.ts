@@ -289,6 +289,7 @@ export class NoteReplica {
   }
 
   private captureShared(state: NoteJournal, { id, value, previous, keepAlternative }: SharedMutation): NoteJournal {
+    const pending = state.pending.findLast((entry) => entry.id === id);
     if (keepAlternative) {
       // The editor was overtaken by a canonical projection. No CAS may be minted for
       // that edit until the user explicitly reviews the current relay revision.
@@ -296,11 +297,11 @@ export class NoteReplica {
       const kind = value === null ? 'delete' : head?.item ? 'update' : head ? 'restore' : 'create';
       const { shared } = checkedSharedBody(id, value, kind);
       const item = shared === null ? null : { shared };
-      if (sameRegistryValue(head?.item ?? null, item)) return state;
+      // Another editor clear can queue behind the local projection of the same delete.
+      if ((kind === 'delete' && pending?.kind === 'delete') || sameRegistryValue(head?.item ?? null, item)) return state;
       return { ...state, conflicts: [...(state.conflicts ?? []), { intentId: crypto.randomUUID(), noteId: id,
         kind, item, revision: head?.revision ?? 0, fields: ['editor'], at: Date.now() }] };
     }
-    const pending = state.pending.findLast((entry) => entry.id === id);
     const head = pending ?? confirmedNote(state, id);
     const prior = previous === null ? null : checkedSharedBody(id, previous, 'update').shared;
     if (value === null && (!head || head.item === null)) {
