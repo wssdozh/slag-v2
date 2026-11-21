@@ -102,7 +102,7 @@ export class NoteReplica {
       relayHead: this.observedRevision,
       appliedThrough: this.durableCursor,
       application: this.projectionFailed || this.journalFailed ? 'error' as const
-        : this.ready && !this.needsFeed ? 'current' as const : 'catching-up' as const,
+        : this.ready && !this.needsFeed && !this.pendingCount ? 'current' as const : 'catching-up' as const,
     };
   }
 

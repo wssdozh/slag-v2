@@ -81,6 +81,22 @@ test('a legacy import staged before a local save keeps the new note in the live 
   expect(ids.surviving).toEqual(ids.expected);
 });
 
+test('manual registry catch-up waits for startup and read-only notes use the receipt ledger', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { SyncEngine } = await import('/manifest-regression.mjs');
+    const engine = Object.create(SyncEngine.prototype);
+    let pulls = 0;
+    engine.config = { enabled: true, localSyncMode: 'receive-only' };
+    engine.noteSession = { replica: { catchUp: async () => { pulls++; }, deliveryStatus: (item: { id: string }) => item.id === 'accepted' ? 'accepted' : 'unconfirmed' } };
+    engine.requestManifestCheck();
+    const before = pulls;
+    engine.activeRoomId = 'ready-test-room';
+    engine.requestManifestCheck();
+    return { before, after: pulls, accepted: engine.getItemDeliveryStatus({ id: 'accepted' }), unknown: engine.getItemDeliveryStatus({ id: 'unknown' }) };
+  });
+  expect(result).toEqual({ before: 0, after: 1, accepted: 'accepted', unknown: 'unconfirmed' });
+});
+
 test('folder projection publishes nothing on partial write and replays the complete group', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');

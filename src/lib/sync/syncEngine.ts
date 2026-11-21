@@ -392,8 +392,9 @@ export class SyncEngine {
   private itemDeliveryLedger?: { queued: Set<string>; sent: Record<string, string> };
 
   public getItemDeliveryStatus(item: SlagItem, hash?: string) {
-    if (!this.config.enabled || this.config.localSyncMode === 'receive-only') return 'local';
+    if (!this.config.enabled) return 'local';
     if (this.noteSession) return this.noteSession.replica.deliveryStatus(item);
+    if (this.config.localSyncMode === 'receive-only') return 'local';
     const key = `item:${item.id}`;
     const ledger = this.itemDeliveryLedger ??= {
       queued: new Set(this.getOutbox().pending().filter(({ kind }) => kind === 'item' || kind === 'trash').map(({ id }) => id)),
@@ -528,8 +529,10 @@ export class SyncEngine {
 
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
-    if (this.noteSession) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
-    else manifestSchedule.requestManifestCheck(this);
+    if (this.noteSession) {
+      // The offline capture session exists before disk edits are safe from inbound projection.
+      if (this.activeRoomId) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
+    } else manifestSchedule.requestManifestCheck(this);
   }
 
   /**

@@ -397,10 +397,14 @@ export class StorageService {
   public async readRegistryNoteCopies(ids: Set<string>): Promise<SlagItem[]> {
     if (!isTauri() || !ids.size) return [];
     const vault = this.currentVault;
-    const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
-    const eligible = new Set([...ids].filter((id) => !Object.hasOwn(fenced, id)));
-    if (!eligible.size) return [];
-    return this.files.readProjectionCopies(vault, eligible, true);
+    let copies: SlagItem[] = [];
+    await this.serializeNoteWrite(async () => {
+      if (vault.id !== this.currentVault.id) throw new Error('Vault changed during disk scan');
+      const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
+      const eligible = new Set([...ids].filter((id) => !Object.hasOwn(fenced, id)));
+      if (eligible.size) copies = await this.files.readProjectionCopies(vault, eligible, true);
+    });
+    return copies;
   }
 
   public async hasIncompleteFolderProjection(): Promise<boolean> {
