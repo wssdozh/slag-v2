@@ -58,54 +58,29 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
       {/* Padding and the divider live inside the clipped row, so a collapsed bar
           takes no height at all instead of leaving a 9px strip. */}
       <div className={`motion-accordion-inner flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5 ${className}`}>
-      {/* Type Filter Badge */}
       {activeTypeFilter !== 'all' && (
-        <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
+        <button
+          type="button"
+          onClick={() => setActiveTypeFilter('all')}
+          className={`flex shrink-0 items-center gap-1 rounded-md bg-tint-6 px-1.5 text-fg-secondary hover:bg-tint-10 hover:text-fg-primary focus-visible:bg-tint-10 cursor-pointer ${badgeClassName}`}
+          title={`${activeTypeFilter === 'note' ? 'Заметки' : activeTypeFilter === 'task' ? 'Таски' : 'Статьи'} · нажмите для сброса`}
+          aria-label="Сбросить фильтр по типу"
         >
-          {activeTypeFilter === 'note' && <Icon name="entity.note" size="sm" />}
-          {activeTypeFilter === 'task' && <Icon name="entity.task" size="sm" />}
-          {activeTypeFilter === 'article' && <Icon name="entity.article" size="sm" />}
-          <span>
-            {activeTypeFilter === 'note'
-              ? 'Заметки'
-              : activeTypeFilter === 'task'
-              ? 'Таски'
-              : 'Статьи'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setActiveTypeFilter('all')}
-            className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-            title="Сбросить фильтр по типу"
-            aria-label="Сбросить фильтр по типу"
-          >
-            <Icon name="action.close" size="sm" tone="inherit" />
-          </button>
-        </div>
+          <Icon name={activeTypeFilter === 'note' ? 'entity.note' : activeTypeFilter === 'task' ? 'entity.task' : 'entity.article'} size="sm" tone="inherit" />
+          <Icon name="action.close" size="xs" tone="inherit" />
+        </button>
       )}
-
-      {/* Inbox Mode Filter Badge */}
       {isInbox && inboxMode !== 'all' && (
-        <div
-          className={`flex items-center gap-1 px-2 rounded-md bg-tint-6 border border-tint-8 text-fg-tertiary font-mono shrink-0 ${badgeClassName}`}
+        <button
+          type="button"
+          onClick={() => setInboxMode('all')}
+          className={`flex shrink-0 items-center gap-1 rounded-md bg-tint-6 px-1.5 text-fg-secondary hover:bg-tint-10 hover:text-fg-primary focus-visible:bg-tint-10 cursor-pointer ${badgeClassName}`}
+          title={`${inboxMode === 'sorted' ? 'Разобранные' : 'Неразобранные'} · нажмите для сброса`}
+          aria-label="Сбросить фильтр входящих"
         >
-          {inboxMode === 'sorted' ? (
-            <Icon name="entity.folderFilter" size="sm" />
-          ) : (
-            <Icon name="entity.inbox" size="sm" />
-          )}
-          <span>{inboxMode === 'sorted' ? 'Разобранные' : 'Неразобранные'}</span>
-          <button
-            type="button"
-            onClick={() => setInboxMode('all')}
-            className="p-0.5 hover:text-white transition-colors cursor-pointer ml-0.5"
-            title="Показать все входящие"
-            aria-label="Сбросить фильтр входящих"
-          >
-            <Icon name="action.close" size="sm" tone="inherit" />
-          </button>
-        </div>
+          <Icon name={inboxMode === 'sorted' ? 'entity.folderFilter' : 'entity.inbox'} size="sm" tone="inherit" />
+          <Icon name="action.close" size="xs" tone="inherit" />
+        </button>
       )}
 
       {/* Pinned Filter Badge */}

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Folder View Settings & Todoist-style Modal', () => {
   test('Clean header, Todoist-style view modal, sorting, filtering, and per-folder persistence', async ({ page }) => {
     // Open app
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
     await page.waitForSelector('header');
 
     // 1. Verify clean header: no segmented mode switcher, only folder title and 3-dots button
@@ -57,12 +57,10 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     await expect(modal).not.toBeVisible();
 
     // Verify active filter chip appears in the header with 1-click dismiss button
-    const taskChip = page.locator('header span', { hasText: 'Таски' }).first();
-    await expect(taskChip).toBeVisible();
-
-    // Click dismiss button on the chip
     const dismissChipBtn = page.locator('header button[aria-label="Сбросить фильтр по типу"]');
-    await expect(dismissChipBtn).toBeVisible();
+    await expect(dismissChipBtn).toHaveAttribute('title', /Таски/);
+    await expect(dismissChipBtn).toHaveCSS('border-top-width', '0px');
+    await dismissChipBtn.locator('xpath=ancestor::header').screenshot({ path: 'test-results/screenshots/compact-feed-filter.png' });
     await dismissChipBtn.click();
 
     // Verify chip disappeared
