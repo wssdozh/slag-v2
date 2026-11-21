@@ -900,7 +900,7 @@ export function readWorkspaceState(store: SettingsStoreHost): WorkspaceState {
 export function writeWorkspaceState(
   store: SettingsStoreHost,
   partialState: Partial<WorkspaceState>,
-  origin: 'local' | 'remote' = 'local'
+  syncOrigin?: 'local' | 'remote',
 ): void {
   const updated = { ...readWorkspaceState(store), ...partialState };
   const current = snapshotFor(store);
@@ -918,7 +918,8 @@ export function writeWorkspaceState(
   } else {
     writeBrowserJson(workspaceKey(store.currentVault.id), updated);
   }
-  store.emitChange({ kind: 'workspace', action: 'upsert', id: 'workspace_state', payload: updated, origin });
+  // Device-only writes must not create or replace a legacy shared intent.
+  if (syncOrigin) store.emitChange({ kind: 'workspace', action: 'upsert', id: 'workspace_state', payload: updated, origin: syncOrigin });
 }
 
 export function writeFolderViewSettings(

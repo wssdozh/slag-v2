@@ -1174,7 +1174,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): Promise<void> {
     const sharedKeys = ['profile', 'notifyRoutes', 'notifyPrefs', 'aiPrompt', 'aiPromptAt', 'aiPersona', 'aiPersonaAt', 'aiPersonaEnabled'];
     if (origin === 'local' && !sharedKeys.some((key) => Object.hasOwn(partialState, key))) {
-      writeWorkspaceState(this, partialState, origin);
+      writeWorkspaceState(this, partialState);
       return Promise.resolve();
     }
     const seen = this.getWorkspaceState();

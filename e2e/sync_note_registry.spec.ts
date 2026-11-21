@@ -83,8 +83,22 @@ test('two browser vaults receive accepted notes through the registry, not legacy
       if (i === 0) {
         registryActive = true;
         await view.evaluate(async () => {
-          const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+          const { syncEngine, storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
           if (syncEngine.noteGeneration) throw new Error('expected legacy before refresh');
+          const outbox = syncEngine.getOutbox();
+          const pending = () => JSON.stringify(outbox.pending());
+          const before = pending();
+          await storage.saveWorkspaceState({ currentFolder: 'Device-only folder', sortOrder: 'desc' });
+          if (storage.getWorkspaceState().currentFolder !== 'Device-only folder' || pending() !== before) {
+            throw new Error('Device-only workspace write did not persist locally or created a legacy intent');
+          }
+          await storage.saveWorkspaceState({ profile: { name: 'Fixture author' } });
+          const shared = outbox.pending().find((op: { kind: string }) => op.kind === 'workspace');
+          if (!shared) throw new Error('Shared workspace intent was not queued');
+          const afterShared = pending();
+          await storage.saveWorkspaceState({ sortOrder: 'asc' });
+          if (pending() !== afterShared) throw new Error('Device-only write replaced a pending shared intent');
+          outbox.clear(); // This fixture explicitly discards its synthetic edit before cutover.
           await syncEngine.retrySync();
           if (syncEngine.noteGeneration !== 1) throw new Error(syncEngine.getStatus().error ?? 'refresh did not renegotiate registry');
         });
@@ -135,7 +149,8 @@ test('two browser vaults receive accepted notes through the registry, not legacy
     expect(events).toHaveLength(11);
     await page.evaluate(async () => {
       const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
-      const pending = { bundleId: 'frozen-regression', encrypted: {}, settled: false };
+      const pending = { bundleId: 'frozen-regression', encrypted: { bundleId: 'frozen-regression' },
+        settled: false, stateHash: 'synthetic-hash', packedHashes: {}, opIds: [], changes: 0 };
       await syncEngine.deliverPushOverHttp(pending);
       if (pending.settled || !syncEngine.getStatus().error?.includes('409')) {
         throw new Error('frozen bundle was treated as delivered');
