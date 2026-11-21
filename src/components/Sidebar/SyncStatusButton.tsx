@@ -1,4 +1,3 @@
-// The sidebar shows saved comparison data; it never infers device presence from a manifest.
 import { useEffect, useId, useState } from 'react';
 import { BaseModal } from '../Modals/BaseModal';
 import { syncEngine } from '../../lib/sync/syncEngine';
@@ -6,8 +5,7 @@ import type { SyncStatus } from '../../lib/sync/types';
 import { Icon } from '../UI/icons/Icon';
 import { syncGlyph } from './syncGlyph';
 
-export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
-  vaultId?: string;
+export function SyncStatusButton({ onSettings, mobile = false }: {
   onSettings: () => void;
   mobile?: boolean;
 }) {
@@ -16,19 +14,10 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
   const [isOpen, setIsOpen] = useState(false);
   const id = useId();
   const [dismissed, setDismissed] = useState(false);
-  const config = syncEngine.getConfig();
-  const glyph = syncGlyph(status, config.enabled, mobile);
-  const manifest = status.manifest;
-  const peers = manifest?.peers.filter((peer) => !peer.anonymous) ?? [];
-  const devices = new Map(config.trustedDevices.filter((device) =>
-    device.id !== config.deviceId && !device.isCurrent && (!device.allowedVaults || (vaultId && device.allowedVaults.includes(vaultId))),
-  ).map((device) => [device.id, device.name]));
-  const hasLegacyReport = manifest?.peers.some((peer) => peer.anonymous);
-  for (const peer of peers) {
-    if (peer.deviceId && !devices.has(peer.deviceId)) {
-      devices.set(peer.deviceId, config.trustedDevices.find((device) => device.id === peer.deviceId)?.name ?? peer.deviceId);
-    }
-  }
+  const glyph = syncGlyph(status, syncEngine.getConfig().enabled, mobile);
+  const liveTitle = status.authRequired && !status.isAuthenticated ? glyph.title
+    : status.state === 'syncing' || (status.state === 'connected' && status.initialSync.state === 'loading') ? 'Идёт синхронизация'
+    : status.state === 'connected' ? 'Есть связь с релеем' : glyph.title;
 
   const registry = status.registry;
   const mediaLabel = registry && {
@@ -39,8 +28,9 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
         <span className={`flex items-center gap-1.5 font-medium ${glyph.className}`}>
-          {registry && <Icon name={glyph.name} size="sm" tone="inherit" />} {glyph.title}
+          {registry && <Icon name={glyph.name} size="sm" tone="inherit" />} {liveTitle}
         </span>
+        {status.pendingCount > 0 && <span className="text-fg-secondary">В очереди: {status.pendingCount}</span>}
         {!registry && status.lastSyncTime && <span className="text-fg-secondary">Обмен: {status.lastSyncTime}</span>}
       </div>
       {registry && (
@@ -54,7 +44,7 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
           </dt>
           <dd className={`text-right tabular-nums ${registry.application === 'error' ? 'text-warning' : ''}`}>
             {`#${registry.appliedThrough}`}
-            {registry.application === 'error' ? ' · Сбой' : registry.application === 'catching-up' ? ' · Сверка' : ''}
+            {registry.application === 'error' ? ' · Сбой' : registry.application === 'catching-up' ? ' · Дочитывание' : ''}
           </dd>
           <dt className="flex items-center gap-1.5 text-fg-secondary" title="Вложения реестра на этом устройстве">
             <Icon name="action.attach" size="sm" /> Вложения
@@ -62,23 +52,6 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
           <dd className={`text-right ${registry.media === 'error' ? 'text-warning' : ''}`}>{mediaLabel}</dd>
         </dl>
       )}
-      {devices.size > 0 && (
-        <ul aria-label="Последняя сверка устройств" className="max-h-48 divide-y divide-border-subtle overflow-y-auto border-y border-border-subtle">
-          {[...devices].map(([deviceId, name]) => {
-            const peer = peers.find((candidate) => candidate.deviceId === deviceId);
-            return (
-              <li key={deviceId} className="flex items-center justify-between gap-3 py-1.5">
-                <span className="truncate font-medium text-fg-primary" title={name}>{name}</span>
-                <span className={`shrink-0 ${peer && !peer.inSync ? 'text-warning' : 'text-fg-secondary'}`} title={peer?.at == null ? undefined : new Date(peer.at).toLocaleString('ru-RU')}>
-                  {peer ? (peer.inSync ? 'Совпало' : 'Не совпало') : 'Нет сверки'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {!registry && devices.size === 0 && <p className="text-fg-secondary">Нет сверок с другими устройствами</p>}
-      {hasLegacyReport && <details className="text-fg-secondary"><summary className="cursor-pointer">Детали сверки</summary>Есть старая сводка без имени устройства.</details>}
       <button type="button" onClick={() => { setIsOpen(false); setDismissed(true); onSettings(); }} data-testid={mobile ? 'mobile-sync-open-settings' : 'sidebar-sync-open-settings'}
         className={`flex w-full items-center gap-2 rounded-md text-left text-fg-primary hover:bg-tint-6 focus-visible:bg-tint-8 cursor-pointer ${mobile ? 'min-h-12' : 'py-1'}`}>
         <Icon name="system.settings" size="sm" /> {registry ? 'Настройки' : 'Настройки синхронизации'}

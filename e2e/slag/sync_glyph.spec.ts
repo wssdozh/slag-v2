@@ -1,6 +1,6 @@
 import { test, expect } from '../support/selfhostFixture';
 
-test('the sidebar keeps ordinary exchange quiet and opens the last known device reports on hover', async ({ page }) => {
+test('the sidebar keeps the icon quiet and shows live exchange instead of saved comparisons', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   const button = page.getByTestId('sidebar-sync-btn');
@@ -35,12 +35,12 @@ test('the sidebar keeps ordinary exchange quiet and opens the last known device 
   await expect(panel).toBeHidden();
   await button.hover();
   await expect(panel).toBeVisible();
-  await expect(panel.getByText('телефон', { exact: true })).toBeVisible();
-  await expect(panel.getByText('Не совпало')).toBeVisible();
-  await expect(panel.getByText('Не совпало')).toHaveAttribute('title', /20\.11\.2026/);
-  await expect(panel.getByText('ноутбук', { exact: true })).toBeVisible();
-  await expect(panel.getByText('Нет сверки')).toBeVisible();
-  await expect(panel.getByText('Детали сверки')).toBeVisible();
+  await expect(panel.getByText('Идёт синхронизация')).toBeVisible();
+  await expect(panel.getByText(/сверк|Совпало|Не совпало|телефон|ноутбук/i)).toHaveCount(0);
+  await changeState('offline');
+  await expect(panel.getByText('Нет связи с релеем')).toBeVisible();
+  await changeState('connected');
+  await expect(panel.getByText('Есть связь с релеем')).toBeVisible();
   await panel.hover();
   await expect(panel).toHaveCSS('opacity', '1');
   await page.screenshot({ path: 'test-results/screenshots/sidebar-sync-status.png', clip: { x: 0, y: 585, width: 380, height: 315 } });
@@ -66,7 +66,7 @@ test('registry status distinguishes relay acceptance, local application and atta
   await page.evaluate(async () => {
     const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
     const getStatus = syncEngine.getStatus.bind(syncEngine);
-    syncEngine.getStatus = () => ({ ...getStatus(), state: 'error', registry: {
+    syncEngine.getStatus = () => ({ ...getStatus(), state: 'error', pendingCount: 2, registry: {
       relayHead: 42, appliedThrough: 39, application: 'error', media: 'error',
     } });
     syncEngine.notify();
@@ -76,6 +76,7 @@ test('registry status distinguishes relay acceptance, local application and atta
   const progress = panel.getByLabel('Прогресс реестра');
   await expect(progress.locator('dt [data-icon]')).toHaveCount(3);
   await expect(progress.locator('dd')).toHaveText(['#42', '#39 · Сбой', 'Сбой']);
+  await expect(panel.getByText('В очереди: 2')).toBeVisible();
   await expect(panel.getByText('Нет сверок с другими устройствами')).toHaveCount(0);
   await panel.screenshot({ path: 'test-results/screenshots/sidebar-registry-progress.png', animations: 'disabled' });
 });

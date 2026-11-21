@@ -140,7 +140,7 @@ export const Sidebar: React.FC = () => {
           position="bottom"
         />
 
-        <SyncStatusButton vaultId={vault.syncId ?? vault.id} onSettings={() => openSettingsModal('sync')} />
+        <SyncStatusButton onSettings={() => openSettingsModal('sync')} />
 
         {/* Logs HUD button */}
         <button
