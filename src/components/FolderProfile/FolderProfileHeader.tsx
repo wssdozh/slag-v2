@@ -143,8 +143,13 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {!isSystem && (
-            <FolderActionsMenu onRename={edit.startRename} onMove={onMove} onDelete={onDelete} />
+          {(!isSystem || variant === 'dock') && (
+            <FolderActionsMenu
+              onRename={isSystem ? undefined : edit.startRename}
+              onMove={isSystem ? undefined : onMove}
+              onDelete={isSystem ? undefined : onDelete}
+              onDescription={variant === 'dock' ? edit.startDescription : undefined}
+            />
           )}
           {onClose && (
             <IconButton size="sm" title="Закрыть (Esc)" aria-label="Закрыть" onClick={onClose}>
@@ -157,6 +162,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
       {/* Description and its editor are one stacked block: the open row grows exactly as
           the closed one shrinks, so the profile changes height in a single motion instead
           of the textarea popping in. */}
+      {(variant !== 'dock' || folder?.description || isEditingDescription) && (
       <div className="flex flex-col min-w-0">
         <div className="motion-fold" data-expanded={!isEditingDescription} inert={isEditingDescription}>
           <button
@@ -198,6 +204,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
