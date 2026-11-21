@@ -97,6 +97,19 @@ test('manual registry catch-up waits for startup and read-only notes use the rec
   expect(result).toEqual({ before: 0, after: 1, accepted: 'accepted', unknown: 'unconfirmed' });
 });
 
+test('Markdown preserves projection provenance outside of the note model', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { parseMarkdownToItem, serializeItemToMarkdown } = await import('/manifest-regression.mjs');
+    const original = parseMarkdownToItem('local body', 'valid-id');
+    const marker = '2:' + 'a'.repeat(64);
+    const markdown = serializeItemToMarkdown(original, marker);
+    let recorded;
+    const reloaded = parseMarkdownToItem(markdown, '', undefined, (value: string) => { recorded = value; });
+    return { marker: recorded, body: reloaded.content, survivesOrdinaryRewrite: serializeItemToMarkdown(reloaded).includes(marker), leakedIntoModel: Object.values(reloaded).includes(marker) };
+  });
+  expect(result).toEqual({ marker: '2:' + 'a'.repeat(64), body: 'local body', survivesOrdinaryRewrite: false, leakedIntoModel: false });
+});
+
 test('folder projection publishes nothing on partial write and replays the complete group', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');

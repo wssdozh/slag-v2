@@ -1,6 +1,7 @@
 // Serializes local intents and canonical application, not the network. I/O is owned by the host.
 import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
 import type { AcceptedNote, NoteMutation } from '../../storage/noteRegistry';
+import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
 import { NoteChannel } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
@@ -19,6 +20,7 @@ interface NoteReplicaHost {
   keys: NoteKeys;
   signal: AbortSignal;
   readOnly: boolean;
+  trackDiskProjection?: boolean;
   sendLive: (data: string) => boolean;
   save: (state: NoteJournal) => Promise<void>;
   apply: (note: AcceptedNote) => Promise<void>;
@@ -43,6 +45,8 @@ function omittedFolderMembers(state: NoteJournal, members: ReadonlySet<string>, 
   const removed = new Set(before.filter(({ path }) => path !== DEFAULT_INBOX_FOLDER && !remaining.has(path)).map(({ path }) => path));
   return Object.entries(state.confirmed).some(([id, { item }]) => !members.has(id) && isNoteItem(item) && removed.has(item.folder));
 }
+
+const normalizeDiskBody = (content: string) => content.replace(/\r\n/g, '\n').trim();
 
 function headRejected(result: NoteResult): boolean {
   return result.status === 'rejected' && (result.code === 'note_head_changed' || result.code === 'note_head_required');
@@ -325,7 +329,12 @@ export class NoteReplica {
     return run.catch((err: unknown) => { this.error(err); throw err; });
   }
 
-  captureColdNoteEdits(readCopies: (ids: Set<string>) => Promise<SlagItem[]>): Promise<void> {
+  private registryBodyMarker(id: string, revision: number, content: string): Promise<string> {
+    return sha256Hex(JSON.stringify([this.host.room, this.host.generation, id, revision, normalizeDiskBody(content)]))
+      .then((digest) => `${revision}:${digest}`);
+  }
+
+  captureColdNoteEdits(readCopies: (ids: Set<string>) => Promise<{ item: SlagItem; marker?: string }[]>): Promise<void> {
     if (this.host.readOnly) return Promise.resolve();
     return this.enqueue(async () => {
       const state = this.state;
@@ -336,13 +345,17 @@ export class NoteReplica {
       const copies = await readCopies(new Set(live.keys()));
       this.host.signal.throwIfAborted();
       const counts = new Map<string, number>();
-      for (const { id } of copies) counts.set(id, (counts.get(id) ?? 0) + 1);
-      const body = (content: string) => content.replace(/\r\n/g, '\n').trim();
+      for (const { item: { id } } of copies) counts.set(id, (counts.get(id) ?? 0) + 1);
       let next = state;
-      for (const copy of copies) {
+      for (const { item: copy, marker } of copies) {
         const previous = live.get(copy.id);
         if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder
-            || previous.title !== copy.title || previous.type !== copy.type || body(previous.content) === body(copy.content)) continue;
+            || previous.title !== copy.title || previous.type !== copy.type || normalizeDiskBody(previous.content) === normalizeDiskBody(copy.content)) continue;
+        // The Markdown and its provenance were replaced together. A replayable projection
+        // ahead of this journal is not a local edit, even if the relay has since advanced again.
+        const projected = marker ? Number(marker.split(':', 1)[0]) : 0;
+        if (Number.isSafeInteger(projected) && projected > state.confirmed[copy.id].revision
+            && marker === await this.registryBodyMarker(copy.id, projected, copy.content)) continue;
         // Keep the confirmed base. A newer remote revision must conflict, not rebase this edit.
         next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous,
           item: { ...previous, content: copy.content } });
@@ -396,7 +409,12 @@ export class NoteReplica {
     }
   }
 
-  private async applyValue(id: string, item: RegistryValue, discardLiveCopy = false) {
+  private async projectedNote(id: string, item: SlagItem | null, revision: number): Promise<AcceptedNote> {
+    if (!this.host.trackDiskProjection || !item || !revision) return { id, item };
+    return { id, item, registryBodyMarker: await this.registryBodyMarker(id, revision, item.content) };
+  }
+
+  private async applyValue(id: string, item: RegistryValue, revision: number, discardLiveCopy = false) {
     if (isSharedRegistryId(id)) {
       if (!this.host.applyShared || (item !== null && !('shared' in item))) throw new Error('Shared registry support is not enabled');
       await this.host.applyShared({ id, shared: item?.shared ?? null });
@@ -405,7 +423,7 @@ export class NoteReplica {
       await this.host.applyFolderTree(item);
     } else {
       if (Array.isArray(item) || (item && 'shared' in item)) throw new Error('Invalid accepted note');
-      await this.host.apply({ id, item, ...(discardLiveCopy ? { discardLiveCopy: true as const } : {}) });
+      await this.host.apply({ ...await this.projectedNote(id, item, revision), ...(discardLiveCopy ? { discardLiveCopy: true as const } : {}) });
     }
   }
 
@@ -416,7 +434,7 @@ export class NoteReplica {
     if (!next.pending.some((entry) => entry.id === intent.id)) {
       const current = confirmedNote(next, intent.id);
       if (current || fields.includes('folder')) {
-        await this.applyValue(intent.id, current?.item ?? null, !!current && !current.item && !!intent.item && fields.length > 0);
+        await this.applyValue(intent.id, current?.item ?? null, current?.revision ?? 0, !!current && !current.item && !!intent.item && fields.length > 0);
       }
     }
     await this.persist(next);
@@ -439,7 +457,7 @@ export class NoteReplica {
     }
     const next = setConfirmed(this.state, id, base);
     if ((next !== this.state || (applyKnown && confirmedNote(next, id)?.revision === head.revision))
-        && !next.pending.some((entry) => entry.id === id)) await this.applyValue(id, item);
+        && !next.pending.some((entry) => entry.id === id)) await this.applyValue(id, item, head.revision);
     await this.persist(next);
   }
 
@@ -468,7 +486,7 @@ export class NoteReplica {
       // checked separately. Never project an older head over a newer confirmation.
       if (confirmedNote(next, body.id)?.revision !== revision || next.pending.some(({ id }) => id === body.id)) continue;
       if ('folders' in body) folders = body.folders;
-      else notes.push({ id: body.id, item: body.item });
+      else notes.push(await this.projectedNote(body.id, body.item, revision));
     }
     if (folders || notes.length) await apply(notes, folders);
     await this.persist({ ...next, cursor: heads[heads.length - 1].revision });
@@ -801,9 +819,11 @@ export class NoteReplica {
     let folders: FolderMeta[] | undefined;
     for (const { id } of members) {
       if (next.pending.some((entry) => entry.id === id)) continue;
-      const item = confirmedNote(next, id)?.item;
+      const base = confirmedNote(next, id);
+      if (!base) continue;
+      const { item, revision } = base;
       if (id === FOLDER_TREE_ID && Array.isArray(item)) folders = item;
-      else if (item === null || isNoteItem(item)) notes.push({ id, item });
+      else if (item === null || isNoteItem(item)) notes.push(await this.projectedNote(id, item, revision));
     }
     if (!this.host.applyFolderGroup) throw new Error('Atomic folder projection is unavailable');
     if (folders || notes.length) await this.host.applyFolderGroup(notes, folders);

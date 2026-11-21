@@ -142,6 +142,7 @@ export async function openNoteSession(options: {
     }
   };
   const replica = new NoteReplica({ ...options, keys, generation, atomicGroups, room: options.roomId,
+    trackDiskProjection: !!options.port.readRegistryNoteCopies,
     channel: {
       events: async (...args) => { requireVerified(); return channel.events(...args); },
       heads: async (...args) => { requireVerified(); return channel.heads(...args); },

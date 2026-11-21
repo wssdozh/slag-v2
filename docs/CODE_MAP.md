@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **639**, строк: **113138**, зон: **48**.
+Модулей: **639**, строк: **113185**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -16,9 +16,9 @@
 | `src/lib/storage/index.ts` | 1430 | 46 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/storage/settingsStore.ts` | 959 | 5 |
+| `src/lib/sync/notes/replica.ts` | 927 | 1 |
+| `src/lib/storage/vaultFiles.ts` | 922 | 2 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
-| `src/lib/storage/vaultFiles.ts` | 914 | 2 |
-| `src/lib/sync/notes/replica.ts` | 907 | 1 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 827 | 1 |
@@ -26,7 +26,7 @@
 | `src/context/AppContext.tsx` | 801 | 70 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 
-## e2e (playwright) — 139 файлов, 25394 строк
+## e2e (playwright) — 139 файлов, 25408 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -597,7 +597,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 35 | 3 | writeJsonAtomic, writeAppDataTextAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
 
-## src/lib/storage — 31 файлов, 7279 строк
+## src/lib/storage — 31 файлов, 7288 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -612,7 +612,7 @@
 | `integrityStore.ts` | 90 | 1 | encodeIndex, decodeIndex, encodeLeaves, decodeLeaves, integrityDir, +4 | The integrity index: a tiny inline summary, a bulk leaves file, and the codec… |
 | `legacyJson.ts` | 18 | 3 | parseLegacyJson | The JSON an older build left in the webview profile. Every module that moves … |
 | `legacyProfile.ts` | 439 | 1 | LegacyVaultSection, LegacyVaultKey, LegacyKeySplit, splitLegacyKeys, importLegacyProfile | The one-off move off the webview profile. |
-| `noteRegistry.ts` | 32 | 7 | NoteMutation, AcceptedNote, FolderTreeListener, FolderGroupListener, NoteRegistryStorage |  |
+| `noteRegistry.ts` | 33 | 7 | NoteMutation, AcceptedNote, FolderTreeListener, FolderGroupListener, NoteRegistryStorage |  |
 | `noteRemoval.ts` | 25 | 1 | notesRemovedByImport | Which files a synced import takes off the disk. |
 | `port.ts` | 86 | 10 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
 | `prefs.ts` | 214 | 24 | PrefsBackend, PrefsProfileBackend, initPrefs, getPref, setPref, +3 | Preferences: the one place settings live, wherever they came from. |
@@ -625,7 +625,7 @@
 | `trashStore.ts` | 80 | 2 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 914 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultFiles.ts` | 922 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultRegistry.ts` | 181 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
@@ -633,7 +633,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 47 файлов, 11166 строк
+## src/lib/sync — 47 файлов, 11187 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -666,8 +666,8 @@
 | `notes/mediaWire.ts` | 49 | 1 | REGISTRY_MEDIA_MAX_BYTES, sealRegistryMedia, openRegistryMedia |  |
 | `notes/merge.ts` | 29 | 7 | equal, relayNote, sameNote | Normalize note data for the relay and compare semantic payloads. |
 | `notes/persistence.ts` | 150 | 3 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
-| `notes/replica.ts` | 907 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
-| `notes/session.ts` | 223 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/replica.ts` | 927 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/session.ts` | 224 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/sharedBody.ts` | 60 | 18 | SharedKind, SharedValue, isLegacySharedKind, SharedBody, SharedMutation, +4 |  |
 | `notes/sharedWorkspace.ts` | 109 | 5 | SharedWorkspaceField, SharedWorkspace, SharedWorkspaceValue, isSharedWorkspaceField, selectSharedWorkspace, +3 |  |
 | `notes/wire.ts` | 316 | 15 | FOLDER_TREE_ID, RegistryBody, NoteKind, NoteMode, NoteStatus, +32 | The authenticated relay sees routing metadata, never the note's identity or b… |
@@ -712,7 +712,7 @@
 | `reminder.ts` | 174 | 8 | reminderClock, reminderClockLabel, reminderDay, reminderToIso, shiftReminderToDay, +1 | reminder.ts — что означает строка `reminder` и как её записать. |
 | `todoistTaskParser.ts` | 571 | 12 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +2 | Parses Todoist-style quick input into title, due date, tags, priority, durati… |
 
-## src/lib/vault — 18 файлов, 2047 строк
+## src/lib/vault — 18 файлов, 2050 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -721,7 +721,7 @@
 | `folderOptions.ts` | 47 | 6 | FolderSelectOption, buildFolderOptions | Turns the flat folder list into the one tree of picker options every menu sha… |
 | `folderPaths.ts` | 38 | 4 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 | Folder names are file names on disk, so the OS-forbidden characters become da… |
 | `folderTree.ts` | 153 | 9 | FolderNode, FolderTreeRow, FolderDropMode, folderName, folderRank, +5 | The folder hierarchy and the order it is drawn in: one tree for the sidebar, … |
-| `integrity/fingerprint.ts` | 75 | 1 | canonicalJson, fingerprint, sha256Hex | One line per note that a device can compare byte for byte. |
+| `integrity/fingerprint.ts` | 75 | 2 | canonicalJson, fingerprint, sha256Hex | One line per note that a device can compare byte for byte. |
 | `integrity/manifest.ts` | 95 | 2 | buildManifest, compare | A vault reduced to three levels of hashes: one line per note, one per folder,… |
 | `integrity/repair.ts` | 135 | 1 | planRepair | What a sweep would do, decided before anything is touched. |
 | `integrity/scanners.ts` | 253 | 1 | scanDuplicateIds, scanPathMismatch, scanFolderMissing, scanGhostFolders, scanEmptyFolders, +5 | The scans themselves: what a vault looks like when it has quietly filled with… |
@@ -729,7 +729,7 @@
 | `integrity/types.ts` | 206 | 17 | Severity, FixKind, ScannerId, FIX_KIND_BY_SCANNER, Finding, +14 | What a storage check finds, and what fixing it would do. |
 | `itemSchema.ts` | 46 | 1 | PropertySchemaItem, ITEM_MUTABLE_PROPERTIES, ITEM_UPDATES_SCHEMA | Single Source of Truth (SSOT) metadata registry for SlagItem mutable fields. |
 | `itemUpdates.ts` | 70 | 2 | applyItemUpdates | Applies a partial update to an item without touching storage. |
-| `markdownSerializer.ts` | 212 | 5 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
+| `markdownSerializer.ts` | 215 | 6 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
 | `noteFilename.ts` | 35 | 5 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
 | `safePath.ts` | 69 | 7 | SafeVaultPathOptions, safeVaultRelativePath, isSafeVaultRelativePath | One answer to "is this path allowed inside the vault": normalizes separators … |
 | `stats.ts` | 67 | 2 | VaultStats, collectExistingTags, computeVaultStats | Read-only counters and tag tallies, with the inbox treated as the whole vault. |

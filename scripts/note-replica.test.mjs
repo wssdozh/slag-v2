@@ -89,7 +89,7 @@ test('cold disk edits use the last durable base, never a newer relay revision', 
     await cold.replica.captureColdNoteEdits(async (ids) => {
       assert.deepEqual([...ids].sort(), ['duplicate', 'edited', 'missing']);
       return [note('edited', { content: 'external body', updatedAt: 900 }),
-        note('duplicate', { content: 'ambiguous' }), note('duplicate'), note('unknown')];
+        note('duplicate', { content: 'ambiguous' }), note('duplicate'), note('unknown')].map((item) => ({ item }));
     });
     const [intent] = cold.saved().pending;
     assert.equal(cold.saved().pending.length, 1);
@@ -104,6 +104,37 @@ test('cold disk edits use the last durable base, never a newer relay revision', 
   };
   await expectCapture(false);
   await expectCapture(true);
+});
+
+test('cold capture distinguishes an uncheckpointed projection from a changed or restored file', async (t) => {
+  const server = relay();
+  let projected;
+  const receiver = device(t, server, { trackDiskProjection: true, apply: async (value) => { projected = value; } });
+  const source = device(t, server);
+  await Promise.all([source.replica.catchUp(), receiver.replica.catchUp()]);
+  await source.replica.record([change('create', note('one'))]);
+  await until(() => receiver.saved()?.cursor === 1);
+  const before = receiver.saved();
+  await source.replica.record([change('update', note('one', { content: 'intermediate' }))]);
+  await until(() => receiver.saved()?.cursor === 2);
+  const { item, registryBodyMarker: marker } = projected;
+  assert.match(marker, /^2:[a-f0-9]{64}$/);
+  assert.equal(Object.hasOwn(item, 'registryBodyMarker'), false);
+  await source.replica.record([change('update', note('one', { content: 'new head' }))]);
+  await until(() => receiver.saved()?.cursor === 3);
+  const after = receiver.saved();
+  const cold = device(t, server, { state: before });
+  await cold.replica.captureColdNoteEdits(async () => [{ item, marker }]);
+  assert.equal(cold.replica.pendingCount, 0);
+  await cold.replica.catchUp();
+  assert.equal(cold.conflicts.length, 0);
+  assert.equal(cold.saved().confirmed.one.item.content, 'new head');
+  const changed = device(t, server, { state: before });
+  await changed.replica.captureColdNoteEdits(async () => [{ item: { ...item, content: 'outside editor' }, marker }]);
+  assert.equal(changed.saved().pending[0].item.content, 'outside editor');
+  const restored = device(t, server, { state: after });
+  await restored.replica.captureColdNoteEdits(async () => [{ item, marker }]);
+  assert.equal(restored.saved().pending[0].item.content, 'intermediate');
 });
 
 test('attachment upload must succeed before a durable attempt or revision is created', async (t) => {

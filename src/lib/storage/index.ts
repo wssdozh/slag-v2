@@ -394,15 +394,15 @@ export class StorageService {
     });
   }
 
-  public async readRegistryNoteCopies(ids: Set<string>): Promise<SlagItem[]> {
+  public async readRegistryNoteCopies(ids: Set<string>): Promise<{ item: SlagItem; marker?: string }[]> {
     if (!isTauri() || !ids.size) return [];
     const vault = this.currentVault;
-    let copies: SlagItem[] = [];
+    let copies: { item: SlagItem; marker?: string }[] = [];
     await this.serializeNoteWrite(async () => {
       if (vault.id !== this.currentVault.id) throw new Error('Vault changed during disk scan');
       const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
       const eligible = new Set([...ids].filter((id) => !Object.hasOwn(fenced, id)));
-      if (eligible.size) copies = await this.files.readProjectionCopies(vault, eligible, true);
+      if (eligible.size) copies = await this.files.readRegistryNoteCopies(vault, eligible);
     });
     return copies;
   }
@@ -421,14 +421,14 @@ export class StorageService {
     }, vault, true, true);
   }
 
-  private async writeAcceptedNote({ id, item, discardLiveCopy }: AcceptedNote, previous: SlagItem | undefined,
+  private async writeAcceptedNote({ id, item, discardLiveCopy, registryBodyMarker }: AcceptedNote, previous: SlagItem | undefined,
     trashed: SlagItem | undefined, vault: VaultMeta): Promise<SlagItem | null> {
     const applied = item ? { ...item, filename: getSafeNoteFilename(item.title, id) } : null;
     if (applied) {
       if (item?.id !== id) throw new Error('Canonical note id mismatch');
       safeVaultRelativePath(id);
       safeVaultRelativePath(applied.folder || DEFAULT_INBOX_FOLDER);
-      await this.files.flushItemToDisk(applied, previous?.folder, previous?.filename, vault, true);
+      await this.files.flushItemToDisk(applied, previous?.folder, previous?.filename, vault, true, undefined, registryBodyMarker);
       if (trashed) await this.files.removeTrashCopy(trashed, trashed.filename, vault);
     } else if (previous) {
       await this.files.removeItemFromDisk(previous, vault, true, discardLiveCopy);

@@ -11,6 +11,7 @@ export interface NoteMutation {
 export interface AcceptedNote {
   id: string;
   item: SlagItem | null;
+  registryBodyMarker?: string;
   /** The live copy is a rejected edit, not the deleted revision. Do not move it to trash. */
   discardLiveCopy?: true;
 }
@@ -21,7 +22,7 @@ export type FolderGroupListener = (changes: NoteMutation[], folders: FolderMeta[
 export interface NoteRegistryStorage {
   applyAcceptedFolderTree?(folders: FolderMeta[]): Promise<void>;
   hasIncompleteFolderProjection?(): Promise<boolean>;
-  readRegistryNoteCopies?(ids: Set<string>): Promise<SlagItem[]>;
+  readRegistryNoteCopies?(ids: Set<string>): Promise<{ item: SlagItem; marker?: string }[]>;
   applyAcceptedFolderGroup?(notes: AcceptedNote[], folders: FolderMeta[] | undefined): Promise<void>;
   subscribeFolderTreeIntents?(listener: FolderTreeListener, group?: FolderGroupListener): () => void;
   readNoteRegistry(): Promise<unknown>;

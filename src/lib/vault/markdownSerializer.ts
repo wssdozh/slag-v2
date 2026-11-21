@@ -8,7 +8,7 @@ import { normalizeReminder } from '../time/reminder';
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
  */
-export function serializeItemToMarkdown(item: SlagItem): string {
+export function serializeItemToMarkdown(item: SlagItem, registryBodyDigest?: string): string {
   const frontmatterData: Record<string, any> = {
     id: item.id,
     type: item.type,
@@ -79,6 +79,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     }));
   }
 
+  if (registryBodyDigest) frontmatterData.slagRegistryBody = registryBodyDigest;
   const yamlString = YAML.stringify(frontmatterData).trim();
   const body = (item.content || '').trim();
 
@@ -88,7 +89,8 @@ export function serializeItemToMarkdown(item: SlagItem): string {
 /**
  * Parses raw Markdown text with YAML frontmatter into a SlagItem.
  */
-export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER): SlagItem {
+export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER,
+  onRegistryBody?: (digest: string) => void): SlagItem {
   let frontmatter: Record<string, any> = {};
   let body = rawContent;
 
@@ -106,6 +108,7 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   const id = typeof frontmatter.id === 'string' && isSafeVaultRelativePath(frontmatter.id)
     ? frontmatter.id
     : fallbackId;
+  if (typeof frontmatter.slagRegistryBody === 'string') onRegistryBody?.(frontmatter.slagRegistryBody);
   const type: SlagItemType = (['note', 'article', 'task'].includes(frontmatter.type) ? frontmatter.type : 'note') as SlagItemType;
   
   // Title fallback: from frontmatter -> from first # Heading -> first line -> Untitled

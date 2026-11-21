@@ -1,4 +1,5 @@
 export { SyncEngine } from '../../src/lib/sync/syncEngine';
+export { parseMarkdownToItem, serializeItemToMarkdown } from '../../src/lib/vault/markdownSerializer';
 export { StorageService } from '../../src/lib/storage';
 export { moveFolderTree, rememberFolders, readFolders } from '../../src/lib/storage/folderStore';
 export { syncManifest } from '../../src/lib/sync/manifest/sync';
