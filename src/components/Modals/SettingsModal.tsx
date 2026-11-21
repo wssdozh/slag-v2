@@ -39,9 +39,9 @@ const RailRow: React.FC<RailRowProps> = ({ isActive, depth = 0, onClick, testId,
     aria-current={isActive || undefined}
     onClick={onClick}
     style={depth > 0 ? { paddingLeft: `${10 + depth * 14}px` } : undefined}
-    className={`shrink-0 flex items-center gap-2 whitespace-nowrap text-left text-xs transition-colors cursor-pointer motion-press px-3 py-1.5 rounded-xl md:px-2.5 md:py-2 md:rounded-lg ${
-      isActive ? 'bg-tint-8 text-white font-medium' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
-    }`}
+    className={`relative flex h-12 shrink-0 items-center gap-2 whitespace-nowrap px-2 text-left text-xs transition-colors cursor-pointer motion-press md:h-auto md:rounded-lg md:px-2.5 md:py-2 ${
+      isActive ? 'font-medium text-fg-primary after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-current md:bg-tint-8 md:after:hidden' : 'text-fg-secondary hover:text-fg-soft md:hover:bg-tint-4'
+    } focus-visible:bg-tint-8`}
   >
     {children}
   </button>
@@ -84,7 +84,7 @@ export const SettingsModal: React.FC = () => {
   const tabRail = (
     <div
       ref={tabsRef}
-      className="flex md:flex-col overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:w-48 shrink-0 bg-panel md:bg-surface p-2 gap-1 md:gap-0.5 border-b md:border-b-0 border-border-subtle select-none scrollbar-none"
+      className="relative flex md:flex-col overflow-x-auto md:overflow-y-auto md:overflow-x-hidden md:w-48 shrink-0 bg-panel md:bg-surface px-3 md:p-2 gap-2 md:gap-0.5 border-b md:border-b-0 border-border-subtle select-none scrollbar-none"
     >
       {SETTINGS_TABS.map((tab) => {
         const isActive = activeTab === tab.id;

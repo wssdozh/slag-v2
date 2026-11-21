@@ -13,6 +13,7 @@ import { materialsInFolder } from '../../lib/vault/folderItems';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { useComposerInset } from '../../hooks/layout/useComposerInset';
+import { SyncStatusButton } from '../Sidebar/SyncStatusButton';
 
 function unsortedLabel(count: number): string {
   const mod10 = count % 10;
@@ -38,12 +39,7 @@ export const MobileFoldersView: React.FC = () => {
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
-    activeTypeFilter,
-    sortBy,
-    sortOrder,
-    hideCompletedTasks,
-    isPinnedOnlyFilter,
-    inboxMode,
+    openSettingsModal,
   } = useApp();
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
@@ -64,15 +60,6 @@ export const MobileFoldersView: React.FC = () => {
   };
 
   const isInbox = mobileActiveFolder === DEFAULT_INBOX_FOLDER;
-
-  const isCustomized =
-    feedViewMode !== 'feed' ||
-    activeTypeFilter !== 'all' ||
-    sortBy !== 'createdAt' ||
-    sortOrder !== 'asc' ||
-    hideCompletedTasks ||
-    isPinnedOnlyFilter ||
-    (isInbox && inboxMode !== 'all');
 
   const folderMaterialsCount = useMemo(
     () => materialsInFolder(items, currentFolder).length,
@@ -132,7 +119,7 @@ export const MobileFoldersView: React.FC = () => {
               <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-150 ${isVaultMenuOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
             </button>
           }
-          icon="S"
+          leadingAction={<SyncStatusButton mobile vaultId={vault.syncId ?? vault.id} onSettings={() => openSettingsModal('sync')} />}
           rightSlot={
             <>
               <button
@@ -300,9 +287,6 @@ export const MobileFoldersView: React.FC = () => {
               aria-label="Вид и фильтры папки"
             >
               <Icon name="action.more" size="lg" tone="inherit" />
-              {isCustomized && (
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
-              )}
             </button>
           </div>
         }
@@ -313,14 +297,14 @@ export const MobileFoldersView: React.FC = () => {
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-tint-4 bg-panel/60 overflow-x-auto scrollbar-none shrink-0 z-10">
+        <div className="z-10 flex shrink-0 items-center gap-2 overflow-x-auto border-b border-tint-6 bg-panel px-3 scrollbar-none">
           {directSubfolders.map(sub => {
             const subItemsCount = items.filter(i => i.folder === sub.path).length;
             return (
               <button
                 key={sub.path}
                 onClick={() => setMobileActiveFolder(sub.path)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tint-4 hover:bg-tint-8 border border-tint-6 text-xs font-medium text-fg-tertiary shrink-0 motion-press cursor-pointer whitespace-nowrap"
+                className="flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 text-xs font-medium text-fg-secondary active:bg-tint-8 focus-visible:bg-tint-8 cursor-pointer"
               >
                 <Icon name="entity.folder" size="sm" />
                 <span>{sub.name}</span>
@@ -330,7 +314,7 @@ export const MobileFoldersView: React.FC = () => {
           })}
           <button
             onClick={() => openCreateFolderModal(mobileActiveFolder)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-tint-2 hover:bg-tint-6 border border-dashed border-tint-10 text-xs text-fg-secondary shrink-0 cursor-pointer whitespace-nowrap"
+            className="flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 text-xs text-fg-secondary active:bg-tint-8 focus-visible:bg-tint-8 cursor-pointer"
             title="Создать подпапку"
           >
             <Icon name="action.add" size="sm" tone="inherit" />

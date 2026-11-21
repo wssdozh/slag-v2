@@ -131,12 +131,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
                   variant={isActive ? 'filled' : 'outline'}
                   className="transition-colors duration-150"
                 />
-                {hasDot && (
-                  <span
-                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-surface"
-                    title={`${unsortedCount} неразобранных записей`}
-                  />
-                )}
+
               </div>
             </button>
           );

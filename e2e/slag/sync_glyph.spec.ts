@@ -36,11 +36,11 @@ test('the sidebar keeps ordinary exchange quiet and opens the last known device 
   await button.hover();
   await expect(panel).toBeVisible();
   await expect(panel.getByText('телефон', { exact: true })).toBeVisible();
-  await expect(panel.getByText('Копии различались')).toBeVisible();
-  await expect(panel.getByText('Сводка:', { exact: false })).toBeVisible();
+  await expect(panel.getByText('Не совпало')).toBeVisible();
+  await expect(panel.getByText('Не совпало')).toHaveAttribute('title', /20\.11\.2026/);
   await expect(panel.getByText('ноутбук', { exact: true })).toBeVisible();
-  await expect(panel.getByText('Нет сохранённой сводки')).toBeVisible();
-  await expect(panel.getByText('Есть старая сводка без имени устройства.')).toBeVisible();
+  await expect(panel.getByText('Нет сверки')).toBeVisible();
+  await expect(panel.getByText('Детали сверки')).toBeVisible();
   await panel.hover();
   await expect(panel).toHaveCSS('opacity', '1');
   await page.screenshot({ path: 'test-results/screenshots/sidebar-sync-status.png', clip: { x: 0, y: 585, width: 380, height: 315 } });

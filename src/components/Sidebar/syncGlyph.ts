@@ -8,7 +8,7 @@ interface SyncGlyph {
   title: string;
 }
 
-export function syncGlyph(status: SyncStatus, enabled: boolean): SyncGlyph {
+export function syncGlyph(status: SyncStatus, enabled: boolean, mobile = false): SyncGlyph {
   if (status.authRequired && !status.isAuthenticated) {
     return { name: 'system.syncOffline', className: 'text-warning', title: 'Войдите в SLAG ID' };
   }
@@ -18,8 +18,11 @@ export function syncGlyph(status: SyncStatus, enabled: boolean): SyncGlyph {
   if (status.state === 'offline') {
     return { name: 'system.syncOffline', className: 'text-fg-dim', title: 'Нет связи с релеем' };
   }
-  if (enabled || status.state !== 'idle' || status.currentRoomId) {
-    return { name: 'system.sync', className: 'text-fg-secondary', title: 'Синхронизация включена' };
+  if (mobile && (status.state === 'syncing' || status.initialSync.state === 'loading')) {
+    return { name: 'system.sync', className: 'text-fg-primary', title: 'Идёт синхронизация' };
   }
-  return { name: 'system.syncIdle', className: 'text-fg-dim', title: 'Синхронизация выключена' };
+  if (enabled || status.state !== 'idle' || status.currentRoomId) {
+    return { name: mobile ? 'system.syncIdle' : 'system.sync', className: 'text-fg-primary', title: 'Синхронизация включена' };
+  }
+  return { name: 'system.syncOffline', className: 'text-fg-secondary', title: 'Синхронизация выключена' };
 }

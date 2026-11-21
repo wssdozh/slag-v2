@@ -2,10 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
-import { syncEngine } from '../../lib/sync/syncEngine';
 import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
-import type { SyncStatus } from '../../lib/sync/types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Icon } from '../UI/icons/Icon';
 import { SyncStatusButton } from './SyncStatusButton';
@@ -23,13 +21,8 @@ export const Sidebar: React.FC = () => {
     appUpdate,
   } = useApp();
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
   const bottomBarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    return syncEngine.subscribe(setSyncStatus);
-  }, []);
 
   useEffect(() => {
     if (!isVaultDropdownOpen) return;
@@ -147,7 +140,7 @@ export const Sidebar: React.FC = () => {
           position="bottom"
         />
 
-        <SyncStatusButton status={syncStatus} vaultId={vault.syncId ?? vault.id} onSettings={() => openSettingsModal('sync')} />
+        <SyncStatusButton vaultId={vault.syncId ?? vault.id} onSettings={() => openSettingsModal('sync')} />
 
         {/* Logs HUD button */}
         <button

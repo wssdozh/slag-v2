@@ -9,6 +9,7 @@ export interface MobileScreenHeaderProps {
   backLabel?: string;
   backTitle?: string;
   leftSlot?: React.ReactNode;
+  leadingAction?: React.ReactNode;
   centerSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
   className?: string;
@@ -22,6 +23,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
   backLabel = 'Назад',
   backTitle,
   leftSlot,
+  leadingAction,
   centerSlot,
   rightSlot,
   className = '',
@@ -50,6 +52,7 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
           </button>
         ) : (
           <>
+            {leadingAction}
             {icon && (
               <div className="w-6 h-6 rounded-md bg-tint-10 flex items-center justify-center font-mono font-bold text-xs text-white shrink-0">
                 {icon}
