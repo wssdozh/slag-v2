@@ -427,6 +427,9 @@ export class BackupService {
       throw new Error('Архив повреждён или имеет неверный формат');
     }
 
+    if (Object.hasOwn(unzipped, 'slag-migration.json')) {
+      throw new Error('Это снимок для перехода на реестр, а не резервная копия');
+    }
     const fileKeys = Object.keys(unzipped);
     if (fileKeys.length === 0) {
       throw new Error('Архив пуст');

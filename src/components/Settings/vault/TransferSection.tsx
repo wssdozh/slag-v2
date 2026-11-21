@@ -2,10 +2,23 @@
 import React from 'react';
 import { useApp } from '../../../context/AppContext';
 import { storage } from '../../../lib/storage';
+import { canExportMigrationSnapshot, exportMigrationSnapshot } from '../../../lib/sync/notes/migrationExport';
 import { SettingsDivider, SettingsGroup, SettingsRow } from '../SettingsUI';
 
 export const TransferSection: React.FC = () => {
   const { confirmAction, downloadVaultZip, restoreFromZipFile, refreshData, addToast } = useApp();
+  const [isExportingMigration, setIsExportingMigration] = React.useState(false);
+
+  const handleMigrationExport = async () => {
+    setIsExportingMigration(true);
+    try {
+      if (await exportMigrationSnapshot()) addToast('Снимок синхронизации сохранён', 'success');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : 'Не удалось сохранить снимок синхронизации', 'error');
+    } finally {
+      setIsExportingMigration(false);
+    }
+  };
 
   const handleExportZip = async () => {
     await downloadVaultZip();
@@ -64,6 +77,16 @@ export const TransferSection: React.FC = () => {
         <SettingsRow label="Экспорт в ZIP (заметки и медиа)" onClick={() => void handleExportZip()} testId="btn-export-zip" />
         <SettingsDivider />
         <SettingsRow label="Экспорт структуры в JSON" onClick={handleExportJson} />
+        {canExportMigrationSnapshot() && <>
+          <SettingsDivider />
+          <SettingsRow
+            label="Снимок для перехода на реестр"
+            description={isExportingMigration ? 'Подготовка архива…' : 'Локальный архив с заметками и корзиной. Не для восстановления.'}
+            disabled={isExportingMigration}
+            onClick={() => void handleMigrationExport()}
+            testId="btn-export-migration"
+          />
+        </>}
         <SettingsDivider />
         <label className="flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 text-xs font-medium text-fg-primary hover:bg-surface-hover focus-within:bg-surface-hover cursor-pointer">
           Восстановить из файла (.zip / .json)
