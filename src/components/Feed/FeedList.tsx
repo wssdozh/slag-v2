@@ -36,7 +36,6 @@ import {
 // Within this distance of the bottom the note is arriving in front of the reader:
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
-const COMPOSER_SETTLE_PX = 200;
 
 function subscribeToNow() {
   return () => {};
@@ -155,10 +154,7 @@ export const FeedList: React.FC = () => {
     }
   }
 
-  const prevScrollHeightRef = useRef<number>(0);
-  const prevScrollTopRef = useRef<number>(0);
-  const isPrependRef = useRef<boolean>(false);
-  const prevItemsLengthRef = useRef<number>(filteredItems.length);
+  const prependAnchorRef = useRef<{ card: HTMLElement; top: number } | null>(null);
 
   const todayMidnight = useSyncExternalStore(subscribeToNow, getTodayMidnight, () => 0);
 
@@ -169,11 +165,12 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container || !hasMoreOlder) return;
     // Предыдущая догрузка ещё держит анкор: вторая подряд даёт скачок.
-    if (isPrependRef.current) return;
+    if (prependAnchorRef.current) return;
 
-    prevScrollHeightRef.current = container.scrollHeight;
-    prevScrollTopRef.current = container.scrollTop;
-    isPrependRef.current = true;
+    const card = container.querySelector<HTMLElement>('[data-flip-id]');
+    if (card) {
+      prependAnchorRef.current = { card, top: card.getBoundingClientRect().top };
+    }
 
     setWindowSize(prev => nextWindowSize(prev, filteredItems.length));
   }, [hasMoreOlder, filteredItems.length]);
@@ -188,22 +185,18 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container) return;
 
-    const added = filteredItems.length > prevItemsLengthRef.current;
-    prevItemsLengthRef.current = filteredItems.length;
-
-    if (isPrependRef.current) {
-      const delta = container.scrollHeight - prevScrollHeightRef.current;
-      if (delta > 0) {
-        container.scrollTop = prevScrollTopRef.current + delta;
+    const anchor = prependAnchorRef.current;
+    if (anchor) {
+      prependAnchorRef.current = null;
+      if (container.contains(anchor.card)) {
+        // Correct only the movement that remains after any browser anchoring.
+        container.scrollTop += anchor.card.getBoundingClientRect().top - anchor.top;
+        return;
       }
-      isPrependRef.current = false;
-      return;
     }
 
     if (highlightedItemId) return;
-    const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (isStuckToBottomRef.current || (added && distFromBottom <= COMPOSER_SETTLE_PX)) {
-      isStuckToBottomRef.current = true;
+    if (isStuckToBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
   });
