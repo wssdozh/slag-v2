@@ -21,6 +21,7 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
   const blockers: { reason: string; id: string }[] = [];
   const candidates = new Map<string, SlagItem | null>();
   const matchingTrash = new Map<string, SlagItem[]>();
+  const liveOn = new Map<string, Set<string>>();
   const seen = new Set<string>();
   const required = new Set(requiredDevices);
   if (!required.size || required.has('') || required.size !== requiredDevices.length) {
@@ -40,6 +41,9 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
     for (const item of copy.live) {
       if (liveIds.has(item.id)) blockers.push({ reason: 'duplicate_live_id', id: item.id });
       liveIds.add(item.id);
+      const devices = liveOn.get(item.id) ?? new Set<string>();
+      devices.add(copy.deviceId);
+      liveOn.set(item.id, devices);
       const previous = candidates.get(item.id);
       if (previous && !sameNote(previous, item)) blockers.push({ reason: 'divergent_live', id: item.id });
       else candidates.set(item.id, relayNote(item));
@@ -49,6 +53,9 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
   const accepted = new Set<string>();
   for (const [id] of matchingTrash) {
     if (explicitDeletes.has(id)) continue;
+    // Historical trash is not a second live state when every writer still has the same active
+    // note and no ledger records a delete. Other guards still reject missing or divergent copies.
+    if (required.size > 0 && [...required].every((deviceId) => liveOn.get(id)?.has(deviceId))) continue;
     // Keep reviewed trash-only bytes in the original local archives. Do not create a shared
     // tombstone from absence, or let an archive decision hide a still-live copy.
     if (!candidates.has(id) && decisions.get(id) === 'archive') accepted.add(id);

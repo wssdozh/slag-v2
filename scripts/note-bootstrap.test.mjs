@@ -83,3 +83,20 @@ test('archive is local-only; a different live body needs a provenance decision',
   assert.deepEqual(new Set(plan(decisions).blockers.map(({ reason }) => reason)),
     new Set(['divergent_live', 'unproven_deletion', 'invalid_decision']));
 });
+
+test('a trash copy cannot suppress the same live note on every required device', () => {
+  const current = note('shared', 'current');
+  const pc = snapshot('pc', { live: [current], trash: [note(current.id, 'historical body')] });
+  const phone = snapshot('phone', { live: [{ ...current, updatedAt: 2 }] });
+  const plan = (decisions) => planBootstrap(['pc', 'phone'], [pc, phone], new Map(decisions));
+  assert.deepEqual(plan().blockers, []);
+  assert.equal(plan().candidates.get(current.id).content, 'current');
+  assert.deepEqual(plan([[current.id, 'archive']]).blockers, [{ reason: 'invalid_decision', id: current.id }]);
+  phone.live = [];
+  assert.deepEqual(plan().blockers, [{ reason: 'unproven_deletion', id: current.id }]);
+  phone.live = [note(current.id, 'different current body')];
+  assert.deepEqual(plan().blockers, [{ reason: 'divergent_live', id: current.id }]);
+  phone.live = [current];
+  phone.tombstones = [current.id];
+  assert.deepEqual(plan().blockers, [{ reason: 'delete_vs_live', id: current.id }]);
+});

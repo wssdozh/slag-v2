@@ -45,7 +45,7 @@ asyncio.run(create())`, db, room]);
   const archiveOnly = note('local-archive');
   await writeFile(join(dir, file.name), bytes);
   await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [source, ...noteCopies], trash: [] }));
-  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [source], trash: [...noteCopies, archiveOnly] }));
+  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [source], trash: [...noteCopies, archiveOnly, { ...source, content: 'historical local trash' }] }));
   const command = ['scripts/note-bootstrap.mjs', '--devices', 'pc,laptop', '--room', room, '--generation', String(generation), ...snaps];
   const ledgerPath = join(dir, 'review.json');
   assert.throws(() => node([...command, '--review', ledgerPath]), (err) => err.status === 2 &&
