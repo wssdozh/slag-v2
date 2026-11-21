@@ -74,7 +74,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
 | эталон заметок: операции, квитанции, слияние и восстановление | `src/lib/sync/notes/`: `session.ts` — режим комнаты, `replica.ts` — доставка, `journal.ts` — намерения, `merge.ts` — слияние, `bootstrap.ts` — подготовка миграции |
 | загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
-| сверка корней между устройствами, манифест комнаты | `src/lib/sync/manifest/`: `sync.ts` — оркестратор (сборка → соседи → решение → реакция), `channel.ts` — форма и решение по пирам, `peers.ts` — чтение чужих корней и запрос недостающих, `publish.ts` — свой POST, `schedule.ts` — тайминги, `resolve.ts` — авторазбор. Хэши заметок — `src/lib/vault/integrity/manifest.ts` |
+| сверка корней между устройствами, манифест комнаты | `src/lib/sync/manifest/`: `sync.ts` — диагностическая сверка legacy и чтение сохранённых бандлов, `channel.ts` — формат и сравнение, `peers.ts` — чтение чужих корней, `publish.ts` — свой POST, `schedule.ts` — тайминги. Хэши заметок — `src/lib/vault/integrity/manifest.ts` |
 | конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
 | экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |
 | уведомления и напоминания | `src/lib/notify/`, `src/context/hooks/useNotifyArm.ts` |
