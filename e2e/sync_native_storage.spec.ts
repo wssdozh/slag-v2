@@ -136,15 +136,19 @@ test('native sync refuses a corrupt journal until it can re-read a valid one', a
       const otherPath = storage.files.getVaultStatePath(other);
       const good = JSON.stringify({ sync: { tombstones: { removed: 100 } }, untouched: true });
       const files = new Map<string, string>();
+      const dirs = new Set([storage.files.getVaultDir(meta)]);
       let rejectRename = false;
       let network = 0;
       window.fetch = async () => { network++; return Response.json({ bundles: [] }); };
       window.__TAURI_INTERNALS__ = { invoke: async (cmd: string, args: { path: string; oldPath: string; newPath: string } | Uint8Array, options?: { headers: { path: string } }) => {
         if (cmd === 'plugin:fs|write_text_file' && options) {
-          files.set(decodeURIComponent(options.headers.path), new TextDecoder().decode(args as Uint8Array));
+          const file = decodeURIComponent(options.headers.path);
+          if (!dirs.has(file.slice(0, file.lastIndexOf('/')))) throw new Error('parent missing (os error 3)');
+          files.set(file, new TextDecoder().decode(args as Uint8Array));
           return;
         }
         const p = args as { path: string; oldPath: string; newPath: string };
+        if (cmd === 'plugin:fs|mkdir') { dirs.add(p.path); return; }
         if (cmd === 'plugin:fs|exists') return files.has(p.path);
         if (cmd === 'plugin:fs|read_text_file') {
           if (!files.has(p.path)) throw new Error('file not found (os error 2)');

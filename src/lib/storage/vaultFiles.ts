@@ -356,6 +356,8 @@ export class VaultFiles {
         const current = asStateObject(section);
         const next = typeof patch === 'function' ? patch(current) : patch;
         state[name] = replace ? next : { ...current, ...next };
+        // The first sync write can race native vault hydration before it creates the directory.
+        await mkdir(this.getVaultDir(vault), { baseDir: BaseDirectory.AppData, recursive: true });
         await writeJsonAtomic(statePath, state);
       } catch (err) {
         if (strict) throw err;
