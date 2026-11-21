@@ -37,8 +37,8 @@ if (values.decisions) {
   if (ledger.snapshot !== snapshot || !Array.isArray(ledger.decisions)) throw new Error('Decisions belong to a different snapshot or room generation');
   for (const entry of ledger.decisions) {
     if (typeof entry?.id !== 'string' || !entry.id || decisions.has(entry.id) ||
-        (entry.action !== 'delete' && entry.action !== 'keep') || typeof entry.evidence !== 'string' || !entry.evidence.trim()) {
-      throw new Error('Each decision needs a unique ID, delete/keep action and provenance');
+        !['delete', 'keep', 'archive'].includes(entry.action) || typeof entry.evidence !== 'string' || !entry.evidence.trim()) {
+      throw new Error('Each decision needs a unique ID, delete/keep/archive action and provenance');
     }
     decisions.set(entry.id, entry.action);
   }

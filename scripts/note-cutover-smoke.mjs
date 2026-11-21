@@ -42,17 +42,20 @@ asyncio.run(create())`, db, room]);
   const bytes = Buffer.from('synthetic attachment');
   const file = { id: 'fixture-attachment', name: 'fixture.bin', size: bytes.length, type: 'file', mimeType: 'application/octet-stream', relativePath: '.attachments/fixture.bin' };
   const source = { ...note('shared'), attachments: [file] };
+  const archiveOnly = note('local-archive');
   await writeFile(join(dir, file.name), bytes);
   await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [source, ...noteCopies], trash: [] }));
-  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [source], trash: noteCopies }));
+  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [source], trash: [...noteCopies, archiveOnly] }));
   const command = ['scripts/note-bootstrap.mjs', '--devices', 'pc,laptop', '--room', room, '--generation', String(generation), ...snaps];
   const ledgerPath = join(dir, 'review.json');
-  assert.throws(() => node([...command, '--review', ledgerPath]), (err) => err.status === 2 && JSON.parse(err.stdout).blockers.review_restore_provenance === 11);
+  assert.throws(() => node([...command, '--review', ledgerPath]), (err) => err.status === 2 &&
+    JSON.parse(err.stdout).blockers.review_restore_provenance === 11 && JSON.parse(err.stdout).blockers.unproven_deletion === 1);
   assert.equal(admin('status').mode, 'frozen');
   const ledger = JSON.parse(await readFile(ledgerPath, 'utf8'));
-  assert.equal(ledger.blockers.length, 11);
+  assert.equal(ledger.blockers.length, 12);
   // The fixture defines these copies as stale; never edit the input snapshots to resolve this.
   ledger.decisions = noteCopies.map(({ id }) => ({ id, action: 'delete', evidence: 'fixture: explicit delete and no restore' }));
+  ledger.decisions.push({ id: archiveOnly.id, action: 'archive', evidence: 'fixture: only in archived trash; keep bytes in original backup' });
   await writeFile(ledgerPath, JSON.stringify(ledger));
   assert.throws(() => node([...command, '--generation', String(generation + 1), '--decisions', ledgerPath]), (err) => err.status === 1 && /different snapshot or room generation/.test(err.stderr));
   const secret = join(dir, 'key.b64');
@@ -141,7 +144,7 @@ print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), sys.argv[5], 
   assert.equal((await openNote(keys, room, generation, folderEvents[0])).item.folder, 'Work');
   assert.equal((await openRegistryBody(keys, room, generation, folderEvents[1])).folders[1].path, 'Work');
   assert.deepEqual(submit(group, 19), [folderReceipt, []]);
-  process.stdout.write('isolated cutover: reviewed folders, shared records, notes and encrypted media activated together; 11 ambiguous copies blocked; folder and note receipts survived reopening SQLite; explicit deletion, stale rejection and restore verified\n');
+  process.stdout.write('isolated cutover: reviewed folders, shared records, notes and encrypted media activated together; 11 ambiguous copies blocked; archive-only copy excluded without tombstone; folder and note receipts survived reopening SQLite; explicit deletion, stale rejection and restore verified\n');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

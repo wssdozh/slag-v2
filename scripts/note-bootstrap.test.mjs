@@ -60,3 +60,26 @@ test('migration refuses missing devices, pending ops, and apparent stale copies 
   assert.equal(reviewed.candidates.get('stale-1'), null);
   assert.ok(planBootstrap(['pc'], inputs).blockers.some(({ reason, id }) => reason === 'invalid_snapshot' && id === 'laptop'));
 });
+
+test('archive is local-only; a different live body needs a provenance decision', () => {
+  const restored = note('restored', 'edited after explicit restore');
+  const archived = note('archive');
+  const inputs = [snapshot('pc', { live: [restored] }), snapshot('phone', {
+    tombstones: [restored.id], trash: [archived, archived, note(restored.id)],
+  })];
+  const plan = (decisions) => planBootstrap(['pc', 'phone'], inputs, new Map(decisions));
+  assert.deepEqual(plan().blockers, [
+    { reason: 'unproven_deletion', id: archived.id }, { reason: 'delete_vs_live', id: restored.id },
+  ]);
+  assert.equal(plan([[restored.id, 'delete']]).candidates.get(restored.id), null);
+  assert.ok(plan([[restored.id, 'archive']]).blockers.some(({ reason }) => reason === 'invalid_decision'));
+  const decisions = [[restored.id, 'keep'], [archived.id, 'archive']];
+  const reviewed = plan(decisions);
+  assert.deepEqual(reviewed.blockers, []);
+  assert.deepEqual(reviewed.candidates.get(restored.id), restored);
+  assert.equal(reviewed.candidates.has(archived.id), false);
+  inputs[0].live.push(archived);
+  inputs[1].live.push(note(restored.id));
+  assert.deepEqual(new Set(plan(decisions).blockers.map(({ reason }) => reason)),
+    new Set(['divergent_live', 'unproven_deletion', 'invalid_decision']));
+});

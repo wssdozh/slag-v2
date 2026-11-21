@@ -14,8 +14,10 @@ export interface BootstrapCopy {
   trash: readonly SlagItem[];
 }
 
+export type BootstrapDecision = 'delete' | 'keep' | 'archive';
+
 /** Explicit, local decisions for a frozen snapshot set. No inference from timestamps. */
-export function planBootstrap(requiredDevices: readonly string[], copies: readonly BootstrapCopy[], decisions: ReadonlyMap<string, 'delete' | 'keep'> = new Map()) {
+export function planBootstrap(requiredDevices: readonly string[], copies: readonly BootstrapCopy[], decisions: ReadonlyMap<string, BootstrapDecision> = new Map()) {
   const blockers: { reason: string; id: string }[] = [];
   const candidates = new Map<string, SlagItem | null>();
   const matchingTrash = new Map<string, SlagItem[]>();
@@ -30,7 +32,6 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
     seen.add(copy.deviceId);
     for (const id of copy.pendingIds) blockers.push({ reason: 'pending_intent', id });
     for (const item of copy.trash) {
-      if (!explicitDeletes.has(item.id)) blockers.push({ reason: 'unproven_deletion', id: item.id });
       const alternatives = matchingTrash.get(item.id) ?? [];
       alternatives.push(item);
       matchingTrash.set(item.id, alternatives);
@@ -45,21 +46,31 @@ export function planBootstrap(requiredDevices: readonly string[], copies: readon
     }
   }
   for (const id of requiredDevices) if (!seen.has(id)) blockers.push({ reason: 'missing_device', id });
-  const eligibleDecisions = new Set<string>();
+  const accepted = new Set<string>();
+  for (const [id] of matchingTrash) {
+    if (explicitDeletes.has(id)) continue;
+    // Keep reviewed trash-only bytes in the original local archives. Do not create a shared
+    // tombstone from absence, or let an archive decision hide a still-live copy.
+    if (!candidates.has(id) && decisions.get(id) === 'archive') accepted.add(id);
+    else blockers.push({ reason: 'unproven_deletion', id });
+  }
   for (const id of explicitDeletes) {
     const live = candidates.get(id);
-    // Equal trash proves the live copy is the deleted body, but cannot prove the absence of an
-    // explicit restore. Require operator review rather than deciding by device clocks.
-    const matchesTrash = live && matchingTrash.get(id)?.some((copy) => sameNote(copy, live));
-    if (matchesTrash) eligibleDecisions.add(id);
     const decision = decisions.get(id);
-    if (!live || (matchesTrash && decision === 'delete')) candidates.set(id, null);
-    else if (!(matchesTrash && decision === 'keep')) blockers.push({ reason: matchesTrash ? 'review_restore_provenance' : 'delete_vs_live', id });
+    // An operator may verify a delete after an edit, or a restore followed by an edit. The
+    // original snapshots preserve all bodies; the projection moves a live copy to local trash.
+    // A disagreement between two live copies still blocks, regardless of the review decision.
+    if (!live) candidates.set(id, null);
+    else if (decision === 'keep' || decision === 'delete') {
+      if (decision === 'delete') candidates.set(id, null);
+      accepted.add(id);
+    } else {
+      const matchesTrash = matchingTrash.get(id)?.some((copy) => sameNote(copy, live));
+      blockers.push({ reason: matchesTrash ? 'review_restore_provenance' : 'delete_vs_live', id });
+    }
   }
   for (const id of decisions.keys()) {
-    if (!eligibleDecisions.has(id)) {
-      blockers.push({ reason: 'invalid_decision', id });
-    }
+    if (!accepted.has(id)) blockers.push({ reason: 'invalid_decision', id });
   }
   return { blockers, candidates };
 }
