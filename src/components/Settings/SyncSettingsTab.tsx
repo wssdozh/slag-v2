@@ -5,27 +5,41 @@ import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
-import { keepRelayOnConflict, setKeepRelayOnConflict } from '../../lib/sync/notes/conflicts';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
-  const [, renderConflictSetting] = useState(0);
-  const vaultId = syncEngine.currentVaultId;
-  const keepRelay = keepRelayOnConflict(vaultId);
-
-  const changeConflictSetting = async (enabled: boolean) => {
-    if (enabled && !await confirmAction({
-      title: 'Не сохранять отклонённые правки?',
-      description: 'Совместимые правки по-прежнему объединятся. При настоящем конфликте останется версия релея, а отвергнутая правка не попадёт в локальную историю. Уже сохранённая история не удалится.',
-      confirmLabel: 'Оставлять версию релея', isDestructive: true,
-    })) return;
-    setKeepRelayOnConflict(vaultId, enabled);
-    renderConflictSetting((revision) => revision + 1);
-  };
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
+  const conflicts = syncEngine.getNoteConflicts();
+  const sections = new Map<string, typeof conflicts>();
+  for (const entry of conflicts) {
+    const key = entry.folderGroup?.id ?? entry.intentId;
+    const entries = sections.get(key);
+    if (entries) entries.push(entry);
+    else sections.set(key, [entry]);
+  }
+  const resolveConflict = async (entries: typeof conflicts, resolution: 'keep' | 'retry') => {
+    const [entry] = entries;
+    const groupId = entry.folderGroup?.id;
+    const keep = resolution === 'keep';
+    const retryLabel = groupId ? 'Повторить всю операцию' : 'Применить локальную';
+    if (!await confirmAction({
+      title: keep ? 'Оставить версию релея?' : groupId ? 'Повторить всю папочную операцию?' : 'Применить локальную правку?',
+      description: groupId ? (keep ? 'Весь перенос будет отклонён. Папки и заметки останутся как на релее.'
+        : 'Локальные версии дерева и всех записей будут отправлены вместе. Если хотя бы одна ревизия сменилась, пакет не применится.')
+        : keep ? 'Отклонённая правка будет удалена из списка конфликтов.'
+        : `Локальная правка будет отправлена поверх подтверждённой ревизии ${entry.currentRevision}. Если версия сменилась, синхронизация не перезапишет её.`,
+      confirmLabel: keep ? 'Оставить версию релея' : retryLabel, isDestructive: true,
+    })) return;
+    try {
+      if (groupId) await syncEngine.resolveFolderConflict(groupId, resolution, Object.fromEntries(entries.map(({ noteId, currentRevision }) => [noteId, currentRevision])));
+      else await syncEngine.resolveNoteConflict(entry.intentId, resolution, entry.currentRevision);
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    }
+  };
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -110,12 +124,45 @@ export const SyncSettingsTab: React.FC = () => {
         ]} />
       </SettingsGroup>
 
-      <SettingsGroup title="Конфликты заметок">
-        <SettingsRow label="В конфликте оставлять версию релея"
-          description={keepRelay ? 'Отклонённые правки не сохраняются. Совместимые правки объединяются.' : 'Отклонённые правки сохраняются в локальной истории, а не в ленте.'}
-          right={<SettingsSwitch checked={keepRelay} onChange={(enabled) => void changeConflictSetting(enabled)} label="В конфликте оставлять версию релея" />}
-        />
-      </SettingsGroup>
+      {conflicts.length > 0 && (
+        <SettingsGroup title="Конфликты синхронизации">
+          {[...sections].map(([key, entries]) => (
+            <React.Fragment key={key}>
+              {entries[0].folderGroup && <SettingsRow label="Папочная операция" description="Дерево и записи можно принять или отклонить только вместе." />}
+              {entries.map((entry) => <React.Fragment key={entry.intentId}>
+              <SettingsRow
+                label={Array.isArray(entry.item) ? 'Дерево папок' : entry.item && 'title' in entry.item ? entry.item.title || entry.noteId : entry.noteId}
+                description={`Локальная правка не принята · ревизия релея ${entry.currentRevision}`}
+              />
+              <SettingsRow label={(
+                <details className="text-xs text-fg-secondary">
+                  <summary className="cursor-pointer">Сравнить версии</summary>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {[['Релей', entry.currentItem], ['Локально', entry.item]].map(([label, item]) => (
+                      <div key={String(label)} className="min-w-0">
+                        <p className="text-fg-primary">{String(label)}</p>
+                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">{
+                          item === null ? 'Нет записи' : JSON.stringify(item, null, 2)
+                        }</pre>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )} />
+              </React.Fragment>)}
+              <SettingsRow label="Решение" right={(
+                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
+                  <button type="button" className="text-xs text-fg-primary hover:underline" onClick={() => void resolveConflict(entries, 'keep')}>Оставить версию релея</button>
+                  <button type="button" disabled={config.localSyncMode === 'receive-only' || (!!entries[0].folderGroup && entries.some(({ currentItem }) => currentItem === null))} className="text-xs text-fg-primary hover:underline disabled:opacity-40" onClick={() => void resolveConflict(entries, 'retry')}>
+                    {entries[0].folderGroup ? 'Повторить всю операцию' : 'Применить локальную'}
+                  </button>
+                </div>
+              )} />
+              <SettingsDivider />
+            </React.Fragment>
+          ))}
+        </SettingsGroup>
+      )}
 
       <SettingsGroup title="Безопасность">
         <SettingsRow label="Смена ключа хранилища" danger right={

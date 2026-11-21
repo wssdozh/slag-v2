@@ -255,6 +255,58 @@ export class AttachmentStore {
     return true;
   }
 
+  public async readForRegistry(attachment: SlagAttachment): Promise<Uint8Array> {
+    const dir = this.attachmentsDir();
+    const basename = this.basename(attachment);
+    if (isTauri() && await exists(`${dir}/${basename}`, { baseDir: BaseDirectory.AppData })) {
+      const bytes = await readFile(`${dir}/${basename}`, { baseDir: BaseDirectory.AppData });
+      if (bytes.length !== attachment.size) throw new Error('Размер вложения на диске не совпадает с метаданными');
+      return bytes;
+    }
+    await this.writeQueue;
+    if (this.attachmentsDir() !== dir) throw new Error('Хранилище изменилось во время чтения вложения');
+    const stored = await idbGetAttachment(attachment.id);
+    const decoded = stored?.dataUrl && dataUrlToBytes(stored.dataUrl);
+    if (!decoded || decoded.bytes.length !== attachment.size) throw new Error(`Байты вложения «${attachment.name}» не найдены`);
+    return decoded.bytes;
+  }
+
+  public async writeAccepted(attachment: SlagAttachment, bytes: Uint8Array): Promise<void> {
+    const basename = attachment.relativePath.split(/[\\/]/).at(-1) ?? '';
+    if (!attachment.registryBlobId || !basename || !isSafeVaultRelativePath(basename) || bytes.length !== attachment.size) {
+      throw new Error('Invalid accepted attachment');
+    }
+    const dir = this.attachmentsDir(); // Capture the destination before awaiting anything.
+    if (isTauri()) {
+      await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
+      const path = `${dir}/${basename}`;
+      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
+        const current = await readFile(path, { baseDir: BaseDirectory.AppData });
+        if (current.length !== bytes.length || current.some((byte, i) => byte !== bytes[i])) {
+          throw new Error('Accepted attachment would overwrite different local bytes');
+        }
+      } else {
+        await writeFile(path, bytes, { baseDir: BaseDirectory.AppData, createNew: true });
+      }
+    } else {
+      const dataUrl = `data:${attachment.mimeType};base64,${bytesToBase64(bytes)}`;
+      const write = this.writeQueue.then(async () => {
+        const stored = await idbGetAttachment(attachment.id);
+        const current = stored?.dataUrl && dataUrlToBytes(stored.dataUrl);
+        if (stored && (!current || current.bytes.length !== bytes.length || current.bytes.some((byte, i) => byte !== bytes[i]))) {
+          throw new Error('Accepted attachment would overwrite different local bytes');
+        }
+        await idbSaveAttachment({ ...attachment, dataUrl }, true);
+      });
+      this.writeQueue = write.then(() => undefined, () => undefined);
+      await write;
+    }
+    this.urlCache.delete(attachment.id);
+    this.dataUrlCache.delete(attachment.id);
+    this.missingBytes.delete(attachment.id);
+    this.nameIndex = null;
+  }
+
   /** A note keeps attachment ids; the bytes belong in IndexedDB, once per attachment. */
   public persistNew(items: SlagItem[]): void {
     for (const item of items) {

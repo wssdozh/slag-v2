@@ -57,3 +57,25 @@ test('the sidebar keeps ordinary exchange quiet and opens the last known device 
   await changeState('error');
   await expect(icon).toHaveAttribute('data-icon', 'system.syncError');
 });
+
+test('registry status distinguishes relay acceptance, local application and attachments', async ({ page }) => {
+  test.setTimeout(240_000);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const button = page.getByTestId('sidebar-sync-btn');
+  await expect(button).toBeVisible({ timeout: 120_000 });
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    const getStatus = syncEngine.getStatus.bind(syncEngine);
+    syncEngine.getStatus = () => ({ ...getStatus(), state: 'error', registry: {
+      relayHead: 42, appliedThrough: 39, application: 'error', media: 'error',
+    } });
+    syncEngine.notify();
+  });
+  await button.hover();
+  const panel = page.getByTestId('sidebar-sync-status');
+  const progress = panel.getByLabel('Прогресс реестра');
+  await expect(progress.locator('dt [data-icon]')).toHaveCount(3);
+  await expect(progress.locator('dd')).toHaveText(['#42', '#39 · Сбой', 'Сбой']);
+  await expect(panel.getByText('Нет сверок с другими устройствами')).toHaveCount(0);
+  await panel.screenshot({ path: 'test-results/screenshots/sidebar-registry-progress.png', animations: 'disabled' });
+});

@@ -186,12 +186,10 @@ export function leavesToRequest(report: DriftReport, wire: WireBody): string[] {
  * A mismatch is only a report, never permission to push or delete vault contents.
  */
 export interface ManifestDecision {
-  action: 'none' | 'reconcile' | 'report';
+  action: 'none' | 'report';
   /** The peer the verdict is about: the first diverged one, or the first peer when all agree. */
   peer: PeerManifest | null;
   drift: DriftReport | null;
-  /** The device the resend is aimed at; `null` for an old client or when nothing is resent. */
-  resendTo: string | null;
 }
 
 /**
@@ -203,17 +201,17 @@ export function decideManifest(
   local: Manifest,
   peers: PeerManifest[],
 ): ManifestDecision {
-  if (peers.length === 0) return { action: 'none', peer: null, drift: null, resendTo: null };
+  if (peers.length === 0) return { action: 'none', peer: null, drift: null };
 
   const divergedNamed = peers.find((peer) => peer.deviceId !== null && peer.root !== local.root);
   if (divergedNamed) {
     const drift = diffWire(local, divergedNamed);
-    return { action: 'report', peer: divergedNamed, drift, resendTo: null };
+    return { action: 'report', peer: divergedNamed, drift };
   }
 
   // Only the old client's row is left to disagree: that is a fact for the panel, not a job.
   const peer = peers.find((candidate) => candidate.root !== local.root) ?? peers[0];
-  return { action: 'none', peer, drift: diffWire(local, peer), resendTo: null };
+  return { action: 'none', peer, drift: diffWire(local, peer) };
 }
 
 /**

@@ -3,7 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { Finding, IntegrityStatus, RepairPlan } from '../../lib/vault/integrity/types';
 import type { ManifestStatus } from '../../lib/sync/types';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { readManifestAutoCheck, readManifestAutoResolve, writeManifestAutoCheck, writeManifestAutoResolve } from '../../lib/sync/manifest/prefs';
+import { readManifestAutoCheck, writeManifestAutoCheck } from '../../lib/sync/manifest/prefs';
 import { applyIntegrityRepair, runIntegrityCheck } from '../../lib/storage/integrityService';
 
 export interface UseIntegrity {
@@ -18,9 +18,6 @@ export interface UseIntegrity {
   /** Whether the engine compares on its own. Off means only the button asks. */
   autoCheck: boolean;
   setAutoCheck(next: boolean): void;
-  /** Whether a refused note goes to the trash by itself, or waits for the button. */
-  autoResolve: boolean;
-  setAutoResolve(next: boolean): void;
   /** «сверить с сервером сейчас»: one check, now, with the anti-loop latch aside. */
   checkServer(): void;
   verify(): Promise<void>;
@@ -44,16 +41,10 @@ export function useIntegrity(): UseIntegrity {
   const remote = useSyncExternalStore(subscribeToEngine, () => syncEngine.getManifest(), () => null);
   // Lazy initial state, not an effect: the switch has to show the stored answer on the first frame.
   const [autoCheck, setAutoCheckState] = useState(readManifestAutoCheck);
-  const [autoResolve, setAutoResolveState] = useState(readManifestAutoResolve);
 
   const setAutoCheck = useCallback((next: boolean) => {
     writeManifestAutoCheck(next);
     setAutoCheckState(next);
-  }, []);
-
-  const setAutoResolve = useCallback((next: boolean) => {
-    writeManifestAutoResolve(next);
-    setAutoResolveState(next);
   }, []);
 
   const checkServer = useCallback(() => {
@@ -118,8 +109,6 @@ export function useIntegrity(): UseIntegrity {
     remote,
     autoCheck,
     setAutoCheck,
-    autoResolve,
-    setAutoResolve,
     checkServer,
     verify,
     repair,

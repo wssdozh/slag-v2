@@ -66,12 +66,20 @@ export function useFolderAdmin(deps: {
     remapMobileFolder(remap);
   }, [currentFolder, setCurrentFolder, setFolderInfoTarget, remapMobileFolder]);
 
+  const reportQueued = useCallback((queued: Promise<void>) => {
+    void queued.then(
+      () => addToast('Изменение папки в очереди, ждём подтверждения релея', 'info'),
+      (error: unknown) => addToast(error instanceof Error ? error.message : 'Не удалось сохранить операцию с папкой', 'error'),
+    );
+  }, [addToast]);
+
   const renameFolder = useCallback((oldPath: string, updatedFolder: FolderMeta) => {
-    storage.renameFolder(oldPath, updatedFolder);
+    const queued = storage.renameFolder(oldPath, updatedFolder);
+    if (queued) return reportQueued(queued);
     followFolderPath(oldPath, updatedFolder.path);
     refreshData();
     addToast(`Папка переименована в «${updatedFolder.name}»`, 'success');
-  }, [followFolderPath, refreshData, addToast]);
+  }, [followFolderPath, refreshData, addToast, reportQueued]);
 
   /**
    * A dropped folder: the storage does the rename, the re-numbering and the announcements; this
@@ -92,6 +100,7 @@ export function useFolderAdmin(deps: {
       } else addToast('Не нашёл, куда перенести папку', 'error');
       return false;
     }
+    if (result.queued) { reportQueued(result.queued); return true; }
     const nextPath = result.path ?? path;
     if (nextPath !== path) {
       followFolderPath(path, nextPath);
@@ -99,14 +108,15 @@ export function useFolderAdmin(deps: {
     }
     refreshData();
     return true;
-  }, [addToast, followFolderPath, refreshData]);
+  }, [addToast, followFolderPath, refreshData, reportQueued]);
 
   const deleteFolder = (path: string) => {
     if (path === DEFAULT_INBOX_FOLDER) {
       addToast(`Папку «${DEFAULT_INBOX_FOLDER}» нельзя удалить`, 'error');
       return;
     }
-    storage.deleteFolder(path);
+    const queued = storage.deleteFolder(path);
+    if (queued) return reportQueued(queued);
     if (currentFolder === path || currentFolder.startsWith(path + '/')) {
       setCurrentFolder(DEFAULT_INBOX_FOLDER);
     }

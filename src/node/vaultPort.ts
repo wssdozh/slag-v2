@@ -53,8 +53,22 @@ export class NodeVault implements VaultPort {
     this.vault = { id: 'default_vault', name: vaultName };
   }
 
+  private assertLegacyWritable(): void {
+    // Headless currently speaks legacy only. Refuse before touching files, even offline.
+    for (const root of [this.root, ...(path.basename(this.root) === 'notes' ? [path.dirname(this.root)] : [])]) {
+      try {
+        fs.lstatSync(path.join(root, 'note-registry.json'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      throw new Error('Headless sync cannot open an enrolled note registry vault');
+    }
+  }
+
   /** Boot: make the layout, read the state file, and index every note on disk. */
   public load(): void {
+    this.assertLegacyWritable();
     for (const dir of [this.notesDir, this.trashDir, this.attachmentsDir]) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -117,6 +131,7 @@ export class NodeVault implements VaultPort {
   }
 
   public saveMemory(items: MemoryItem[], origin: ChangeOrigin = 'local'): boolean {
+    this.assertLegacyWritable();
     this.memory = items.slice();
     this.writeState();
     if (origin === 'local') this.emit({ kind: 'memory', action: 'upsert', id: `memory:${items.length}` });
@@ -125,6 +140,7 @@ export class NodeVault implements VaultPort {
 
   /** The node's own delete: the file into `.trash/`, the index without it, one local event. */
   public moveToTrash(id: string): void {
+    this.assertLegacyWritable();
     if (!this.byId.has(id)) return;
     this.trashItemFile(id);
     this.byId.delete(id);
@@ -132,7 +148,9 @@ export class NodeVault implements VaultPort {
     this.emit({ kind: 'item', action: 'delete', id, origin: 'local' });
   }
 
-  public async importSyncedVaultData(data: SyncedVaultData): Promise<void> {    if (data.items) this.applyItems(data.items);
+  public async importSyncedVaultData(data: SyncedVaultData): Promise<void> {
+    this.assertLegacyWritable();
+    if (data.items) this.applyItems(data.items);
     if (data.folders) {
       this.folders = data.folders.slice();
       this.writeState();
@@ -144,6 +162,7 @@ export class NodeVault implements VaultPort {
   }
 
   public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean> {
+    this.assertLegacyWritable();
     const bytes = dataUrlToBytes(dataUrl);
     if (!bytes) throw new Error(`Attachment ${attachment.id} arrived without usable bytes`);
     const target = path.join(this.attachmentsDir, safeAttachmentName(attachment));
@@ -306,6 +325,7 @@ export class NodeVault implements VaultPort {
   }
 
   private writeState(): void {
+    this.assertLegacyWritable();
     const file = path.join(this.root, STATE_FILE);
     const payload: VaultStateFile = {
       vault: this.vault,

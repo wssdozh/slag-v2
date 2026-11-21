@@ -6,6 +6,7 @@ import { loadDraftTombstone, loadSentHashes, loadTombstones, requireSyncSectionF
 import { attachmentSignature } from './attachmentSignature';
 import { logger } from '../logger/logger';
 import { vault } from '../storage/port';
+import { isLegacySharedKind } from './notes/sharedBody';
 import type { ComposerDraft, FolderMeta, FullscreenDraft, MemoryItem, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
@@ -119,6 +120,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       // The notes this bundle says are gone. Collected as it goes: the write takes exactly these off
       // the disk, instead of every note the payload happens not to list.
       const removedIds: string[] = [];
+      const itemDeletes: { itemId: string | null; decision: string; deletedAt?: number; localUpdatedAt?: number }[] = [];
       const originalTombstones = loadTombstones(engine.bookkeeping);
       const tombstones = { ...originalTombstones };
       const changedTombstones = new Set<string>();
@@ -126,6 +128,8 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       const registry = Boolean(engine.noteGeneration);
       for (const ch of bundle.changes) {
         if (registry && (ch.type === 'item' || ch.type === 'trash')) continue;
+        if (engine.hasSharedRegistry && isLegacySharedKind(ch.type)) continue;
+        if (engine.hasRegistryMedia && (ch.type === 'attachment' || ch.type === 'attachment_request')) continue;
         if (ch.type === 'item') {
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as SlagItem;
@@ -142,7 +146,14 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
           } else if (ch.action === 'delete') {
             const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
             const idx = currentItems.findIndex((it) => it.id === ch.id);
-            if (idx >= 0 && (currentItems[idx].updatedAt ?? 0) <= deletedAt) {
+            const localUpdatedAt = idx >= 0 ? (currentItems[idx].updatedAt ?? 0) : undefined;
+            const remove = localUpdatedAt !== undefined && localUpdatedAt <= deletedAt;
+            if (itemDeletes.length < 8) itemDeletes.push({
+              itemId: /^item_[\w-]{1,64}$/.test(ch.id) ? ch.id : null,
+              decision: remove ? 'staged' : idx < 0 ? 'already-absent' : 'newer-local-copy',
+              deletedAt, localUpdatedAt,
+            });
+            if (remove) {
               currentItems.splice(idx, 1);
               removedIds.push(ch.id);
               hasItemsChanged = true;
@@ -387,6 +398,9 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       }
 
       const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
+      if (itemDeletes.length > 0) syncLog.debug('Legacy bundle: explicit note deletes evaluated', {
+        bundleId: bundle.bundleId, stagedDeletes: removedIds.length, itemDeletes,
+      });
 
       engine.appliedBundleIds.add(bundle.bundleId);
       if (engine.batchUpdating) engine.status.initialSync.processed++;
@@ -416,10 +430,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         }
       }
 
-      // A bundle we took, even one that changed nothing, is a fact the room needs: the next check
-      // republishes our row, so its `at` moves past the peer's resend. Without it a peer that
-      // accepted a resend but kept its root looks like it refused the notes, and auto-resolve
-      // would act on "has not looked yet".
+      // Publish the next comparison after processing this bundle.
       engine.manifestPostedRoot = null;
       engine.status.lastSyncTime = new Date().toLocaleTimeString();
       engine.status.state = engine.batchUpdating ? 'syncing' : 'connected';

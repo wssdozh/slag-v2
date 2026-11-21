@@ -40,8 +40,8 @@ export function getNotifyRoutes(): NotifyRoute[] {
   return storage.getWorkspaceState().notifyRoutes ?? [];
 }
 
-export function saveNotifyRoutes(routes: NotifyRoute[]): void {
-  storage.saveWorkspaceState({ notifyRoutes: routes });
+export function saveNotifyRoutes(routes: NotifyRoute[]): Promise<void> {
+  return storage.saveWorkspaceState({ notifyRoutes: routes });
 }
 
 export function getNotifyPrefs(): NotifyPrefs {
@@ -59,8 +59,12 @@ export function getNotifyPrefs(): NotifyPrefs {
   };
 }
 
-export function saveNotifyPrefs(prefs: NotifyPrefs): void {
-  storage.saveWorkspaceState({ notifyPrefs: prefs });
+export function saveNotifyPrefs(patch: Partial<NotifyPrefs>): Promise<void> {
+  if (Object.keys(patch).length === 1 && patch.integrationsEnabled !== undefined) {
+    storage.setDeviceIntegrationsEnabled(patch.integrationsEnabled);
+    return Promise.resolve();
+  }
+  return storage.saveWorkspaceState({ notifyPrefs: { ...getNotifyPrefs(), ...patch } });
 }
 
 /** Relay error codes, in words the user can act on. */

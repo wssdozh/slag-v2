@@ -38,20 +38,20 @@ export const TransferSection: React.FC = () => {
         e.target.value = '';
         return;
       }
-      await restoreFromZipFile(file);
+      try {
+        await restoreFromZipFile(file);
+      } catch {
+        // useBackup already surfaced the failure to the user.
+      }
     } else if (file.name.endsWith('.json')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        const success = storage.importVaultFromJson(content);
-        if (success) {
-          refreshData();
-          addToast('Хранилище восстановлено из JSON', 'success');
-        } else {
-          addToast('Ошибка формата файла', 'error');
-        }
-      };
-      reader.readAsText(file);
+      const vault = storage.getCurrentVault();
+      try {
+        if (!await storage.importVaultFromJson(await file.text(), vault)) throw new Error('Ошибка формата файла');
+        refreshData();
+        addToast('Хранилище восстановлено из JSON', 'success');
+      } catch (error) {
+        addToast(error instanceof Error ? error.message : 'Не удалось импортировать файл', 'error');
+      }
     } else {
       addToast('Поддерживаются только архивы .zip и файлы .json', 'error');
     }

@@ -9,9 +9,8 @@
 //
 // Reads are synchronous by contract: they happen inside `useState(() => …)` and in the change
 // events the UI reacts to. So the sections are hydrated once into a snapshot and every reader takes
-// it from there; until that finishes, the old keys are the honest answer — exactly like the
-// tombstones in `sync/localBookkeeping.ts`. The snapshot belongs to one vault, so a switch makes it
-// stale and the next read hydrates the one that is loaded now.
+// it from there. Native shared settings never fall back to legacy keys before enrollment is known:
+// doing so could expose a deleted record. A vault switch invalidates the snapshot.
 //
 // Native never writes `localStorage` any more: the file is the store. The browser build has no
 // `state.json`, so there the keys keep going to the browser backend that `prefs` owns — the same
@@ -30,6 +29,9 @@ import { DEFAULT_WORKSPACE_STATE, STORAGE_KEYS } from '../../config';
 import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
 import { stripAttachmentList } from './attachmentData';
+import { parseSharedRegistryId } from '../sync/notes/sharedBody';
+import type { SharedBody } from '../sync/notes/sharedBody';
+import { sharedSettingsProjection } from './sharedProjection';
 import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from './prefs';
 import { parseLegacyJson } from './legacyJson';
 import {
@@ -103,9 +105,9 @@ interface WriteQueue {
  * module invents no new door into `state.json`.
  */
 export interface SettingsStateFiles {
-  readStateSection(name: string): Promise<Record<string, unknown>>;
-  writeStateSection(name: string, patch: Record<string, unknown>): Promise<void>;
-  flushStateToDisk(): Promise<void>;
+  readStateSection(name: string, vault?: VaultMeta, strict?: boolean): Promise<Record<string, unknown>>;
+  writeStateSection(name: string, patch: Record<string, unknown> | ((section: Record<string, unknown>) => Record<string, unknown>), vault?: VaultMeta, strict?: boolean): Promise<void>;
+  flushStateToDisk(strict?: boolean): Promise<void>;
 }
 
 export interface SettingsStoreHost {
@@ -113,6 +115,7 @@ export interface SettingsStoreHost {
   instanceId: string;
   files: SettingsStateFiles;
   getDraftChannel(): BroadcastChannel | null;
+  allowLegacySharedMigration(vault: VaultMeta): Promise<boolean>;
   emitChange(event: StorageChangeEvent): void;
 }
 
@@ -158,7 +161,7 @@ function snapshotFor(store: SettingsStoreHost): SettingsSnapshot | null {
   return snapshot && snapshot.vaultId === store.currentVault.id ? snapshot : null;
 }
 
-/** A read that arrives before hydration is the reason hydration exists: start it, answer from the old keys. */
+/** Start hydration for reads that arrive before the new vault snapshot is available. */
 function ensureHydrated(store: SettingsStoreHost): void {
   if (!usesStateFile() || snapshotFor(store)) return;
   void hydrateSettings(store);
@@ -175,10 +178,9 @@ export function hydrateSettings(store: SettingsStoreHost): Promise<void> {
   if (!usesStateFile()) return Promise.resolve();
   hydratingVaultId = vaultId;
   const run = loadSections(store, vaultId)
-    // A failed read is not a reason to keep the window from opening: the old keys answer, and the
-    // next start tries the file again.
+    // Keep the window open, but don't answer from unverified legacy keys.
     .catch((err: unknown) => {
-      settingsLog.warn('Settings could not be read from state.json, the old keys answer until the next start:', err);
+      settingsLog.warn('Settings could not be read from state.json:', err);
     })
     .finally(() => {
       if (hydratingVaultId === vaultId) {
@@ -191,12 +193,14 @@ export function hydrateSettings(store: SettingsStoreHost): Promise<void> {
 }
 
 async function loadSections(store: SettingsStoreHost, vaultId: string): Promise<void> {
+  const vault = store.currentVault;
+  const mayMergeLegacy = await store.allowLegacySharedMigration(vault).catch(() => false);
   const [drafts, chat, memory, workspace, migrations] = await Promise.all([
-    store.files.readStateSection(STATE_SECTIONS.drafts),
-    store.files.readStateSection(STATE_SECTIONS.chat),
-    store.files.readStateSection(STATE_SECTIONS.memory),
-    store.files.readStateSection(STATE_SECTIONS.workspace),
-    store.files.readStateSection(STATE_SECTIONS.migrations),
+    store.files.readStateSection(STATE_SECTIONS.drafts, vault, !mayMergeLegacy),
+    store.files.readStateSection(STATE_SECTIONS.chat, vault),
+    store.files.readStateSection(STATE_SECTIONS.memory, vault, !mayMergeLegacy),
+    store.files.readStateSection(STATE_SECTIONS.workspace, vault, !mayMergeLegacy),
+    store.files.readStateSection(STATE_SECTIONS.migrations, vault),
   ]);
   // A switch while the file was being read: this answer belongs to a vault nobody is looking at.
   if (store.currentVault.id !== vaultId) return;
@@ -207,7 +211,7 @@ async function loadSections(store: SettingsStoreHost, vaultId: string): Promise<
   const storedWorkspace = workspaceFromState(workspace);
   const stamps = migrationStampsFrom(migrations);
 
-  const legacy = stamps.legacyAt === 0 ? readLegacySections(store) : emptyLegacySections();
+  const legacy = mayMergeLegacy && stamps.legacyAt === 0 ? readLegacySections(store) : emptyLegacySections();
   const merged: SettingsSnapshot = {
     vaultId,
     composer: mergeComposerDrafts(onDisk.composer, legacy.composer),
@@ -239,7 +243,7 @@ async function loadSections(store: SettingsStoreHost, vaultId: string): Promise<
       `${merged.chat.length} chat messages, ${merged.memory.length} facts`
   );
 
-  if (stamps.legacyAt === 0) await persistLegacyMigration(store, merged, legacy);
+  if (mayMergeLegacy && stamps.legacyAt === 0) await persistLegacyMigration(store, merged, legacy);
 }
 
 interface LegacySections {
@@ -369,7 +373,20 @@ export function flushDraftWrites(store: SettingsStoreHost): void {
   void flushWrites(store);
 }
 
-async function flushWrites(store: SettingsStoreHost): Promise<void> {
+const settingsWrites = new WeakMap<SettingsStoreHost, Promise<void>>();
+
+function serializeSettingsWrite(store: SettingsStoreHost, write: () => Promise<void>): Promise<void> {
+  const before = settingsWrites.get(store) ?? Promise.resolve();
+  const next = before.then(write, write);
+  settingsWrites.set(store, next);
+  return next;
+}
+
+function flushWrites(store: SettingsStoreHost): Promise<void> {
+  return serializeSettingsWrite(store, () => flushQueuedSections(store));
+}
+
+async function flushQueuedSections(store: SettingsStoreHost): Promise<void> {
   const queue = writeQueue(store);
   if (queue.timer) {
     clearTimeout(queue.timer);
@@ -391,6 +408,7 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
     return;
   }
   if (queue.dirty.size === 0) return;
+  const vault = store.currentVault;
   queue.lastWriteAt = Date.now();
 
   const sections = new Set(queue.dirty);
@@ -414,12 +432,12 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
       // touched, and the whole map is what lands in the section. A restore is the one exception.
       const onDisk = replaceDrafts
         ? { composer: {}, fullscreen: {} }
-        : draftsFromSection(await store.files.readStateSection(STATE_SECTIONS.drafts));
+        : draftsFromSection(await store.files.readStateSection(STATE_SECTIONS.drafts, vault, true));
       const composer = mergeComposerDrafts(onDisk.composer, current.composer);
       for (const folderPath of erasedComposer) delete composer[folderPath];
       const fullscreen = mergeFullscreenDrafts(onDisk.fullscreen, current.fullscreen);
       for (const itemId of erasedFullscreen) delete fullscreen[itemId];
-      await store.files.writeStateSection(STATE_SECTIONS.drafts, draftsToSection({ composer, fullscreen }));
+      await store.files.writeStateSection(STATE_SECTIONS.drafts, draftsToSection({ composer, fullscreen }), vault, true);
       for (const event of events) {
         store.emitChange({
           kind: 'draft',
@@ -454,7 +472,7 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
 
   if (sections.has('memory')) {
     try {
-      await store.files.writeStateSection(STATE_SECTIONS.memory, memoryToSection(current.memory));
+      await store.files.writeStateSection(STATE_SECTIONS.memory, memoryToSection(current.memory), vault, true);
     } catch (err) {
       failed('memory', err);
     }
@@ -464,7 +482,8 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
     try {
       // The one writer `state.json.workspace` already had: it reads the file, replaces that section
       // and leaves `folders` and the MCP server's own keys alone.
-      await store.files.flushStateToDisk();
+      if (store.currentVault.id !== vault.id) throw new Error('Vault changed before workspace flush');
+      await store.files.flushStateToDisk(true);
     } catch (err) {
       failed('workspace', err);
     }
@@ -477,6 +496,44 @@ async function flushWrites(store: SettingsStoreHost): Promise<void> {
       failed('migrations', err);
     }
   }
+}
+
+export function projectSharedSettings(store: SettingsStoreHost, body: SharedBody, origin: 'local' | 'remote' = 'remote'): Promise<void> {
+  const vault = store.currentVault;
+  return hydrateSettings(store).then(() => serializeSettingsWrite(store, async () => {
+    if (store.currentVault.id !== vault.id) throw new Error('Vault changed before shared projection');
+    const current = snapshotFor(store);
+    if (!usesStateFile() || !current) throw new Error('Shared settings require a hydrated vault state file');
+    const projection = sharedSettingsProjection(body);
+    const { section } = projection;
+    // Drain old writers before replacing a member. A failed local write must not be overwritten.
+    await flushQueuedSections(store);
+    const assertScope = () => {
+      if (snapshotFor(store) !== current) throw new Error('Vault changed during shared projection');
+      if (writeQueue(store).dirty.has(section)) throw new Error('Local settings changed during shared projection');
+    };
+    assertScope();
+    if (projection.section === 'workspace') {
+      const patch = projection.patch(current.workspace);
+      await store.files.writeStateSection(STATE_SECTIONS.workspace, patch, vault, true);
+      assertScope();
+      current.workspace = { ...current.workspace, ...patch };
+    } else {
+      await store.files.writeStateSection(STATE_SECTIONS[section], projection.patch, vault, true);
+      assertScope();
+      if (projection.section === 'memory') current.memory = projection.replace(current.memory);
+      else projection.replace(current);
+    }
+    if (section === 'drafts') {
+      const { type, key } = parseSharedRegistryId(body.id);
+      const draft = type === 'composer' ? current.composer[key] : current.fullscreen[key];
+      store.emitChange({ kind: 'draft', action: body.shared === null ? 'delete' : 'upsert',
+        id: `${type}:${key}`, payload: draft, origin, registry: true });
+    }
+    window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: {
+      hasWorkspaceChanged: section === 'workspace', hasMemoryChanged: section === 'memory', hasDraftsChanged: section === 'drafts',
+    } }));
+  }));
 }
 
 /** A window that hides, loses focus or unloads is the last moment a queued draft can land. */
@@ -501,7 +558,7 @@ function postComposerDraft(
   const channel = store.getDraftChannel();
   if (!channel) return;
   try {
-    channel.postMessage({ type: 'DRAFT_CHANGED', senderId: store.instanceId, folderPath, draft, action });
+    channel.postMessage({ type: 'DRAFT_CHANGED', senderId: store.instanceId, vaultId: store.currentVault.id, folderPath, draft, action });
   } catch {}
 }
 
@@ -517,7 +574,7 @@ export function readComposerDrafts(store: SettingsStoreHost): ComposerDraftMap {
   const current = snapshotFor(store);
   if (current) return { ...current.composer };
   ensureHydrated(store);
-  return composerDraftsFrom(getPrefJson(composerDraftsKey(store.currentVault.id), null));
+  return usesStateFile() ? {} : composerDraftsFrom(getPrefJson(composerDraftsKey(store.currentVault.id), null));
 }
 
 export function readComposerDraft(store: SettingsStoreHost, folderPath: string): ComposerDraft | null {
@@ -639,6 +696,7 @@ export function readFullscreenDraft(store: SettingsStoreHost, itemId: string): F
   const current = snapshotFor(store);
   if (current) return current.fullscreen[itemId] ?? null;
   ensureHydrated(store);
+  if (usesStateFile()) return null;
   const draft = fullscreenDraftsFrom({
     [itemId]: getPrefJson(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, null),
   });
@@ -658,11 +716,11 @@ export function writeFullscreenDraft(
       void hydrateSettings(store);
       return;
     }
-    writeBrowserJson(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, draft);
+    writeBrowserJson(`${fullscreenDraftsKey(store.currentVault.id)}_${itemId}`, draft.attachments ? { ...draft, attachments: stripAttachmentList(draft.attachments) } : draft);
     store.emitChange({ kind: 'draft', action: 'upsert', id: `fullscreen:${itemId}`, payload: draft, origin });
     return;
   }
-  current.fullscreen[itemId] = draft;
+  current.fullscreen[itemId] = draft.attachments ? { ...draft, attachments: stripAttachmentList(draft.attachments) } : draft;
   writeQueue(store).erasedFullscreen.delete(itemId);
   writeQueue(store).events.push({ id: `fullscreen:${itemId}`, action: 'upsert', origin, payload: draft });
   markDirty(store, 'drafts');
@@ -805,7 +863,7 @@ export function readMemory(store: SettingsStoreHost): MemoryItem[] {
   const current = snapshotFor(store);
   if (current) return [...current.memory];
   ensureHydrated(store);
-  return memoryFrom(getPrefJson(memoryKey(store.currentVault.id), null));
+  return usesStateFile() ? [] : memoryFrom(getPrefJson(memoryKey(store.currentVault.id), null));
 }
 
 /** A file write cannot refuse a fact the way a full quota could: it lands in the snapshot, then on disk. */
@@ -835,7 +893,7 @@ export function readWorkspaceState(store: SettingsStoreHost): WorkspaceState {
   ensureHydrated(store);
   return {
     ...DEFAULT_WORKSPACE_STATE,
-    ...workspaceFromState(getPrefJson(workspaceKey(store.currentVault.id), null)),
+    ...(!usesStateFile() && workspaceFromState(getPrefJson(workspaceKey(store.currentVault.id), null))),
   };
 }
 

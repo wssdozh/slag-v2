@@ -1,6 +1,8 @@
 // The authenticated relay sees routing metadata, never the note's identity or body.
-import type { FolderMeta, SlagItem } from '../../../types/index.ts';
+import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
 import { safeVaultRelativePath } from '../../vault/safePath.ts';
+import { readSharedBody, isSharedRegistryId } from './sharedBody.ts';
+import type { SharedBody } from './sharedBody.ts';
 
 import { bytesToBase64, base64ToBytes, toArrayBuffer } from '../../media/byteCodec.ts';
 
@@ -9,13 +11,16 @@ export type RegistryBody = { id: string; item: SlagItem | null } | { id: typeof 
 
 export type NoteKind = 'create' | 'update' | 'delete' | 'restore';
 export type NoteMode = 'legacy' | 'frozen' | 'registry';
-export interface NoteStatus { mode: NoteMode; generation: number; head: number; floor: number; folderTree?: true }
+export interface NoteStatus { mode: NoteMode; generation: number; head: number; floor: number; folderTree?: true; atomicGroups?: true; sharedRecords?: true; registryMedia?: true }
 export interface NoteSealed { iv: string; ciphertext: string }
+export interface NoteGroup { id: string; index: number; size: number }
 export interface NoteOp {
   opId: string;
   noteId: string;
   baseRevision: number;
   kind: NoteKind;
+  group?: NoteGroup;
+  mediaIds?: string[];
   sealed: NoteSealed;
 }
 export interface NoteHead extends NoteOp { revision: number }
@@ -69,7 +74,24 @@ export function parseNoteStatus(value: unknown): NoteStatus {
   if (mode !== 'legacy' && mode !== 'frozen' && mode !== 'registry') throw new Error('Invalid note registry mode');
   if (input.folderTree !== undefined && input.folderTree !== true) throw new Error('Invalid folder tree capability');
   if (input.folderTree === true && mode !== 'registry') throw new Error('Folder tree requires registry mode');
-  return { mode, ...watermark(input), ...(input.folderTree === true ? { folderTree: true as const } : {}) };
+  if (input.atomicGroups !== undefined && (input.atomicGroups !== true || input.folderTree !== true)) {
+    throw new Error('Atomic groups require folder tree capability');
+  }
+  if (input.sharedRecords !== undefined && (input.sharedRecords !== true || mode !== 'registry')) throw new Error('Invalid shared records capability');
+  if (input.registryMedia !== undefined && (input.registryMedia !== true || mode !== 'registry')) throw new Error('Invalid registry media capability');
+  return { mode, ...watermark(input), ...(input.folderTree === true ? { folderTree: true as const } : {}),
+    ...(input.atomicGroups === true ? { atomicGroups: true as const } : {}),
+    ...(input.sharedRecords === true ? { sharedRecords: true as const } : {}),
+    ...(input.registryMedia === true ? { registryMedia: true as const } : {}) };
+}
+
+function readMediaIds(value: unknown, kind: NoteKind): string[] | undefined {
+  if (value === undefined) return undefined;
+  const ids = records(value, (id) => string(id, opaqueId));
+  if (kind === 'delete' || !ids.length || ids.some((id, i) => i > 0 && id <= ids[i - 1])) {
+    throw new Error('Invalid registry media references');
+  }
+  return ids;
 }
 
 export function parseNoteHead(value: unknown): NoteHead {
@@ -80,11 +102,13 @@ export function parseNoteHead(value: unknown): NoteHead {
   const revision = integer(input.revision, 1);
   const baseRevision = integer(input.baseRevision);
   if (baseRevision >= revision) throw new Error('Invalid note operation base');
+  const group = input.group === undefined ? undefined : parseGroup(input.group);
+  const mediaIds = readMediaIds(input.mediaIds, kind);
   const ciphertext = sealed.ciphertext;
   if (typeof ciphertext !== 'string' || ciphertext.length < 24 || ciphertext.length > NOTE_MAX_BYTES) throw new Error('Invalid encrypted note size');
   return {
     kind, revision, baseRevision, noteId: string(input.noteId, opaqueId), opId: string(input.opId, opId),
-    sealed: { iv: string(sealed.iv, /^[A-Za-z0-9+/]{16}$/), ciphertext },
+    ...(group ? { group } : {}), ...(mediaIds ? { mediaIds } : {}), sealed: { iv: string(sealed.iv, /^[A-Za-z0-9+/]{16}$/), ciphertext },
   };
 }
 
@@ -122,18 +146,29 @@ export function parseNoteResults(value: unknown): NoteResults {
   };
 }
 
-function associatedData(room: string, generation: number, op: Pick<NoteOp, 'opId' | 'noteId' | 'kind' | 'baseRevision'>) {
-  return encoder.encode(JSON.stringify(['slag-note-v1', room, generation, op.opId, op.noteId, op.kind, op.baseRevision]));
+export function parseGroup(value: unknown): NoteGroup {
+  const input = record(value);
+  const group = { id: string(input.id, opId), index: integer(input.index), size: integer(input.size, 2) };
+  if (group.size > NOTE_BATCH_COUNT || group.index >= group.size) throw new Error('Invalid note group');
+  return group;
+}
+
+function associatedData(room: string, generation: number, op: Omit<NoteOp, 'sealed'>) {
+  const group = op.group;
+  return encoder.encode(JSON.stringify(['slag-note-v1', room, generation, op.opId, op.noteId, op.kind, op.baseRevision,
+    ...(group ? [group.id, group.index, group.size] : []), ...(op.mediaIds ? [op.mediaIds] : [])]));
 }
 
 export async function deriveNoteKeys(vaultKey: CryptoKey, room: string) {
   const source = await crypto.subtle.importKey('raw', await crypto.subtle.exportKey('raw', vaultKey), 'HKDF', false, ['deriveKey']);
   const params = (purpose: string) => ({ name: 'HKDF', hash: 'SHA-256', salt: encoder.encode(room), info: encoder.encode(`slag-note-v1:${purpose}`) });
-  const [idKey, bodyKey] = await Promise.all([
+  const [idKey, bodyKey, mediaKey, mediaNonceKey] = await Promise.all([
     crypto.subtle.deriveKey(params('id'), source, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']),
     crypto.subtle.deriveKey(params('body'), source, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']),
+    crypto.subtle.deriveKey(params('media'), source, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']),
+    crypto.subtle.deriveKey(params('media-nonce'), source, { name: 'HMAC', hash: 'SHA-256', length: 256 }, false, ['sign']),
   ]);
-  return { idKey, bodyKey };
+  return { idKey, bodyKey, mediaKey, mediaNonceKey };
 }
 
 export type NoteKeys = Awaited<ReturnType<typeof deriveNoteKeys>>;
@@ -144,7 +179,7 @@ export async function opaqueNoteId(keys: NoteKeys, id: string): Promise<string> 
 }
 
 export function sealNote(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, id: string, item: SlagItem | null): Promise<NoteOp> {
-  if (id === FOLDER_TREE_ID || (op.kind === 'delete') !== (item === null) || (item && item.id !== id)) throw new Error('Invalid local note operation');
+  if (id === FOLDER_TREE_ID || isSharedRegistryId(id) || (op.kind === 'delete') !== (item === null) || (item && item.id !== id)) throw new Error('Invalid local note operation');
   return sealRegistryBody(keys, room, generation, op, { id, item });
 }
 
@@ -152,7 +187,38 @@ export function sealFolderTree(keys: NoteKeys, room: string, generation: number,
   return sealRegistryBody(keys, room, generation, op, { id: FOLDER_TREE_ID, folders: readFolderTree(folders, op.kind) });
 }
 
-async function sealRegistryBody(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, body: RegistryBody): Promise<NoteOp> {
+export function sealSharedRecord(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, id: string, value: unknown): Promise<NoteOp> {
+  if (op.group) throw new Error('Shared records cannot be members of a folder group');
+  return sealRegistryBody(keys, room, generation, op, checkedSharedBody(id, value, op.kind));
+}
+
+export function checkedSharedBody(id: string, value: unknown, kind: NoteKind): SharedBody {
+  const body = readSharedBody(id, value, kind);
+  if (body.shared && typeof body.shared === 'object' && 'attachments' in body.shared && (!Array.isArray(body.shared.attachments)
+      || !body.shared.attachments.every(isAttachmentMetadata))) throw new Error('Invalid shared attachment metadata');
+  return body;
+}
+
+export function registryAttachments(body: RegistryBody | SharedBody): SlagAttachment[] {
+  const value = 'item' in body ? body.item : 'shared' in body ? body.shared : null;
+  return value && typeof value === 'object' && 'attachments' in value ? value.attachments ?? [] : [];
+}
+
+export function registryMediaIds(attachments: SlagAttachment[]): string[] {
+  return [...new Set(attachments.flatMap(({ registryBlobId }) => registryBlobId ? [registryBlobId] : []))].sort();
+}
+
+function verifyMediaIds(body: RegistryBody | SharedBody, declared: string[] | undefined) {
+  const expected = registryMediaIds(registryAttachments(body));
+  if (expected.length !== (declared?.length ?? 0) || expected.some((id, index) => id !== declared?.[index])) {
+    throw new Error('Registry attachment addresses do not match the operation');
+  }
+}
+
+async function sealRegistryBody(keys: NoteKeys, room: string, generation: number, op: Omit<NoteOp, 'sealed'>, body: RegistryBody | SharedBody): Promise<NoteOp> {
+  const mediaIds = readMediaIds(op.mediaIds, op.kind);
+  verifyMediaIds(body, mediaIds);
+  op = { ...op, ...(mediaIds ? { mediaIds } : {}) };
   if (await opaqueNoteId(keys, body.id) !== op.noteId) throw new Error('Local registry identity mismatch');
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
@@ -173,15 +239,18 @@ export function isNoteItem(value: unknown): value is SlagItem {
     && typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
     && typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt)
     && Array.isArray(item.tags) && item.tags.every((tag: unknown) => typeof tag === 'string')
-    && Array.isArray(item.attachments) && item.attachments.every((attachment: unknown) => {
-      if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return false;
-      const metadata = attachment as Record<string, unknown>;
-      return typeof metadata.id === 'string' && typeof metadata.name === 'string'
-        && typeof metadata.relativePath === 'string' && typeof metadata.mimeType === 'string'
-        && (metadata.type === 'image' || metadata.type === 'audio' || metadata.type === 'video' || metadata.type === 'file')
-        && typeof metadata.size === 'number' && Number.isFinite(metadata.size) && metadata.size >= 0
-        && metadata.dataUrl === undefined;
-    });
+    && Array.isArray(item.attachments) && item.attachments.every(isAttachmentMetadata);
+}
+
+function isAttachmentMetadata(attachment: unknown): boolean {
+  if (!attachment || typeof attachment !== 'object' || Array.isArray(attachment)) return false;
+  const metadata = attachment as Record<string, unknown>;
+  return typeof metadata.id === 'string' && typeof metadata.name === 'string'
+    && typeof metadata.relativePath === 'string' && typeof metadata.mimeType === 'string'
+    && (metadata.type === 'image' || metadata.type === 'audio' || metadata.type === 'video' || metadata.type === 'file')
+    && typeof metadata.size === 'number' && Number.isFinite(metadata.size) && metadata.size >= 0
+    && (metadata.registryBlobId === undefined || (typeof metadata.registryBlobId === 'string' && opaqueId.test(metadata.registryBlobId)))
+    && metadata.dataUrl === undefined;
 }
 
 function isFolderMeta(value: unknown): value is FolderMeta {
@@ -210,16 +279,33 @@ export function readFolderTree(value: unknown, kind: NoteKind): FolderMeta[] {
   return value;
 }
 
-export async function openRegistryBody(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<RegistryBody> {
+export async function openAnyRegistryBody(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<RegistryBody | SharedBody> {
   const plaintext = await crypto.subtle.decrypt({
     name: 'AES-GCM', iv: toArrayBuffer(base64ToBytes(op.sealed.iv)), additionalData: associatedData(room, generation, op),
   }, keys.bodyKey, toArrayBuffer(base64ToBytes(op.sealed.ciphertext)));
-  const { id, item, folders } = record(JSON.parse(decoder.decode(plaintext)));
+  const { id, item, folders, shared } = record(JSON.parse(decoder.decode(plaintext)));
   if (typeof id !== 'string' || !id || await opaqueNoteId(keys, id) !== op.noteId) throw new Error('Encrypted registry identity mismatch');
-  if (id === FOLDER_TREE_ID) return { id, folders: readFolderTree(folders, op.kind) };
-  if (op.kind === 'delete' && item === null) return { id, item };
-  if (op.kind === 'delete' || !isNoteItem(item) || item.id !== id) throw new Error('Invalid encrypted note');
-  return { id, item };
+  let body: RegistryBody | SharedBody;
+  if (isSharedRegistryId(id)) {
+    if (op.group) throw new Error('Shared records cannot be members of a folder group');
+    body = checkedSharedBody(id, shared, op.kind);
+  } else if (id === FOLDER_TREE_ID) {
+    body = { id, folders: readFolderTree(folders, op.kind) };
+  } else if (op.kind === 'delete' && item === null) {
+    body = { id, item };
+  } else if (op.kind !== 'delete' && isNoteItem(item) && item.id === id) {
+    body = { id, item };
+  } else {
+    throw new Error('Invalid encrypted note');
+  }
+  verifyMediaIds(body, readMediaIds(op.mediaIds, op.kind));
+  return body;
+}
+
+export async function openRegistryBody(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<RegistryBody> {
+  const body = await openAnyRegistryBody(keys, room, generation, op);
+  if ('shared' in body) throw new Error('Shared records require a compatible replica');
+  return body;
 }
 
 export async function openNote(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<{ id: string; item: SlagItem | null }> {

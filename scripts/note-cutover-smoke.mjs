@@ -2,9 +2,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { openRegistryMedia } from '../src/lib/sync/notes/mediaWire.ts';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { deriveNoteKeys, openNote, openRegistryBody, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
+import { sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
+import { deriveNoteKeys, openAnyRegistryBody, openNote, openRegistryBody, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 
 const relay = resolve(process.argv[2] ?? '../slag-relay/.worktrees/note-registry');
 const dir = await mkdtemp(join(tmpdir(), 'slag-cutover-'));
@@ -36,8 +39,12 @@ asyncio.run(create())`, db, room]);
   assert.equal(mode, 'frozen');
   const snaps = ['pc', 'laptop'].map((name) => join(dir, `${name}.json`));
   const noteCopies = Array.from({ length: 11 }, (_, i) => note(`stale-${i}`));
-  await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [note('shared'), ...noteCopies], trash: [] }));
-  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [note('shared')], trash: noteCopies }));
+  const bytes = Buffer.from('synthetic attachment');
+  const file = { id: 'fixture-attachment', name: 'fixture.bin', size: bytes.length, type: 'file', mimeType: 'application/octet-stream', relativePath: '.attachments/fixture.bin' };
+  const source = { ...note('shared'), attachments: [file] };
+  await writeFile(join(dir, file.name), bytes);
+  await writeFile(snaps[0], JSON.stringify({ deviceId: 'pc', hydrated: true, pendingIds: [], tombstones: [], live: [source, ...noteCopies], trash: [] }));
+  await writeFile(snaps[1], JSON.stringify({ deviceId: 'laptop', hydrated: true, pendingIds: [], tombstones: noteCopies.map(({ id }) => id), live: [source], trash: noteCopies }));
   const command = ['scripts/note-bootstrap.mjs', '--devices', 'pc,laptop', '--room', room, '--generation', String(generation), ...snaps];
   const ledgerPath = join(dir, 'review.json');
   assert.throws(() => node([...command, '--review', ledgerPath]), (err) => err.status === 2 && JSON.parse(err.stdout).blockers.review_restore_provenance === 11);
@@ -55,54 +62,86 @@ asyncio.run(create())`, db, room]);
   const folderFile = join(dir, 'reviewed-folders.json');
   const folders = [{ name: 'Inbox', path: 'Inbox', description: '', order: 0 }];
   await writeFile(folderFile, JSON.stringify(folders));
-  const report = node([...command, '--decisions', ledgerPath, '--key-file', secret, '--out', seed, '--reviewed-folders', folderFile]);
+  const sharedFile = join(dir, 'reviewed-shared.json');
+  const records = [
+    { id: sharedRegistryId('workspace', 'aiPrompt'), shared: '' },
+    { id: sharedRegistryId('memory', 'deleted-fact'), shared: null },
+    { id: sharedRegistryId('fullscreen', 'shared'), shared: { itemId: 'shared', title: 'Editor draft', content: 'draft with a copy of the same file', folder: 'Inbox', type: 'task', reminder: '2026-11-21T13:00:00Z', tags: [], attachments: [file], updatedAt: 1 } },
+  ];
+  await writeFile(sharedFile, JSON.stringify({ snapshot: ledger.snapshot, evidence: 'synthetic fixture', records }));
+  const mediaFile = join(dir, 'reviewed-media.json');
+  const mediaReview = { snapshot: ledger.snapshot, evidence: 'synthetic fixture', files: [{ id: file.id, path: file.name, sha256: '0'.repeat(64) }] };
+  const seedCommand = [...command, '--decisions', ledgerPath, '--key-file', secret, '--out', seed,
+    '--reviewed-folders', folderFile, '--reviewed-shared', sharedFile, '--reviewed-media', mediaFile];
+  await writeFile(mediaFile, JSON.stringify(mediaReview));
+  assert.throws(() => node(seedCommand), (err) => /bytes differ from review/.test(err.stderr));
+  mediaReview.files[0].sha256 = createHash('sha256').update(bytes).digest('hex');
+  await writeFile(mediaFile, JSON.stringify(mediaReview));
+  const report = node(seedCommand);
   const { folderTreeId } = JSON.parse(await readFile(seed, 'utf8'));
   assert.match(folderTreeId, /^[0-9a-f]{64}$/);
   assert.deepEqual(report, { devices: 2, candidates: 12, blockers: {} });
   const windowsSeed = join(dir, 'windows-seed.json');
   await writeFile(windowsSeed, '\uFEFF' + await readFile(seed, 'utf8'));
-  assert.deepEqual(admin('activate', '--seed', windowsSeed, '--confirm-room', room), { mode: 'registry', generation, head: 13, floor: 13, folderTree: true });
-  const page = python(['-c', 'import json, sys; from store import RelayDatabase; print(json.dumps(RelayDatabase(sys.argv[1]).note_heads(sys.argv[2], int(sys.argv[3]), "", 0, 13, 2000000, folder_tree=True)))', db, room, String(generation)]);
+  assert.throws(() => admin('activate', '--seed', windowsSeed, '--confirm-room', room), (err) => err.status === 2 && /capability must match/.test(err.stderr));
+  assert.equal(admin('status').mode, 'frozen');
+  assert.deepEqual(admin('activate', '--seed', windowsSeed, '--confirm-room', room, '--atomic-groups', '--shared-records', '--registry-media'), { mode: 'registry', generation, head: 16, floor: 16, folderTree: true, atomicGroups: true, sharedRecords: true, registryMedia: true });
+  const page = python(['-c', 'import json, sys; from store import RelayDatabase; print(json.dumps(RelayDatabase(sys.argv[1]).note_heads(sys.argv[2], int(sys.argv[3]), "", 0, 16, 2000000, folder_tree=True, groups=True, shared=True, media=True)))', db, room, String(generation)]);
   const keys = await deriveNoteKeys(vaultKey, room);
   const tree = page.heads.find(({ noteId }) => noteId === folderTreeId);
   assert.deepEqual((await openRegistryBody(keys, room, generation, tree)).folders, folders);
-  const noteHeads = page.heads.filter((head) => head !== tree);
+  const bodies = await Promise.all(page.heads.map((entry) => openAnyRegistryBody(keys, room, generation, entry)));
+  const draft = bodies.find(({ id }) => id === records[2].id);
+  records[2].shared.attachments = [{ ...file, registryBlobId: draft.shared.attachments[0].registryBlobId }];
+  assert.deepEqual(bodies.filter((body) => 'shared' in body).sort((a, b) => a.id.localeCompare(b.id)), [...records].sort((a, b) => a.id.localeCompare(b.id)));
+  const noteHeads = page.heads.filter((_, index) => 'item' in bodies[index]);
   const opened = await Promise.all(noteHeads.map((entry) => openNote(keys, room, generation, entry)));
   assert.equal(opened.filter(({ item }) => item).length, 1);
   assert.equal(opened.filter(({ item }) => !item).length, 11);
+  const blob = opened.find(({ id }) => id === 'shared').item.attachments[0].registryBlobId;
+  assert.equal(blob, draft.shared.attachments[0].registryBlobId);
+  assert.equal(JSON.parse(await readFile(seed, 'utf8')).media.length, 1);
+  const stored = python(['-c', 'import base64, json, sys; from store import RelayDatabase; print(json.dumps(base64.b64encode(RelayDatabase(sys.argv[1]).get_note_media(sys.argv[2], int(sys.argv[3]), sys.argv[4])).decode()))', db, room, String(generation), blob]);
+  assert.deepEqual(Buffer.from(await openRegistryMedia(keys, room, generation, blob, Buffer.from(stored, 'base64'))), bytes);
   // Start fresh processes against the activated DB: prove CAS and immutable replay survive reopen.
   const shared = noteHeads[opened.findIndex(({ id }) => id === 'shared')];
   const edit = await sealNote(keys, room, generation, { noteId: shared.noteId, opId: crypto.randomUUID(),
     baseRevision: shared.revision, kind: 'update' }, 'shared', { ...note('shared'), content: 'after restart' });
-  const submit = (op, sender = 'device-1') => python(['-c', `import json, sys
+  const submit = (op, observedHead, sender = 'device-1') => python(['-c', `import json, sys
 from store import RelayDatabase
 db = RelayDatabase(sys.argv[1])
 owner = db.conn.execute('SELECT owner_account_id FROM vaults JOIN rooms ON vaults.id = rooms.vault_id WHERE room_id = ?', (sys.argv[2],)).fetchone()[0]
-print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), sys.argv[5], owner, 20000000, [json.loads(sys.argv[4])], folder_tree=True)))`, db, room, String(generation), JSON.stringify(op), sender]);
-  const [accepted, events] = submit(edit);
-  assert.deepEqual(accepted, [{ opId: edit.opId, status: 'accepted', revision: 14 }]);
+print(json.dumps(db.commit_note_ops(sys.argv[2], int(sys.argv[3]), sys.argv[5], owner, 20000000, json.loads(sys.argv[4]), folder_tree=True, groups=True, shared=True, media=True, observed_head=int(sys.argv[6]))))`, db, room, String(generation), JSON.stringify([op].flat()), sender, String(observedHead)]);
+  const [accepted, events] = submit(edit, 16);
+  assert.deepEqual(accepted, [{ opId: edit.opId, status: 'accepted', revision: 17 }]);
   assert.equal((await openNote(keys, room, generation, events[0])).item.content, 'after restart');
-  assert.deepEqual(submit(edit), [accepted, []]);
+  assert.deepEqual(submit(edit, 16), [accepted, []]);
   const transition = (kind, baseRevision, item) => sealNote(keys, room, generation,
     { noteId: shared.noteId, opId: crypto.randomUUID(), kind, baseRevision }, 'shared', item);
-  const stale = await transition('update', 14, { ...note('shared'), content: 'offline copy' });
-  const deleted = await transition('delete', 14, null);
-  assert.equal(submit(deleted)[0][0].revision, 15);
+  const stale = await transition('update', 17, { ...note('shared'), content: 'offline copy' });
+  const deleted = await transition('delete', 17, null);
+  assert.equal(submit(deleted, 17)[0][0].revision, 18);
   // Every submit reopens the same database in a new process.
-  const [[rejected], unexpected] = submit(stale, 'device-2');
+  assert.equal(submit(stale, 17, 'device-2')[0][0].code, 'note_head_changed');
+  const [[rejected], unexpected] = submit(stale, 18, 'device-2');
   assert.equal(rejected.status, 'stale');
   assert.equal(rejected.current.kind, 'delete');
   assert.deepEqual(unexpected, []);
-  assert.deepEqual(admin('status'), { mode: 'registry', generation, head: 15, floor: 13, folderTree: true });
-  const restored = await transition('restore', 15, note('shared'));
-  assert.equal(submit(restored)[0][0].revision, 16);
+  assert.deepEqual(admin('status'), { mode: 'registry', generation, head: 18, floor: 16, folderTree: true, atomicGroups: true, sharedRecords: true, registryMedia: true });
+  const restored = await transition('restore', 18, note('shared'));
+  assert.equal(submit(restored, 18)[0][0].revision, 19);
+  const id = crypto.randomUUID();
+  const moved = await sealNote(keys, room, generation, { noteId: shared.noteId, opId: id,
+    kind: 'update', baseRevision: 19, group: { id, index: 0, size: 2 } }, 'shared', { ...note('shared'), folder: 'Work' });
   const reordered = await sealFolderTree(keys, room, generation, { noteId: folderTreeId, opId: crypto.randomUUID(),
-    kind: 'update', baseRevision: tree.revision }, [...folders, { name: 'Work', path: 'Work', description: '', order: 1 }]);
-  const [folderReceipt, folderEvents] = submit(reordered);
-  assert.equal(folderReceipt[0].revision, 17);
-  assert.equal((await openRegistryBody(keys, room, generation, folderEvents[0])).folders[1].path, 'Work');
-  assert.deepEqual(submit(reordered), [folderReceipt, []]);
-  process.stdout.write('isolated cutover: reviewed folder seed and notes activated together; 11 ambiguous copies blocked; folder and note receipts survived reopening SQLite; explicit deletion, stale rejection and restore verified\n');
+    kind: 'update', baseRevision: tree.revision, group: { id, index: 1, size: 2 } }, [...folders, { name: 'Work', path: 'Work', description: '', order: 1 }]);
+  const group = [moved, reordered];
+  const [folderReceipt, folderEvents] = submit(group, 19);
+  assert.deepEqual(folderReceipt.map(({ revision }) => revision), [20, 21]);
+  assert.equal((await openNote(keys, room, generation, folderEvents[0])).item.folder, 'Work');
+  assert.equal((await openRegistryBody(keys, room, generation, folderEvents[1])).folders[1].path, 'Work');
+  assert.deepEqual(submit(group, 19), [folderReceipt, []]);
+  process.stdout.write('isolated cutover: reviewed folders, shared records, notes and encrypted media activated together; 11 ambiguous copies blocked; folder and note receipts survived reopening SQLite; explicit deletion, stale rejection and restore verified\n');
 } finally {
   await rm(dir, { recursive: true, force: true });
 }

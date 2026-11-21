@@ -13,6 +13,7 @@ import type {
 import type { StorageChangeEvent } from './index';
 import { storage } from './index';
 import type { NoteRegistryStorage } from './noteRegistry';
+import type { SharedBody, SharedMutation } from '../sync/notes/sharedBody';
 
 export type ChangeOrigin = 'local' | 'remote';
 
@@ -51,17 +52,22 @@ export interface VaultPort extends Partial<NoteRegistryStorage> {
   importSyncedVaultData(data: SyncedVaultData): Promise<void>;
   /** `false` means the bytes did not reach the disk; the caller must not treat them as delivered. */
   importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean>;
+  writeAcceptedAttachment?(attachment: SlagAttachment, bytes: Uint8Array): Promise<void>;
+  readRegistryAttachment?(attachment: SlagAttachment): Promise<Uint8Array>;
   getAttachmentDataUrl(attachment: SlagAttachment): Promise<string | undefined>;
   /** Whether this device can actually read the bytes, without base64-ing them. */
   hasAttachmentBytes(id: string, relativePath: string): Promise<boolean>;
 
-  // Drafts are per-device and never leave the device that wrote them, so the node returns null.
+  // The headless port has no editor; only ports with both shared hooks can join shared rooms.
   getComposerDraft(folderPath: string): ComposerDraft | null;
   saveComposerDraft(folderPath: string, draft: ComposerDraft, origin?: ChangeOrigin): void;
   deleteComposerDraft(folderPath: string, origin?: ChangeOrigin): void;
   getFullscreenDraft(itemId: string): FullscreenDraft | null;
   saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin?: ChangeOrigin): void;
   clearFullscreenDraft(itemId: string, origin?: ChangeOrigin): void;
+
+  applyAcceptedShared?(body: SharedBody): Promise<void>;
+  subscribeSharedIntents?(listener: (changes: () => SharedMutation[], applyLocal: () => Promise<void>) => Promise<void>): () => void;
 
   subscribeChanges(listener: (event: StorageChangeEvent) => void): () => void;
 }

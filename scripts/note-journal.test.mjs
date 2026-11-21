@@ -1,6 +1,17 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { mergeNote, sameNote } from '../src/lib/sync/notes/merge.ts';
+import { sameNote } from '../src/lib/sync/notes/merge.ts';
+import { hasSharedRegistryEnrollment } from '../src/lib/sync/notes/persistence.ts';
+
+test('cold write fence reads enrollment without a relay, token, or decrypted journal', () => {
+  const envelope = { version: 1, room: 'room', generation: 3 };
+  assert.equal(hasSharedRegistryEnrollment(undefined), false);
+  assert.equal(hasSharedRegistryEnrollment(envelope), false);
+  assert.equal(hasSharedRegistryEnrollment({ ...envelope, sharedRecords: true }), true);
+  assert.throws(() => hasSharedRegistryEnrollment({ ...envelope, sharedRecords: 'true' }), /capability/);
+  assert.throws(() => hasSharedRegistryEnrollment({ ...envelope, generation: 0 }), /enrollment/);
+  assert.throws(() => hasSharedRegistryEnrollment({ ...envelope, room: '' }), /room/);
+});
 import { emptyJournal, firstPerNote, recordNote, sameRegistryValue, setAttempt, setConfirmed, settleNote } from '../src/lib/sync/notes/journal.ts';
 
 const note = { id: 'note', type: 'note', title: 'title', content: 'one\ntwo\nthree\nfour\nfive', folder: 'inbox', tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
@@ -19,29 +30,15 @@ test('an edit queued during canonical application keeps the snapshot the editor 
   const state = setConfirmed(emptyJournal(), note.id, { revision: 2, item: remote });
   const local = { ...note, title: 'local-title' };
   const [intent] = recordNote(state, { id: note.id, intentId: 'late', kind: 'update', item: local, previous: note }).pending;
-  const result = mergeNote(intent.base.item, intent.item, remote);
-  assert.deepEqual(result.conflicts, []);
-  assert.equal(result.item.folder, remote.folder);
-  assert.equal(result.item.title, local.title);
+  assert.deepEqual(intent.base, { revision: 2, item: note });
+  assert.notDeepEqual(intent.base.item, remote);
+  assert.deepEqual(intent.item, local);
 });
 
-test('can merge disjoint ranges and fields while keeping only the conflicting remote range', () => {
-  const local = { ...note, title: 'mine', content: 'ONE\ntwo\nlocal three\nfour\nfive', tags: ['one'] };
-  const remote = { ...note, folder: 'moved', content: 'one\ntwo\nremote three\nfour\nFIVE', tags: ['two'] };
-  const { item, conflicts } = mergeNote(note, local, remote);
-  assert.deepEqual(conflicts, ['content']);
-  assert.equal(item.content, 'ONE\ntwo\nremote three\nfour\nFIVE');
-  assert.equal(item.title, 'mine');
-  assert.equal(item.folder, 'moved');
-  assert.deepEqual(item.tags, ['two', 'one']);
-});
-
-test('overlapping insertion is a conflict; identical edits and local disk fields are not', () => {
-  const local = { ...note, content: 'start\n' + note.content, filename: 'mine.md', updatedAt: 999 };
-  const remote = { ...note, content: 'remote\n' + note.content };
-  assert.deepEqual(mergeNote(note, local, remote).conflicts, ['content']);
-  assert.deepEqual(mergeNote(note, local, { ...local, filename: 'different.md' }).conflicts, []);
-  assert.ok(sameNote(local, { ...local, updatedAt: 333, filename: 'different.md' }));
+test('note equality ignores local file names and clock differences, not edits', () => {
+  const local = { ...note, filename: 'mine.md', updatedAt: 999 };
+  assert.ok(sameNote(local, { ...note, updatedAt: 333, filename: 'different.md' }));
+  assert.ok(!sameNote(local, { ...note, content: 'other body' }));
 });
 
 test('immutable sent attempt is not compacted, and successor retains the optimistic base', () => {
@@ -57,7 +54,7 @@ test('immutable sent attempt is not compacted, and successor retains the optimis
   journal = setConfirmed(journal, note.id, { revision: 3, item: attempt.item });
   journal = settleNote(journal, journal.pending[0], 3);
   assert.deepEqual(journal.pending[0].base, { revision: 3, item: first });
-  assert.equal(mergeNote(first, second, attempt.item).item.folder, 'remote');
+  assert.notDeepEqual(journal.pending[0].base.item, attempt.item);
 });
 
 test('delete and restore retain distinct intents and no-op updates do not enter the queue', () => {

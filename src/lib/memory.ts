@@ -306,10 +306,12 @@ export const memoryService = {
     return storage.getMemory().filter((item) => !item.deletedAt);
   },
 
-  remember(input: RememberInput): RememberResult | null {
-    const result = applyRemember(storage.getMemory(), input, memoryTagVocabulary(), Date.now());
+  async remember(input: RememberInput): Promise<RememberResult | null> {
+    const result = await storage.mutateMemory((items) => {
+      const result = applyRemember(items, input, memoryTagVocabulary(), Date.now());
+      return result ? { items: result.items, result } : undefined;
+    });
     if (!result) return null;
-    storage.saveMemory(result.items);
     log.info(`Memory ${result.status}: "${result.item.text.slice(0, 60)}"`, {
       kind: result.item.kind,
       tag: result.item.tag,
@@ -318,10 +320,12 @@ export const memoryService = {
     return result;
   },
 
-  forget(idOrText: string): boolean {
-    const result = applyForget(storage.getMemory(), idOrText, Date.now());
-    if (!result.removed) return false;
-    storage.saveMemory(result.items);
+  async forget(idOrText: string): Promise<boolean> {
+    const removed = await storage.mutateMemory((items) => {
+      const result = applyForget(items, idOrText, Date.now());
+      return result.removed ? { items: result.items, result: true } : undefined;
+    });
+    if (!removed) return false;
     log.info('Memory forgotten', { needle: idOrText.slice(0, 40) });
     return true;
   },
@@ -340,7 +344,8 @@ export const memoryService = {
     const now = Date.now();
     if (now - lastTouchPersistAt < TOUCH_PERSIST_INTERVAL_MS) return;
     lastTouchPersistAt = now;
-    storage.saveMemory(applyTouch(storage.getMemory(), ids, now));
+    void storage.mutateMemory((items) => ({ items: applyTouch(items, ids, now), result: undefined }))
+      .catch((error: unknown) => log.warn('Could not persist memory usage', error));
   },
 
   /** Topics worth showing the model so it reuses them instead of inventing new ones. */
@@ -356,12 +361,13 @@ export const memoryService = {
       .map(([tag]) => tag);
   },
 
-  clear(): void {
+  async clear(): Promise<void> {
     // Tombstoned rather than erased: wiping the key would leave every other device with the
     // facts they already received, and a plain "empty list" never travels.
     const now = Date.now();
-    const items = storage.getMemory().map((item) => (item.deletedAt ? item : { ...item, deletedAt: now }));
-    storage.saveMemory(items);
+    await storage.mutateMemory((items) => ({
+      items: items.map((item) => (item.deletedAt ? item : { ...item, deletedAt: now })), result: undefined,
+    }));
     log.info('Memory cleared');
   },
 };

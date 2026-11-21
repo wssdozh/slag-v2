@@ -21,7 +21,10 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
       } else if (cmd === 'plugin:fs|mkdir') dirs.add(args.path);
       else if (cmd === 'plugin:fs|exists') return files.has(args.path) || dirs.has(args.path);
       else if (cmd === 'plugin:fs|remove') files.delete(args.path);
-      else if (cmd === 'plugin:fs|read_text_file') return [...new TextEncoder().encode(files.get(args.path))];
+      else if (cmd === 'plugin:fs|read_text_file') {
+         if (args.path.endsWith('/note-registry.json') && !files.has(args.path)) throw new Error('not found (os error 2)');
+         return [...new TextEncoder().encode(files.get(args.path))];
+       }
       else if (cmd === 'plugin:fs|read_dir') {
         const prefix = args.path + '/';
         const entries = new Map<string, boolean>();
@@ -39,7 +42,7 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
     const note = { id: 'durable-note', title: 'сохранено 🔒', content: 'после перезапуска', type: 'note', folder: 'Входящие', tags: [], attachments: [], createdAt: 123, updatedAt: 456 };
     try {
       await storage.importSyncedVaultData({ items: [note], folders: [{ path: 'Входящие', name: 'Входящие' }] });
-      storage.importVaultData({ items: [] });
+      await storage.importVaultData({ items: [] });
       await storage.syncCurrentVaultFs();
       const restored = storage.getItemById(note.id);
       if (!restored) throw new Error(JSON.stringify({ files: [...files], dirs: [...dirs], items: storage.getItems() }));
@@ -49,7 +52,7 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
       failWrites = false;
       await storage.importSyncedVaultData({ items: [{ ...note, id: 'replacement', filename: 'сохранено 🔒.md' }] });
       const replacementOnDisk = [...files.values()].some(text => text.includes('id: replacement'));
-      duringWrite = () => storage.importVaultData({ items: [{ ...note, id: 'local-edit', title: 'local concurrent edit' }] });
+      duringWrite = () => storage.applyVaultImport({ items: [{ ...note, id: 'local-edit', title: 'local concurrent edit' }] });
       let concurrentRejected = false;
       try { await storage.importSyncedVaultData({ items: [{ ...note, id: 'remote-edit' }] }); } catch { concurrentRejected = true; }
       // `importVaultData` keeps the local edit in memory; the disk follows on the next flush.
@@ -74,6 +77,51 @@ test.fixme('synced native notes survive disk reload and disk failures reject', a
     document.body.append(panel);
   }, result);
   await page.screenshot({ path: 'test-results/screenshots/sync-native-persistence.png' });
+});
+
+test('cold registry hydration cannot resurrect legacy draft, memory or prompt', async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 240_000 });
+  const result = await page.evaluate(async () => {
+    const { storage } = await import('/src/lib/storage/index.ts');
+    const { hydrateSettings } = await import('/src/lib/storage/settingsStore.ts');
+    const { setPref, removePref } = await import('/src/lib/storage/prefs.ts');
+    const { id } = storage.getCurrentVault();
+    const folder = 'Входящие';
+    const registry = JSON.stringify({ version: 1, room: 'offline', generation: 1, sharedRecords: true, journal: { cursor: 0, confirmed: {}, pending: [] } });
+    const state = JSON.stringify({ workspace: { currentFolder: folder, aiPrompt: 'from state file' } });
+    const legacy = {
+      [`slag_drafts_${id}`]: { [folder]: { content: 'do not resurrect' } },
+      [`slag_memory_${id}`]: [{ id: 'stale', text: 'do not resurrect' }],
+      [`slag_workspace_state_${id}`]: { aiPrompt: 'outdated preference' },
+    };
+    for (const [key, value] of Object.entries(legacy)) setPref(key, JSON.stringify(value));
+    let writes = 0;
+    const reads: string[] = [];
+    const ipc = { invoke: async (cmd: string, args: { path: string }) => {
+      if (cmd === 'plugin:fs|read_text_file') {
+        reads.push(args.path);
+        const content = args.path.endsWith('/note-registry.json') ? registry : state;
+        return [...new TextEncoder().encode(content)];
+      }
+      writes++;
+      throw new Error(`Unexpected write: ${cmd}`);
+    } };
+    Object.defineProperty(window, '__TAURI_INTERNALS__', { value: ipc, configurable: true });
+    Object.defineProperty(window, 'isTauri', { value: true, configurable: true });
+    try {
+      const enrolled = await storage.allowLegacySharedMigration(storage.getCurrentVault());
+      if (enrolled || !reads.some((path) => path.endsWith('/note-registry.json'))) throw new Error(`Registry fixture not read: ${JSON.stringify(reads)}`);
+      await hydrateSettings(storage);
+      return { draft: storage.getComposerDraft(folder), memory: storage.getMemory(), prompt: storage.getWorkspaceState().aiPrompt, writes, stateReads: reads.filter((path) => path.endsWith('/state.json')).length };
+    } finally {
+      delete window.__TAURI_INTERNALS__;
+      delete window.isTauri;
+      for (const key of Object.keys(legacy)) removePref(key);
+    }
+  });
+  expect(result).toEqual({ draft: null, memory: [], prompt: 'from state file', writes: 0, stateReads: 5 });
 });
 
 test('native sync refuses a corrupt journal until it can re-read a valid one', async ({ page }) => {
@@ -176,7 +224,10 @@ test('two notes with one title land in two files', async ({ page }) => {
       else if (cmd === 'plugin:fs|mkdir') dirs.add(args.path);
       else if (cmd === 'plugin:fs|exists') return files.has(args.path) || dirs.has(args.path);
       else if (cmd === 'plugin:fs|remove') files.delete(args.path);
-      else if (cmd === 'plugin:fs|read_text_file') return [...new TextEncoder().encode(files.get(args.path))];
+      else if (cmd === 'plugin:fs|read_text_file') {
+         if (args.path.endsWith('/note-registry.json') && !files.has(args.path)) throw new Error('not found (os error 2)');
+         return [...new TextEncoder().encode(files.get(args.path))];
+       }
       else if (cmd === 'plugin:fs|read_dir') {
         const prefix = args.path + '/';
         const entries = new Map<string, boolean>();

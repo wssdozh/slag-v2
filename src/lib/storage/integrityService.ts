@@ -85,7 +85,11 @@ export async function runIntegrityCheck(): Promise<IntegrityRun> {
 }
 
 export async function applyIntegrityRepair(plan: RepairPlan): Promise<RepairOutcome> {
+  const vault = storage.getCurrentVault();
   const notesPath = notesPathOf();
+  // Scan is still useful; a repair is an independent writer and must not bypass the registry.
+  if (await storage.readNoteRegistry() !== undefined) throw new Error('Починка файлов недоступна для хранилища с реестром синхронизации');
+  if (storage.getCurrentVault() !== vault) throw new Error('Хранилище сменилось до начала починки');
   const runDir = `${integrityDir(notesPath)}/hygiene/${new Date().toISOString().replace(/[:.]/g, '-')}`;
   const outcome: RepairOutcome = { moved: 0, dropped: 0, skipped: [], runDir };
 

@@ -53,7 +53,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       const registry = Boolean(engine.noteGeneration);
       const items = !registry || engine.canPackAttachment() ? stripAttachmentData(vault().getItems()) : [];
       const folders = engine.hasFolderTreeRegistry ? [] : vault().getFolders();
-      const workspaceState = vault().getWorkspaceState();
       const pendingOps = engine.getBundleOutbox();
 
       const stateHash = await computeStateRootHash(registry ? [] : items, folders);
@@ -134,52 +133,55 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         });
       }
 
-      // The prompt and the persona travel on their own channel, below: the workspace bundle is
-      // deduped per entity, and these are the one thing a device that joined late can never
-      // recover from a bundle that was already acked.
-      const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _personaOn,
-              aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...sharedWorkspace } = workspaceState;
-      const workspaceHash = await computeHash(JSON.stringify(sharedWorkspace));
-      pack('workspace:workspace_state', workspaceHash, {
-        id: 'workspace_state',
-        type: 'workspace',
-        action: 'upsert',
-        version: 1,
-        hash: workspaceHash,
-        payload: sharedWorkspace,
-      });
-
-      // Always packed, never deduped: a few hundred bytes are worth a channel that cannot be
-      // missed. The receiver resolves each field by its timestamp, so a stale copy is harmless.
-      const promptPayload = {
-        prompt: workspaceState.aiPrompt ?? '',
-        persona: workspaceState.aiPersona ?? '',
-        personaEnabled: workspaceState.aiPersonaEnabled === true,
-        promptAt: workspaceState.aiPromptAt ?? 0,
-        personaAt: workspaceState.aiPersonaAt ?? 0,
-      };
-      changes.push({
-        id: 'assistant_prompt',
-        type: 'assistant_prompt',
-        action: 'upsert',
-        version: 1,
-        hash: await computeHash(JSON.stringify(promptPayload)),
-        payload: promptPayload,
-      });
-
-      // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is
-      // not in the state root hash: the outbox op a memory write leaves behind opens the push
-      // gate, and the hash of each fact settles what actually left.
-      for (const fact of vault().getMemory()) {
-        const factHash = await computeHash(JSON.stringify(fact));
-        pack(`memory:${fact.id}`, factHash, {
-          id: fact.id,
-          type: 'memory',
-          action: fact.deletedAt ? 'delete' : 'upsert',
+      if (!engine.hasSharedRegistry) {
+        const workspaceState = vault().getWorkspaceState();
+        // The prompt and the persona travel on their own channel, below: the workspace bundle is
+        // deduped per entity, and these are the one thing a device that joined late can never
+        // recover from a bundle that was already acked.
+        const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _personaOn,
+                aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...sharedWorkspace } = workspaceState;
+        const workspaceHash = await computeHash(JSON.stringify(sharedWorkspace));
+        pack('workspace:workspace_state', workspaceHash, {
+          id: 'workspace_state',
+          type: 'workspace',
+          action: 'upsert',
           version: 1,
-          hash: factHash,
-          payload: fact.deletedAt ? { deletedAt: fact.deletedAt } : fact,
+          hash: workspaceHash,
+          payload: sharedWorkspace,
         });
+
+        // Always packed, never deduped: a few hundred bytes are worth a channel that cannot be
+        // missed. The receiver resolves each field by its timestamp, so a stale copy is harmless.
+        const promptPayload = {
+          prompt: workspaceState.aiPrompt ?? '',
+          persona: workspaceState.aiPersona ?? '',
+          personaEnabled: workspaceState.aiPersonaEnabled === true,
+          promptAt: workspaceState.aiPromptAt ?? 0,
+          personaAt: workspaceState.aiPersonaAt ?? 0,
+        };
+        changes.push({
+          id: 'assistant_prompt',
+          type: 'assistant_prompt',
+          action: 'upsert',
+          version: 1,
+          hash: await computeHash(JSON.stringify(promptPayload)),
+          payload: promptPayload,
+        });
+
+        // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is
+        // not in the state root hash: the outbox op a memory write leaves behind opens the push
+        // gate, and the hash of each fact settles what actually left.
+        for (const fact of vault().getMemory()) {
+          const factHash = await computeHash(JSON.stringify(fact));
+          pack(`memory:${fact.id}`, factHash, {
+            id: fact.id,
+            type: 'memory',
+            action: fact.deletedAt ? 'delete' : 'upsert',
+            version: 1,
+            hash: factHash,
+            payload: fact.deletedAt ? { deletedAt: fact.deletedAt } : fact,
+          });
+        }
       }
 
       // One attachment per bundle, and only when the previous bundle is confirmed. A slow uplink
@@ -259,7 +261,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
             hash: String(op.timestamp),
             payload: op.payload,
           });
-        } else if (op.kind === 'draft') {
+        } else if (!engine.hasSharedRegistry && op.kind === 'draft') {
           changes.push({
             id: op.id,
             type: 'draft',

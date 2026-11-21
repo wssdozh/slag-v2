@@ -66,6 +66,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
       mimeType: att.mimeType,
       size: att.size,
       relativePath: att.relativePath,
+      ...(att.registryBlobId ? { registryBlobId: att.registryBlobId } : {}),
       ...(att.duration !== undefined ? { duration: att.duration } : {}),
       ...(att.waveform ? { waveform: att.waveform } : {}),
       ...(att.extractedText ? { extractedText: att.extractedText } : {}),

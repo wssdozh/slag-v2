@@ -225,7 +225,6 @@ test('a matching root asks for nothing', () => {
   assert.equal(decision.action, 'none');
   assert.equal(decision.peer?.deviceId, 'dev-a');
   assert.equal(decision.drift?.rootMatch, true);
-  assert.equal(decision.resendTo, null);
 });
 
 test('a device that got no answer does not call that a mismatch', () => {
@@ -233,7 +232,6 @@ test('a device that got no answer does not call that a mismatch', () => {
     action: 'none',
     peer: null,
     drift: null,
-    resendTo: null,
   });
 });
 
@@ -242,7 +240,6 @@ test('a fresh divergence reports the named peer without authorizing a resend', (
 
   assert.equal(decision.action, 'report');
   assert.equal(decision.peer?.deviceId, 'dev-b');
-  assert.equal(decision.resendTo, null);
   assert.equal(decision.drift?.rootMatch, false);
 });
 
@@ -252,7 +249,6 @@ test('an old client is compared but never resent to', () => {
   assert.equal(decision.action, 'none');
   assert.equal(decision.peer?.deviceId, null);
   assert.equal(decision.drift?.rootMatch, false);
-  assert.equal(decision.resendTo, null);
 });
 
 test('a named peer that disagrees outranks the old client', () => {
@@ -260,7 +256,6 @@ test('a named peer that disagrees outranks the old client', () => {
 
   assert.equal(decision.action, 'report');
   assert.equal(decision.peer?.deviceId, 'dev-a');
-  assert.equal(decision.resendTo, null);
 });
 
 test('a task absent from fresh, repeated and newer peer snapshots stays only a diagnostic extra', () => {
@@ -269,7 +264,6 @@ test('a task absent from fresh, repeated and newer peer snapshots stays only a d
     const decision = decideManifest(local, [peer('dev-a', { root, leaves: {} })]);
     assert.equal(decision.action, 'report');
     assert.deepEqual(decision.drift?.extra, ['local-task']);
-    assert.equal(decision.resendTo, null);
   }
 });
 

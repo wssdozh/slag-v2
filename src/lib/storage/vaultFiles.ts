@@ -17,6 +17,8 @@ import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
 import { folderMetaFor } from './folderSource';
 import type { AttachmentStore } from './attachments';
+import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
+import { mergeRegistryDeviceWorkspace } from '../sync/notes/sharedWorkspace';
 
 const fsLog = logger.scope('FS');
 
@@ -163,9 +165,12 @@ export class VaultFiles {
     if (!isTauri()) return false;
     const startedAt = performance.now();
     try {
-      const notesPath = this.getVaultNotesPath();
-      const trashPath = this.getVaultTrashPath();
-      const statePath = this.getVaultStatePath();
+      const vault = this.vault;
+      const notesPath = this.getVaultNotesPath(vault);
+      const trashPath = this.getVaultTrashPath(vault);
+      const statePath = this.getVaultStatePath(vault);
+      const fence = await this.readStateSection('pendingFolderProjection', vault, true);
+      if (this.vault !== vault) return false;
 
       await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
       // The inbox comes first: it is where a note without a folder goes, and folders are read back
@@ -173,9 +178,10 @@ export class VaultFiles {
       await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
 
       const notesStartedAt = performance.now();
-      const loadedItems = await this.scanNotesDir(notesPath);
+      const loadedItems = (await this.scanNotesDir(notesPath)).filter(({ id }) => !Object.hasOwn(fence, id));
+      if (this.vault !== vault) return false;
       const notesMs = performance.now() - notesStartedAt;
-      if (loadedItems.length > 0) {
+      if (loadedItems.length > 0 || Object.keys(fence).length > 0) {
         this.deps.cacheItems(this.deps.getItemsKey(), loadedItems);
         fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.vault.name}" from ${notesPath}`);
       } else {
@@ -195,6 +201,7 @@ export class VaultFiles {
         this.listFolderPaths(),
         this.readFolderState(),
       ]);
+      if (this.vault !== vault) return false;
       const sideMs = performance.now() - sideStartedAt;
       this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
       fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
@@ -202,9 +209,10 @@ export class VaultFiles {
       // After the notes: a note that lands on disk creates its folder, and the list read before that
       // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
       // the list came from the disk, so there is nothing to write back to it.
-      const folders = folderState.authoritative ? folderState.folders
+      const authoritative = folderState.authoritative || Object.keys(fence).length > 0;
+      const folders = authoritative ? folderState.folders
         : folderMetaFor(folderPaths, folderState.folders, DEFAULT_INBOX_FOLDER);
-      if (folderState.authoritative) this.deps.hydrateRegistryFolders(folders);
+      if (authoritative) this.deps.hydrateRegistryFolders(folders);
       else this.deps.persistFolders(folders, 'external');
       fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
 
@@ -335,7 +343,7 @@ export class VaultFiles {
    * own keys — as it is. It goes through the same queue as the folder writer: several writers, one
    * file, one read-merge-write at a time.
    */
-  public writeStateSection(name: string, patch: Record<string, unknown>, vault = this.vault, strict = false): Promise<void> {
+  public writeStateSection(name: string, patch: Record<string, unknown> | ((section: Record<string, unknown>) => Record<string, unknown>), vault = this.vault, strict = false, replace = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
     const statePath = this.getVaultStatePath(vault);
     return this.queueStateWrite(async () => {
@@ -345,7 +353,9 @@ export class VaultFiles {
         if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
           throw new Error(`Invalid vault state section: ${name}`);
         }
-        state[name] = { ...asStateObject(section), ...patch };
+        const current = asStateObject(section);
+        const next = typeof patch === 'function' ? patch(current) : patch;
+        state[name] = replace ? next : { ...current, ...next };
         await writeJsonAtomic(statePath, state);
       } catch (err) {
         if (strict) throw err;
@@ -356,19 +366,22 @@ export class VaultFiles {
 
   /** Registry data is not a cache. Never replace corrupt state or hide a failed rename. */
   public async readRegistryState(vault: VaultMeta): Promise<unknown> {
-    const path = `${this.getVaultDir(vault)}/note-registry.json`;
     await this.stateWrite.catch(() => undefined); // Read the last committed copy after a failed write.
-    if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) return undefined;
-    return this.parseStateStrict(await readTextFile(path, { baseDir: BaseDirectory.AppData }));
+    return this.readRegistryFile(vault);
+  }
+
+  private async readRegistryFile(vault: VaultMeta): Promise<unknown> {
+    const path = `${this.getVaultDir(vault)}/note-registry.json`;
+    const text = await readTextFile(path, { baseDir: BaseDirectory.AppData }).catch((error: unknown) => {
+      // `exists` can also return false on access errors; those must keep the fence closed.
+      if (/\(os error [23]\)$/.test(String(error))) return undefined;
+      throw error;
+    });
+    return text === undefined ? undefined : this.parseStateStrict(text);
   }
 
   public writeRegistryState(vault: VaultMeta, value: unknown): Promise<void> {
     return this.writeNoteSyncJson(this.getVaultDir(vault), 'note-registry.json', value);
-  }
-
-  public writeNoteConflict(vault: VaultMeta, id: string, value: unknown): Promise<void> {
-    if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid conflict id');
-    return this.writeNoteSyncJson(`${this.getVaultDir(vault)}/.note-conflicts`, `${id}.json`, value);
   }
 
   private writeNoteSyncJson(dir: string, name: string, value: unknown): Promise<void> {
@@ -538,12 +551,16 @@ export class VaultFiles {
     return items.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   }
 
-  private async scanNotesDir(dirPath: string): Promise<SlagItem[]> {
+  public async readProjectionCopies(vault: VaultMeta, ids: Set<string>): Promise<SlagItem[]> {
+    return (await this.scanNotesDir(this.getVaultNotesPath(vault), vault, true)).filter(({ id }) => ids.has(id));
+  }
+
+  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
       const normalized = dirPath.replace(/\\/g, '/');
-      const notesBase = this.getVaultNotesPath().replace(/\\/g, '/');
+      const notesBase = this.getVaultNotesPath(vault).replace(/\\/g, '/');
       const folderPart = normalized.startsWith(notesBase + '/')
         ? normalized.slice(notesBase.length + 1)
         : (normalized === notesBase ? DEFAULT_INBOX_FOLDER : normalized);
@@ -566,6 +583,7 @@ export class VaultFiles {
               parsed.filename = entry.name;
               return [entry.name, parsed] as const;
             } catch (e) {
+              if (strict) throw e;
               fsLog.warn(`Failed to read note file ${subPath}:`, e);
               return null;
             }
@@ -586,7 +604,7 @@ export class VaultFiles {
           // files. Walking into them would put deleted notes back in the feed — and the folder
           // list skips them too, so a note from there would land in a folder nothing draws.
           if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const nested = await this.scanNotesDir(subPath);
+          const nested = await this.scanNotesDir(subPath, vault, strict);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
               firstIndexById.set(nestedItem.id, items.length);
@@ -608,6 +626,7 @@ export class VaultFiles {
         }
       }
     } catch (err) {
+      if (strict) throw err;
       fsLog.warn(`Failed reading dir ${dirPath}:`, err);
     }
     return items;
@@ -771,16 +790,19 @@ export class VaultFiles {
    * `state.json` keeps what the disk cannot say: the workspace. Folders are directories now, so
    * this must never put a list of them over one the MCP server wrote.
    */
-  public flushStateToDisk(): Promise<void> {
+  public flushStateToDisk(strict = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
-    const statePath = this.getVaultStatePath();
+    const vault = this.vault;
+    const statePath = this.getVaultStatePath(vault);
     const workspace = this.deps.getWorkspaceState();
     return this.queueStateWrite(async () => {
       try {
         const state = await this.readStateObject(statePath);
-        state.workspace = workspace;
+        const enrolled = hasSharedRegistryEnrollment(await this.readRegistryFile(vault));
+        state.workspace = enrolled ? mergeRegistryDeviceWorkspace(asStateObject(state.workspace), workspace) : workspace;
         await writeJsonAtomic(statePath, state);
       } catch (err) {
+        if (strict) throw err;
         fsLog.warn(`Failed to flush state.json to disk:`, err);
       }
     });

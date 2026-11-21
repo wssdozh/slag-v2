@@ -178,6 +178,8 @@ function fullscreenDraft(value: unknown): FullscreenDraft | null {
     type: pick(value.type, ITEM_TYPES, 'note'),
     updatedAt: milliseconds(value.updatedAt),
   };
+  if (Array.isArray(value.attachments)) draft.attachments = attachments(value.attachments);
+  if (typeof value.reminder === 'string') draft.reminder = value.reminder;
   if (isDefined(value.priority)) draft.priority = pick(value.priority, PRIORITIES, 'none');
   if (isDefined(value.status)) draft.status = pick(value.status, STATUSES, 'todo');
   if (typeof value.dueDate === 'string') draft.dueDate = value.dueDate;

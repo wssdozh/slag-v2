@@ -77,6 +77,8 @@ export class McpVault {
   }
 
   public async init(): Promise<void> {
+    // An enrolled vault owns its directories. Reads never recreate a removed inbox.
+    if (await this.hasRegistryMarker()) return;
     await fs.mkdir(this.config.notesDir, { recursive: true });
     await fs.mkdir(this.config.trashDir, { recursive: true });
     await fs.mkdir(path.join(this.config.notesDir, DEFAULT_INBOX_FOLDER), { recursive: true });
@@ -95,7 +97,27 @@ export class McpVault {
     return value as VaultStateData;
   }
 
+  private async hasRegistryMarker(): Promise<boolean> {
+    const roots = new Set([this.config.vaultPath, this.config.notesDir === this.config.vaultPath && path.basename(this.config.notesDir) === 'notes'
+      ? path.dirname(this.config.notesDir) : this.config.vaultPath]);
+    for (const root of roots) {
+      try {
+        await fs.lstat(path.join(root, 'note-registry.json'));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+        throw error;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  private async assertLegacyWritable(): Promise<void> {
+    if (await this.hasRegistryMarker()) throw new Error('Это хранилище использует реестр синхронизации. Изменяйте записи в приложении SLAG.');
+  }
+
   public async writeState(data: VaultStateData): Promise<void> {
+    await this.assertLegacyWritable();
     const current = await this.readState();
     const updated = { ...current, ...data, updatedAt: Date.now() };
     const temp = `${this.config.statePath}.${crypto.randomUUID()}.tmp`;
@@ -162,6 +184,7 @@ export class McpVault {
   }
 
   public async createFolder(folderPath: string, description?: string, icon?: string): Promise<FolderMeta> {
+    await this.assertLegacyWritable();
     const norm = safeVaultRelativePath(folderPath);
     const absPath = path.join(this.config.notesDir, norm);
     await fs.mkdir(absPath, { recursive: true });
@@ -457,6 +480,7 @@ export class McpVault {
     recurrence?: SlagItem['recurrence'] | null;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
+    await this.assertLegacyWritable();
     let existingMatch: NoteMatch | null = null;
 
     if (params.id) {
@@ -572,6 +596,7 @@ export class McpVault {
   }
 
   public async deleteNote(idOrTitle: string): Promise<{ item: SlagItem; trashPath: string }> {
+    await this.assertLegacyWritable();
     const match = await this.findNote(idOrTitle);
     if (!match) {
       throw new Error(`Заметка «${idOrTitle}» не найдена.`);
@@ -590,6 +615,7 @@ export class McpVault {
   }
 
   public async toggleTask(idOrTitle: string, subtaskId?: string, explicitStatus?: 'todo' | 'done'): Promise<SlagItem> {
+    await this.assertLegacyWritable();
     const match = await this.findNote(idOrTitle);
     if (!match) {
       throw new Error(`Задача «${idOrTitle}» не найдена.`);

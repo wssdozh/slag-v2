@@ -113,8 +113,8 @@ test.describe('security hardening', () => {
         items: [{ ...base, id: 'item_valid', title: 'valid', folder: 'Входящие', filename: 'valid.md' }],
       });
       return {
-        malicious: storage.importVaultFromJson(malicious),
-        valid: storage.importVaultFromJson(valid),
+        malicious: await storage.importVaultFromJson(malicious),
+        valid: await storage.importVaultFromJson(valid),
       };
     });
 

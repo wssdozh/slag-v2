@@ -16,13 +16,15 @@ export interface AcceptedNote {
 }
 
 export type FolderTreeListener = (folders: FolderMeta[], previous: FolderMeta[]) => Promise<void>;
+export type FolderGroupListener = (changes: NoteMutation[], folders: FolderMeta[], previous: FolderMeta[]) => Promise<void>;
 
 export interface NoteRegistryStorage {
   applyAcceptedFolderTree?(folders: FolderMeta[]): Promise<void>;
-  subscribeFolderTreeIntents?(listener: FolderTreeListener): () => void;
+  hasIncompleteFolderProjection?(): Promise<boolean>;
+  applyAcceptedFolderGroup?(notes: AcceptedNote[], folders: FolderMeta[] | undefined): Promise<void>;
+  subscribeFolderTreeIntents?(listener: FolderTreeListener, group?: FolderGroupListener): () => void;
   readNoteRegistry(): Promise<unknown>;
   writeNoteRegistry(value: unknown): Promise<void>;
-  writeNoteConflict(id: string, value: unknown): Promise<void>;
   applyAcceptedNote(note: AcceptedNote): Promise<void>;
   subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void;
 }

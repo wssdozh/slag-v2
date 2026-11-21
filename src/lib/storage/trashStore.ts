@@ -71,9 +71,9 @@ export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'loc
   store.cacheTrash(trash.filter(i => i.id !== id));
 
   // Restore to active items
-  store.saveItem(item, origin, true);
-  fsLog.info(`Restored "${item.title || item.id}" from .trash to "${item.folder}"`);
+  const restored = store.saveItem(item, origin, true);
+  fsLog.info(`Restored "${restored.title || restored.id}" from .trash to "${restored.folder}"`);
 
-  store.emitChange({ kind: 'trash', action: 'restore', id: item.id, payload: item, origin });
-  return item;
+  store.emitChange({ kind: 'trash', action: 'restore', id: restored.id, payload: restored, origin });
+  return restored;
 }

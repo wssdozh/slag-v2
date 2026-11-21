@@ -392,12 +392,13 @@ export class BackupService {
    * Restores the vault from a stored snapshot id.
    */
   public async restoreSnapshot(snapshotId: string): Promise<boolean> {
+    const vault = storage.getCurrentVault();
     const data = await idbGetSnapshotData(snapshotId);
     if (!data) {
       backupLog.error(`Snapshot ${snapshotId} data not found`);
       return false;
     }
-    const res = await this.restoreFromZip(data);
+    const res = await this.restoreFromZip(data, vault);
     return res.itemsCount >= 0;
   }
 
@@ -407,7 +408,8 @@ export class BackupService {
    * and clean Obsidian Vault ZIPs.
    */
   public async restoreFromZip(
-    fileOrBuffer: File | Blob | Uint8Array
+    fileOrBuffer: File | Blob | Uint8Array,
+    vault = storage.getCurrentVault(),
   ): Promise<{ itemsCount: number; attachmentsCount: number }> {
     let zipBytes: Uint8Array;
     if (fileOrBuffer instanceof Uint8Array) {
@@ -430,6 +432,7 @@ export class BackupService {
       throw new Error('Архив пуст');
     }
 
+    await storage.assertBackupRestoreAllowed(vault);
     let itemsToRestore: SlagItem[] = [];
     let foldersToRestore: FolderMeta[] = [];
     let restoredAttachmentsCount = 0;
@@ -491,7 +494,9 @@ export class BackupService {
         dataUrl,
       };
 
+      await storage.assertBackupRestoreAllowed(vault);
       await idbSaveAttachment(attachment);
+      await storage.assertBackupRestoreAllowed(vault);
       storage.saveAttachment(attachment);
       restoredAttachmentsCount++;
     }
@@ -525,10 +530,9 @@ export class BackupService {
     }
 
     // Persist restored items and folders
-    storage.importVaultData({
-      folders: foldersToRestore,
-      items: itemsToRestore,
-    });
+    if (!await storage.importVaultData({ folders: foldersToRestore, items: itemsToRestore }, vault)) {
+      throw new Error('Не удалось восстановить заметки из архива');
+    }
 
     // In Tauri, flush to disk
     if (isTauri()) {

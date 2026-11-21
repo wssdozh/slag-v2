@@ -22,6 +22,127 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/manifest-regression');
 });
 
+test('legacy restore applies on a peer despite the old trash timestamp', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { recoverFromTrash, persistIncomingBundle, loadTombstones, saveTombstones, vault, setVaultPort } = await import('/manifest-regression.mjs');
+    const port = vault();
+    const old = { id: 'item_restore-test', type: 'task', title: 'task', folder: 'Inbox', updatedAt: 10 };
+    const saved = { ...old, updatedAt: 30 };
+    const changes = [];
+    const restored = recoverFromTrash({
+      attachments: { hydrate: (items) => items }, readTrashIndex: () => [old], cacheTrash: () => {},
+      saveItem: () => {
+        changes.push({ id: saved.id, type: 'item', action: 'upsert', payload: saved });
+        return saved;
+      },
+      emitChange: (event) => changes.push({ ...event, type: event.kind }),
+    }, old.id);
+    const scope = { roomId: 'restore-test-room', vaultId: 'restore-test-vault', accountSync: false };
+    saveTombstones(scope, { [old.id]: 20 });
+    const acked = [];
+    let items = [];
+    const bundleId = 'restore-test-bundle';
+    const engine = {
+      activeVaultKey: {}, initGeneration: 1, activeRoomId: scope.roomId, currentVaultId: scope.vaultId,
+      bookkeeping: scope, config: { deviceId: 'local', trustedDevices: [{ id: 'sender' }] },
+      status: { initialSync: {} }, appliedBundleIds: new Set(),
+      usesAccountSync: () => false, notify: () => {}, saveConfig: () => {},
+      sendAck: async (id) => { acked.push(id); },
+      stageImport: (incoming, _folders, _removed, _workspace, _detail, id) => {
+        items = incoming;
+        acked.push(id); // Simulate a successful import flush.
+      },
+    };
+    setVaultPort(Object.assign(Object.create(port), { getItems: () => [], getFolders: () => [] }));
+    try {
+      await persistIncomingBundle(engine, { bundleId, roomId: scope.roomId, fromDeviceId: 'sender', changes });
+      return { acked, items, restored, tombstones: loadTombstones(scope) };
+    } finally {
+      setVaultPort(null);
+    }
+  });
+  expect(result.acked).toEqual(['restore-test-bundle']);
+  expect(result.items).toEqual([result.restored]);
+  expect(result.restored.updatedAt).toBe(30);
+  expect(result.tombstones).toEqual({});
+});
+
+test('folder projection publishes nothing on partial write and replays the complete group', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');
+    const store = new StorageService();
+    store.currentVault = { id: 'folder-projection-test', name: 'Folder projection test' };
+    const oldTree = [{ path: 'Old', name: 'Old' }];
+    const tree = [{ path: 'New', name: 'New' }];
+    rememberFolders(store, oldTree);
+    const notes = ['one', 'two'].map((id) => ({ id, item: { id, type: 'note', title: id, folder: 'New', content: '', tags: [], createdAt: 1, updatedAt: 2 } }));
+    store.cacheItems(store.getItemsKey(), notes.map(({ item }) => ({ ...item, folder: 'Old' })));
+    const visible = () => [store.getItems().map(({ folder }) => folder), store.getFolders().map(({ path }) => path)];
+    const events = [];
+    store.subscribeChanges(() => events.push(visible()));
+    const writes = [];
+    let fail = true;
+    let fence = {};
+    store.files.writeStateSection = async (name, patch) => {
+      if (name !== 'pendingFolderProjection') throw new Error(`Unexpected section ${name}`);
+      fence = JSON.parse(JSON.stringify(patch(fence)));
+    };
+    store.files.flushItemToDisk = async ({ id }) => {
+      writes.push(id);
+      if (fail && id === 'two') throw new Error('injected disk failure');
+    };
+    store.files.removeFolderFromDisk = async (path) => { writes.push(`remove:${path}`); };
+    let failure;
+    try { await store.applyAcceptedFolderGroup(notes, tree); } catch (error) { failure = String(error); }
+    const afterFailure = visible();
+    const prematureEvents = events.length;
+    const afterCrash = fence;
+    fail = false;
+    const reopened = new StorageService();
+    reopened.currentVault = store.currentVault;
+    rememberFolders(reopened, oldTree);
+    reopened.files.writeStateSection = store.files.writeStateSection;
+    reopened.files.flushItemToDisk = store.files.flushItemToDisk;
+    reopened.files.removeFolderFromDisk = store.files.removeFolderFromDisk;
+    reopened.subscribeChanges(() => events.push([reopened.getItems().map(({ folder }) => folder), reopened.getFolders().map(({ path }) => path)]));
+    await reopened.applyAcceptedFolderGroup(notes, tree);
+    return { failure, afterFailure, prematureEvents, afterCrash, afterReplay: fence, events, writes };
+  });
+  expect(result.failure).toContain('injected disk failure');
+  expect(result.afterFailure).toEqual([['Old', 'Old'], ['Old']]);
+  expect(result.prematureEvents).toBe(0);
+  expect(result.afterCrash).toEqual({ one: true, two: true });
+  expect(result.afterReplay).toEqual({});
+  expect(result.events).toEqual(Array(2).fill([['New', 'New'], ['New']]));
+  expect(result.writes).toEqual(['one', 'two', 'one', 'two', 'remove:Old']);
+});
+
+test('an enrolled folder action journals its cascade without optimistic writes', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { StorageService, rememberFolders } = await import('/manifest-regression.mjs');
+    const store = new StorageService();
+    store.currentVault = { id: 'folder-cascade-test', name: 'Folder cascade test' };
+    const tree = [{ path: 'Old', name: 'Old' }];
+    rememberFolders(store, tree);
+    store.cacheItems(store.getItemsKey(), [{ id: 'one', type: 'note', title: 'one', folder: 'Old', content: '', tags: [], createdAt: 1, updatedAt: 1 }]);
+    const captured = [];
+    let fallback = 0;
+    const unsubscribe = store.subscribeFolderTreeIntents(async () => { fallback++; }, async (notes, next, previous) => {
+      captured.push([notes.map(({ previous, item }) => [previous.folder, item.folder]), next.map(({ path }) => path), previous.map(({ path }) => path)]);
+    });
+    store.subscribeNoteIntents(async () => { fallback++; });
+    store.subscribeChanges(() => { fallback++; });
+    await store.renameFolder('Old', { path: 'New', name: 'New' });
+    await store.deleteFolder('Old');
+    unsubscribe();
+    let fenced = false;
+    try { await store.deleteFolder('Old'); } catch { fenced = true; }
+    return { captured, fallback, fenced, item: store.getItemById('one').folder, tree: store.getFolders().map(({ path }) => path) };
+  });
+  expect(result.captured).toEqual([[[['Old', 'New']], ['New'], ['Old']], [[['Old', 'Входящие']], [], ['Old']]]);
+  expect(result).toMatchObject({ fallback: 0, fenced: true, item: 'Old', tree: ['Old'] });
+});
+
 test('one cross-parent drag captures one complete folder tree', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { moveFolderTree, rememberFolders, readFolders } = await import('/manifest-regression.mjs');
@@ -40,14 +161,15 @@ test('one cross-parent drag captures one complete folder tree', async ({ page })
 
 test('a peer manifest missing a local task only reports and pulls', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { syncManifest, vault, setVaultPort, writeManifestAutoResolve } = await import('/manifest-regression.mjs');
+    const { logger, syncManifest, vault, setVaultPort } = await import('/manifest-regression.mjs');
     const port = vault();
     const originalFetch = window.fetch;
     const trashed: string[] = [];
     let pulls = 0;
     let pushes = 0;
-    const task = { id: 'local-task', type: 'task', title: 'offline task', content: '', updatedAt: 1, folder: 'Inbox' };
-    const peer = { deviceId: 'peer', root: 'peer-root', at: Date.now() + 30_000, folders: {}, leaves: {} };
+    const task = { id: 'item_local-task', type: 'task', title: 'private-title', content: 'private-body', updatedAt: 1, folder: 'private-folder' };
+    const peer = { deviceId: 'peer', root: 'peer-root', at: 1_700_000_000_000, folders: {}, leaves: {} };
+    const oldPeer = { deviceId: 'old-peer', root: 'old-root', folders: {} };
     const engine = {
       initGeneration: 1, activeRoomId: 'test-room', currentVaultId: 'test-vault',
       config: { deviceId: 'local', serverUrl: 'https://relay.invalid', localSyncMode: 'read-write' },
@@ -56,22 +178,30 @@ test('a peer manifest missing a local task only reports and pulls', async ({ pag
       scheduleDebouncedPush: () => { pushes++; },
       usesAccountSync: () => false, notify: () => undefined,
     };
-    writeManifestAutoResolve(true);
     setVaultPort(Object.assign(Object.create(port), {
       getItems: () => [task], getFolders: () => [], moveToTrash: (id: string) => trashed.push(id),
     }));
     window.fetch = async (_input, init) => init?.method === 'POST'
       ? new Response(null, { status: 204 })
-      : Response.json({ v: 1, manifests: [peer] });
+      : Response.json({ v: 1, manifests: [peer, oldPeer] });
     try {
       await syncManifest(engine);
-      return { trashed, pulls, pushes, manifest: engine.status.manifest };
+      const log = logger.getEntries().find((entry) => entry.message === 'Манифест: сводки устройств различаются');
+      return { trashed, pulls, pushes, manifest: engine.status.manifest, log: log?.data };
     } finally {
       window.fetch = originalFetch;
       setVaultPort(null);
     }
   });
-  expect(result.manifest).toMatchObject({ action: 'report', extra: ['local-task'] });
+  expect(result.manifest).toMatchObject({ action: 'report', extra: ['item_local-task'] });
+  expect(result.log).toMatchObject({
+    action: 'pull-retained', divergedCount: 2,
+    peers: [
+      { deviceId: 'peer', snapshotAtMs: 1_700_000_000_000, onlyLocal: 1, onlyLocalIds: ['item_local-task'], onlyPeer: 0 },
+      { deviceId: 'old-peer', snapshotAtMs: null, onlyLocal: null, onlyPeer: null, changedNotes: null },
+    ],
+  });
+  expect(JSON.stringify(result.log)).not.toMatch(/private-|peer-root|old-root/);
   expect(result.trashed).toEqual([]);
   expect(result.pulls).toBe(1);
   expect(result.pushes).toBe(0);
@@ -84,12 +214,10 @@ test('a peer manifest missing a local task only reports and pulls', async ({ pag
  * `decideManifest` reports divergence without resending. The room's old anonymous row
  * cannot outrank a named peer. The answer
  * formats are pinned beside it, because a relay older than this app answers one row for the room.
- * Two safety rules on auto-resolve are pinned at the end: a row without `at` (old relay) and a row
- * older than our resend mean "has not seen it yet", never "refused it".
  */
 test('a manifest check decides per peer, not against one room row', async ({ page }) => {
   const outcomes = await page.evaluate(async () => {
-    const { decideManifest, parsePeerManifests, resolveRejected } = await import('/manifest-regression.mjs');
+    const { decideManifest, parsePeerManifests } = await import('/manifest-regression.mjs');
 
     type Row = {
       deviceId: string | null;
@@ -106,13 +234,6 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
     ): Row => ({ deviceId, at: null, root, folders: {}, leaves: {}, ...overrides });
     // Two peers, the second one behind; the first already agrees and must not win the verdict.
     const split = [peer('dev-a', 'root-local'), peer('dev-b', 'root-other')];
-    // Notes this device holds and the peer's row does not: a refused note, if the row is current.
-    const drift = { rootMatch: false, folders: [], missing: [], extra: ['item_old'], conflict: [] };
-    const decisionFor = (candidate: Row) => ({ action: 'report' as const, peer: candidate, drift, resendTo: null });
-    const engine = { manifestResentAt: 5_000 };
-    const noAt = peer('dev-a', 'root-other', { leaves: { item_old: 'leaf-a' } });
-    const stale = peer('dev-a', 'root-other', { leaves: { item_old: 'leaf-a' }, at: 4_000 });
-
     return {
       split: decideManifest(local, split),
       agreed: decideManifest(local, [peer('dev-a', 'root-local'), peer('dev-b', 'root-local')]),
@@ -128,36 +249,25 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
         anonymous: { root: 'root-old', folders: {}, syncId: 3 },
       }),
       oldRelay: parsePeerManifests({ v: 1, root: 'root-room', folders: {}, syncId: 3 }),
-      // Auto-resolve must not fire: no row date, a row older than the resend, or nobody to ask.
-      resolveWithoutAt: resolveRejected(engine, local, decisionFor(noAt)),
-      resolveStaleAt: resolveRejected(engine, local, decisionFor(stale)),
-      resolveAnonymous: resolveRejected(
-        engine,
-        local,
-        decisionFor(parsePeerManifests({ v: 1, root: 'root-old', folders: {}, syncId: 3 })[0]),
-      ),
     };
   });
 
-  // Two peers, one behind: the diverged one is named, and it is who the resend is aimed at.
+  // Two peers, one behind: the diverged one is named.
   expect(outcomes.split.action).toBe('report');
   expect(outcomes.split.peer?.deviceId).toBe('dev-b');
-  expect(outcomes.split.resendTo).toBeNull();
   // Every peer agrees with the local root: nothing to do, and the row is still named for the panel.
   expect(outcomes.agreed.action).toBe('none');
   expect(outcomes.agreed.drift?.rootMatch).toBe(true);
-  expect(outcomes.empty).toEqual({ action: 'none', peer: null, drift: null, resendTo: null });
+  expect(outcomes.empty).toEqual({ action: 'none', peer: null, drift: null });
 
   // The old room-wide row disagrees, every named peer agrees: "no data", never a resend.
   expect(outcomes.anonymousOnly.action).toBe('none');
   expect(outcomes.anonymousOnly.peer?.deviceId).toBeNull();
   expect(outcomes.anonymousOnly.peer?.root).toBe('root-old');
   expect(outcomes.anonymousOnly.drift?.rootMatch).toBe(false);
-  expect(outcomes.anonymousOnly.resendTo).toBeNull();
   // A named peer that disagrees outranks the anonymous one: the real divergence is the verdict.
   expect(outcomes.anonymousAndReal.action).toBe('report');
   expect(outcomes.anonymousAndReal.peer?.deviceId).toBe('dev-b');
-  expect(outcomes.anonymousAndReal.resendTo).toBeNull();
 
   // Both relay answers become peers: rows by device (with the row's own date), plus the old row.
   expect(outcomes.perDevice.map((entry: { deviceId: string | null }) => entry.deviceId))
@@ -173,9 +283,4 @@ test('a manifest check decides per peer, not against one room row', async ({ pag
   expect(outcomes.oldRelay[0].at).toBeNull();
   expect(outcomes.oldRelay[0].leaves).toBeUndefined();
 
-  // Auto-resolve: without a row date, or with a row older than our resend, silence is "not yet".
-  expect(outcomes.resolveWithoutAt).toEqual([]);
-  expect(outcomes.resolveStaleAt).toEqual([]);
-  // And an old client's row names no note to act on.
-  expect(outcomes.resolveAnonymous).toEqual([]);
 });

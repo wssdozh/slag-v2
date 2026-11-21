@@ -30,12 +30,38 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
     }
   }
 
+  const registry = status.registry;
+  const mediaLabel = registry && {
+    legacy: 'Legacy', waiting: 'Ожидание', applying: 'Запись…', error: 'Сбой', 'applied-through-cursor': 'Записаны',
+  }[registry.media];
+
   const summary = (
     <div className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-        <span className={`font-medium ${glyph.className}`}>{glyph.title}</span>
-        {status.lastSyncTime && <span className="text-fg-secondary">Обмен: {status.lastSyncTime}</span>}
+        <span className={`flex items-center gap-1.5 font-medium ${glyph.className}`}>
+          {registry && <Icon name={glyph.name} size="sm" tone="inherit" />} {glyph.title}
+        </span>
+        {!registry && status.lastSyncTime && <span className="text-fg-secondary">Обмен: {status.lastSyncTime}</span>}
       </div>
+      {registry && (
+        <dl aria-label="Прогресс реестра" className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-1 border-y border-border-subtle py-2">
+          <dt className="flex items-center gap-1.5 text-fg-secondary" title="Последняя известная ревизия релея, не подтверждение от других устройств">
+            <Icon name="system.syncIdle" size="sm" /> Релей
+          </dt>
+          <dd className="text-right tabular-nums">{registry.relayHead === null ? 'Не проверен' : `#${registry.relayHead}`}</dd>
+          <dt className="flex items-center gap-1.5 text-fg-secondary" title="Ревизия, записанная на этом устройстве">
+            <Icon name={mobile ? 'entity.phone' : 'entity.desktop'} size="sm" /> Здесь
+          </dt>
+          <dd className={`text-right tabular-nums ${registry.application === 'error' ? 'text-warning' : ''}`}>
+            {`#${registry.appliedThrough}`}
+            {registry.application === 'error' ? ' · Сбой' : registry.application === 'catching-up' ? ' · Сверка' : ''}
+          </dd>
+          <dt className="flex items-center gap-1.5 text-fg-secondary" title="Вложения реестра на этом устройстве">
+            <Icon name="action.attach" size="sm" /> Вложения
+          </dt>
+          <dd className={`text-right ${registry.media === 'error' ? 'text-warning' : ''}`}>{mediaLabel}</dd>
+        </dl>
+      )}
       {devices.size > 0 && (
         <ul aria-label="Последняя сверка устройств" className="max-h-48 divide-y divide-border-subtle overflow-y-auto border-y border-border-subtle">
           {[...devices].map(([deviceId, name]) => {
@@ -51,11 +77,11 @@ export function SyncStatusButton({ vaultId, onSettings, mobile = false }: {
           })}
         </ul>
       )}
-      {devices.size === 0 && <p className="text-fg-secondary">Нет сверок с другими устройствами</p>}
+      {!registry && devices.size === 0 && <p className="text-fg-secondary">Нет сверок с другими устройствами</p>}
       {hasLegacyReport && <details className="text-fg-secondary"><summary className="cursor-pointer">Детали сверки</summary>Есть старая сводка без имени устройства.</details>}
       <button type="button" onClick={() => { setIsOpen(false); setDismissed(true); onSettings(); }} data-testid={mobile ? 'mobile-sync-open-settings' : 'sidebar-sync-open-settings'}
         className={`flex w-full items-center gap-2 rounded-md text-left text-fg-primary hover:bg-tint-6 focus-visible:bg-tint-8 cursor-pointer ${mobile ? 'min-h-12' : 'py-1'}`}>
-        <Icon name="system.settings" size="sm" /> Настройки синхронизации
+        <Icon name="system.settings" size="sm" /> {registry ? 'Настройки' : 'Настройки синхронизации'}
       </button>
     </div>
   );

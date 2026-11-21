@@ -12,6 +12,7 @@ export interface SlagAttachment {
   size: number;
   relativePath: string;
   dataUrl?: string; // Base64 or Object URL for rendering
+  registryBlobId?: string; // Address of the accepted encrypted bytes
   duration?: number; // Duration in seconds (e.g. 5.8)
   waveform?: number[]; // Normalized waveform peak array [0..1]
   extractedText?: string; // Whisper transcription (audio/video), OCR text (image), or file sample
@@ -354,6 +355,8 @@ export interface FullscreenDraft {
   title: string;
   content: string;
   tags: string[];
+  attachments?: SlagAttachment[];
+  reminder?: string;
   folder: string;
   type: SlagItemType;
   priority?: 'none' | 'low' | 'medium' | 'high';

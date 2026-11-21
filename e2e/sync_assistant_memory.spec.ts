@@ -23,7 +23,7 @@ test('memory packs as its own change type and deletions ride tombstones', async 
       const scope = engine.bookkeeping;
       const key = await cryptoMod.deriveVaultKey('synthetic memory seed');
 
-      memoryService.remember({
+      await memoryService.remember({
         text: 'не любит созвон-митинги до полудня',
         kind: 'pref',
         tag: 'работа',
@@ -49,7 +49,7 @@ test('memory packs as its own change type and deletions ride tombstones', async 
       await push();
       const first = (captured.changes || []).filter((change) => change.type === 'memory');
 
-      memoryService.forget('не любит созвон-митинги до полудня');
+      await memoryService.forget('не любит созвон-митинги до полудня');
       removePref(stateHashKey(scope));
       await push();
       const second = (captured.changes || []).filter((change) => change.type === 'memory');

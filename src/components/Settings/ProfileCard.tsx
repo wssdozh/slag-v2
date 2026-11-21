@@ -74,9 +74,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
     return () => window.removeEventListener('slag-sync-updated', applySyncedProfile);
   }, []);
 
-  const save = (next: ProfileInfo) => {
+  const save = async (next: ProfileInfo) => {
+    try {
+      await storage.saveWorkspaceState({ profile: next });
+    } catch {
+      return; // The workspace writer reports the failure; don't publish it to the account.
+    }
     setProfile(next);
-    storage.saveWorkspaceState({ profile: next });
     // The name lives in the vault; the copy on the account exists so the telegram bot can greet
     // a person in `/start`, where it has no way to decrypt anything.
     if (!accountClient.isAuthenticated()) return;

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { planBootstrap, sealBootstrap } from '../src/lib/sync/notes/bootstrap.ts';
-import { deriveNoteKeys, openNote } from '../src/lib/sync/notes/wire.ts';
+import { sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
+import { deriveNoteKeys, openAnyRegistryBody, openNote } from '../src/lib/sync/notes/wire.ts';
 
 const snapshot = (deviceId, extras) => ({ deviceId, hydrated: true, pendingIds: [], live: [], tombstones: [], trash: [], ...extras });
 const note = (id, content = 'copy') => ({ id, type: 'note', title: 'title', folder: 'Inbox', content, createdAt: 1, updatedAt: 1, tags: [], attachments: [] });
@@ -27,6 +28,21 @@ test('offline bootstrap collapses identical live notes and keeps explicit tombst
   const ops = await sealBootstrap(keys, 'bootstrap', 3, plan);
   const opened = await Promise.all(ops.map((op, i) => openNote(keys, 'bootstrap', 3, { ...op, revision: i + 1 })));
   assert.deepEqual(opened.map(({ id, item }) => [id, !!item]), [['same', true], ['unique', true], ['deleted', false]]);
+});
+
+test('reviewed shared seed preserves explicit tombstones and never infers a missing record', async () => {
+  const plan = planBootstrap(['pc'], [snapshot('pc')]);
+  const vaultKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+  const keys = await deriveNoteKeys(vaultKey, 'shared-seed');
+  const removed = { id: sharedRegistryId('memory', 'removed'), shared: null };
+  const prompt = { id: sharedRegistryId('workspace', 'aiPrompt'), shared: '' };
+  const ops = await sealBootstrap(keys, 'shared-seed', 1, plan, [removed, prompt]);
+  assert.deepEqual(await Promise.all(ops.map((op, index) => openAnyRegistryBody(keys, 'shared-seed', 1, { ...op, revision: index + 1 }))), [removed, prompt]);
+  await assert.rejects(sealBootstrap(keys, 'shared-seed', 1, plan, [removed, removed]), /duplicate/);
+  await assert.rejects(sealBootstrap(keys, 'shared-seed', 1, plan, [{
+    id: sharedRegistryId('composer', 'Inbox'), shared: { content: 'photo', attachments: [{ id: 'photo' }] },
+  }]), /require a reviewed media seed/);
+  await assert.rejects(sealBootstrap(keys, 'shared-seed', 1, plan, [{ id: sharedRegistryId('workspace', 'currentFolder'), shared: 'private' }]), /workspace field/);
 });
 
 test('migration refuses missing devices, pending ops, and apparent stale copies without restore provenance', () => {

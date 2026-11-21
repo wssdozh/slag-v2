@@ -85,7 +85,34 @@ export async function syncManifest(
   if (!published) syncLog.debug(`${describeWire(wire)} не записан; сверка подождёт следующей попытки`);
   else if (observedPeers === null) return;
   else if (peers.length === 0) syncLog.info(`${describeWire(wire)} записан; сводок других устройств пока нет`);
-  else if (decision.action === 'none') syncLog.info(`${describeWire(wire)}; корень сходится с соседями`);
-  // A peer snapshot is not a deletion receipt, even when it was published after a resend.
-  else if (decision.action === 'report') syncLog.debug(`${describeWire(wire)}; корень расходится с соседом`);
+  else if (peers.every((peer) => peer.root === local.root)) syncLog.info(`${describeWire(wire)}; корень сходится с соседями`);
+
+  if (observedPeers === null) return;
+  const diverged = peers.filter((peer) => peer.root !== local.root);
+  if (diverged.length === 0) return;
+  const sampleIds = (ids: string[]) => ids.filter((id) => /^item_[\w-]{1,64}$/.test(id)).slice(0, 8);
+  // A peer snapshot is not a deletion receipt. Keep the log useful without logging fingerprints or paths.
+  syncLog.debug('Манифест: сводки устройств различаются', {
+    trigger,
+    localDeviceId: engine.config.deviceId,
+    localItems: Object.keys(local.leaves).length,
+    published,
+    action: decision.action === 'report' ? 'pull-retained' : 'none',
+    peerCount: peers.length,
+    divergedCount: diverged.length,
+    peers: diverged.slice(0, 8).map((peer) => {
+      const drift = peer === decision.peer && decision.drift ? decision.drift : diffWire(local, peer);
+      return {
+        deviceId: peer.deviceId,
+        snapshotAtMs: peer.at,
+        changedFolderHashes: drift.folders.length,
+        onlyLocal: peer.leaves === undefined ? null : drift.extra.length,
+        onlyPeer: peer.leaves === undefined ? null : drift.missing.length,
+        changedNotes: peer.leaves === undefined ? null : drift.conflict.length,
+        onlyLocalIds: sampleIds(drift.extra),
+        onlyPeerIds: sampleIds(drift.missing),
+        changedNoteIds: sampleIds(drift.conflict),
+      };
+    }),
+  });
 }

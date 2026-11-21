@@ -4,6 +4,41 @@
 // no Tauri, no `localStorage` — so this file reads it as is.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { draftSharedMutation, memorySharedMutations, sharedSettingsProjection, workspaceSharedMutations } from '../src/lib/storage/sharedProjection.ts';
+import { sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
+
+test('local shared mutations keep device preferences and inline attachment bytes out of the journal', () => {
+  const before = { aiPrompt: 'old', aiPersona: 'keep', notifyPrefs: { integrationsEnabled: true } };
+  assert.deepEqual(workspaceSharedMutations(before, { currentFolder: 'private', aiPromptAt: 300,
+    notifyPrefs: { integrationsEnabled: false } }), []);
+  assert.deepEqual(workspaceSharedMutations(before, { aiPrompt: '' }), [
+    { id: sharedRegistryId('workspace', 'aiPrompt'), value: '', previous: 'old' },
+  ]);
+  const fact = { id: 'fact', text: 'remember this' };
+  assert.deepEqual(memorySharedMutations([fact], []), []);
+  assert.deepEqual(memorySharedMutations([fact], [{ ...fact, deletedAt: 123 }]), [
+    { id: sharedRegistryId('memory', 'fact'), value: null, previous: fact },
+  ]);
+  const attached = draft('photo', 1, { attachments: [{ id: 'a', dataUrl: 'local bytes' }] });
+  assert.deepEqual(draftSharedMutation('composer', 'Inbox', null, attached)[0].value.attachments, [{ id: 'a' }]);
+  assert.deepEqual(draftSharedMutation('composer', 'Inbox', attached, draft('photo', 1, { attachments: [{ id: 'a' }] })), []);
+});
+
+test('shared projection ignores local clocks and only replaces the addressed value', () => {
+  const id = sharedRegistryId('composer', 'Inbox');
+  const local = { composer: { Inbox: draft('newer local', 500), Other: draft('keep', 100) }, fullscreen: {} };
+  const accepted = sharedSettingsProjection({ id, shared: draft('canonical', 1) });
+  assert.equal(accepted.section, 'drafts');
+  const patch = accepted.patch(local);
+  assert.equal(patch.composer.Inbox.content, 'canonical');
+  assert.equal(patch.composer.Other.content, 'keep');
+  assert.equal(local.composer.Inbox.content, 'newer local');
+  const deleted = sharedSettingsProjection({ id, shared: null }).patch(patch);
+  assert.deepEqual(Object.keys(deleted.composer), ['Other']);
+  assert.deepEqual(sharedSettingsProjection({ id, shared: null }).patch(deleted), deleted);
+  const memory = sharedSettingsProjection({ id: sharedRegistryId('memory', 'fact'), shared: null });
+  assert.deepEqual(memory.patch({ items: [{ id: 'fact', text: 'remove' }, { id: 'other', text: 'keep' }] }).items.map((item) => item.id), ['other']);
+});
 import {
   chatFromSection,
   chatToSection,

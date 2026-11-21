@@ -40,6 +40,9 @@ export interface TransportOptions {
   enabled: boolean;
   noteGeneration?: number;
   folderTree?: boolean;
+  atomicGroups?: boolean;
+  sharedRecords?: boolean;
+  registryMedia?: boolean;
   /**
    * Acknowledge over HTTP instead of the socket. Some networks pass a websocket downstream and
    * drop the upstream half: bundles arrive, acks never do, and the relay re-sends the page
@@ -104,6 +107,9 @@ export class SyncTransport {
     const query = new URLSearchParams({ vault: options.vaultId });
     if (this.currentOptions?.noteGeneration) query.set('noteGeneration', String(this.currentOptions.noteGeneration));
     if (this.currentOptions?.folderTree) query.set('folderTree', '1');
+    if (this.currentOptions?.atomicGroups) query.set('atomicGroups', '1');
+    if (this.currentOptions?.sharedRecords) query.set('sharedRecords', '1');
+    if (this.currentOptions?.registryMedia) query.set('registryMedia', '1');
     const response = await fetch(`${serverUrl}/api/rooms/${roomId}/ack?${query}`, {
       method: 'POST',
       headers: options.authHeaders(true),
@@ -146,6 +152,9 @@ export class SyncTransport {
       });
       if (options.noteGeneration) authParams.set('noteGeneration', String(options.noteGeneration));
       if (options.folderTree) authParams.set('folderTree', '1');
+      if (options.atomicGroups) authParams.set('atomicGroups', '1');
+      if (options.sharedRecords) authParams.set('sharedRecords', '1');
+      if (options.registryMedia) authParams.set('registryMedia', '1');
       const token = accountClient.getToken(options.serverUrl);
       if (token) authParams.set('token', token);
       const fullWsUrl = `${baseWsUrl}/ws/${options.roomId}?${authParams.toString()}`;

@@ -1,7 +1,7 @@
 // Owns sync: config, push of local changes, apply of incoming bundles, status reporting.
 import { vault } from '../storage/port';
 import { openNoteSession } from './notes/session';
-import { archiveNoteConflict } from './notes/conflicts';
+import { isLegacySharedKind } from './notes/sharedBody';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
@@ -118,12 +118,19 @@ export class SyncEngine {
   public activeRoomId: string | null = null;
   private noteAbort?: AbortController;
   private noteSession: Awaited<ReturnType<typeof openNoteSession>> = null;
+  private noteError: string | null = null;
   get noteGeneration() { return this.noteSession?.generation; }
   get hasFolderTreeRegistry() { return this.noteSession?.folderTree === true; }
+  get hasAtomicFolderGroups() { return this.noteSession?.atomicGroups === true; }
+  get hasSharedRegistry() { return this.noteSession?.sharedRecords === true; }
+  get hasRegistryMedia() { return this.noteSession?.registryMedia === true; }
   public bundleQuery() {
     const query = new URLSearchParams({ vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId });
     if (this.noteGeneration) query.set('noteGeneration', String(this.noteGeneration));
     if (this.hasFolderTreeRegistry) query.set('folderTree', '1');
+    if (this.hasAtomicFolderGroups) query.set('atomicGroups', '1');
+    if (this.hasSharedRegistry) query.set('sharedRecords', '1');
+    if (this.hasRegistryMedia) query.set('registryMedia', '1');
     return query;
   }
   public isProcessingSync = false;
@@ -200,16 +207,6 @@ export class SyncEngine {
   private pushDebounceTrailing = false;
   /** The root this device last put in the room, so an unchanged vault makes no request. */
   public manifestPostedRoot: string | null = null;
-  /**
-   * The room root this device already resent against. The anti-loop latch: a divergence that a
-   * full resend did not fix is reported, never resent again against the same peer state.
-   */
-  public manifestReconcileRoot: string | null = null;
-  /**
-   * When that resend went out, ms. A note edited after this moment was never in front of the
-   * neighbour, so it cannot be one it refused — `decideResolve` refuses to touch it.
-   */
-  public manifestResentAt: number | null = null;
   /** The slow background check: it starts with the room and dies with it. */
   private manifestHeartbeatInterval: ReturnType<typeof setInterval> | null = null;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
@@ -243,7 +240,7 @@ export class SyncEngine {
   public attachmentPass = false;
 
   public canPackAttachment(): boolean {
-    return this.attachmentPass && this.pendingPull === null;
+    return !this.hasRegistryMedia && this.attachmentPass && this.pendingPull === null;
   }
   /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
   private attachmentSyncBlocked = false;
@@ -265,6 +262,7 @@ export class SyncEngine {
   constructor() {
     this.transport = new SyncTransport({
       onStatus: (state, error) => {
+        this.noteSession?.replica.requireCatchUp();
         this.status.state = state;
         if (error !== null) {
           this.status.error = error;
@@ -361,6 +359,7 @@ export class SyncEngine {
       // and the two devices would ping-pong the same bundle forever.
       if (event.origin === 'remote') return;
       if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
+      if (this.hasSharedRegistry && isLegacySharedKind(event.kind)) return;
       if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
         if (event.origin === 'external' && event.kind === 'item') {
           void this.noteSession.replica.recordExternal(event).catch((error: unknown) => this.reportNoteError(error));
@@ -374,6 +373,7 @@ export class SyncEngine {
       if (op) {
         syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
         this.getOutbox().enqueue(op);
+        if (op.kind === 'item' || op.kind === 'trash') this.notify();
         // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
         const isDraft = op.kind === 'draft';
         this.scheduleDebouncedPush(
@@ -388,11 +388,62 @@ export class SyncEngine {
     return { ...this.config };
   }
 
+  private failedItemHashes = new Map<string, string>();
+  private itemDeliveryLedger?: { queued: Set<string>; sent: Record<string, string> };
+
+  public getItemDeliveryStatus(item: SlagItem, hash?: string) {
+    if (!this.config.enabled || this.config.localSyncMode === 'receive-only') return 'local';
+    if (this.noteSession) return this.noteSession.replica.deliveryStatus(item);
+    const key = `item:${item.id}`;
+    const ledger = this.itemDeliveryLedger ??= {
+      queued: new Set(this.getOutbox().pending().filter(({ kind }) => kind === 'item' || kind === 'trash').map(({ id }) => id)),
+      sent: loadSentHashes(this.bookkeeping),
+    };
+    const queued = ledger.queued.has(item.id);
+    if (this.activeRoomId && hash) {
+      if (ledger.sent[key] === hash && !queued) return 'accepted';
+      if ([...this.pendingPushes.values()].some((push) => push.packedHashes[key] === hash)) return 'pending';
+      if (this.failedItemHashes.get(key) === hash) return 'error';
+    }
+    return queued ? 'pending' : 'unconfirmed';
+  }
+
+  public getNoteConflicts() {
+    const replica = this.noteSession?.replica;
+    return replica?.conflicts.map((entry) => {
+      const current = replica.confirmedValue(entry.noteId);
+      return { ...entry, currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
+    }) ?? [];
+  }
+
+  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number) {
+    const replica = this.noteSession?.replica;
+    if (!replica) throw new Error('Реестр синхронизации недоступен');
+    await replica.resolveConflict(intentId, resolution, reviewedRevision);
+  }
+
+  public async resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>) {
+    const replica = this.noteSession?.replica;
+    if (!replica) throw new Error('Реестр синхронизации недоступен');
+    await replica.resolveFolderConflict(groupId, resolution, reviewed);
+  }
+
   public getStatus(): SyncStatus {
     const manifest = this.status.manifest;
+    const registry = this.noteSession?.replica;
+    const pendingCount = registry ? registry.pendingCount + this.getOutbox().pending().length : this.status.pendingCount;
+    const error = this.status.error ?? this.noteError;
+    const state = registry && this.status.state === 'connected'
+      ? registry.syncHealth === 'error' || error ? 'error'
+        : !this.activeRoomId || !this.transport.isOpenFor(this.activeRoomId) ? 'offline'
+        : registry.syncHealth !== 'current' || pendingCount || this.pendingPushes.size ? 'syncing' : 'connected'
+      : this.status.state;
     return {
       ...this.status,
-      pendingCount: this.noteSession?.replica.pendingCount ?? this.status.pendingCount,
+      state,
+      error,
+      pendingCount,
+      registry: this.noteSession?.progress,
       initialSync: { ...this.status.initialSync },
       subscription: computeSubscription(this),
       // Copied like the fields above: the panel holds this object, and a status the engine keeps
@@ -431,6 +482,7 @@ export class SyncEngine {
   }
 
   public notify(): void {
+    this.itemDeliveryLedger = undefined;
     const current = this.getStatus();
     this.listeners.forEach((fn) => fn(current));
   }
@@ -458,7 +510,8 @@ export class SyncEngine {
   public getBundleOutbox() {
     return this.getOutbox().pending().filter((op) =>
       (!this.noteGeneration || (op.kind !== 'item' && op.kind !== 'trash'))
-      && (!this.hasFolderTreeRegistry || op.kind !== 'folder'));
+      && (!this.hasFolderTreeRegistry || op.kind !== 'folder')
+       && (!this.hasSharedRegistry || !isLegacySharedKind(op.kind)));
   }
 
   public getOutbox(): Outbox {
@@ -484,6 +537,7 @@ export class SyncEngine {
    * photo never rides inside a keystroke bundle. The pass is a one-shot flag the push consumes.
    */
   private scheduleAttachmentPass(): void {
+    if (this.hasRegistryMedia) return;
     // A queued ask for missing bytes drains one bundle at a time, on the same one-shot push.
     if (this.pendingRequests.size > 0) this.scheduleDebouncedPush(0);
     // A backlog pull owns the channel: one file per push here is slower than the pull and would
@@ -533,6 +587,7 @@ export class SyncEngine {
     sentHashes: Record<string, string>,
     packedHashes: Record<string, string>
   ): Promise<boolean> {
+    if (this.hasRegistryMedia) return false;
     const attachments = item.attachments ?? [];
     const attempted = new Set<string>();
     // A device asked for these bytes after a bundle it ACKed failed to write them: they leave
@@ -614,7 +669,7 @@ export class SyncEngine {
 
   /** A paired device lost these bytes: send them again despite the delivered mark. */
   public forceAttachmentSend(attachmentId: string): void {
-    if (this.forcedAttachmentIds.has(attachmentId)) return;
+    if (this.hasRegistryMedia || this.forcedAttachmentIds.has(attachmentId)) return;
     if (this.attachmentSyncBlocked) {
       syncLog.debug('Forced attachment skipped: relay refused the plan quota for this session');
       return;
@@ -629,7 +684,7 @@ export class SyncEngine {
    * with a dozen broken photos would otherwise ask on every reconnect.
    */
   public requestAttachmentBytes(att: SlagAttachment): void {
-    if (this.pendingRequests.has(att.id)) return;
+    if (this.hasRegistryMedia || this.pendingRequests.has(att.id)) return;
     const lastRequestedAt = loadAttachmentRequests(this.bookkeeping)[`att:${att.id}`] ?? 0;
     if (Date.now() - lastRequestedAt < ATTACHMENT_REQUEST_COOLDOWN_MS) return;
     this.pendingRequests.set(att.id, {
@@ -660,6 +715,7 @@ export class SyncEngine {
 
   /** At most one request per bundle: the answer is a whole file, not a diff. */
   public nextAttachmentRequest(): AttachmentRequestPayload | null {
+    if (this.hasRegistryMedia) return null;
     const next = this.pendingRequests.values().next();
     return next.done ? null : next.value;
   }
@@ -670,7 +726,7 @@ export class SyncEngine {
   }
 
   public hasPendingAttachmentRequests(): boolean {
-    return this.pendingRequests.size > 0;
+    return !this.hasRegistryMedia && this.pendingRequests.size > 0;
   }
 
   public markAttachmentRequestSent(attachmentId: string): void {
@@ -683,6 +739,7 @@ export class SyncEngine {
    * stats the disk, so this is not a per-bundle loop; the per-file cooldown does the rest.
    */
   public async requestMissingAttachments(): Promise<void> {
+    if (this.hasRegistryMedia) return;
     if (this.missingScanGeneration === this.initGeneration) return;
     this.missingScanGeneration = this.initGeneration;
     try {
@@ -762,7 +819,7 @@ export class SyncEngine {
         folders: !this.hasFolderTreeRegistry && buffered.detail.folders ? buffered.folders : undefined,
         removedIds: !this.noteGeneration && buffered.detail.items ? buffered.removedIds : undefined,
         registryNotes: Boolean(this.noteGeneration),
-        workspaceState: buffered.workspaceState,
+        workspaceState: this.hasSharedRegistry ? undefined : buffered.workspaceState,
       });
       await requireSyncSectionFlushed();
     } catch (error) {
@@ -779,6 +836,15 @@ export class SyncEngine {
         this.notify();
       }
       throw error;
+    }
+    if (generation === this.initGeneration && !this.noteGeneration && buffered.removedIds.length > 0) {
+      const activeIds = new Set(vault().getItems().map((item) => item.id));
+      syncLog.debug('Legacy import: explicit note deletes after persistence', {
+        bundles: buffered.bundles.slice(0, 8),
+        bundleCount: buffered.bundles.length,
+        requested: buffered.removedIds.length,
+        stillActive: buffered.removedIds.filter((id) => activeIds.has(id)).length,
+      });
     }
     // One render per burst, after the final state is on disk.
     window.dispatchEvent(
@@ -1017,25 +1083,26 @@ export class SyncEngine {
         serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
         signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
         readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
+        onDeliveryChange: () => this.notify(),
         onError: (error: unknown) => this.reportNoteError(error), onProgress: () => {
+          if (controller.signal.aborted) return;
+          if (this.noteSession?.replica.syncHealth === 'current') this.noteError = null;
           this.status.lastSyncTime = new Date().toLocaleTimeString();
           this.notify();
         },
-        onResolution: ({ merged, conflicts }: { merged: number; conflicts: number }) => syncLog.info('Note registry resolutions', {
-          merged, conflicts, conflictShare: conflicts / (merged + conflicts),
-        }),
         onApplied: ({ item }: { item: SlagItem | null }) => {
           window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
+          // Registry media is verified and written before onApplied; only legacy needs a peer lookup.
+          if (this.hasRegistryMedia) return;
           for (const attachment of item?.attachments ?? []) {
             void port.hasAttachmentBytes(attachment.id, attachment.relativePath).then((present) => {
               if (!controller.signal.aborted && !present) this.requestAttachmentBytes(attachment);
             }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
           }
         },
-        storeConflict: (conflict: import('./notes/replica').NoteConflict) =>
-          archiveNoteConflict(this.currentVaultId, conflict, port.writeNoteConflict?.bind(port)),
-        hasPendingLegacyNotes: (folderTree: boolean) => this.getOutbox().pending().some(({ kind }) =>
-           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')),
+        hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => this.getOutbox().pending().some(({ kind }) =>
+           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')
+           || (sharedRecords === true && isLegacySharedKind(kind))),
       });
       if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
         const roomId = await accountRoom(vaultId);
@@ -1226,6 +1293,9 @@ export class SyncEngine {
     }
     this.pendingPushes.delete(pending.bundleId);
 
+    for (const [key, hash] of Object.entries(pending.packedHashes)) {
+      if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
+    }
     saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
     this.getOutbox().markSynced(pending.opIds);
@@ -1249,6 +1319,10 @@ export class SyncEngine {
     // A refusal from the relay is an answer, not a failure to repeat: only a lost connection or a
     // timeout is worth another pass, and those schedule one below.
     let retryable = true;
+    for (const [key, hash] of Object.entries(pending.packedHashes)) {
+      if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
+    }
+    const generation = this.initGeneration;
     // The deadline is bytes-shaped, not flat. A 7 MB attachment over a home uplink is a legitimate
     // push that needs more than thirty seconds: the fixed deadline cut it off mid-transfer, the pull
     // put that file back in the queue, and the machine sat in a push → timeout → retry loop where
@@ -1291,6 +1365,11 @@ export class SyncEngine {
     } catch (err: unknown) {
       if (pending.settled) return;
       this.pendingPushes.delete(pending.bundleId);
+      if (generation === this.initGeneration) {
+        for (const [key, hash] of Object.entries(pending.packedHashes)) {
+          if (key.startsWith('item:')) this.failedItemHashes.set(key, hash);
+        }
+      }
       const msg = syncErrorText(err, timeoutMs);
       syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
       this.status.state = 'error';
@@ -1465,15 +1544,18 @@ export class SyncEngine {
   }
 
   private reportNoteError(error: unknown): void {
-    this.status.error = syncErrorText(error, this.pullTimeoutMs);
+    if (!this.noteSession) return;
+    this.noteError = syncErrorText(error, this.pullTimeoutMs);
     this.notify();
   }
 
   public disconnect(): void {
     ++this.initGeneration;
+    this.failedItemHashes.clear();
     this.noteAbort?.abort();
     this.noteAbort = undefined;
     this.noteSession = null;
+    this.noteError = null;
     // A retry belongs to the session it was armed in; a vault switch must not inherit it.
     this.clearRetryTimer();
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
@@ -1485,8 +1567,6 @@ export class SyncEngine {
     manifestSchedule.clearManifestCheck();
     // A new room is a new row: the root this device published belongs to the room it left.
     this.manifestPostedRoot = null;
-    this.manifestReconcileRoot = null;
-    this.manifestResentAt = null;
     if (this.importTimer) clearTimeout(this.importTimer);
     this.importTimer = null;
     this.importBuffer = null;

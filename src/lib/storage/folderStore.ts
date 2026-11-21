@@ -28,6 +28,7 @@ export interface FolderStoreHost {
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): Promise<void> | undefined;
   emitChange(event: StorageChangeEvent): void;
   persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined;
+  captureFolderCascade?(changes: NoteMutation[], folders: FolderMeta[]): Promise<void> | undefined;
   queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void>;
   getItems(folder?: string): SlagItem[];
   cacheItems(key: string, items: SlagItem[]): void;
@@ -72,7 +73,7 @@ export function renameFolderTree(
   updatedFolder: FolderMeta,
   origin: 'local' | 'remote' = 'local',
   orderedPaths?: string[],
-): void {
+): Promise<void> | undefined {
   if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
 
   // A rename remaps metadata and notes. Whether a folder exists is still the directory's call.
@@ -88,12 +89,11 @@ export function renameFolderTree(
     return f;
   });
   const ranks = new Map(orderedPaths?.map((path, index) => [path, index]));
-  const folderWrite = store.persistFolders(folders.map((folder) =>
-    ranks.has(folder.path) ? { ...folder, order: ranks.get(folder.path) } : folder), origin);
+  const nextFolders = folders.map((folder) => ranks.has(folder.path) ? { ...folder, order: ranks.get(folder.path) } : folder);
 
   // Update items belonging to this folder and its subfolders
   const previousItems = store.getItems();
-  const items = previousItems.map(it => {
+  const items = updatedFolder.path === oldPath ? previousItems : previousItems.map(it => {
     if (it.folder === oldPath) {
       return { ...it, folder: updatedFolder.path, updatedAt: Date.now() };
     }
@@ -103,8 +103,12 @@ export function renameFolderTree(
     }
     return it;
   });
-  const noteWrite = origin === 'local' ? store.persistNoteIntents(items
-    .flatMap((item, index): NoteMutation[] => item === previousItems[index] ? [] : [{ id: item.id, kind: 'update', item, previous: previousItems[index] }])) : undefined;
+  const changes = origin === 'local' && updatedFolder.path !== oldPath ? items
+    .flatMap((item, index): NoteMutation[] => item === previousItems[index] ? [] : [{ id: item.id, kind: 'update', item, previous: previousItems[index] }]) : [];
+  const group = store.captureFolderCascade?.(changes, nextFolders);
+  if (group) return group;
+  const folderWrite = store.persistFolders(nextFolders, origin);
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(changes) : undefined;
   const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), items);
@@ -151,6 +155,7 @@ export interface FolderMoveResult {
   reason?: 'missing' | 'cycle' | 'exists';
   /** Where the folder ended up; a same-level move keeps its path. */
   path?: string;
+  queued?: Promise<void>;
 }
 
 /**
@@ -199,7 +204,8 @@ export function moveFolderTree(
   if (nextPath !== movedPath) {
     const movedFolder: FolderMeta = { ...moved, path: nextPath, name: folderName(nextPath) };
     if (rank >= 0) movedFolder.order = rank;
-    renameFolderTree(store, movedPath, movedFolder, 'local', order);
+    const queued = renameFolderTree(store, movedPath, movedFolder, 'local', order);
+    return { ok: true, path: nextPath, ...(queued ? { queued } : {}) };
   } else {
     applyFolderOrder(store, order);
   }
@@ -227,11 +233,9 @@ export function describeFolder(
   }
 }
 
-export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): void {
+export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
   if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
   const folders = readFolders(store).filter(f => f.path !== path && !f.path.startsWith(path + '/'));
-  const folderWrite = store.persistFolders(folders, origin);
-
   // Move orphan items to inbox
   const items = store.getItems();
   const movedItems: { item: SlagItem; oldFolder: string }[] = [];
@@ -244,9 +248,12 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
     }
     return it;
   });
-  const noteWrite = origin === 'local' ? store.persistNoteIntents(movedItems.map(({ item, oldFolder }) => ({
-    id: item.id, kind: 'update', item, previous: { ...item, folder: oldFolder },
-  }))) : undefined;
+  const changes = origin === 'local' ? updatedItems.flatMap((item, index): NoteMutation[] => item === items[index]
+    ? [] : [{ id: item.id, kind: 'update', item, previous: items[index] }]) : [];
+  const group = store.captureFolderCascade?.(changes, folders);
+  if (group) return group;
+  const folderWrite = store.persistFolders(folders, origin);
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(changes) : undefined;
   const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
   const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), updatedItems);

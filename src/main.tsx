@@ -60,6 +60,7 @@ async function boot(): Promise<void> {
     // snapshot has to be here before the shell. On the browser build there is no file and this
     // returns at once; the old keys keep answering.
     const { storage } = await import('./lib/storage')
+    await storage.prepareSharedWrites().catch((error: unknown) => bootLog.error('Shared registry enrollment could not be read; shared writes are blocked', error))
     await hydrateSettings(storage)
     const { default: App } = await import('./App')
     const root = document.getElementById('root')!

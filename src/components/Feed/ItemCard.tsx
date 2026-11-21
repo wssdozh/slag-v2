@@ -15,6 +15,7 @@ import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 import { ItemCardActions } from './item/ItemCardActions';
+import { ItemSyncDot } from './item/ItemSyncDot';
 import { ItemReplyBanner } from './item/ItemReplyBanner';
 import { ItemSubtasks } from './item/ItemSubtasks';
 import { ItemVideoNotes } from './item/ItemVideoNotes';
@@ -556,6 +557,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
+        <ItemSyncDot item={item} />
         {/* Text and media keep their full width; only articles reserve an inside action. */}
         <ItemCardActions
           isFloating={hasFloatingActions}

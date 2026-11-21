@@ -69,8 +69,7 @@ export function anonymousOnlyDrift(peers: ManifestPeerStatus[]): boolean {
  * The last manifest check: this device's root, the room's roots, and what was done about them.
  *
  * `remoteRoot: null` means the room had nothing to answer with — not "we agree". `action` is the
- * decision the engine took: `none` (equal or nothing to compare), `reconcile` (one full resend was
- * scheduled) or `report` (diverged, and a resend against this same peer state already happened).
+ * decision the engine took: `none` or `report` (a named peer snapshot differs).
  * `trigger` says what started this check, because "сходится" after a button press and after a
  * silent pass at start-up are different promises to a person.
  */
@@ -85,7 +84,7 @@ export interface ManifestStatus {
   extra: string[];
   /** Notes the room holds and this device does not. Empty when the peer sent no leaves. */
   missing: string[];
-  action: 'none' | 'reconcile' | 'report';
+  action: 'none' | 'report';
   trigger: ManifestTrigger;
   /** Every peer this check saw, one line each. Empty when no other device has published. */
   peers: ManifestPeerStatus[];
@@ -107,6 +106,12 @@ export interface SyncStatus {
   currentRoomId: string | null;
   subscription: SubscriptionInfo;
   manifest?: ManifestStatus;
+  registry?: {
+    relayHead: number | null;
+    appliedThrough: number;
+    application: 'error' | 'catching-up' | 'current';
+    media: 'legacy' | 'waiting' | 'applying' | 'error' | 'applied-through-cursor';
+  };
 }
 
 export interface SyncConfig {

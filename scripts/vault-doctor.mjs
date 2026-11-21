@@ -163,6 +163,16 @@ function main() {
     process.exit(args.help ? 0 : 2);
   }
   const vaultDir = resolve(args.vaultDir);
+  if (args.apply && !args.json) {
+    try {
+      // Do not interpret a corrupt or unreadable registry as permission to repair behind it.
+      readFileSync(join(vaultDir, 'note-registry.json'));
+      console.error('Починка файлов недоступна для хранилища с реестром синхронизации');
+      process.exit(1);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
   let snapshot;
   try {
     snapshot = buildVaultSnapshot(vaultDir);

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { deletionsFromOutbox } from '../src/lib/sync/itemDeletions.ts';
 import { notesRemovedByImport } from '../src/lib/storage/noteRemoval.ts';
+import { reconcileSyncedVault } from '../src/lib/storage/syncReconcile.ts';
 
 const op = (kind, action, id, timestamp = 1_700_000_000_000) => ({ opId: `op_${id}`, kind, action, id, timestamp });
 
@@ -56,4 +57,18 @@ test('import: only the named ids leave, and only when they are still absent', ()
     'a delete followed by the same note in the payload means it came back');
   assert.deepEqual(notesRemovedByImport(previous, new Set(), ['note_zzz']), [],
     'an id this device never had is nothing to remove');
+});
+
+test('import: an explicit remote delete survives unrelated drift without hiding unmentioned notes', () => {
+  const deleted = { id: 'deleted', updatedAt: 1 };
+  const restored = { id: 'restored', updatedAt: 3 };
+  const untouched = { id: 'untouched', updatedAt: 1 };
+  const created = { id: 'created', updatedAt: 2 };
+  const base = { items: [deleted, restored, untouched], folders: [], workspace: {} };
+  const result = reconcileSyncedVault({
+    base,
+    current: { ...base, items: [...base.items, created] },
+    incoming: { items: [restored], folders: [], removedIds: ['deleted', 'restored'] },
+  });
+  assert.deepEqual(result.items, [restored, untouched, created]);
 });

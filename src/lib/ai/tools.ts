@@ -180,7 +180,7 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
       const op = String(args.op ?? '').toLowerCase();
 
       if (op === 'remember') {
-        const result = memoryService.remember({
+        const result = await memoryService.remember({
           text: String(args.text ?? ''),
           kind: args.kind,
           tag: typeof args.tag === 'string' ? args.tag : undefined,
@@ -217,7 +217,7 @@ export function createLocalToolExecutor(params: ToolExecutorParams) {
       }
 
       if (op === 'forget') {
-        const removed = memoryService.forget(String(args.id || args.text || ''));
+        const removed = await memoryService.forget(String(args.id || args.text || ''));
         return removed
           ? { status: 'forgotten', message: 'Убрал из памяти.' }
           : { error: 'Такой записи в памяти нет. Уточните id или текст факта.' };

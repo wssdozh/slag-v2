@@ -58,17 +58,22 @@ export const IntegrationsSettingsTab: React.FC = () => {
   const live = integrationsLive(prefs);
 
   /** Saves the switch and hands the relay the new verdict on the whole delivery path. */
-  const applyPrefs = (next: Partial<NotifyPrefs>): NotifyPrefs => {
-    const merged = { ...prefs, ...next };
-    setPrefs(merged);
-    saveNotifyPrefs(merged);
-    return merged;
+  const applyPrefs = async (next: Partial<NotifyPrefs>): Promise<NotifyPrefs | null> => {
+    try {
+      await saveNotifyPrefs(next);
+      const stored = getNotifyPrefs();
+      setPrefs(stored);
+      return stored;
+    } catch {
+      setPrefs(getNotifyPrefs());
+      return null;
+    }
   };
 
   // The switch is a promise that nothing leaves the device: it stops new arms here and tells
   // the relay to stop routing questions. Whatever an earlier session queued still fires.
-  const syncRelay = async (next: NotifyPrefs) => {
-    if (!vaultId || !accountClient.isAuthenticated() || routes.length === 0) return;
+  const syncRelay = async (next: NotifyPrefs | null) => {
+    if (!next || !vaultId || !accountClient.isAuthenticated() || routes.length === 0) return;
     const mode = next.assistantMode;
     try {
       await setAssistantForRoutes(vaultId, routes, integrationsLive(next) && mode !== 'off', mode === 'off' ? 'minimal' : mode);
@@ -86,8 +91,8 @@ export const IntegrationsSettingsTab: React.FC = () => {
         ...routes.filter((route) => route.state !== 'pending'),
         { token: created.routeToken, label: '', state: 'pending' as const },
       ];
-      setRoutes(updated);
-      saveNotifyRoutes(updated);
+      await saveNotifyRoutes(updated);
+      setRoutes(getNotifyRoutes());
       setInvite(created);
       setIsModalOpen(true);
     } catch (error) {
@@ -102,20 +107,20 @@ export const IntegrationsSettingsTab: React.FC = () => {
     else void handleRequestInvite();
   };
 
-  const handleLinked = (routeToken: string) => {
+  const handleLinked = async (routeToken: string) => {
     const updated = routes.map((route) =>
       route.token === routeToken ? { ...route, state: 'active' as const } : route
     );
-    setRoutes(updated);
-    saveNotifyRoutes(updated);
+    try { await saveNotifyRoutes(updated); } catch { return; }
+    setRoutes(getNotifyRoutes());
     setInvite(null);
     setIsModalOpen(false);
     addToast('telegram подключён', 'success');
   };
 
-  const handleDisconnect = () => {
-    setRoutes([]);
-    saveNotifyRoutes([]);
+  const handleDisconnect = async () => {
+    try { await saveNotifyRoutes([]); } catch { return; }
+    setRoutes(getNotifyRoutes());
     setInvite(null);
     setIsModalOpen(false);
   };
@@ -139,8 +144,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
     }
     setIsSavingAssistant(true);
     try {
-      await setAssistantForRoutes(vaultId, routes, mode !== 'off', mode === 'off' ? 'minimal' : mode);
-      applyPrefs({ assistantMode: mode });
+      await syncRelay(await applyPrefs({ assistantMode: mode }));
     } catch (error) {
       addToast(notifyErrorText(error), 'error');
     } finally {
@@ -229,7 +233,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
             <SettingsSwitch
               label="Включить интеграции"
               checked={prefs.integrationsEnabled}
-              onChange={(value) => void syncRelay(applyPrefs({ integrationsEnabled: value }))}
+              onChange={(value) => void applyPrefs({ integrationsEnabled: value }).then(syncRelay)}
             />
           }
         />
@@ -254,7 +258,7 @@ export const IntegrationsSettingsTab: React.FC = () => {
                 label="канал telegram"
                 checked={live}
                 disabled={!prefs.integrationsEnabled}
-                onChange={(value) => void syncRelay(applyPrefs({ telegramEnabled: value }))}
+                onChange={(value) => void applyPrefs({ telegramEnabled: value }).then(syncRelay)}
               />
             </span>
           }

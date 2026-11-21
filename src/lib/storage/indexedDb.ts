@@ -40,7 +40,7 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-export async function idbSaveAttachment(attachment: SlagAttachment): Promise<void> {
+export async function idbSaveAttachment(attachment: SlagAttachment, strict = false): Promise<void> {
   try {
     const db = await openDb();
     const tx = db.transaction(ATTACHMENTS_STORE, 'readwrite');
@@ -49,8 +49,10 @@ export async function idbSaveAttachment(attachment: SlagAttachment): Promise<voi
     await new Promise((res, rej) => {
       tx.oncomplete = res;
       tx.onerror = rej;
+      tx.onabort = rej;
     });
   } catch (err) {
+    if (strict) throw err;
     dbLog.warn('[IDB] Failed to save attachment to IndexedDB:', err);
   }
 }
