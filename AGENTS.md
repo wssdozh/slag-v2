@@ -80,7 +80,8 @@ docs/project-map/  база знаний проекта, 15 документов
 | telegram-бот: канал, приглашение, доставка | `wssdozh/slag-relay` (`bot.py`, `delivery.py`, `DEPLOYMENT.md`), `src/lib/notify/prefs.ts` |
 | вопрос из бота: режимы и ответ | `src/lib/notify/assistant.ts`, `src/lib/ai/orchestrator.ts`, `wssdozh/slag-relay` (`server.py`) |
 | ссылки `slag://`: страница-переходник на релее, схема в ОС | `wssdozh/slag-relay` (`tg.py`, `render_answer_links`), `src/lib/platform/deepLink.ts`, `src-tauri/src/deeplink.rs` |
-| лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
+| лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx`; секции сроков и окна — `src/components/Feed/list/` |
+| сегодня, просрочка и автоматический повтор | `src/lib/tasks/taskSchedule.ts`, `src/context/hooks/useLocalDay.ts`, `useRecurringRollover.ts`, `src/lib/time/recurrenceHelper.ts` |
 | композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
 | запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |
 | папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |

@@ -24,6 +24,7 @@ src/
     Feed/assistant/   по компоненту на вид сообщения
     Feed/item/        слоты карточки: картинки, файлы, аудио, видео, подзадачи, баннер, действия
     Feed/composer/    стрип вложений, тип, ИИ, запись, отправка, резолвер полей
+    Feed/list/        окна хронологии, секции сегодняшних и просроченных задач
     Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
     Settings/devices/  список, карточка, права, действия, pairing
     Settings/notifications/ контент, тихие часы, система; канал и ассистент в telegram — во вкладке «Интеграции»
@@ -42,7 +43,7 @@ src/
     logger/         logger (уровни, скоупы, буфер, ретеншн) и logRedaction (что не попадёт в лог)
     platform/       platform, windowControls, folderOpener — всё, что говорит с ОС и Tauri
     text/           chatMarkdown, diffUtils, formatBytes
-    tasks/          taskUtils (чекбоксы в markdown), taskCompletion (переходы статусов)
+    tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока)
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
     vault/          модель записи: schema, updates, markdown serializer, filename, vaultDisplay, demo

@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **617**, строк: **108714**, зон: **48**.
+Модулей: **622**, строк: **109024**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -14,19 +14,19 @@
 | `e2e/slag/editor.spec.ts` | 1736 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1471 | 25 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/storage/index.ts` | 924 | 44 |
+| `src/lib/storage/index.ts` | 929 | 45 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
 | `src/lib/storage/settingsStore.ts` | 900 | 5 |
 | `e2e/mobile.spec.ts` | 886 | 0 |
 | `e2e/slag/feed.spec.ts` | 872 | 0 |
 | `src/components/Feed/ItemCard.tsx` | 815 | 1 |
-| `src/context/AppContext.tsx` | 795 | 71 |
-| `src/lib/storage/vaultFiles.ts` | 788 | 2 |
+| `src/lib/storage/vaultFiles.ts` | 801 | 2 |
+| `src/context/AppContext.tsx` | 783 | 71 |
 | `src/mcp/vault.ts` | 780 | 6 |
 | `src/components/Feed/Composer.tsx` | 758 | 4 |
-| `src/types/index.ts` | 686 | 219 |
+| `src/types/index.ts` | 686 | 222 |
 
-## e2e (playwright) — 131 файлов, 24479 строк
+## e2e (playwright) — 133 файлов, 24708 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -112,7 +112,7 @@
 | `MobileEditorBar.tsx` | 312 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 320 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 51 файлов, 7989 строк
+## src/components/Feed — 52 файлов, 8020 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -148,7 +148,7 @@
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
 | `FeedHeader.tsx` | 160 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder name and icon, filter badges, sort, materials toggl… |
-| `FeedList.tsx` | 559 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
+| `FeedList.tsx` | 540 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 179 | 1 | FolderSuggestionMenu | The `@folder` autocomplete: the folder tree as branch rows, the selected one,… |
 | `item/itemAttachments.ts` | 142 | 5 | THUMB_MAX_HEIGHT, THUMB_MAX_WIDTH, CardShape, AttachmentGroups, AttachmentCounts, +11 | How a card's files split by kind, how many slots they get, and where their by… |
 | `item/ItemAudioNotes.tsx` | 46 | 1 | ItemAudioNotesProps, ItemAudioNotes | The card's voice notes, a player each: waveform, transcript and the enrichmen… |
@@ -159,10 +159,11 @@
 | `item/ItemSubtasks.tsx` | 83 | 1 | ItemSubtasksProps, ItemSubtasks | A task's subtasks: one counter, one toggleable line each, collapsible. |
 | `item/ItemVideoNotes.tsx` | 42 | 1 | ItemVideoNotesProps, ItemVideoNotes | Video circle notes on a card: plays in place, the corner opens the full viewe… |
 | `ItemCard.tsx` | 815 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
-| `list/FeedDateBubble.tsx` | 22 | 1 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
+| `list/FeedDateBubble.tsx` | 22 | 2 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
 | `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay | The dashed frame over the feed while files hover: what dropping them will do. |
 | `list/FeedScrollHint.tsx` | 73 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
-| `list/feedWindow.ts` | 92 | 1 | WINDOW_CHUNK, takeWindow, hasOlderItems, nextWindowSize, windowSizeAroundTarget, +3 | Pure windowing for the feed: how many cards stay mounted and when to grow the… |
+| `list/FeedTaskSection.tsx` | 33 | 1 | FeedTaskSection |  |
+| `list/feedWindow.ts` | 109 | 2 | partitionFeedBySchedule, WINDOW_CHUNK, takeWindow, hasOlderItems, nextWindowSize, +4 | Pure windowing for the feed: how many cards stay mounted and when to grow the… |
 | `PinnedBanner.tsx` | 218 | 1 | PinnedBanner | The pinned strip over the feed: cycles this folder's pinned notes and jumps t… |
 | `SlashCommandMenu.tsx` | 102 | 1 | SlashCommandMenu | The `/` command list: filtered by the typed query, grouped by category. |
 | `SuggestionMenuShell.tsx` | 57 | 4 | SuggestionMenuShell | Shared placement and presence for the suggestion lists, plus keeping the row … |
@@ -207,7 +208,7 @@
 | `useFolderBrowser.ts` | 91 | 1 | useFolderBrowser | Granted folders and the entries inside one, loaded only while the picker is o… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo | A clip in the viewer: custom transport that hides with the chrome, and play m… |
 
-## src/components/Mobile — 18 файлов, 2841 строк
+## src/components/Mobile — 18 файлов, 2836 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -221,7 +222,7 @@
 | `calendar/ThreeDayGrid.tsx` | 242 | 1 | ThreeDayGridProps, ThreeDayGrid | The 24-hour three-day grid: day headers, all-day band, hour rail, and timed b… |
 | `calendar/WeekStrip.tsx` | 74 | 1 | WeekStripProps, WeekStrip | The seven-day strip: weekday, number, and a dot when that day has tasks. |
 | `MobileAssistantView.tsx` | 72 | 1 | MobileAssistantView | The phone's assistant tab: a chat under a screen header, scoped to the open f… |
-| `MobileCalendarView.tsx` | 434 | 3 | MobileCalendarView | The phone calendar: agenda and three-day modes, day swipes, and a month picke… |
+| `MobileCalendarView.tsx` | 429 | 3 | MobileCalendarView | The phone calendar: agenda and three-day modes, day swipes, and a month picke… |
 | `MobileFloatingDock.tsx` | 158 | 1 | MobileFloatingDockProps, MobileFloatingDock | The floating tab dock at the bottom of the phone shell, with its capture butt… |
 | `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView | Phone folder page: the profile fills the screen and editing happens in place. |
 | `MobileFoldersView.tsx` | 377 | 1 | MobileFoldersView | The phone folder screen: header, feed/Kanban/calendar switch, and the pinned … |
@@ -327,7 +328,7 @@
 |---|---:|---:|---|---|
 | `AudioPlayer.tsx` | 365 | 4 | AudioPlayer | Plays a note's audio: waveform scrub, speed, transcript and on-demand enrichm… |
 | `AudioRecorder.tsx` | 209 | 2 | AudioRecorder | Records a voice memo in a bottom bar, previews its length, then hands the cli… |
-| `Button.tsx` | 57 | 7 | ButtonProps, Button | The kit's one button: four tones, three sizes, optional icon, ref-forwarded. |
+| `Button.tsx` | 57 | 8 | ButtonProps, Button | The kit's one button: four tones, three sizes, optional icon, ref-forwarded. |
 | `Checkbox.tsx` | 75 | 2 | CheckboxProps, Checkbox | A checkbox with a label and hint, toggled by click or keyboard for settings r… |
 | `ContextMenu.tsx` | 357 | 1 | ContextMenu | Right-click menu for items, folders and feed rows: sections, submenus and hov… |
 | `DatePickerPopover.tsx` | 305 | 1 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
@@ -369,7 +370,7 @@
 |---|---:|---:|---|---|
 | `VaultSwitcherMenu.tsx` | 222 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu | Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete. |
 
-## src/components/Views — 13 файлов, 2632 строк
+## src/components/Views — 13 файлов, 2634 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -378,7 +379,7 @@
 | `calendarHelpers.ts` | 67 | 4 | getPriorityBadge, cleanTimeFromTitle, formatDurationBadge | Calendar-only lookups: the priority badge palette, duration label, title clea… |
 | `CalendarMonthView.tsx` | 210 | 1 | CalendarMonthViewProps, CalendarMonthView | The month grid: six weeks of cells, the task pills in each, and drop zones wh… |
 | `CalendarTaskBlock.tsx` | 339 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock | The two task shapes on the calendar: the all-day pill and the timed block wit… |
-| `CalendarView.tsx` | 542 | 1 | CalendarView | The desktop calendar: month and week grids, drag to reschedule, and the overd… |
+| `CalendarView.tsx` | 544 | 1 | CalendarView | The desktop calendar: month and week grids, drag to reschedule, and the overd… |
 | `kanban/KanbanCard.tsx` | 222 | 1 | KanbanCardProps, KanbanCard | A task card on the board: status glyph, key, due date, tags, and its drag han… |
 | `kanban/KanbanColumn.tsx` | 120 | 1 | KanbanColumnProps, KanbanColumn | One board column: header with counter, its cards, the drop highlight, an add … |
 | `kanban/KanbanMaterialsDock.tsx` | 193 | 1 | KanbanMaterialsDockProps, KanbanMaterialsDock | The materials dock: the folder's notes and articles, searchable, draggable on… |
@@ -411,12 +412,12 @@
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 2 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
-## src/context — 2 файлов, 1034 строк
+## src/context — 2 файлов, 1023 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 795 | 71 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
-| `appContext.types.ts` | 239 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
+| `AppContext.tsx` | 783 | 71 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `appContext.types.ts` | 240 | 8 | ToastMessage, AttachSheetRequest, ContextMenuTarget, AppContextType | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 90 строк
 
@@ -424,7 +425,7 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 90 | 1 | FeedViewQuery, selectVisibleItems | Which records the feed shows and in what order — the inbox's three modes as a… |
 
-## src/context/hooks — 13 файлов, 2178 строк
+## src/context/hooks — 14 файлов, 2229 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -435,11 +436,12 @@
 | `useFeedView.ts` | 214 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
 | `useFolderAdmin.ts` | 137 | 1 | useFolderAdmin | A folder's own writes: save, describe, rename, move, delete and the create mo… |
 | `useItemWrites.ts` | 226 | 1 | ItemWritesDeps, useItemWrites | Every write to a note: create, save, delete, restore from trash, move, comple… |
+| `useLocalDay.ts` | 35 | 1 | useLocalDay | One calendar-day signal for the workspace, independent of task writes. |
 | `useMobileNav.ts` | 124 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav | Which phone surface is showing and how we got there: tabs, push, pop, dock or… |
-| `useNotifyArm.ts` | 146 | 1 | useNotifyArm | Keeps the relay armed with the current reminders and fires the local ones. |
+| `useNotifyArm.ts` | 148 | 1 | useNotifyArm | Keeps the relay armed with the current reminders and fires the local ones. |
 | `useOverlays.ts` | 243 | 1 | useOverlays | Everything above the app: modals, lightbox, context menu, toasts, confirm, at… |
-| `useRecurringRollover.ts` | 68 | 1 | useRecurringRollover | Rolls recurring tasks over at midnight and after the tab wakes, with no user. |
-| `useVaults.ts` | 164 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
+| `useRecurringRollover.ts` | 80 | 1 | useRecurringRollover | Reconcile the active vault after its read, incoming changes, and local midnig… |
+| `useVaults.ts` | 166 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
 | `useVaultWatch.ts` | 92 | 1 | UseVaultWatchOptions, useVaultWatch | Keeps the open vault honest about the disk. Files the MCP server, another edi… |
 
 ## src/hooks — 4 файлов, 708 строк
@@ -566,13 +568,13 @@
 | `imageCodec.ts` | 91 | 3 | EncodedImage, ImageEncodeOptions, STORED_IMAGE_MAX_DIM, STORED_IMAGE_QUALITY, UNCOMPRESSIBLE_IMAGE_TYPES, +3 | Shrinks and re-encodes images on a canvas before storage, sync or sending to … |
 | `mediaEvents.ts` | 29 | 2 | bindMediaEvents | One list of media-element events, bound and unbound in one move. A player that |
 
-## src/lib/notify — 5 файлов, 845 строк
+## src/lib/notify — 5 файлов, 832 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `assistant.ts` | 214 | 3 | ASSISTANT_TOOL_ALLOWLIST, buildVaultFacts, setAssistantForRoutes, buildAssistantAnswer, clearAssistantHistory, +1 | The assistant path of the bot: what a question forwarded from telegram is ans… |
 | `assistantAction.ts` | 199 | 3 | describeActionTarget, ActionCardDescriptor, describeActionCard, toAssistantAction, parseAssistantAction | The action offered under a telegram answer: how it is packed for the relay an… |
-| `plan.ts` | 320 | 3 | localDateKey, resolveReminder, reconcileNotifications, runLocalReminders, LocalNotificationResult, +2 | Delayed reminders: arm them on the relay, toast them locally when nothing els… |
+| `plan.ts` | 307 | 3 | localDateKey, resolveReminder, reconcileNotifications, runLocalReminders, LocalNotificationResult, +2 | Delayed reminders: arm them on the relay, toast them locally when nothing els… |
 | `prefs.ts` | 74 | 6 | DEFAULT_NOTIFY_PREFS, integrationsLive, describeError, getNotifyRoutes, saveNotifyRoutes, +3 | Notify settings: what this vault wants to hear, where reminders go, and the w… |
 | `quiet.ts` | 38 | 1 | DAY_MS, inQuietHours, shiftOutOfQuiet | Quiet hours: the window where a reminder waits instead of ringing. |
 
@@ -595,7 +597,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 32 | 2 | writeJsonAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
 
-## src/lib/storage — 29 файлов, 6385 строк
+## src/lib/storage — 29 файлов, 6401 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -603,7 +605,7 @@
 | `attachments.ts` | 312 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
 | `folderStore.ts` | 244 | 1 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 924 | 44 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `index.ts` | 929 | 45 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 158 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 159 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
@@ -621,8 +623,8 @@
 | `trashStore.ts` | 79 | 1 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 788 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
-| `vaultRegistry.ts` | 181 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
+| `vaultFiles.ts` | 801 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultRegistry.ts` | 179 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
 | `vaultWatch.ts` | 193 | 1 | VaultWatchOptions, VaultWatch, canWatchVault, startVaultWatch | Notices .md files and folders that appeared, changed or vanished under the va… |
@@ -671,11 +673,12 @@
 | `types.ts` | 211 | 31 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
 | `vaultSharing.ts` | 85 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
 
-## src/lib/tasks — 2 файлов, 166 строк
+## src/lib/tasks — 3 файлов, 179 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `taskCompletion.ts` | 57 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
+| `taskSchedule.ts` | 13 | 4 | classifyDueDate, classifyTaskSchedule | A local calendar comparison, independent of reminder time and task recurrence. |
 | `taskUtils.ts` | 109 | 17 | baseTaskId, parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, +1 | The calendar projects a recurring task into every occurrence as |
 
 ## src/lib/text — 5 файлов, 463 строк
@@ -688,13 +691,13 @@
 | `formatBytes.ts` | 9 | 9 | formatBytes | Formats a byte count for UI labels, and stays silent when the size is unknown. |
 | `shortId.ts` | 7 | 6 | shortId | An id cut down for reading: the head, an ellipsis, the tail. |
 
-## src/lib/time — 5 файлов, 1352 строк
+## src/lib/time — 5 файлов, 1349 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `calendarLayout.ts` | 139 | 6 | LayoutPositionedTask, TimedBlockBox, timedBlockBox, computeAntiOverlapLayout | Day-calendar geometry: which column a timed task takes and how tall its block… |
-| `dateUtils.ts` | 175 | 33 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, getTodayIso, getTomorrowIso, +13 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
-| `recurrenceHelper.ts` | 293 | 5 | RECURRENCE_PRESETS, parseISODateString, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, +3 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
+| `dateUtils.ts` | 186 | 35 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, parseISODateString, getTodayIso, +14 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
+| `recurrenceHelper.ts` | 279 | 3 | RECURRENCE_PRESETS, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, computeNextOccurrence, +2 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
 | `reminder.ts` | 174 | 8 | reminderClock, reminderClockLabel, reminderDay, reminderToIso, shiftReminderToDay, +1 | reminder.ts — что означает строка `reminder` и как её записать. |
 | `todoistTaskParser.ts` | 571 | 12 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +2 | Parses Todoist-style quick input into title, due date, tags, priority, durati… |
 
@@ -759,5 +762,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 686 | 219 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 686 | 222 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +78 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |
