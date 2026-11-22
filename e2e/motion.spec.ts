@@ -194,7 +194,19 @@ test('loading older notes keeps a visible card still from the first frame', asyn
   await page.screenshot({ path: 'test-results/screenshots/feed_prepend_no_jump.png' });
 });
 
+async function seedChronologicalFeed(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const now = Date.now();
+    localStorage.setItem('slag_items_default_vault', JSON.stringify(Array.from({ length: 15 }, (_, i) => ({
+      id: `motion-note-${i}`, type: 'note', title: `Заметка ${i}`, content: '', folder: 'Входящие',
+      createdAt: now - (15 - i) * 60_000, updatedAt: now, tags: [], attachments: [],
+    }))));
+  });
+}
+
 test('a sent note rises from the composer, and the cards above it do not jump', async ({ page }) => {
+  // Only a note appended at the bottom rises from the composer. Active task groups can follow it.
+  await seedChronologicalFeed(page);
   await page.goto('/');
   // Long enough to read the start keyframe before the animation ends.
   await page.addStyleTag({ content: ':root { --slag-motion-slow: 1600ms; }' });
@@ -258,6 +270,7 @@ test('a sent note rises from the composer, and the cards above it do not jump', 
 
 test('reduced motion lands a sent note without rising', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await seedChronologicalFeed(page);
   await page.goto('/');
   const field = page.locator('.composer-surface textarea').first();
   await expect(field).toBeVisible();

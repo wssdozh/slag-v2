@@ -29,8 +29,8 @@ test('the feed preserves reading position during prepend and incoming notes', as
   await page.evaluate(() => {
     const { storage } = window as typeof window & { storage: typeof import('../src/lib/storage').storage };
     const now = Date.now();
-    storage.saveItems([{ id: 'scroll-incoming', type: 'note', folder: 'Входящие', title: '', content: 'Входящая запись', createdAt: now, updatedAt: now, tags: [] }], 'remote');
-    window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { changedItemIds: ['scroll-incoming'] } }));
+    storage.saveItems([{ id: 'scroll-incoming', type: 'note', folder: 'Входящие', title: 'Входящая запись', content: '', createdAt: now, updatedAt: now, tags: [], attachments: [] }], 'remote');
+    window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
   });
   await expect(feed.locator('#item-scroll-incoming')).toHaveCount(1);
   await expect.poll(() => nearEnd.evaluate((el, y) => Math.abs(el.getBoundingClientRect().top - y), before)).toBeLessThan(2);
