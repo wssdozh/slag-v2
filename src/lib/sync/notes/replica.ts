@@ -24,6 +24,8 @@ interface NoteReplicaHost {
   readOnly: boolean;
   trackDiskProjection?: boolean;
   sendLive: (data: string) => boolean;
+  /** The confirmed socket is open right now, so a first note need not wait for it. */
+  isLiveOpen?: () => boolean;
   save: (state: NoteJournal) => Promise<void>;
   apply: (note: AcceptedNote) => Promise<void>;
   applyFolderTree?: (folders: FolderMeta[]) => Promise<void>;
@@ -38,6 +40,7 @@ interface NoteReplicaHost {
 }
 
 const PUSH_DELAY_MS = 50;
+const FIRST_NOTE_DELAY_MS = 0;
 const RETRY_MS = 10_000;
 const WS_ACK_MS = 2_500;
 
@@ -339,7 +342,7 @@ export class NoteReplica {
       const state = changes.reduce((journal, change) => recordNote(journal, { ...change, source, intentId: change.intentId ?? crypto.randomUUID() }), this.state);
       await this.persist(state);
       for (const intent of state.pending) if (!before.includes(intent)) this.logIntent('Note intent recorded', intent);
-      this.schedule();
+      this.schedule(this.firstLiveNote() ? FIRST_NOTE_DELAY_MS : PUSH_DELAY_MS);
     });
     return run.catch((err: unknown) => { this.error(err); throw err; });
   }
@@ -404,10 +407,30 @@ export class NoteReplica {
     if (!this.host.signal.aborted) this.host.onError(error);
   }
 
+  // One ordinary text edit with a durable journal and an open confirmed socket has nothing
+  // to coalesce with, so it skips the batch window. Media, folder groups, retries, a pending
+  // feed and an HTTP-only transport keep it: their send is not a single sealed note operation.
+  private firstLiveNote(): boolean {
+    if (this.pendingCount !== 1 || this.host.isLiveOpen?.() !== true || this.needsFeed) return false;
+    const [intent] = this.state.pending;
+    const item = intent.item;
+    return intent.source === 'app' && !intent.attempt && !intent.folderGroup
+      && (intent.kind === 'create' || intent.kind === 'update')
+      && intent.id !== FOLDER_TREE_ID && !isSharedRegistryId(intent.id)
+      && isNoteItem(item) && (item.attachments ?? []).length === 0;
+  }
+
   private schedule(delay = PUSH_DELAY_MS) {
     if (!this.ready || this.host.readOnly || this.host.signal.aborted || this.sending || this.timer || !this.pendingCount) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
+      // The queue at scheduling time is not a licence to send: a reconnect, read-only
+      // switch or abort may land first. Fall back to the ordinary window without touching
+      // the journal; a same-tick burst or a media note takes the same path.
+      if (delay === FIRST_NOTE_DELAY_MS && (!this.ready || this.host.readOnly || this.host.signal.aborted || !this.firstLiveNote())) {
+        this.schedule();
+        return;
+      }
       void this.flush();
     }, delay);
   }

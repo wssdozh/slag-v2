@@ -71,6 +71,17 @@ async function until(predicate) {
   }
 }
 
+// Mocked timers never advance by themselves; let the promise chains behind a send finish.
+async function pump(predicate, message = 'condition did not settle') {
+  for (let i = 0; i < 5_000 && !predicate(); i++) await new Promise((resolve) => setImmediate(resolve));
+  assert.ok(predicate(), message);
+}
+
+// When the assertion is that nothing will happen, still give every pending promise chain a turn.
+async function settle() {
+  for (let i = 0; i < 200; i++) await new Promise((resolve) => setImmediate(resolve));
+}
+
 const change = (kind, item, id = item.id) => ({ kind, id, item });
 
 test('cold disk edits use the last durable base, never a newer relay revision', async (t) => {
@@ -976,4 +987,174 @@ test('a queued successor can undo its own preceding edit without undoing the rem
   assert.equal(b.local.get(base.id).title, 'remote title');
   assert.equal(b.local.get(base.id).content, base.content);
   assert.equal(server.events.length, 4);
+});
+
+function liveDevice(t, server, options = {}) {
+  const delivered = [];
+  let replica;
+  const d = device(t, server, {
+    isLiveOpen: () => true,
+    sendLive: (text) => {
+      // A live send must never leave before the sealed attempt is on disk.
+      const data = JSON.parse(text);
+      assert.deepEqual(d.saved().pending.map(({ attempt }) => attempt?.op), data.ops);
+      delivered.push(data.ops);
+      void server.view.send(generation, data.requestId, data.ops).then((response) => replica.handleMessage(response));
+      return true;
+    },
+    ...options,
+  });
+  replica = d.replica;
+  return { ...d, delivered };
+}
+
+test('the first fresh text note leaves at once on an idle confirmed socket', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const server = relay();
+  const d = liveDevice(t, server);
+  await d.replica.catchUp();
+  const item = note('first-live');
+  await d.replica.record([change('create', item)]);
+  assert.equal(d.delivered.length, 0, 'the journal turn must not send before its timer');
+  t.mock.timers.tick(0);
+  await pump(() => d.delivered.length === 1, 'the first note waited for the batch window');
+  await pump(() => d.replica.pendingCount === 0);
+  assert.equal(d.delivered.length, 1);
+  assert.equal(d.delivered[0].length, 1);
+  assert.deepEqual(d.errors, []);
+});
+
+test('a same-tick burst keeps one batched send', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const server = relay();
+  const d = liveDevice(t, server);
+  await d.replica.catchUp();
+  await Promise.all(Array.from({ length: 10 }, (_, i) => d.replica.record([change('create', note(`burst-${i}`))])));
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(d.delivered.length, 0, 'a burst is not hot-dispatched');
+  t.mock.timers.tick(49);
+  await settle();
+  assert.equal(d.delivered.length, 0);
+  t.mock.timers.tick(1);
+  await pump(() => d.delivered.length === 1 && d.replica.pendingCount === 0);
+  assert.equal(d.delivered[0].length, 10);
+  assert.deepEqual(d.errors, []);
+});
+
+test('media, an HTTP-only socket and a failed journal write keep the old window', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const server = relay();
+  const attachment = { id: 'asset', name: 'asset', type: 'file', mimeType: 'application/octet-stream', size: 4, relativePath: '.attachments/asset' };
+  let uploads = 0;
+  const media = liveDevice(t, server, { uploadAttachment: async () => {
+    uploads++;
+    return 'a'.repeat(64);
+  } });
+  await media.replica.catchUp();
+  await media.replica.record([change('create', note('media', { attachments: [attachment] }))]);
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(uploads + media.delivered.length, 0, 'a media note is neither sealed nor sent on the hot turn');
+  t.mock.timers.tick(50);
+  await pump(() => media.delivered.length === 1);
+  assert.equal(uploads, 1);
+  assert.deepEqual(media.delivered[0][0].mediaIds, ['a'.repeat(64)]);
+  await pump(() => media.replica.pendingCount === 0);
+  media.stop();
+
+  const http = device(t, server, { isLiveOpen: () => false, sendLive: () => false });
+  await http.replica.catchUp();
+  const sends = server.sends();
+  await http.replica.record([change('create', note('http-only'))]);
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(server.sends(), sends, 'HTTP-only must wait for the batch window');
+  t.mock.timers.tick(50);
+  await pump(() => http.replica.pendingCount === 0);
+  assert.equal(server.sends(), sends + 1);
+
+  let journalBroken = false;
+  const broken = device(t, server, { isLiveOpen: () => true, sendLive: () => { throw new Error('sent without a journal'); },
+    save: async () => { if (journalBroken) throw new Error('disk full'); } });
+  await broken.replica.catchUp();
+  journalBroken = true;
+  await assert.rejects(broken.replica.record([change('create', note('lost-journal'))]), /disk full/);
+  t.mock.timers.tick(0);
+  t.mock.timers.tick(50);
+  await settle();
+  assert.equal(broken.replica.pendingCount, 0);
+});
+
+test('a read-only switch, a required catch-up or a pending feed falls back without losing the note', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const server = relay();
+  const d = liveDevice(t, server);
+  await d.replica.catchUp();
+
+  await d.replica.record([change('create', note('read-only-switch'))]);
+  d.replica.setReadOnly(true);
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(d.delivered.length, 0, 'read-only must not send on the hot turn');
+  assert.equal(d.replica.pendingCount, 1, 'the note stays in the journal');
+  d.replica.setReadOnly(false);
+  await d.replica.catchUp();
+  t.mock.timers.tick(50);
+  await pump(() => d.replica.pendingCount === 0);
+  assert.equal(d.delivered.length, 1);
+
+  await d.replica.record([change('create', note('reconnect'))]);
+  d.replica.requireCatchUp();
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(d.delivered.length, 1, 'a required catch-up must not send on the hot turn');
+  assert.equal(d.replica.pendingCount, 1);
+  await d.replica.catchUp();
+  t.mock.timers.tick(50);
+  await pump(() => d.replica.pendingCount === 0);
+  assert.equal(d.delivered.length, 2);
+
+  d.replica.noteRelayHead(d.replica.progress.relayHead + 1);
+  await d.replica.record([change('create', note('behind-feed'))]);
+  t.mock.timers.tick(0);
+  await settle();
+  assert.equal(d.delivered.length, 2, 'a pending feed gap must not send on the hot turn');
+  t.mock.timers.tick(49);
+  await settle();
+  assert.equal(d.delivered.length, 2);
+  t.mock.timers.tick(1);
+  await pump(() => d.replica.pendingCount === 0);
+  assert.equal(d.delivered.length, 3);
+  assert.deepEqual(d.errors, []);
+});
+
+test('a failed send keeps its saved attempt and only retries after the backoff', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const server = relay();
+  const transmitted = [];
+  const d = device(t, server, { isLiveOpen: () => false, sendLive: () => false,
+    channel: { ...server.view, send: async (gen, requestId, ops) => {
+      transmitted.push(ops);
+      if (transmitted.length === 1) throw new Error('offline');
+      return server.view.send(gen, requestId, ops);
+    } } });
+  await d.replica.catchUp();
+  await d.replica.record([change('create', note('retried'))]);
+  t.mock.timers.tick(0);
+  await settle();
+  assert.deepEqual(transmitted, [], 'an offline note is never hot-dispatched');
+  t.mock.timers.tick(50);
+  await pump(() => d.errors.length === 1);
+  assert.equal(transmitted.length, 1);
+  const attempt = d.saved().pending[0].attempt;
+  assert.ok(attempt, 'the sealed attempt is durable before the send');
+  t.mock.timers.tick(9_999);
+  await settle();
+  assert.equal(transmitted.length, 1, 'a failed send waits out its backoff');
+  t.mock.timers.tick(1);
+  await pump(() => d.replica.pendingCount === 0);
+  assert.equal(transmitted.length, 2);
+  assert.equal(transmitted[1][0].opId, attempt.op.opId);
+  assert.deepEqual(d.errors.map(String), ['Error: offline']);
 });

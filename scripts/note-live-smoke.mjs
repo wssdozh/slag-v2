@@ -116,6 +116,7 @@ try {
       } else ws.send(text);
       return true;
     },
+    isLiveOpen: () => ws.readyState === WebSocket.OPEN,
     apply: async ({ id, item }) => local.set(id, item),
     applyFolderTree: async (tree) => { folders = tree; },
     applyFolderGroup: async (notes, tree) => {
