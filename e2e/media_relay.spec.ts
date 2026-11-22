@@ -101,24 +101,46 @@ test.describe('Media enrichment through the relay', () => {
         loaded.find((name) => name.split('?')[0].endsWith('/src/lib/media/enrichment/dispatch.ts')) ||
         '/src/lib/media/enrichment/dispatch.ts';
       const { enrichAttachment } = await import(url);
-      return enrichAttachment(
-        {
-          id: 'att-image',
-          type: 'image',
-          name: 'receipt.png',
-          mimeType: 'image/png',
-          dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-          size: 68,
-        } as any,
-        'контекст',
-        { sourceMode: 'subscription' } as any,
-      );
+      const { storage } = await import(loaded.find((name) => name.split('?')[0].endsWith('/src/lib/storage/index.ts')) || '/src/lib/storage/index.ts');
+      const attachment = {
+        id: 'att-image',
+        type: 'image' as const,
+        name: 'receipt.png',
+        relativePath: '.attachments/att-image_receipt.png',
+        mimeType: 'image/png',
+        size: 68,
+      };
+      await storage.saveAttachment({ ...attachment, dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
+      storage.getAttachmentUrl = () => { throw new Error('OCR must not use the playback URL'); };
+      return enrichAttachment(attachment, 'контекст', { sourceMode: 'subscription' } as any);
     });
 
     expect(capture.body?.dataUrl).toContain('data:image/');
     expect(capture.body?.prompt).toContain('OCR');
     expect(result.enrichmentStatus).toBe('ready');
     expect(result.extractedText).toBe('чек на 300');
+  });
+
+  test('the feed opens OCR text after recognition without writing a processing status', async ({ page }) => {
+    await patchPaidSubscription(page);
+    await routeRelay(page, 'vision', { extractedText: 'Чек на 300 рублей', summary: 'Чек' });
+    await page.evaluate(async () => {
+      const { storage } = await import('/src/lib/storage/index.ts');
+      const now = Date.now();
+      const attachment = { id: 'ocr-tile', name: 'ocr.png', type: 'image' as const, mimeType: 'image/png', size: 68, relativePath: '.attachments/ocr-tile_ocr.png' };
+      await storage.saveAttachment({ ...attachment, dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' });
+      storage.saveItem({ id: 'ocr-note', type: 'note', title: 'Тест OCR', content: 'Тест OCR', folder: 'Входящие', tags: [], attachments: [attachment], createdAt: now, updatedAt: now });
+      const save = storage.saveItem.bind(storage);
+      storage.saveItem = (item, ...args) => {
+        if (item.id === 'ocr-note' && item.attachments.some((att) => att.enrichmentStatus === 'processing')) throw new Error('Transient OCR status was saved');
+        return save(item, ...args);
+      };
+      window.dispatchEvent(new Event('slag-sync-updated'));
+    });
+    const card = page.locator('#item-ocr-note');
+    await card.getByRole('button', { name: 'Текст: ocr.png' }).click();
+    await expect(card.getByText('Чек на 300 рублей', { exact: true })).toBeVisible();
+    await card.screenshot({ path: 'test-results/screenshots/ocr-feed.png' });
   });
 
   test('without a lease and without a key the attachment stays idle', async ({ page }) => {

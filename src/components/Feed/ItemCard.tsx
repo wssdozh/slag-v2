@@ -7,6 +7,7 @@ import { Icon } from '../UI/icons/Icon';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
 import { extractFocalContext } from '../../lib/media/enrichment/text';
+import { storage } from '../../lib/storage';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
@@ -99,25 +100,29 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const [tagsRowWidth, setTagsRowWidth] = useState(0);
   const tagsRowRef = useRef<HTMLDivElement | null>(null);
 
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const handleEnrichAttachment = useCallback(async (targetAtt: SlagAttachment) => {
+    if (processingId) return;
     if (!canEnrichAttachments(aiSettings)) {
       addToast('Подписка неактивна, а свой ключ Groq не указан — распознавание недоступно', 'info');
       return;
     }
-    const focalContext = extractFocalContext(item);
-    const inFlightAttachments = item.attachments.map(a =>
-      a.id === targetAtt.id ? { ...a, enrichmentStatus: 'processing' as const } : a
-    );
-    updateItem({ ...item, attachments: inFlightAttachments });
-
+    const vaultId = storage.getCurrentVault().id;
+    setProcessingId(targetAtt.id);
     try {
-      const enriched = await enrichAttachment(targetAtt, focalContext, aiSettings);
-      const updatedAttachments = item.attachments.map(a => a.id === targetAtt.id ? enriched : a);
-      updateItem({ ...item, attachments: updatedAttachments });
-    } catch {
-      // quiet fallback
+      const enriched = await enrichAttachment(targetAtt, extractFocalContext(item), aiSettings);
+      if (enriched.enrichmentStatus !== 'ready') {
+        addToast(enriched.enrichmentStatus === 'error' ? 'Не удалось распознать вложение' : 'Распознавание для этого вложения недоступно', 'error');
+        return;
+      }
+      if (storage.getCurrentVault().id !== vaultId) return;
+      const latest = storage.getItemById(item.id);
+      if (!latest?.attachments.some(a => a.id === targetAtt.id)) return;
+      updateItem({ ...latest, attachments: latest.attachments.map(a => a.id === targetAtt.id ? enriched : a) });
+    } finally {
+      setProcessingId(null);
     }
-  }, [aiSettings, item, updateItem, addToast]);
+  }, [aiSettings, item, processingId, updateItem, addToast]);
 
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -282,8 +287,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const galleryAttachments = useMemo(
     () => (item.attachments ?? []).filter(
       (attachment) => !embeddedAttachmentIds.has(attachment.id)
-    ),
-    [item.attachments, embeddedAttachmentIds]
+    ).map(attachment => attachment.id === processingId ? { ...attachment, enrichmentStatus: 'processing' as const } : attachment),
+    [item.attachments, embeddedAttachmentIds, processingId]
   );
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
   // `missing` tells pictures apart from bytes still on their way.
