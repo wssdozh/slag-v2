@@ -103,13 +103,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel, accountActi
 
   const menuItems = (
     <>
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          setIsMenuOpen(false);
+          void handleAvatarPick(event);
+        }}
+      />
       <button
         type="button"
         className={PHOTO_MENU_ITEM}
-        onClick={() => {
-          setIsMenuOpen(false);
-          avatarInputRef.current?.click();
-        }}
+        onClick={() => avatarInputRef.current?.click()}
       >
         <Icon name="media.camera" size="sm" tone="inherit" className="shrink-0" />
         <span>Сменить фото</span>
@@ -134,43 +141,28 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel, accountActi
   );
 
   return (
-    <div className="flex items-center gap-3 p-4">
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          aria-label="Сменить фото профиля"
-          title="Сменить фото профиля"
-          onClick={() => avatarInputRef.current?.click()}
-          className="block size-12 sm:size-14 rounded-full overflow-hidden border border-subtle bg-tint-6 hover:border-hover transition-colors cursor-pointer outline-none ring-0 focus-visible:ring-2 focus-visible:ring-accent/40"
+    <div className="flex items-center gap-3 px-4 py-3 sm:py-4">
+      <div className="shrink-0">
+        <MenuDropdown
+          ariaLabel="Действия с фото профиля"
+          minWidth={168}
+          isOpen={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          trigger={
+            <button
+              type="button"
+              aria-label="Изменить фото профиля"
+              title="Изменить фото профиля"
+              className="block size-12 overflow-hidden rounded-full border border-subtle bg-tint-6 outline-none ring-0 transition-colors hover:border-hover focus-visible:border-hover sm:size-14"
+            >
+              <ProfileAvatar profile={profile} className="w-full h-full text-lg" />
+            </button>
+          }
         >
-          <ProfileAvatar
-            profile={profile}
-            className="w-full h-full text-lg"
-          />
-        </button>
-        <div className="absolute -bottom-1 -right-2">
-          <MenuDropdown
-            ariaLabel="Действия с фото профиля"
-            minWidth={168}
-            align="end"
-            isOpen={isMenuOpen}
-            onOpenChange={setIsMenuOpen}
-            trigger={
-              <IconButton
-                size="md"
-                title="Изменить фото"
-                aria-label="Изменить фото"
-                className="rounded-full border border-subtle bg-surface-elevated shadow-sm hover:border-hover hover:bg-surface-hover"
-              >
-                <Icon name="action.edit" size="sm" tone="inherit" />
-              </IconButton>
-            }
-          >
-            {menuItems}
-          </MenuDropdown>
-        </div>
+          {menuItems}
+        </MenuDropdown>
       </div>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <input
           ref={nameInputRef}
           aria-label="Имя профиля"
@@ -182,25 +174,21 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel, accountActi
             if (event.key === 'Enter') event.currentTarget.blur();
           }}
           spellCheck={false}
-          className="w-full truncate border-b border-transparent bg-transparent text-base font-semibold text-fg-primary outline-none placeholder:text-fg-dim focus:border-hover"
+          className="w-full truncate border-b border-transparent bg-transparent text-base font-semibold leading-5 text-fg-primary outline-none placeholder:text-fg-dim focus:border-hover"
         />
         <span className="truncate text-xs text-fg-secondary" title={planLabel}>{planLabel}</span>
       </div>
       {accountAction && (
-        <button type="button" data-testid={accountAction.testId} onClick={accountAction.onClick}
-          className="ml-auto flex min-h-9 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-fg-secondary hover:bg-tint-6 hover:text-fg-primary focus-visible:bg-tint-8"
-        >
-          <Icon name="entity.user" size="sm" tone="inherit" />
-          {accountAction.label}
-        </button>
+        <IconButton
+          size="lg"
+          data-testid={accountAction.testId}
+          onClick={accountAction.onClick}
+          aria-label={accountAction.label}
+          title={accountAction.label}
+          className="ml-auto hover:bg-tint-6 focus-visible:bg-tint-8"
+          icon={<Icon name="system.settings" size="lg" tone="inherit" />}
+        />
       )}
-      <input
-        ref={avatarInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => void handleAvatarPick(event)}
-      />
     </div>
   );
 };

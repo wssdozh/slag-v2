@@ -43,14 +43,17 @@ test('profile hero — desktop', async ({ page }) => {
 test('profile hero — mobile 375', async ({ page }) => {
   await openMobileSettings(page);
   await page.waitForTimeout(400);
-  await page.screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
+  const account = page.getByTestId('mobile-settings-account-btn');
+  await expect(account).toHaveText('');
+  await page.getByLabel('Имя профиля').locator('../..').screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
+  await account.click();
+  await expect(page).toHaveURL(/page=account/);
 });
 
-test('avatar is left of the name and the photo opens the picker', async ({ page }) => {
-  test.setTimeout(60_000);
+test('the avatar opens the photo menu without a separate pencil button', async ({ page }) => {
   await openMobileSettings(page);
 
-  const avatar = page.getByRole('button', { name: 'Сменить фото профиля' });
+  const avatar = page.getByRole('button', { name: 'Изменить фото профиля', exact: true });
   const avatarBox = (await avatar.boundingBox())!;
   const nameBox = (await page.getByLabel('Имя профиля').boundingBox())!;
   expect(avatarBox.width).toBeGreaterThanOrEqual(44);
@@ -58,20 +61,12 @@ test('avatar is left of the name and the photo opens the picker', async ({ page 
   expect(nameBox.y).toBeLessThan(avatarBox.y + avatarBox.height);
   await expect(page.getByTestId('mobile-settings-account-btn')).toBeVisible();
 
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), avatar.click()]);
-  expect(chooser).toBeTruthy();
-  await chooser.setFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: AVATAR_PNG });
-});
-
-test('the pencil opens the menu and its item opens the same picker', async ({ page }) => {
-  test.setTimeout(90_000);
-  await openMobileSettings(page);
-
-  await page.getByRole('button', { name: 'Изменить фото' }).click();
+  await expect(page.getByRole('button', { name: 'Изменить фото', exact: true })).toHaveCount(0);
+  await avatar.click();
+  await expect(page.getByRole('button', { name: 'Убрать фото' })).toBeVisible();
   const menuItem = page.getByRole('button', { name: 'Сменить фото', exact: true });
-  await expect(menuItem).toBeVisible({ timeout: 5000 });
 
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), menuItem.click()]);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), menuItem.click()]);
   expect(chooser).toBeTruthy();
   await chooser.setFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: AVATAR_PNG });
 });
