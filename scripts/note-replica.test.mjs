@@ -137,6 +137,28 @@ test('cold capture distinguishes an uncheckpointed projection from a changed or 
   assert.equal(restored.saved().pending[0].item.content, 'intermediate');
 });
 
+test('an external attachment-only edit creates one revision on both replicas', async (t) => {
+  const server = relay();
+  const attachment = { id: 'asset', name: 'asset', type: 'file', mimeType: 'application/octet-stream', size: 4, relativePath: '.attachments/asset' };
+  const blob = 'b'.repeat(64);
+  const source = device(t, server, { uploadAttachment: async (selected) => {
+    assert.deepEqual(selected, attachment);
+    return blob;
+  } });
+  const receiver = device(t, server);
+  const item = note('external-media');
+  await Promise.all([source.replica.catchUp(), receiver.replica.catchUp()]);
+  await source.replica.record([change('create', item)]);
+  await until(() => source.saved()?.confirmed[item.id]?.revision === 1 && receiver.saved()?.cursor === 1);
+  await source.replica.recordExternal({ id: item.id, action: 'upsert', previous: item, payload: { ...item, attachments: [attachment] } });
+  await until(() => source.saved()?.confirmed[item.id]?.revision === 2 && receiver.saved()?.cursor === 2);
+  assert.deepEqual(receiver.local.get(item.id), { ...item, attachments: [{ ...attachment, registryBlobId: blob }] });
+  assert.equal(server.events.length, 2);
+  assert.deepEqual(server.events[1].mediaIds, [blob]);
+  assert.equal(source.replica.pendingCount, 0);
+  assert.deepEqual([...source.errors, ...receiver.errors], []);
+});
+
 test('attachment upload must succeed before a durable attempt or revision is created', async (t) => {
   const server = relay();
   const attachment = { id: 'asset', name: 'asset', type: 'file', mimeType: 'application/octet-stream', size: 4, relativePath: '.attachments/asset' };

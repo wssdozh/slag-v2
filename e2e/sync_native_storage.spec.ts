@@ -217,6 +217,70 @@ test('native sync refuses a corrupt journal until it can re-read a valid one', a
     noAckOnFailedWrite: true, ackAfterRepair: true });
 });
 
+test('disk reload picks up frontmatter-only changes without echoing equivalent YAML', async ({ page }) => {
+  await page.route('**/storage-test.html', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+  await page.goto('/storage-test.html');
+  const result = await page.evaluate(async () => {
+    const { storage } = await import(/* @vite-ignore */ '/src/lib/storage/index.ts');
+    const id = 'external-frontmatter-test';
+    const relativePath = `Входящие/${id}.md`;
+    const notePath = `${storage.getVaultNotesPath()}/${relativePath}`;
+    const header = `id: ${id}\ntitle: External edit\ncreated: 100\nupdated: 200`;
+    const attachments = `attachments:
+  - id: screenshot
+    name: screenshot.webp
+    type: image
+    mimeType: image/webp
+    size: 4
+    relativePath: .attachments/screenshot.webp`;
+    const markdown = (yaml: string, body = 'Original body') => `---\n${yaml}\n---\n\n${body}\n`;
+    let disk = markdown(header);
+    const reads: string[] = [];
+    window.__TAURI_INTERNALS__ = { invoke: async (cmd: string, { path }: { path: string }) => {
+      if (cmd === 'plugin:fs|exists') return path === notePath;
+      if (cmd === 'plugin:fs|read_text_file' && path.endsWith('/state.json')) return [123, 125]; // {}
+      if (cmd === 'plugin:fs|read_text_file' && path === notePath) {
+        reads.push(path);
+        return [...new TextEncoder().encode(disk)];
+      }
+      throw new Error(`unexpected invoke ${cmd} ${path}`);
+    } };
+    window.isTauri = true;
+    const reload = () => storage.reloadFromDisk({ changed: [relativePath], removed: [] });
+    try {
+      await reload();
+      const events: { origin?: string; action: string; before: number | undefined; after: number | undefined }[] = [];
+      const unsubscribe = storage.subscribeChanges((event: import('../src/lib/storage').StorageChangeEvent) => {
+        if (event.kind === 'item' && event.id === id) {
+          events.push({ origin: event.origin, action: event.action,
+            before: event.previous?.attachments.length, after: event.payload?.attachments.length });
+        }
+      });
+      try {
+        disk = markdown(`${header}\n${attachments}`);
+        const changed = await reload();
+        const note = storage.getItemById(id);
+        const repeated = await reload();
+        disk = markdown(`${attachments}\n${header}`);
+        const reordered = await reload();
+        disk = markdown(`${attachments}\n${header}`, 'Edited body');
+        const edited = await reload();
+        return { changed, repeated, reordered, edited, events, reads: reads.length,
+          updatedAt: note?.updatedAt, attachment: note?.attachments[0]?.id, body: storage.getItemById(id)?.content };
+      } finally { unsubscribe(); }
+    } finally { delete window.__TAURI_INTERNALS__; delete window.isTauri; }
+  });
+  expect(result).toEqual({
+    changed: { updated: 1, removed: 0 }, repeated: { updated: 0, removed: 0 },
+    reordered: { updated: 0, removed: 0 }, edited: { updated: 1, removed: 0 },
+    events: [
+      { origin: 'external', action: 'upsert', before: 0, after: 1 },
+      { origin: 'external', action: 'upsert', before: 1, after: 1 },
+    ],
+    reads: 5, updatedAt: 200, attachment: 'screenshot', body: 'Edited body',
+  });
+});
+
 test('two notes with one title land in two files', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {

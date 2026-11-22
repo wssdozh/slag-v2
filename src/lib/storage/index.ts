@@ -94,7 +94,7 @@ import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
 import type { SharedBody, SharedMutation } from '../sync/notes/sharedBody';
 import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } from './sharedProjection';
 import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
-import { equal } from '../sync/notes/merge';
+import { equal, sameNote } from '../sync/notes/merge';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -946,7 +946,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     for (const item of parsed) {
       if (Object.hasOwn(fenced, item.id)) continue;
       const cached = byId.get(item.id);
-      if (cached && cached.updatedAt === item.updatedAt && cached.content === item.content) continue;
+      if (cached && sameNote(cached, item)) continue;
       byId.set(item.id, item);
       events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, previous: cached, origin: 'external' });
     }
