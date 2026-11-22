@@ -6,11 +6,11 @@ import React, {
   useState,
   useMemo,
   useCallback,
-  useSyncExternalStore,
 } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ItemCard } from './ItemCard';
-import type { SlagAttachment, LightboxImage } from '../../types';
+import type { SlagAttachment, SlagItem, LightboxImage } from '../../types';
+import { FeedTaskSection } from './list/FeedTaskSection';
 import { Icon } from '../UI/icons/Icon';
 import { EmptyState } from '../UI/EmptyState';
 import { Button } from '../UI/Button';
@@ -29,6 +29,7 @@ import {
   groupFeedByDate,
   hasOlderItems,
   nextWindowSize,
+  partitionFeedBySchedule,
   takeWindow,
   windowSizeAroundTarget,
 } from './list/feedWindow';
@@ -38,21 +39,11 @@ import {
 // animation instead of a glide plus a smooth scroll racing each other.
 const COMPOSER_SETTLE_PX = 200;
 
-function subscribeToNow() {
-  return () => {};
-}
-
-function getTodayMidnight() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
 export const FeedList: React.FC = () => {
   const {
     filteredItems,
+    today,
     items,
-    seedDemoData,
     openContextMenu,
     saveItem,
     updateItem,
@@ -101,7 +92,8 @@ export const FeedList: React.FC = () => {
   }, [items]);
 
   // Windowed items: последние `windowSize` записей, новее всегда в кадре
-  const windowedItems = useMemo(() => takeWindow(filteredItems, windowSize), [filteredItems, windowSize]);
+  const { history, scheduledToday, overdue } = useMemo(() => partitionFeedBySchedule(filteredItems, today), [filteredItems, today]);
+  const windowedItems = useMemo(() => takeWindow(history, windowSize), [history, windowSize]);
 
   // The note keeps attachment metadata; the bytes are resolved once for the feed.
   // ponytail: this preloads the whole folder even though the window renders 15 cards, because the
@@ -149,8 +141,8 @@ export const FeedList: React.FC = () => {
   if (prevHighlightKey !== highlightKey) {
     setPrevHighlightKey(highlightKey);
     if (highlightedItemId) {
-      const targetIdx = filteredItems.findIndex(i => i.id === highlightedItemId);
-      const grown = windowSizeAroundTarget(windowSize, filteredItems.length, targetIdx);
+      const targetIdx = history.findIndex(i => i.id === highlightedItemId);
+      const grown = windowSizeAroundTarget(windowSize, history.length, targetIdx);
       if (grown !== windowSize) setWindowSize(grown);
     }
   }
@@ -160,9 +152,7 @@ export const FeedList: React.FC = () => {
   const isPrependRef = useRef<boolean>(false);
   const prevItemsLengthRef = useRef<number>(filteredItems.length);
 
-  const todayMidnight = useSyncExternalStore(subscribeToNow, getTodayMidnight, () => 0);
-
-  const hasMoreOlder = hasOlderItems(filteredItems.length, windowSize);
+  const hasMoreOlder = hasOlderItems(history.length, windowSize);
 
   // Load more older items with scroll position preservation
   const loadMoreOlder = useCallback(() => {
@@ -175,8 +165,8 @@ export const FeedList: React.FC = () => {
     prevScrollTopRef.current = container.scrollTop;
     isPrependRef.current = true;
 
-    setWindowSize(prev => nextWindowSize(prev, filteredItems.length));
-  }, [hasMoreOlder, filteredItems.length]);
+    setWindowSize(prev => nextWindowSize(prev, history.length));
+  }, [hasMoreOlder, history.length]);
 
   const isStuckToBottomRef = useRef(true);
 
@@ -425,9 +415,21 @@ export const FeedList: React.FC = () => {
 
   // Группы по календарным дням и шаг между соседями считает feedWindow: здесь остаётся «сейчас».
   const grouped = useMemo(
-    () => groupFeedByDate(windowedItems, todayMidnight),
-    [windowedItems, todayMidnight],
+    () => groupFeedByDate(windowedItems, today),
+    [windowedItems, today],
   );
+  const renderCard = useCallback((item: SlagItem, gap: number) => (
+    <ItemCard
+      key={item.id}
+      item={item}
+      gap={gap}
+      isHighlighted={highlightedItemId === item.id}
+      repliesCount={replyMetaMap.countMap.get(item.id) || 0}
+      firstReplyId={replyMetaMap.firstReplyMap.get(item.id) || null}
+      replyParent={item.replyToId ? itemMap.get(item.replyToId) || null : null}
+      onImageClick={handleImageClick}
+    />
+  ), [handleImageClick, highlightedItemId, itemMap, replyMetaMap]);
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -453,12 +455,15 @@ export const FeedList: React.FC = () => {
         <FeedDropOverlay isVisible={isDraggingOver} />
 
         {filteredItems.length === 0 ? (
-          <EmptyState
+          items.length === 0 && !isPinnedOnlyFilter ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-fg-secondary">
+              <Icon name="system.ai" size="none" tone="inherit" className="size-9" />
+              <p className="text-xs font-medium">Хранилище пустое</p>
+            </div>
+          ) : <EmptyState
             icon={
               isPinnedOnlyFilter ? (
                 <Icon name="action.pin" size="lg" tone="warning" className="rotate-45" />
-              ) : items.length === 0 ? (
-                <Icon name="system.ai" size="lg" tone="warning" />
               ) : (
                 <Icon name="entity.inbox" size="lg" tone="inherit" />
               )
@@ -466,15 +471,11 @@ export const FeedList: React.FC = () => {
             title={
               isPinnedOnlyFilter
                 ? 'Нет закрепленных записей'
-                : items.length === 0
-                ? 'Хранилище пустое'
                 : 'В этой папке пусто'
             }
             description={
               isPinnedOnlyFilter
                 ? 'В текущей папке нет закрепленных сообщений.'
-                : items.length === 0
-                ? 'Создайте первую мысль в поле ввода внизу или сгенерируйте стартовые демо-заметки и папки.'
                 : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
             }
             action={
@@ -487,17 +488,6 @@ export const FeedList: React.FC = () => {
                   className="gap-1.5 text-xs text-fg-soft hover:text-white"
                 >
                   Показать все сообщения
-                </Button>
-              ) : items.length === 0 ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={seedDemoData}
-                  className="gap-1.5 text-xs text-fg-soft hover:text-white"
-                >
-                  <Icon name="system.ai" size="sm" tone="warning" />
-                  Сгенерировать демо-заметки и папки
                 </Button>
               ) : undefined
             }
@@ -527,21 +517,12 @@ export const FeedList: React.FC = () => {
 
                 {/* List of cards: the step between two notes is their own gap, not the column's */}
                 <div className="flex flex-col">
-                  {group.items.map(({ item, gap }) => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      gap={gap}
-                      isHighlighted={highlightedItemId === item.id}
-                      repliesCount={replyMetaMap.countMap.get(item.id) || 0}
-                      firstReplyId={replyMetaMap.firstReplyMap.get(item.id) || null}
-                      replyParent={item.replyToId ? itemMap.get(item.replyToId) || null : null}
-                      onImageClick={handleImageClick}
-                    />
-                  ))}
+                  {group.items.map(({ item, gap }) => renderCard(item, gap))}
                 </div>
               </div>
             ))}
+            <FeedTaskSection key={`${filterKey}:today`} label="Сегодня" showLabel={grouped.at(-1)?.dateLabel !== 'Сегодня'} items={scheduledToday} highlightedItemId={highlightedItemId} renderCard={renderCard} />
+            <FeedTaskSection key={`${filterKey}:overdue`} label="Просрочено" items={overdue} highlightedItemId={highlightedItemId} renderCard={renderCard} />
           </>
         )}
 

@@ -7,6 +7,8 @@ import type { SlagAttachment, SlagItem, FolderMeta } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
+import { classifyTaskSchedule } from '../lib/tasks/taskSchedule';
+import { getTodayIso } from '../lib/time/dateUtils';
 import { resolveAttachmentByName } from '../lib/text/attachmentEmbed';
 import { applyNotePatch } from './notePatch';
 import { buildNoteCard, formatBytes } from './noteCard';
@@ -682,7 +684,7 @@ export class McpVault {
 
   public async listTasks(view: string = 'today', folder?: string): Promise<SlagItem[]> {
     const all = await this.scanAllNotes();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getTodayIso();
 
     return all
       .map(m => m.item)
@@ -695,11 +697,9 @@ export class McpVault {
 
         switch (view) {
           case 'today':
-            return due === todayStr && !isDone;
           case 'overdue':
-            return Boolean(due && due < todayStr && !isDone);
           case 'upcoming':
-            return Boolean(due && due > todayStr && !isDone);
+            return classifyTaskSchedule(item, todayStr) === view;
           case 'backlog':
             return item.status === 'backlog' || (!due && !isDone);
           case 'completed':
@@ -735,7 +735,7 @@ export class McpVault {
 
   public async getStats(): Promise<Record<string, unknown>> {
     const all = await this.scanAllNotes();
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getTodayIso();
 
     let notes = 0;
     let tasks = 0;
@@ -755,7 +755,7 @@ export class McpVault {
         if (item.status === 'done') completedTasks++;
         else {
           openTasks++;
-          if (item.dueDate && item.dueDate < todayStr) overdueTasks++;
+          if (classifyTaskSchedule(item, todayStr) === 'overdue') overdueTasks++;
         }
       } else {
         notes++;

@@ -1,12 +1,10 @@
 // The phone calendar: agenda and three-day modes, day swipes, and a month picker.
-import React, { useState, useMemo, useSyncExternalStore, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import {
   getISODateString,
   getMondayOfWeek,
-  getTodayString,
-  getTomorrowString,
 } from '../../lib/time/dateUtils';
 import { useSwipeGesture } from '../../hooks/gestures/useSwipeGesture';
 import { useCalendarSchedule, type CalendarTask } from '../../hooks/useCalendarSchedule';
@@ -38,10 +36,6 @@ import {
   type CalendarSlotTarget,
 } from './calendar/calendarPositions';
 
-function subscribeToNow() {
-  return () => {};
-}
-
 interface MobileCalendarViewProps {
   headerRightExtra?: React.ReactNode;
   embedded?: boolean;
@@ -58,11 +52,11 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     setSelectedItem,
     setIsFullscreenEditorOpen,
     setMobileActionSheetItem,
-    currentFolder
+    currentFolder,
+    today: todayStr,
   } = useApp();
 
-  const todayStr = useSyncExternalStore(subscribeToNow, getTodayString, () => '');
-  const tomorrowStr = useMemo(() => getTomorrowString(), []);
+  const tomorrowStr = shiftDateStr(todayStr, 1);
 
   // Calendar Mode: 'agenda' (Week Strip + List) vs '3day' (3-Day 24h Time Grid)
   const [calendarLayout, setCalendarLayout] = useState<MobileCalendarMode>('agenda');
@@ -132,6 +126,7 @@ export const MobileCalendarView: React.FC<MobileCalendarViewProps> = ({
     tasksByDate: tasksByDateMap,
   } = useCalendarSchedule({
     items,
+    todayStr,
     rangeStart,
     rangeEnd,
   });

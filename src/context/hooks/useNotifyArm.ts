@@ -10,6 +10,7 @@ import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive } from
 import { isPrimaryWindow } from '../../lib/platform/windowControls';
 import { accountClient } from '../../lib/sync/account';
 import { syncEngine } from '../../lib/sync/syncEngine';
+import { storage } from '../../lib/storage';
 
 /** Editing a reminder fires a burst of saves; one arm request wins, not four. */
 const ARM_DEBOUNCE_MS = 2000;
@@ -52,7 +53,7 @@ function armReminders(items: SlagItem[]): void {
  * Two channels, one owner per reminder: with a telegram route the relay delivers
  * (it is online when the machine is not), without one the app toasts locally.
  */
-export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
+export function useNotifyArm(items: SlagItem[], vault: VaultMeta, ready: boolean, read: Promise<boolean>): void {
   const vaultId = vault.id;
   // One window answers questions and arms reminders. The quick composer mounts the same
   // provider, and two arming loops meant two arm requests per edit, two telegram polls and
@@ -126,20 +127,21 @@ export function useNotifyArm(items: SlagItem[], vault: VaultMeta): void {
   }, [isPrimary]);
 
   useEffect(() => {
-    if (!isPrimary) return;
-    const timer = setTimeout(() => armReminders(items), ARM_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [isPrimary, items, vaultId]);
-
-  useEffect(() => {
-    if (!isPrimary) return;
-    void runLocalReminders(items, getNotifyPrefs());
-    const timer = setInterval(() => {
-      void runLocalReminders(items, getNotifyPrefs());
-      // A route goes live only when the recipient taps the link, and that changes
-      // no item: without this pass a pending channel would stay pending forever.
-      armReminders(items);
-    }, LOCAL_TICK_MS);
-    return () => clearInterval(timer);
-  }, [isPrimary, items]);
+    if (!isPrimary || !ready) return;
+    const isCurrent = () => storage.getCurrentVaultRead() === read && storage.getCurrentVault().id === vaultId;
+    const arm = () => {
+      if (isCurrent() && syncEngine.getCurrentVaultId() === vaultId) armReminders(items);
+    };
+    const local = () => {
+      if (isCurrent()) void runLocalReminders(items, getNotifyPrefs());
+    };
+    local();
+    const debounce = setTimeout(arm, ARM_DEBOUNCE_MS);
+    // A route can go live without an item change, so retry arming on the existing tick.
+    const tick = setInterval(() => { local(); arm(); }, LOCAL_TICK_MS);
+    return () => {
+      clearTimeout(debounce);
+      clearInterval(tick);
+    };
+  }, [isPrimary, ready, read, items, vaultId]);
 }

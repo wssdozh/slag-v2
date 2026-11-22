@@ -19,6 +19,17 @@ export function getISODateString(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+export function parseISODateString(dateStr: string): Date {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(NaN);
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(0);
+  date.setHours(12, 0, 0, 0);
+  date.setFullYear(y, m - 1, d);
+  return y >= 1 && date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
+    ? date
+    : new Date(NaN);
+}
+
 export function getTodayIso(): string {
   return getISODateString(new Date());
 }

@@ -34,6 +34,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
 export const CalendarView: React.FC = () => {
   const {
     items,
+    today,
     currentFolder,
     updateItem,
     toggleTaskComplete,
@@ -264,6 +265,7 @@ export const CalendarView: React.FC = () => {
     todayStr,
   } = useCalendarSchedule({
     items,
+    todayStr: today,
     currentFolder,
     filterByFolder: true,
     rangeStart,

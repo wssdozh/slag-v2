@@ -70,6 +70,7 @@ export interface AppContextType {
   setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   items: SlagItem[];
   filteredItems: SlagItem[];
+  today: string;
   selectedItem: SlagItem | null;
   activeTypeFilter: SlagItemType | 'all';
   activeTagFilter: string | null;

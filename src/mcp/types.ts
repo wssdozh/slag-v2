@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { DEFAULT_INBOX_FOLDER } from '../config';
 import type { SlagItem, FolderMeta, RecurrenceRule } from '../types';
-import { parseISODateString } from '../lib/time/recurrenceHelper';
+import { parseISODateString } from '../lib/time/dateUtils';
 
 const RecurrenceSchema: z.ZodType<RecurrenceRule> = z.object({
   freq: z.enum(['daily', 'weekdays', 'weekly', 'monthly', 'yearly']),
