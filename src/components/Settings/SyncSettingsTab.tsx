@@ -21,7 +21,6 @@ const propertyLabels: Record<string, string> = {
 export const SyncSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
-  const noteRoom = syncEngine.getNoteRoomStatus();
   const conflicts = syncEngine.getNoteConflicts();
   const sections = new Map<string, typeof conflicts>();
   for (const entry of conflicts) {
@@ -111,9 +110,6 @@ export const SyncSettingsTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-3">
       <SettingsGroup title="Синхронизация" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
-        <SettingsRow label="Протокол заметок" description={noteRoom?.mode === 'registry' ? `Реестр · поколение ${noteRoom.generation}`
-          : noteRoom?.mode === 'frozen' ? `Подготовка · поколение ${noteRoom.generation}`
-            : noteRoom?.mode === 'legacy' ? 'Старый протокол' : 'Не подтверждён релеем'} />
         <SettingsRow label="Статус" description={
           <span role="status" className="flex flex-col gap-0.5 break-words">
             <span className="inline-flex items-center gap-1.5">

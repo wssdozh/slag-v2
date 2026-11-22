@@ -11,7 +11,9 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
       await page.getByTestId('sidebar-settings-btn').click();
       await page.getByTestId('settings-tab-sync').click();
     }
-    await expect(page.getByText('Протокол заметок')).toBeVisible();
+    await expect(page.getByTestId('sync-refresh-btn')).toBeVisible();
+    await expect(page.getByText('Протокол заметок', { exact: true })).toHaveCount(0);
+    await page.getByRole('dialog', { name: 'Настройки' }).or(page.getByRole('dialog').filter({ has: page.getByTestId('sync-refresh-btn') })).screenshot({ path: `test-results/screenshots/sync-settings-${layout}.png`, animations: 'disabled' });
     await page.evaluate(async () => {
       const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
       const item = { id: 'test-note', type: 'note', title: 'План релиза', content: '1. Проверить сборку\n2. Обновить документацию\n3. Передать на проверку', tags: ['проект'], attachments: [], folder: 'Inbox', createdAt: 1, updatedAt: 1 };
