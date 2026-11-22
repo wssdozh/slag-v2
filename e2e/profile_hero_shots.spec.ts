@@ -37,6 +37,7 @@ test('profile hero — desktop', async ({ page }) => {
   await seedProfile(page);
   await expect(page.getByLabel('Имя профиля')).toHaveValue('Мори');
   await page.waitForTimeout(400);
+  await expect(page.getByRole('dialog').locator('[data-settings-divider]').first()).toBeHidden();
   await page.screenshot({ path: 'test-results/screenshots/profile-hero-desktop.png' });
 });
 
@@ -46,6 +47,10 @@ test('profile hero — mobile 375', async ({ page }) => {
   const account = page.getByTestId('mobile-settings-account-btn');
   await expect(account).toHaveText('');
   await page.getByLabel('Имя профиля').locator('../..').screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
+  await expect(page.getByTestId('mobile-settings-root').locator('[data-settings-divider]').first()).toBeHidden();
+  const create = page.getByRole('button', { name: 'Создать новую запись' });
+  await expect(create).toHaveClass(/\bbg-accent\b/);
+  await page.screenshot({ path: 'test-results/screenshots/settings-mobile-accent.png' });
   await account.click();
   await expect(page).toHaveURL(/page=account/);
 });

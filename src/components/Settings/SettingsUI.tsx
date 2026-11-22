@@ -13,8 +13,7 @@ import { NumberInput } from '../UI/NumberInput';
  * below is the single definition, so a tab composes rather than invents.
  *
  * Rules that hold across the whole surface:
- * - A group is one raised card on the panel background; rows inside it are
- *   separated by dividers, never by their own borders.
+ * - A group is distinguished by its surface tone. Rows rely on padding, not rules.
  * - Icons identify navigation or homogeneous entity lists, not parameters or
  *   commands. Keep one label edge per group; never add icon plates.
  * - The right side carries a value in muted type, or a control, never both.
@@ -47,7 +46,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
         {action}
       </div>
     )}
-    <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden">
+    <div className="overflow-hidden rounded-2xl bg-surface/80 [&>[data-settings-divider]]:hidden">
       {children}
     </div>
   </section>
@@ -55,7 +54,7 @@ export const SettingsGroup: React.FC<SettingsGroupProps> = ({
 
 /** A divider between rows. Inset to the label column when the rows carry icons. */
 export const SettingsDivider: React.FC<{ inset?: boolean }> = ({ inset = false }) => (
-  <div className={`h-px bg-border-subtle ${inset ? 'ml-12' : ''}`} />
+  <div data-settings-divider className={`h-px bg-border-subtle ${inset ? 'ml-12' : ''}`} />
 );
 
 interface SettingsRowProps {
