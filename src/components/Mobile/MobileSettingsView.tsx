@@ -81,13 +81,11 @@ export const MobileSettingsView: React.FC = () => {
         <SettingsGroup className="pt-5">
           <ProfileCard
             planLabel={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            label={isLocked ? 'SLAG ID' : 'Личный кабинет'}
-            testId={isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn'}
-            onClick={() => navigatePage('account')}
-            chevron
+            accountAction={{
+              label: isLocked ? 'SLAG ID' : 'Личный кабинет',
+              testId: isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn',
+              onClick: () => navigatePage('account'),
+            }}
           />
         </SettingsGroup>
 

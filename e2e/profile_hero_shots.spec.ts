@@ -46,18 +46,17 @@ test('profile hero — mobile 375', async ({ page }) => {
   await page.screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
 });
 
-test('portrait is big, the badge misses the name, and the photo opens the picker', async ({ page }) => {
+test('avatar is left of the name and the photo opens the picker', async ({ page }) => {
   test.setTimeout(60_000);
   await openMobileSettings(page);
 
   const avatar = page.getByRole('button', { name: 'Сменить фото профиля' });
-  const pencil = page.getByRole('button', { name: 'Изменить фото' });
-  const avatarBox = await avatar.boundingBox();
-  const nameBox = await page.getByLabel('Имя профиля').boundingBox();
-  const pencilBox = await pencil.boundingBox();
-  expect(avatarBox?.width).toBeGreaterThanOrEqual(88);
-  expect(avatarBox?.width).toBeLessThanOrEqual(96);
-  expect(nameBox!.y).toBeGreaterThan(pencilBox!.y + pencilBox!.height - 8);
+  const avatarBox = (await avatar.boundingBox())!;
+  const nameBox = (await page.getByLabel('Имя профиля').boundingBox())!;
+  expect(avatarBox.width).toBeGreaterThanOrEqual(44);
+  expect(nameBox.x).toBeGreaterThan(avatarBox.x + avatarBox.width);
+  expect(nameBox.y).toBeLessThan(avatarBox.y + avatarBox.height);
+  await expect(page.getByTestId('mobile-settings-account-btn')).toBeVisible();
 
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), avatar.click()]);
   expect(chooser).toBeTruthy();

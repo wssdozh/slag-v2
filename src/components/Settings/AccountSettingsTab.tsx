@@ -52,7 +52,9 @@ export const AccountSettingsTab: React.FC = () => {
       )}
 
       <SettingsGroup title="Профиль" action={<span className="text-2xs font-mono text-fg-dim">в хранилище</span>}>
-        <ProfileCard planLabel={profilePlan} />
+        <ProfileCard planLabel={profilePlan} accountAction={hosted && !locked ? {
+          label: 'Личный кабинет', onClick: () => navigatePage('account'),
+        } : undefined} />
       </SettingsGroup>
 
       <SettingsGroup
@@ -71,12 +73,6 @@ export const AccountSettingsTab: React.FC = () => {
       </SettingsGroup>
 
       <SettingsGroup>
-        {hosted && !locked && (
-          <>
-            <SettingsRow icon={<Icon name="entity.user" size="md" tone="inherit" />} label="Личный кабинет" description="Подписка, устройства и доступ к хранилищам" onClick={() => navigatePage('account')} external />
-            <SettingsDivider inset />
-          </>
-        )}
         <SettingsRow icon={<Icon name="entity.desktop" size="md" tone="inherit" />} label="Подключённые устройства" value={<span className="font-mono">{limitsKnown ? `${activeDevices} из ${maxDevices}` : activeDevices}</span>} testId="sync-to-devices-btn" onClick={() => setSettingsTab('devices')} chevron />
       </SettingsGroup>
     </div>
