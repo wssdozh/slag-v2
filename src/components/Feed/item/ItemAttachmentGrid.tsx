@@ -62,14 +62,14 @@ export function ItemAttachmentGrid({ attachments, srcs, missing, onOpen, onEnric
           const isAudio = att.type === 'audio';
           const isImage = att.type === 'image';
           return (
-            <div key={att.id} className="relative max-w-full">
+            <div key={att.id} className="group/attachment relative max-w-full">
               <AttachmentTile att={att} src={src} unavailable={missing.has(att.id)}
                 audioExpanded={expandedId === att.id} onOpen={() => isAudio ? toggle(att.id) : onOpen(att)} />
               {isImage && src && (
                 <button type="button" title="Текст с изображения" aria-label={`Текст: ${att.name}`}
                   aria-expanded={att.extractedText ? expandedId === att.id : undefined}
                   disabled={att.enrichmentStatus === 'processing'}
-                  className="absolute right-1 bottom-1 rounded-md bg-scrim-80 p-1 text-fg-primary hover:bg-scrim-90 focus-visible:ring-1 focus-visible:ring-fg-primary"
+                  className="absolute right-1 bottom-1 rounded-md bg-scrim-80 p-1 text-fg-primary hover:bg-scrim-90 focus-visible:ring-1 focus-visible:ring-fg-primary motion-safe:transition-opacity motion-safe:duration-100 pointer-fine:opacity-0 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100"
                   onClick={() => {
                     if (att.extractedText) toggle(att.id);
                     else {

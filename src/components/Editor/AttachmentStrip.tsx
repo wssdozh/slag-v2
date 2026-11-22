@@ -65,13 +65,13 @@ export function AttachmentStrip({ itemId, attachments, srcs, missing, menuId, on
       <div ref={stripRef} data-testid="attachment-strip" role="group" aria-label="Вложения"
         className={`flex min-w-0 gap-1.5 ${showAll ? 'flex-wrap' : ''}`}>
         {visible.map((att, index) => (
-          <div key={att.id} className="relative w-14 shrink-0">
+          <div key={att.id} className="group/attachment relative w-14 shrink-0">
             <AttachmentTile att={att} src={attachmentSrc(srcs, att)} unavailable={missing.has(att.id)}
               audioExpanded={audioId === att.id} compact onOpen={() => open(att)} />
             <MenuDropdown className="absolute! bottom-0.5 right-0.5" dropdownClassName="w-40" align="start"
               isOpen={menuId === att.id} onOpenChange={next => onMenuChange(next ? att.id : null)}
               trigger={<button type="button" aria-label={`Действия: ${att.name}`} aria-expanded={menuId === att.id}
-                className="grid size-6 cursor-pointer place-items-center rounded-md bg-scrim-80 text-fg-primary hover:bg-scrim-95 focus-visible:ring-1 focus-visible:ring-fg-primary">
+                className="grid size-6 cursor-pointer place-items-center rounded-md bg-scrim-80 text-fg-primary hover:bg-scrim-95 focus-visible:ring-1 focus-visible:ring-fg-primary motion-safe:transition-opacity motion-safe:duration-100 pointer-fine:opacity-0 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100 aria-expanded:opacity-100">
                 <Icon name="action.moreHorizontal" size="sm" />
               </button>}>
               <button type="button" className={menuItem} onClick={() => {
