@@ -911,6 +911,47 @@ for (const prune of [false, true]) {
   });
 }
 
+for (const reversed of [false, true]) {
+  test(`adjacent lines, paragraphs and tags converge after restart (reverse=${reversed})`, async (t) => {
+    const server = relay();
+    const a = device(t, server), offline = device(t, server);
+    await Promise.all([a.replica.catchUp(), offline.replica.catchUp()]);
+    const base = note('adjacent', { content: 'Alpha\nBeta', tags: ['project', 'old'] });
+    const paragraphs = note('paragraphs', { content: 'First\n\nLast', tags: ['base'] });
+    const unsafe = note('unsafe', { content: 'Before\nParagraph\nExample\nAfter' });
+    const left = [{ ...base, content: 'New Alpha\nBeta', tags: ['project'] },
+      { ...paragraphs, content: 'New First\nSecond line\n\nLast', tags: ['base', 'z'] },
+      { ...unsafe, content: 'Before\n```\nParagraph\nExample\n```\nAfter' }];
+    const right = [{ ...base, content: 'Alpha\nNew Beta', tags: ['project', 'old', 'new'] },
+      { ...paragraphs, content: 'First\n\nNew Last', tags: ['base', 'a'] },
+      { ...unsafe, content: 'Before\nParagraph\n# Heading\nExample\nAfter' }];
+    const originals = [base, paragraphs, unsafe];
+    await a.replica.record(originals.map((item) => change('create', item)));
+    await until(() => offline.saved()?.cursor === 3);
+    const journal = offline.saved();
+    offline.stop();
+    const edits = (items) => items.map((item, index) => ({ ...change('update', item), previous: originals[index],
+      origin: { revision: journal.confirmed[item.id].revision } }));
+    const [winner, stale] = reversed ? [right, left] : [left, right];
+    await a.replica.record(edits(winner));
+    await until(() => a.saved()?.cursor === 6 && !a.replica.pendingCount);
+    const resumed = device(t, server, { state: journal });
+    await resumed.replica.catchUp();
+    await resumed.replica.record(edits(stale));
+    await until(() => server.events.length === 8 && !resumed.replica.pendingCount && resumed.saved().cursor === 8 && a.saved().cursor === 8);
+    for (const d of [a, resumed]) {
+      assert.deepEqual(d.errors, []);
+      assert.equal(d.local.get(base.id).content, 'New Alpha\nNew Beta');
+      assert.deepEqual(d.local.get(base.id).tags, ['project', 'new']);
+      assert.equal(d.local.get(paragraphs.id).content, 'New First\nSecond line\n\nNew Last');
+      assert.deepEqual(d.local.get(paragraphs.id).tags, ['base', 'a', 'z']);
+      assert.equal(d.local.get(unsafe.id).content, winner[2].content);
+    }
+    assert.deepEqual(a.conflicts, []);
+    assert.deepEqual(resumed.conflicts.map(({ fields, item }) => ({ fields, item })), [{ fields: ['content'], item: stale[2] }]);
+  });
+}
+
 test('a queued successor can undo its own preceding edit without undoing the remote edit', async (t) => {
   const server = relay();
   const send = server.view.send;

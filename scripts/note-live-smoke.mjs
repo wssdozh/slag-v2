@@ -217,7 +217,7 @@ try {
   const revision = reader.saved().confirmed[id].revision;
   const beforeMerge = (await phoneChannel.status()).head;
   const parallelTitle = { ...shared, title: 'title from first writer' };
-  const parallelContent = { ...shared, content: 'body from second writer' };
+  const parallelContent = { ...shared, content: 'first paragraph\n\nlast paragraph' };
   const update = (peer, item, previous, baseRevision) => peer.replica.record([
     { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
   ]);
@@ -236,11 +236,11 @@ try {
   const raceRevision = reader.saved().confirmed[id].revision;
   const restartState = reader.saved();
   reader.close();
-  await update(author, { ...raceBase, tags: ['other device'] }, raceBase, raceRevision);
+  await update(author, { ...raceBase, content: 'remote paragraph\n\nlast paragraph', tags: ['other device'] }, raceBase, raceRevision);
   await until(() => third.saved().cursor === beforeRace + 1 && author.replica.pendingCount === 0);
   reader = await device(1, restartState, reader.local);
   const held = reader.holdNextPush();
-  await update(reader, { ...raceBase, content: 'offline edit in the reopened editor' }, raceBase, raceRevision);
+  await update(reader, { ...raceBase, content: 'first paragraph\n\noffline edit in the reopened editor', tags: ['offline'] }, raceBase, raceRevision);
   const send = await held;
   const thirdBase = third.local.get(id);
   await update(third, { ...thirdBase, isPinned: true }, thirdBase, third.saved().confirmed[id].revision);
@@ -251,8 +251,8 @@ try {
   assert.notEqual(retried.opId, obsolete.opId);
   assert.equal(retried.baseRevision, beforeRace + 2);
   const raceResult = reader.local.get(id);
-  assert.deepEqual(raceResult.tags, ['other device']);
-  assert.equal(raceResult.content, 'offline edit in the reopened editor');
+  assert.deepEqual(raceResult.tags, ['offline', 'other device']);
+  assert.equal(raceResult.content, 'remote paragraph\n\noffline edit in the reopened editor');
   assert.equal(raceResult.isPinned, true);
   assert.deepEqual(reader.replica.conflicts, []);
   const requestsBeforeNoop = reader.stats();

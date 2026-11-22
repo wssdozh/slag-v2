@@ -33,6 +33,25 @@ export function sameNote(a: SlagItem | null, b: SlagItem | null): boolean {
   return !a || !b ? a === b : a === b || noteDifferences(a, b).length === 0;
 }
 
+function mergeTags(base: string[], local: string[], head: string[]): string[] | undefined {
+  const original = new Set(base), mine = new Set(local), theirs = new Set(head);
+  if (original.size !== base.length || mine.size !== local.length || theirs.size !== head.length) return;
+  const keepsOrder = (list: string[], members: Set<string>) =>
+    sameProperty(base.filter((tag) => members.has(tag)), list.filter((tag) => original.has(tag)));
+  if (!keepsOrder(local, mine) || !keepsOrder(head, theirs)) return;
+  const additions = [...new Set([...local, ...head])].filter((tag) => !original.has(tag));
+  if (base.some((tag) => !mine.has(tag) && !theirs.has(tag))
+      && additions.some((tag) => !mine.has(tag)) && additions.some((tag) => !theirs.has(tag))) return;
+  const spelling = new Map<string, string>();
+  for (const tag of [...base, ...additions]) {
+    const key = tag.toLowerCase();
+    const previous = spelling.get(key);
+    if (!original.has(tag) && previous !== undefined && previous !== tag) return;
+    spelling.set(key, tag);
+  }
+  return [...base.filter((tag) => mine.has(tag) && theirs.has(tag)), ...additions.sort()];
+}
+
 export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { item: SlagItem; conflicts: string[] } {
   const a = noteProperties(base), b = noteProperties(local), c = noteProperties(head);
   const localChanges = new Set<string>(), remoteChanges = new Set<string>();
@@ -57,6 +76,10 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
       const legacy = (note: SlagItem, fields: ReturnType<typeof noteProperties>) =>
         fields.subtasks === note.subtasks ? note.subtasks : [];
       entries.push([key, choose(key, legacy(base, a), legacy(local, b), legacy(head, c))]);
+    } else if (key === 'tags' && !sameProperty(local.tags, base.tags) && !sameProperty(head.tags, base.tags) && !sameProperty(local.tags, head.tags)) {
+      const tags = mergeTags(base.tags, local.tags, head.tags);
+      if (!tags) conflicts.add(key);
+      entries.push([key, tags ?? head.tags]);
     } else if (key === 'customProps' && [original, mine, theirs].every((v) => v === undefined || (v !== null && typeof v === 'object' && !Array.isArray(v)))) {
       const [x, y, z] = [original, mine, theirs].map((v) => (v ?? {}) as Record<string, unknown>);
       const props = [...keys(x, y, z)].map((name) => [name, choose(key, own(x, name), own(y, name), own(z, name))] as const);
