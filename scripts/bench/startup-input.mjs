@@ -1,31 +1,33 @@
 #!/usr/bin/env node
 // Production startup bench: seeds synthetic articles into localStorage before the built app boots,
 // serves a built dist on loopback, measures cold boot, cold click -> CodeMirror mount, warm re-open.
-//   node scripts/bench/startup-input.mjs [100,1000,5000] [--dist=../app-responsiveness/dist]
 // Ready time is a 5 ms-polled DOM marker, not first paint; no rAF is used.
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { parseArgs } from 'node:util';
 import net from 'node:net';
 import { chromium } from '@playwright/test';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const DIST = resolve(ROOT, (process.argv.find((a) => a.startsWith('--dist=')) ?? '--dist=dist').slice(7));
+const { values, positionals } = parseArgs({
+  allowPositionals: true, options: { dist: { type: 'string', default: 'dist' } },
+});
+const DIST = resolve(ROOT, values.dist);
 const PORT = 18841;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const KEY = 'slag_items_default_vault'; // storage.ts ITEMS_PREFIX + default vault id
 const INBOX = 'Входящие'; // DEFAULT_INBOX_FOLDER
-const SIZES = (process.argv[2] ?? '100,1000,5000').split(',').map(Number).filter((n) => n > 0);
-const VIEWPORTS = [
-  { name: 'desktop', width: 1440, height: 900, interactive: true },
-  { name: 'narrow', width: 390, height: 844, interactive: false },
-];
+const SIZES = (positionals[0] ?? '100,1000,5000').split(',').map(Number);
+if (SIZES.some((n) => !Number.isInteger(n) || n <= 0)) throw new Error('sizes must be positive integers');
+const isLocal = (url) => { try { return new URL(url).origin === ORIGIN; } catch { return /^(data|blob):/.test(url); } };
+const VIEWPORTS = [{ name: 'desktop', width: 1440, height: 900, interactive: true },
+  { name: 'narrow', width: 390, height: 844, interactive: false }];
 const seed = (n) => {
   const base = Date.UTC(2025, 0, 1); // fixed, modern, ascending milliseconds
   return Array.from({ length: n }, (_, i) => ({
     id: `bench-${n}-${i}`, type: 'article', title: `Bench note ${i}`, content: `Synthetic row ${i}.`, folder: INBOX,
-    tags: [], attachments: [], createdAt: base + i * 60_000, updatedAt: base + i * 60_000,
-  }));
+    tags: [], attachments: [], createdAt: base + i * 60_000, updatedAt: base + i * 60_000 }));
 };
 const portFree = () => new Promise((resolvePort) => {
   const socket = net.connect(PORT, '127.0.0.1');
@@ -51,10 +53,8 @@ const startPreview = async () => {
 const collect = (page) => page.evaluate(() => {
   const nav = performance.getEntriesByType('navigation')[0];
   const res = performance.getEntriesByType('resource');
-  return {
-    count: res.length, decoded: res.reduce((s, e) => s + (e.decodedBodySize || 0), 0),
-    nodes: document.getElementsByTagName('*').length, loadEnd: nav ? Math.round(nav.loadEventEnd) : null,
-  };
+  return { count: res.length, decoded: res.reduce((s, e) => s + (e.decodedBodySize || 0), 0),
+    nodes: document.getElementsByTagName('*').length, loadEnd: nav ? Math.round(nav.loadEventEnd) : null };
 });
 const editorReady = (page) => page.waitForFunction(() => {
   const cm = document.querySelector('[data-testid="fullscreen-editor-modal"] .cm-content');
@@ -71,7 +71,7 @@ async function scenario(browser, size, vp) {
   try {
     await context.route('**/*', (route) => {
       const url = route.request().url();
-      if (url.startsWith(ORIGIN) || url.startsWith('data:') || url.startsWith('blob:')) return route.continue();
+      if (isLocal(url)) return route.continue();
       blocked += 1;
       return route.abort();
     });
@@ -94,12 +94,9 @@ async function scenario(browser, size, vp) {
     }, { id: newest, mobile: !vp.interactive }, { polling: 5, timeout: 120_000 });
     const bench = await readyHandle.jsonValue();
     const boot = await collect(page);
-    const row = {
-      scenario: `${vp.name}/${size}`, readyFromNavMs: Math.round(bench.readyAt),
+    const row = { scenario: `${vp.name}/${size}`, readyFromNavMs: Math.round(bench.readyAt),
       readyFromSeedEndMs: Math.round(bench.readyAt - bench.seedEndAt), seedMs: bench.seedMs,
-      resources: boot.count, decodedKB: Math.round(boot.decoded / 1024), nodes: boot.nodes,
-      loadEndMs: boot.loadEnd, blocked: 0, clicks: null,
-    };
+      resources: boot.count, decodedKB: Math.round(boot.decoded / 1024), nodes: boot.nodes, loadEndMs: boot.loadEnd, blocked: 0, clicks: null };
     if (!vp.interactive) { row.blocked = blocked; return row; }
     await page.evaluate((id) => {
       document.addEventListener('click', (event) => {
@@ -129,27 +126,30 @@ async function scenario(browser, size, vp) {
 }
 const rows = [];
 const server = await startPreview();
-let browser;
 try {
-  browser = await chromium.launch({ headless: true });
-  console.log(`startup-input  dist=${DIST}  chromium=${browser.version()}`);
-  for (const vp of VIEWPORTS) {
-    for (const size of SIZES) {
-      try { rows.push(await scenario(browser, size, vp)); }
-      catch (error) { rows.push({ scenario: `${vp.name}/${size}`, error: String(error).split('\n')[0] }); }
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    console.log(`startup-input  dist=${DIST}  chromium=${browser.version()}`);
+    for (const vp of VIEWPORTS) {
+      for (const size of SIZES) {
+        try { rows.push(await scenario(browser, size, vp)); }
+        catch (error) { rows.push({ scenario: `${vp.name}/${size}`, error: String(error).split('\n')[0] }); }
+      }
     }
+    console.log('scenario       nav→rdy seed→rdy seed  res  KB    nodes  load  click→cm  warm   editorKB  blocked');
+    const pad = (v, n) => String(v).padEnd(n);
+    for (const r of rows) {
+      if (r.error) { console.log(`${pad(r.scenario, 15)}ERROR ${r.error}`); continue; }
+      console.log(`${pad(r.scenario, 15)}${pad(r.readyFromNavMs, 7)}${pad(r.readyFromSeedEndMs, 6)}${pad(r.seedMs, 7)}${pad(r.resources, 5)}${pad(r.decodedKB, 5)}${pad(r.nodes, 7)}${pad(r.loadEndMs, 6)}${pad(r.clicks?.firstMs ?? '-', 10)}${pad(r.clicks?.warmMs ?? '-', 7)}${pad(r.clicks?.editorLoadKB ?? '-', 9)}${r.blocked}`);
+    }
+    console.log(JSON.stringify(rows));
+    console.log('notes: ready = performance.now() at a 5ms-polled DOM marker; seed→rdy starts after setItem returns;');
+    console.log('       narrow proves mobile-shell readiness only; decodedKB = cold resource bytes at ready.');
+    process.exitCode = rows.some((r) => r.error) ? 1 : 0;
+  } finally {
+    if (browser) await browser.close();
   }
-  console.log('scenario       nav→rdy seed→rdy seed  res  KB    nodes  load  click→cm  warm   editorKB  blocked');
-  const pad = (v, n) => String(v).padEnd(n);
-  for (const r of rows) {
-    if (r.error) { console.log(`${pad(r.scenario, 15)}ERROR ${r.error}`); continue; }
-    console.log(`${pad(r.scenario, 15)}${pad(r.readyFromNavMs, 7)}${pad(r.readyFromSeedEndMs, 6)}${pad(r.seedMs, 7)}${pad(r.resources, 5)}${pad(r.decodedKB, 5)}${pad(r.nodes, 7)}${pad(r.loadEndMs, 6)}${pad(r.clicks?.firstMs ?? '-', 10)}${pad(r.clicks?.warmMs ?? '-', 7)}${pad(r.clicks?.editorLoadKB ?? '-', 9)}${r.blocked}`);
-  }
-  console.log(JSON.stringify(rows));
-  console.log('notes: ready = performance.now() at a 5ms-polled DOM marker; seed→rdy starts after setItem returns;');
-  console.log('       narrow proves mobile-shell readiness only; decodedKB = cold resource bytes at ready.');
-  process.exitCode = rows.some((r) => r.error) ? 1 : 0;
 } finally {
-  if (browser) await browser.close();
   server.kill();
 }
