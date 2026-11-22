@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **655**, строк: **114482**, зон: **48**.
+Модулей: **655**, строк: **114499**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/ItemCard.tsx` | 763 | 1 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 
-## e2e (playwright) — 142 файлов, 26264 строк
+## e2e (playwright) — 142 файлов, 26274 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -377,7 +377,7 @@
 |---|---:|---:|---|---|
 | `VaultSwitcherMenu.tsx` | 227 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu | Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete. |
 
-## src/components/Views — 13 файлов, 2558 строк
+## src/components/Views — 13 файлов, 2565 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -386,7 +386,7 @@
 | `calendarHelpers.ts` | 67 | 4 | getPriorityBadge, cleanTimeFromTitle, formatDurationBadge | Calendar-only lookups: the priority badge palette, duration label, title clea… |
 | `CalendarMonthView.tsx` | 210 | 1 | CalendarMonthViewProps, CalendarMonthView | The month grid: six weeks of cells, the task pills in each, and drop zones wh… |
 | `CalendarTaskBlock.tsx` | 339 | 1 | AllDayTaskPillProps, AllDayTaskPill, TimedTaskBlockProps, TimedTaskBlock | The two task shapes on the calendar: the all-day pill and the timed block wit… |
-| `CalendarView.tsx` | 566 | 1 | CalendarView | The desktop calendar: month and week grids, drag to reschedule, and the overd… |
+| `CalendarView.tsx` | 573 | 1 | CalendarView | The desktop calendar: month and week grids, drag to reschedule, and the overd… |
 | `kanban/KanbanCard.tsx` | 219 | 1 | KanbanCardProps, KanbanCard | A task card on the board: status glyph, key, due date, tags, and its drag han… |
 | `kanban/KanbanColumn.tsx` | 120 | 1 | KanbanColumnProps, KanbanColumn | One board column: header with counter, its cards, the drop highlight, an add … |
 | `kanban/KanbanMaterialsDock.tsx` | 193 | 1 | KanbanMaterialsDockProps, KanbanMaterialsDock | The materials dock: the folder's notes and articles, searchable, draggable on… |

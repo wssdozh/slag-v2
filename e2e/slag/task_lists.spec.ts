@@ -111,7 +111,17 @@ test('filters active Kanban and Calendar tabs, not the previous tab', async ({ p
   const drawer = page.getByTestId('calendar-drawer-task');
   await expect(drawer.getByText('Согласовать сценарий', { exact: true })).toBeInViewport();
   await expect(week.getByText('Проверить задачи на неделю', { exact: true })).toBeInViewport();
-  await page.screenshot({ path: 'test-results/screenshots/task-quick-filter-calendar.png' });
+  const navigation = page.getByRole('group', { name: 'Навигация по календарю' });
+  const modes = page.getByRole('group', { name: 'Режим календаря' });
+  const deadlines = page.getByRole('button', { name: 'Сроки', exact: true });
+  await page.mouse.move(0, 0);
+  await expect(navigation.getByRole('button', { name: 'Сегодня', exact: true })).toHaveCSS('height', '32px');
+  await expect(modes.getByRole('button', { name: 'Неделя' })).toHaveCSS('height', '32px');
+  await expect(deadlines).toHaveCSS('height', '32px');
+  await expect(deadlines).toHaveAttribute('aria-expanded', 'true');
+  await expect(modes).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(modes.getByRole('button', { name: 'Месяц' })).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await page.screenshot({ path: 'test-results/screenshots/calendar-toolbar.png' });
   await filters.getByRole('button', { name: 'Без даты' }).click();
   await expect(drawer.getByText('Собрать идеи', { exact: true })).toBeVisible();
   await drawer.getByRole('button', { name: 'Завтра' }).click();

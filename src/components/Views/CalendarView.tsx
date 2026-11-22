@@ -359,6 +359,10 @@ export const CalendarView: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskF
     return slotStepMinutes === 15 ? [0, 15, 30, 45] : slotStepMinutes === 30 ? [0, 30] : [0];
   }, [slotStepMinutes]);
   const subSlotHeight = hourHeight / subMinutes.length;
+  const toolbarButton = 'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-xs font-medium transition-colors focus-visible:bg-tint-10';
+  const toolbarState = (active: boolean) => active
+    ? 'bg-tint-10 text-fg-primary'
+    : 'text-fg-secondary hover:bg-tint-6 hover:text-fg-primary';
 
   return (
     <div className="flex-1 flex flex-col h-full bg-canvas text-fg-primary select-none overflow-hidden relative">
@@ -371,27 +375,30 @@ export const CalendarView: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskF
             </h2>
           </div>
 
-          <div className="flex items-center gap-1 bg-tint-3 p-0.5 rounded-md border border-tint-4">
-            <button onClick={handlePrev} className="p-1 rounded hover:bg-tint-6 text-fg-secondary hover:text-white transition-colors cursor-pointer" title="Предыдущий период"><Icon name="nav.prev" size="sm" tone="inherit" /></button>
-            <button onClick={handleToday} className="px-2 py-0.5 rounded text-2xs font-medium text-fg-tertiary hover:text-white hover:bg-tint-6 transition-colors cursor-pointer" title="Перейти к сегодняшнему дню">Сегодня</button>
-            <button onClick={handleNext} className="p-1 rounded hover:bg-tint-6 text-fg-secondary hover:text-white transition-colors cursor-pointer" title="Следующий период"><Icon name="nav.next" size="sm" tone="inherit" /></button>
+          <div role="group" aria-label="Навигация по календарю" className="flex items-center gap-0.5">
+            <button type="button" onClick={handlePrev} className={`${toolbarButton} w-8 ${toolbarState(false)}`} title="Предыдущий период"><Icon name="nav.prev" size="sm" tone="inherit" /></button>
+            <button type="button" onClick={handleToday} className={`${toolbarButton} px-2.5 ${toolbarState(false)}`} title="Перейти к сегодняшнему дню">Сегодня</button>
+            <button type="button" onClick={handleNext} className={`${toolbarButton} w-8 ${toolbarState(false)}`} title="Следующий период"><Icon name="nav.next" size="sm" tone="inherit" /></button>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div aria-label="Режим календаря" className="flex items-center h-8 bg-surface p-0.5 rounded-lg border border-tint-8 shadow-inner shrink-0">
-            <button onClick={() => setViewMode('week')} className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${viewMode === 'week' ? 'bg-tint-10 text-white font-medium shadow-sm border border-tint-8' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4 border border-transparent'}`}>Неделя</button>
-            <button onClick={() => setViewMode('month')} className={`h-7 px-3 rounded-md text-xs font-medium transition-colors cursor-pointer ${viewMode === 'month' ? 'bg-tint-10 text-white font-medium shadow-sm border border-tint-8' : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4 border border-transparent'}`}>Месяц</button>
+          <div role="group" aria-label="Режим календаря" className="flex items-center gap-0.5">
+            <button type="button" aria-pressed={viewMode === 'week'} onClick={() => setViewMode('week')} className={`${toolbarButton} px-2.5 ${toolbarState(viewMode === 'week')}`}>Неделя</button>
+            <button type="button" aria-pressed={viewMode === 'month'} onClick={() => setViewMode('month')} className={`${toolbarButton} px-2.5 ${toolbarState(viewMode === 'month')}`}>Месяц</button>
           </div>
 
           <button
+            type="button"
+            aria-label="Сроки"
+            aria-expanded={isDrawerOpen}
             onClick={() => setIsDrawerOpen(prev => !prev)}
             onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (!isDrawerOpen) setIsDrawerOpen(true); }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors cursor-pointer ${isDrawerOpen ? 'bg-tint-10 border-tint-12 text-white' : 'bg-tint-3 border-tint-5 text-fg-secondary hover:text-fg-soft hover:bg-tint-6'}`}
-            title="Открыть список просроченных и незапланированных задач"
+            className={`${toolbarButton} px-2.5 ${toolbarState(isDrawerOpen)}`}
+            title={isDrawerOpen ? 'Свернуть панель сроков' : 'Открыть список просроченных и незапланированных задач'}
           >
-            {overdueTasks.length > 0 && <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />}
-            <Icon name="time.time" size="sm" />
+            {overdueTasks.length > 0 && <span className="size-1.5 rounded-full bg-danger" aria-hidden="true" />}
+            <Icon name="time.time" size="sm" tone="inherit" />
             <span className="hidden sm:inline">Сроки</span>
             <span className="text-3xs font-mono text-fg-muted">({overdueTasks.length + unscheduledTasks.length})</span>
           </button>
