@@ -451,10 +451,11 @@ export class VaultFiles {
    *
    * Only a path confirmed absent lands in `missing`. Failure to read an existing file is not a deletion.
    */
-  public async reloadNotesFromDisk(relativePaths: string[]): Promise<{ items: SlagItem[]; missing: string[] }> {
+  public async reloadNotesFromDisk(relativePaths: string[], includeInlineTags = true) {
     const notesBase = this.getVaultNotesPath();
     const items: SlagItem[] = [];
     const missing: string[] = [];
+    const markers = new Map<SlagItem, string>();
 
     for (const relativePath of relativePaths) {
       let safe: string;
@@ -469,7 +470,9 @@ export class VaultFiles {
       const filename = slash >= 0 ? safe.slice(slash + 1) : safe;
       try {
         const content = await readTextFile(`${notesBase}/${safe}`, { baseDir: BaseDirectory.AppData });
-        const parsed = parseMarkdownToItem(content, filename.replace(/\.md$/, ''), folder);
+        let marker: string | undefined;
+        const parsed = parseMarkdownToItem(content, filename.replace(/\.md$/, ''), folder, (value) => { marker = value; }, includeInlineTags);
+        if (marker) markers.set(parsed, marker);
         parsed.filename = filename;
         items.push(parsed);
       } catch (error) {
@@ -478,7 +481,7 @@ export class VaultFiles {
       }
     }
 
-    return { items, missing };
+    return { items, missing, markers };
   }
 
   /**
@@ -607,7 +610,7 @@ export class VaultFiles {
               const content = await readTextFile(subPath, { baseDir: BaseDirectory.AppData });
               const fallbackId = entry.name.replace(/\.md$/, '');
               let marker: string | undefined;
-              const parsed = parseMarkdownToItem(content, markers ? '' : fallbackId, folderPart, (value) => { marker = value; });
+              const parsed = parseMarkdownToItem(content, markers ? '' : fallbackId, folderPart, (value) => { marker = value; }, !markers);
               if (markers && marker) markers.set(parsed, marker);
               parsed.filename = entry.name;
               return [entry.name, parsed] as const;

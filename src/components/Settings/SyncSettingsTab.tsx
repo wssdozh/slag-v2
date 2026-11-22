@@ -15,6 +15,13 @@ const propertyLabels: Record<string, string> = {
   title: 'Заголовок', type: 'Тип', folder: 'Папка', tags: 'Теги', attachments: 'Вложения', status: 'Статус',
   priority: 'Приоритет', dueDate: 'Срок', reminder: 'Напоминание', duration: 'Длительность', recurrence: 'Повтор',
   subtasks: 'Подзадачи', isPinned: 'Закрепление', isArchived: 'Архив', linkedItemIds: 'Связанные записи',
+  content: 'Текст', customProps: 'Свойства Markdown', kanbanColumn: 'Колонка', summary: 'Краткое описание',
+};
+
+const conflictReasons: Record<string, string> = {
+  base: 'Не удалось подтвердить исходную версию правки',
+  lifecycle: 'Не удалось подтвердить непрерывную историю заметки',
+  predecessor: 'Предыдущая локальная правка не принята',
 };
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
@@ -157,7 +164,7 @@ export const SyncSettingsTab: React.FC = () => {
         </SettingsGroup>
       )}
 
-      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ item, currentItem, currentRevision, folderGroup }) => {
+      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ item, currentItem, currentRevision, folderGroup, fields }) => {
         const before = isNoteItem(currentItem) ? currentItem : undefined;
         const after = isNoteItem(item) ? item : undefined;
         const show = (value: unknown) => typeof value === 'string' ? value || 'Пусто' : value === undefined ? 'Не задано' : JSON.stringify(value);
@@ -170,11 +177,14 @@ export const SyncSettingsTab: React.FC = () => {
           ? value.map((folder) => JSON.stringify(folder)).join('\n')
           : value && 'shared' in value ? JSON.stringify(value.shared, null, 2) : '';
         const sample = item ?? currentItem;
+        const mismatches = (fields ?? []).filter((key) => Object.hasOwn(propertyLabels, key)).map((key) => propertyLabels[key]);
+        const issue = (fields ?? []).find((key) => Object.hasOwn(conflictReasons, key));
+        const reason = issue ? conflictReasons[issue] : mismatches.length ? `Не удалось объединить: ${mismatches.join(', ')}` : undefined;
         return { title: (after ?? before)?.title || (Array.isArray(sample) ? 'Дерево папок' : sample && 'shared' in sample ? 'Общие данные' : 'Запись'), comparison: {
           before: before?.content ?? snapshot(currentItem), after: draft ?? after?.content ?? snapshot(item), properties,
           onEdit: after && !folderGroup && config.localSyncMode !== 'receive-only' && !reviewed[0]?.folderGroup && !resolving && !decision
             ? (value: string) => setDraft(value === after.content ? undefined : value) : undefined,
-          message: !currentItem ? currentRevision ? 'Запись удалена на релее' : 'Версия релея недоступна' : !item ? 'Локальная операция: удалить запись' : undefined,
+          message: !currentItem ? currentRevision ? 'Запись удалена на релее' : 'Версия релея недоступна' : !item ? 'Локальная операция: удалить запись' : reason,
         } };
       })} actions={(
         <div className="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-2 text-xs">

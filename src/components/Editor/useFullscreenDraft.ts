@@ -10,7 +10,7 @@ import { consumeComposerDraft, restoreComposerDraft } from './fullscreen/compose
 export interface UseFullscreenDraftOptions {
   item: SlagItem;
   saveItem: (item: SlagItem) => SlagItem;
-  updateItem: (item: SlagItem) => void;
+  updateItem: (item: SlagItem, editedFrom?: SlagItem | null) => { item: SlagItem; durable?: Promise<void> };
   onClose: () => void;
   /** The exit animation lands on this item's card, so the surface folds into what was saved. */
   onSaved?: (saved: SlagItem) => void;
@@ -108,6 +108,9 @@ export function useFullscreenDraft({
   const lastObservedDraft = useRef(draft);
   const resetBaseline = useRef(false);
   const itemRef = useRef(item);
+  // A restored shared draft is not evidence of the revision it was edited against.
+  const editedFrom = useRef<SlagItem | null>(initialDraft ? null : item);
+  const savingNote = useRef<Promise<SlagItem> | null>(null);
   useLayoutEffect(() => {
     itemRef.current = item;
     latestDraft.current = draft;
@@ -120,45 +123,53 @@ export function useFullscreenDraft({
   // A saved draft must not come back as a composer draft when the editor unmounts.
   const didSaveRef = useRef(false);
 
-  // Function to persist changes for existing item to disk and sync
-  const flushAutosave = useCallback(() => {
-    if (adopting.current || !pendingNoteEdit.current || item.id.startsWith('draft_')) return;
-    if (autosaveTimerRef.current) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-    const parsedSubtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
-    const updated: SlagItem = {
-      ...item,
-      title: title.trim() || 'Без названия',
-      content: content.trim(),
-      type,
-      folder,
-      tags,
-      attachments,
-      status: type === 'task' ? status : undefined,
-      priority: type === 'task' ? priority : undefined,
-      dueDate: type === 'task' ? dueDate : undefined,
-      reminder: type === 'task' ? reminder : undefined,
-      duration: type === 'task' ? duration : undefined,
-      recurrence: type === 'task' ? recurrence : undefined,
-      subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
-      readingTimeMinutes: type === 'article' ? readTime : undefined,
-      updatedAt: Date.now(),
-    };
+  const buildItem = useCallback((base: SlagItem, id: string): SlagItem => {
+    const subtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
+    return { ...base, id, title: title.trim() || 'Без названия', content: content.trim(), type, folder, tags, attachments,
+      status: type === 'task' ? status : undefined, priority: type === 'task' ? priority : undefined,
+      dueDate: type === 'task' ? dueDate : undefined, reminder: type === 'task' ? reminder : undefined,
+      duration: type === 'task' ? duration : undefined, recurrence: type === 'task' ? recurrence : undefined,
+      subtasks: subtasks?.length ? subtasks : undefined, readingTimeMinutes: type === 'article' ? readTime : undefined,
+      updatedAt: Date.now() };
+  }, [title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime]);
+
+  const flushAutosave = useCallback((): Promise<SlagItem> | null => {
+    if (adopting.current || item.id.startsWith('draft_')) return null;
+    const snapshot = latestDraft.current;
+    if (!pendingNoteEdit.current && equal(snapshot, lastObservedDraft.current)) return savingNote.current;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = null;
+    const base = editedFrom.current;
+    const saved = updateItem(buildItem(base ?? itemRef.current, item.id), base);
+    const { durable, item: optimistic } = saved;
     pendingNoteEdit.current = false;
-    storage.saveItem(updated);
-    storage.clearFullscreenDraft(item.id);
-    setSaveStatus('saved');
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime]);
+    editedFrom.current = optimistic;
+    const save = Promise.resolve(durable).then(async () => {
+      if (savingNote.current === save && !adopting.current && equal(snapshot, latestDraft.current)) {
+        await storage.clearFullscreenDraft(item.id);
+        setSaveStatus('saved');
+      }
+      return optimistic;
+    });
+    savingNote.current = save;
+    void save.catch(() => {
+      if (savingNote.current === save) {
+        editedFrom.current = base;
+        pendingNoteEdit.current = true;
+        setSaveStatus('idle');
+        addToast?.('Не удалось записать правку; черновик оставлен', 'error');
+      }
+    }).finally(() => { if (savingNote.current === save) savingNote.current = null; });
+    return save;
+  }, [item.id, buildItem, updateItem, addToast]);
 
   // Auto-save in-flight edits to crash-proof draft storage & live autosave for existing notes
   useEffect(() => {
     if (adopting.current) return;
     if (!equal(draft, lastObservedDraft.current)) {
       lastObservedDraft.current = draft;
+      pendingNoteEdit.current = true;
       if (!equal(draft, savedDraft.current)) {
-        pendingNoteEdit.current = true;
         void storage.saveFullscreenDraft(item.id, { ...draft, updatedAt: Date.now() }).then(() => {
           if (!adopting.current) savedDraft.current = draft;
         }, () => addToast?.('Не удалось сохранить черновик редактора', 'error'));
@@ -233,6 +244,7 @@ export function useFullscreenDraft({
       resetBaseline.current = true;
       const base = itemRef.current;
       const next = incoming ?? base;
+      editedFrom.current = incoming ? null : base;
       setTitle(next.title || '');
       setContent(!incoming && base.type === 'task' ? migrateLegacySubtasksToContent(base.content || '', base.subtasks) : next.content || '');
       setType(next.type);
@@ -249,6 +261,28 @@ export function useFullscreenDraft({
     };
     retryAdoption.current = adopt;
     const unsubscribe = storage.subscribeChanges((event) => {
+      if (event.kind === 'item' && event.origin === 'remote' && event.id === item.id && event.payload) {
+        // Do not adopt a confirmed note over newer keystrokes or an unrelated shared draft.
+        if (adopting.current || adoptedCanonical.current || pendingNoteEdit.current
+            || !equal(latestDraft.current, lastObservedDraft.current) || !editedFrom.current) return;
+        const accepted = event.payload as SlagItem;
+        editedFrom.current = accepted;
+        itemRef.current = accepted;
+        resetBaseline.current = true;
+        setTitle(accepted.title);
+        setContent(accepted.type === 'task' ? migrateLegacySubtasksToContent(accepted.content, accepted.subtasks) : accepted.content);
+        setType(accepted.type);
+        setFolder(accepted.folder);
+        setTags(accepted.tags);
+        setAttachments(accepted.attachments);
+        setPriority(accepted.priority ?? 'none');
+        setStatus(accepted.status ?? 'todo');
+        setDueDate(accepted.dueDate ?? '');
+        setReminder(accepted.reminder);
+        setDuration(accepted.duration);
+        setRecurrence(accepted.recurrence);
+        return;
+      }
       if (event.kind !== 'draft' || event.origin !== 'remote' || !event.registry || event.id !== `fullscreen:${item.id}`) return;
       incoming = event.action === 'delete' ? null : event.payload as FullscreenDraft;
       void adopt();
@@ -326,45 +360,30 @@ export function useFullscreenDraft({
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
-    const isNewDraft = item.id.startsWith('draft_');
-    const parsedSubtasks = type === 'task' ? parseSubtasksFromContent(content) : undefined;
-    const updated: SlagItem = {
-      ...item,
-      id: isNewDraft ? 'item_' + Date.now() : item.id,
-      title: title.trim() || 'Без названия',
-      content: content.trim(),
-      type,
-      folder,
-      tags,
-      attachments,
-      status: type === 'task' ? status : undefined,
-      priority: type === 'task' ? priority : undefined,
-      dueDate: type === 'task' ? dueDate : undefined,
-      reminder: type === 'task' ? reminder : undefined,
-      duration: type === 'task' ? duration : undefined,
-      recurrence: type === 'task' ? recurrence : undefined,
-      subtasks: parsedSubtasks && parsedSubtasks.length > 0 ? parsedSubtasks : undefined,
-      readingTimeMinutes: type === 'article' ? readTime : undefined,
-      updatedAt: Date.now(),
-    };
-
-    if (isNewDraft) {
-      const saved = saveItem(updated);
+    if (item.id.startsWith('draft_')) {
+      const saved = saveItem(buildItem(item, 'item_' + Date.now()));
       didSaveRef.current = true;
-      storage.clearFullscreenDraft(item.id);
+      void storage.clearFullscreenDraft(item.id);
       consumeComposerDraft(item);
       onSaved?.(saved);
       addToast?.('Запись создана и сохранена', 'success');
-    } else {
-      storage.clearFullscreenDraft(item.id);
-      updateItem(updated);
-      didSaveRef.current = true;
-      onSaved?.(updated);
-      addToast?.('Изменения сохранены', 'success');
+      onClose();
+      return;
     }
-    setSaveStatus('saved');
-    onClose();
-  }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime, saveItem, updateItem, onSaved, addToast, onClose]);
+    // A reopened draft has no trustworthy revision. Explicit Save must still submit it;
+    // the replica keeps it as an alternative rather than guessing what it was based on.
+    if (initialDraft && !editedFrom.current && !adoptedCanonical.current) pendingNoteEdit.current = true;
+    const snapshot = latestDraft.current;
+    const finish = (saved: SlagItem) => {
+      if (pendingNoteEdit.current || !equal(latestDraft.current, snapshot)) return;
+      didSaveRef.current = true;
+      onSaved?.(saved);
+      onClose();
+    };
+    const save = flushAutosave();
+    if (save) void save.then(finish, () => { /* Autosave reports the failure and retains the draft. */ });
+    else finish(editedFrom.current ?? item);
+  }, [item, initialDraft, buildItem, saveItem, flushAutosave, onSaved, addToast, onClose]);
 
   const handleClose = useCallback(() => {
     if (adopting.current) {

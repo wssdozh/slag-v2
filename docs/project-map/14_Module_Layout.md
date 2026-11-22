@@ -26,6 +26,7 @@ src/
     Feed/composer/    стрип вложений, тип, ИИ, запись, отправка, резолвер полей
     Feed/list/        окна хронологии, секции сегодняшних и просроченных задач
     Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
+    Workspace/       Dockview: раскладка, адресация быстрого фильтра активной вкладки
     Settings/devices/  список, карточка, права, действия, pairing
     Settings/notifications/ контент, тихие часы, система; канал и ассистент в telegram — во вкладке «Интеграции»
     Mobile/calendar/   строка задачи, шапка, стрип недели, группы дней, трёхдневка, лист месяца
@@ -43,7 +44,7 @@ src/
     logger/         logger (уровни, скоупы, буфер, ретеншн) и logRedaction (что не попадёт в лог)
     platform/       platform, windowControls, folderOpener — всё, что говорит с ОС и Tauri
     text/           chatMarkdown, diffUtils, formatBytes
-    tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока)
+    tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока), taskQuickFilter (быстрые фильтры)
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
       notes/        wire, channel, session, replica, journal, merge, persistence, conflicts, bootstrap

@@ -72,7 +72,8 @@ docs/project-map/  база знаний проекта, 15 документов
 | задача | начинать с |
 |---|---|
 | синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
-| эталон заметок: операции, квитанции, слияние и восстановление | `src/lib/sync/notes/`: `session.ts` — режим комнаты, `replica.ts` — доставка, `journal.ts` — намерения, `merge.ts` — нормализация и сравнение, `bootstrap.ts` — подготовка миграции |
+| эталон заметок: операции, квитанции, слияние и восстановление | `src/lib/sync/notes/`: `session.ts` — режим комнаты, `replica.ts` — доставка, `journal.ts` — намерения, `reconcile.ts` — решение CAS и проверка непрерывности, `merge.ts` и `mergeValidation.ts` — слияние и проверка результата, `bootstrap.ts` — миграция |
+| эхо записи на диск и семантика Markdown | `src/lib/storage/noteDiskProjection.ts`, `src/lib/vault/noteSemantics.ts`, `src/lib/vault/markdownSerializer.ts`; построчное слияние — `src/lib/text/mergeMarkdown.ts` |
 | загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
 | сверка корней между устройствами, манифест комнаты | `src/lib/sync/manifest/`: `sync.ts` — диагностическая сверка legacy и чтение сохранённых бандлов, `channel.ts` — формат и сравнение, `peers.ts` — чтение чужих корней, `publish.ts` — свой POST, `schedule.ts` — тайминги. Хэши заметок — `src/lib/vault/integrity/manifest.ts` |
 | конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
@@ -91,6 +92,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
+| быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/context/hooks/useLocalDay.ts` — локальная дата |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
 | память ассистента: факты, типы, темы, скоринг | `src/lib/memory.ts`, `src/lib/ai/prompt.ts`, `src/lib/sync/applyBundle.ts` |

@@ -87,7 +87,7 @@ import {
   type VaultImportPayload,
 } from './vaultTransfer';
 import { notesRemovedByImport } from './noteRemoval';
-import type { AcceptedNote, FolderGroupListener, FolderTreeListener, NoteMutation } from './noteRegistry';
+import type { AcceptedNote, FolderGroupListener, FolderTreeListener, NoteMutation, NoteOrigin } from './noteRegistry';
 import type { VaultPort } from './port';
 import { parseSharedRegistryId, readSharedBody, sharedRegistryId } from '../sync/notes/sharedBody';
 import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
@@ -95,6 +95,7 @@ import type { SharedBody, SharedMutation } from '../sync/notes/sharedBody';
 import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } from './sharedProjection';
 import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
 import { equal, sameNote } from '../sync/notes/merge';
+import { editFromDisk, noteDiskProjection } from './noteDiskProjection';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -112,7 +113,7 @@ export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 export type StorageOrigin = 'local' | 'remote' | 'external';
 
 export type StorageChangeEvent =
-  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; origin?: StorageOrigin }
+  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; noteOrigin?: NoteOrigin | null; intentId?: string; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: StorageOrigin }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: StorageOrigin }
@@ -238,8 +239,35 @@ export class StorageService {
    * attachment stay in `.attachments/` and IndexedDB; the index keeps their metadata, as it did
    * when it had a quota to respect.
    */
+  private noteOrigins = new WeakMap<SlagItem, NoteOrigin>();
+  private readonly diskProjections = new Map<string, { original: SlagItem; parsed?: SlagItem; marker?: string }>();
+  private projectionVault?: VaultMeta;
+
+  private noteProjectionCache(vault: VaultMeta) {
+    if (this.projectionVault !== vault) {
+      this.diskProjections.clear();
+      this.projectionVault = vault;
+    }
+    return this.diskProjections;
+  }
+
+  private isCurrentNoteWrite(vault: VaultMeta, item: SlagItem): boolean {
+    const origin = this.noteOrigins.get(item);
+    if (!origin || vault !== this.currentVault) return false;
+    const current = this.readItemsIndex(this.getItemsKey()).find(({ id }) => id === item.id);
+    return !!current && this.noteOrigins.get(current) === origin;
+  }
+
+  private stripIndexBytes(items: SlagItem[]): SlagItem[] {
+    return stripAttachmentData(items).map((item, index) => {
+      const origin = this.noteOrigins.get(items[index]);
+      if (origin) this.noteOrigins.set(item, origin);
+      return item;
+    });
+  }
+
   public cacheItems(key: string, items: SlagItem[]): void {
-    const stored = stripAttachmentData(items);
+    const stored = this.stripIndexBytes(items);
     this.itemsIndex.set(key, stored);
     if (isTauri()) return;
     // Browser build without a disk: localStorage is its storage, not a cache. Native keeps the
@@ -262,7 +290,13 @@ export class StorageService {
 
   public subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void {
     this.noteIntentListeners.add(listener);
-    return () => this.noteIntentListeners.delete(listener);
+    return () => {
+      this.noteIntentListeners.delete(listener);
+      if (!this.noteIntentListeners.size) {
+        this.noteOrigins = new WeakMap();
+        this.diskProjections.clear();
+      }
+    };
   }
 
   public persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined {
@@ -408,6 +442,21 @@ export class StorageService {
     return copies;
   }
 
+  public rememberNoteProjection(note: AcceptedNote, disk: SlagItem): void {
+    if (!note.item || !note.revision) return;
+    const expected = noteDiskProjection(note.item);
+    if (!sameNote(disk, expected)) return; // The body marker alone cannot prove YAML provenance.
+    const origin: NoteOrigin = { revision: note.revision };
+    const cached = this.readItemsIndex(this.getItemsKey()).find(({ id }) => id === note.id);
+    const original = { ...note.item, filename: disk.filename };
+    this.noteOrigins.set(original, origin);
+    this.noteProjectionCache(this.currentVault).set(note.id, { original, parsed: disk, marker: note.registryBodyMarker });
+    // The disk projection can prove external edits without blessing a different visible draft.
+    if (cached && !this.noteOrigins.has(cached) && sameNote(cached, original)) {
+      this.noteOrigins.set(cached, origin);
+    }
+  }
+
   public async hasIncompleteFolderProjection(): Promise<boolean> {
     if (!isTauri()) return false;
     return Object.keys(await this.files.readStateSection('pendingFolderProjection', this.currentVault, true)).length > 0;
@@ -422,7 +471,7 @@ export class StorageService {
     }, vault, true, true);
   }
 
-  private async writeAcceptedNote({ id, item, discardLiveCopy, registryBodyMarker }: AcceptedNote, previous: SlagItem | undefined,
+  private async writeAcceptedNote({ id, item, discardLiveCopy, registryBodyMarker, revision }: AcceptedNote, previous: SlagItem | undefined,
     trashed: SlagItem | undefined, vault: VaultMeta): Promise<SlagItem | null> {
     const applied = item ? { ...item, filename: getSafeNoteFilename(item.title, id) } : null;
     if (applied) {
@@ -430,9 +479,12 @@ export class StorageService {
       safeVaultRelativePath(id);
       safeVaultRelativePath(applied.folder || DEFAULT_INBOX_FOLDER);
       await this.files.flushItemToDisk(applied, previous?.folder, previous?.filename, vault, true, undefined, registryBodyMarker);
+      if (revision) this.noteOrigins.set(applied, { revision });
+      this.noteProjectionCache(vault).set(id, { original: applied, marker: registryBodyMarker });
       if (trashed) await this.files.removeTrashCopy(trashed, trashed.filename, vault);
     } else if (previous) {
       await this.files.removeItemFromDisk(previous, vault, true, discardLiveCopy);
+      this.noteProjectionCache(vault).delete(id);
     }
     return applied;
   }
@@ -495,7 +547,7 @@ export class StorageService {
     if (events.length) {
       const key = this.getItemsKey();
       const upserts = events.flatMap((event) => event.kind === 'item' && event.payload ? [event.payload] : []);
-      const stored = stripAttachmentData([...upserts, ...items.values()]);
+      const stored = this.stripIndexBytes([...upserts, ...items.values()]);
       if (!isTauri()) localStorage.setItem(key, JSON.stringify(stored));
       this.itemsIndex.set(key, stored);
     }
@@ -799,7 +851,13 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   public getItems(folder?: string): SlagItem[] {
     // Copies, not the cached objects: callers trim, move and re-save items in place
     // (`moveItem` mutates `folder`), and that must not reach the shared parse.
-    const list = this.attachments.hydrate(this.readItemsIndex(this.getItemsKey())).map(item => ({ ...item }));
+    const stored = this.readItemsIndex(this.getItemsKey());
+    const list = this.attachments.hydrate(stored).map((item, index) => {
+      const copy = { ...item };
+      const origin = this.noteOrigins.get(stored[index]);
+      if (origin) this.noteOrigins.set(copy, origin);
+      return copy;
+    });
     if (folder) {
       return list.filter(i => i.folder === folder);
     }
@@ -811,9 +869,18 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local', restoring = false): SlagItem {
+    return this.saveNoteEdit(item, { origin, restoring }).item;
+  }
+
+  public saveNoteEdit(item: SlagItem, options: { origin?: 'local' | 'remote'; restoring?: boolean; editedFrom?: SlagItem | null } = {}): { item: SlagItem; durable?: Promise<void> } {
+    const { origin = 'local', restoring = false, editedFrom } = options;
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
+    const previous = editedFrom === undefined ? oldItem : editedFrom ?? undefined;
+    if (this.noteIntentListeners.size && origin === 'local' && !restoring && oldItem && previous && sameNote(previous, item)) {
+      return { item: oldItem };
+    }
     const filename = getSafeNoteFilename(item.title, item.id);
     const updatedItem: SlagItem = {
       ...item,
@@ -829,9 +896,17 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
+    const base = previous && this.noteOrigins.get(previous);
+    const realUpdate = origin === 'local' && !restoring && !!(oldItem || editedFrom !== undefined);
+    const intentId = this.noteIntentListeners.size && origin === 'local' ? crypto.randomUUID() : undefined;
     const before = origin === 'local' ? this.persistNoteIntents([{
-      id: updatedItem.id, kind: restoring ? 'restore' : oldItem ? 'update' : 'create', item: updatedItem, previous: oldItem,
+      id: updatedItem.id, kind: restoring ? 'restore' : realUpdate ? 'update' : 'create', item: updatedItem, previous, intentId,
+      origin: base ?? (editedFrom !== undefined && editedFrom !== oldItem ? null : undefined),
     }]) : undefined;
+    if (intentId) {
+      if (base && previous && sameNote(previous, updatedItem)) this.noteOrigins.set(updatedItem, base);
+      else this.noteOrigins.set(updatedItem, { intentId });
+    }
     const vault = this.currentVault;
     this.attachments.persistNew([updatedItem]);
     this.cacheItems(this.getItemsKey(), items);
@@ -841,8 +916,13 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       // A local edit is the only one that can be stale: a remote bundle is applied state, and a
       // note without a file behind it has nothing to lose.
       if (before) {
-        void this.queueNoteFileWrite(() => restoring ? this.files.restoreItemOnDisk(updatedItem, vault, true)
-          : this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true), before);
+        void this.queueNoteFileWrite(async () => {
+          // A watcher or canonical projection may have won while the intent was being journaled.
+          if (!this.isCurrentNoteWrite(vault, updatedItem)) return;
+          if (restoring) await this.files.restoreItemOnDisk(updatedItem, vault, true);
+          else await this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true);
+          this.noteProjectionCache(vault).set(item.id, { original: updatedItem });
+        }, before);
       } else if (origin === 'local' && oldItem && oldFilename) {
         void this.flushGuarded(updatedItem, oldItem, oldFilename);
       } else {
@@ -852,7 +932,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     }
 
     this.emitChange({ kind: 'item', action: 'upsert', id: updatedItem.id, payload: updatedItem, origin });
-    return updatedItem;
+    return { item: updatedItem, durable: before };
   }
 
   /**
@@ -897,9 +977,13 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         updated.unshift(item);
       }
     }
-    const before = origin === 'local' ? this.persistNoteIntents([...saveMap.values()].map((item) => ({
-      id: item.id, kind: oldItemsMap.has(item.id) ? 'update' : 'create', item, previous: oldItemsMap.get(item.id),
-    }))) : undefined;
+    const before = origin === 'local' ? this.persistNoteIntents([...saveMap.values()].map((item) => {
+      const previous = oldItemsMap.get(item.id);
+      const base = previous && this.noteOrigins.get(previous);
+      const intentId = this.noteIntentListeners.size ? crypto.randomUUID() : undefined;
+      if (intentId) this.noteOrigins.set(item, previous && base && sameNote(previous, item) ? base : { intentId });
+      return { id: item.id, kind: previous ? 'update' : 'create', item, previous, intentId, origin: base };
+    })) : undefined;
     const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);
     this.cacheItems(this.getItemsKey(), updated);
@@ -907,9 +991,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (isTauri()) {
       void this.queueNoteFileWrite(async () => {
         for (const it of saveMap.values()) {
+          if (before && !this.isCurrentNoteWrite(vault, it)) continue;
           const old = oldItemsMap.get(it.id);
           const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
           await this.files.flushItemToDisk(it, old?.folder, oldFilename, vault, !!before);
+          if (before) this.noteProjectionCache(vault).set(it.id, { original: it });
         }
       }, before);
     }
@@ -939,7 +1025,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private async readDiskChanges(change: VaultDiskChange, vault: VaultMeta): Promise<{ updated: number; removed: number }> {
 
-    const { items: parsed, missing } = await this.files.reloadNotesFromDisk(change.changed);
+    const tracked = this.noteIntentListeners.size > 0;
+    const projections = this.noteProjectionCache(vault);
+    const { items: parsed, missing, markers } = await this.files.reloadNotesFromDisk(change.changed, !tracked);
     if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
     // On failure the watcher may see files already written by a group whose cursor did not move.
     // Leave those IDs alone until registry replay finishes the projection.
@@ -950,12 +1038,26 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     const byId = new Map(current.map(item => [item.id, item]));
     const events: StorageChangeEvent[] = [];
 
-    for (const item of parsed) {
-      if (Object.hasOwn(fenced, item.id)) continue;
-      const cached = byId.get(item.id);
-      if (cached && sameNote(cached, item)) continue;
+    for (const parsedItem of parsed) {
+      if (Object.hasOwn(fenced, parsedItem.id)) continue;
+      const cached = byId.get(parsedItem.id);
+      const projected = tracked ? projections.get(parsedItem.id) : undefined;
+      const marker = markers.get(parsedItem);
+      const binding = projected && projected.marker === marker && projected.original.filename === parsedItem.filename
+        && projected.original.folder === parsedItem.folder;
+      const previous = binding ? projected.original : cached;
+      if (binding) projected.parsed ??= noteDiskProjection(projected.original);
+      const item = previous && tracked ? editFromDisk(previous, parsedItem, binding ? projected.parsed : undefined) : parsedItem;
+      if (!item || (cached && sameNote(cached, item))) continue;
+      const noteOrigin = binding ? this.noteOrigins.get(projected.original) : undefined;
+      const intentId = tracked ? crypto.randomUUID() : undefined;
+      if (intentId) {
+        this.noteOrigins.set(item, { intentId });
+        projections.set(item.id, { original: item, parsed: parsedItem, marker });
+      }
       byId.set(item.id, item);
-      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, previous: cached, origin: 'external' });
+      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, previous,
+        noteOrigin: noteOrigin ?? (tracked && previous ? null : undefined), intentId, origin: 'external' });
     }
 
     let removed = 0;

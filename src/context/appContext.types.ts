@@ -57,6 +57,14 @@ export interface ContextMenuTarget {
   folder?: FolderMeta;
 }
 
+export interface FolderViewTarget {
+  anchor: HTMLButtonElement;
+  mode?: FeedViewMode;
+  changeLocalMode?: (mode: FeedViewMode) => void;
+}
+
+export type FolderViewSection = 'main' | 'sort' | 'filters';
+
 export interface AppContextType {
   vault: VaultMeta;
   vaults: VaultMeta[];
@@ -69,7 +77,6 @@ export interface AppContextType {
   isKanbanMaterialsOpen: boolean;
   setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   items: SlagItem[];
-  filteredItems: SlagItem[];
   today: string;
   selectedItem: SlagItem | null;
   activeTypeFilter: SlagItemType | 'all';
@@ -153,8 +160,10 @@ export interface AppContextType {
 
   // Folder View & Filter Settings (Todoist / Linear style)
   isFolderViewModalOpen: boolean;
-  setIsFolderViewModalOpen: (open: boolean) => void;
-  openFolderViewModal: () => void;
+  folderViewTarget: FolderViewTarget | null;
+  folderViewSection: FolderViewSection;
+  setFolderViewSection: (section: FolderViewSection) => void;
+  openFolderViewModal: (target: FolderViewTarget) => void;
   closeFolderViewModal: () => void;
   sortBy: SortField;
   setSortBy: (sort: SortField) => void;
@@ -168,7 +177,7 @@ export interface AppContextType {
   
   // Storage operations
   saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
-  updateItem: (item: SlagItem) => void;
+  updateItem: (item: SlagItem, editedFrom?: SlagItem | null) => { item: SlagItem; durable?: Promise<void> };
   openNewNote: (folder: string) => void;
   deleteItem: (id: string) => void;
   restoreFromTrash: (id: string) => void;

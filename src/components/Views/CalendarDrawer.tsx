@@ -11,6 +11,8 @@ export interface CalendarDrawerProps {
   setIsDrawerOpen: (open: boolean) => void;
   overdueTasks: SlagItem[];
   unscheduledTasks: SlagItem[];
+  isCompletedFilter?: boolean;
+  onOpenTransitionEnd?: () => void;
   isDragging: boolean;
   activeZoneData: Record<string, string> | null;
   draggingTaskId: string | null;
@@ -29,6 +31,8 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   setIsDrawerOpen,
   overdueTasks,
   unscheduledTasks,
+  isCompletedFilter = false,
+  onOpenTransitionEnd,
   isDragging,
   activeZoneData,
   draggingTaskId,
@@ -39,6 +43,8 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
   updateItem,
   addToast,
 }) => {
+  const isOverdueTab = drawerTab === 'overdue';
+  const tasks = isOverdueTab ? overdueTasks : unscheduledTasks;
   const handleQuickSchedule = (task: SlagItem, newDate: string) => {
     updateItem({
       ...task,
@@ -49,6 +55,10 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
 
   return (
     <div
+      inert={!isDrawerOpen}
+      onTransitionEnd={event => {
+        if (isDrawerOpen && event.target === event.currentTarget && event.propertyName === 'width') onOpenTransitionEnd?.();
+      }}
       className={`border-l border-tint-6 bg-panel/95 flex flex-col shrink-0 z-20 overflow-hidden transition-[width] duration-200 ease-out ${
         isDrawerOpen ? 'w-72 sm:w-80' : 'w-0 border-l-0'
       }`}
@@ -111,154 +121,47 @@ export const CalendarDrawer: React.FC<CalendarDrawerProps> = ({
             </div>
           )}
 
-          {drawerTab === 'overdue' ? (
-            overdueTasks.length === 0 ? (
-              <div className="py-12 text-center text-xs text-fg-dim font-mono">
-                Нет просроченных тасок
-              </div>
-            ) : (
-              overdueTasks.map(task => (
-                <div
-                  key={task.id}
-                  data-draggable="true"
-                  onPointerDown={e =>
-                    handlePointerDown(e, {
-                      type: 'task',
-                      id: task.id,
-                      title: task.title || 'Таска',
-                    })
-                  }
-                  onClick={() => {
+          {tasks.length === 0 && (
+            <p className="py-12 text-center font-mono text-xs text-fg-muted">
+              {isOverdueTab ? 'Нет просроченных тасок' : isCompletedFilter ? 'Нет выполненных задач без даты' : 'Все задачи имеют срок выполнения'}
+            </p>
+          )}
+          {tasks.map(task => {
+            const done = task.status === 'done';
+            const title = task.title || 'Безымянная задача';
+            return (
+              <div key={task.id} data-draggable="true" data-testid="calendar-drawer-task"
+                onPointerDown={e => handlePointerDown(e, { type: 'task', id: task.id, title })}
+                className={`space-y-2 rounded-lg border bg-surface p-2.5 text-left shadow-sm transition-colors hover:bg-surface-elevated cursor-grab active:cursor-grabbing touch-none ${isOverdueTab ? 'border-danger/20 hover:border-danger/40' : 'border-tint-6 hover:border-tint-12'} ${isDragging && draggingTaskId === task.id ? 'opacity-40 scale-[0.98]' : ''}`}>
+                <div className="flex items-start gap-2">
+                  <button type="button" role="checkbox" aria-checked={done} aria-label={`Выполнена: ${title}`}
+                    onPointerDown={e => e.stopPropagation()} onClick={() => toggleTaskComplete(task.id)}
+                    className={`group/check mt-0.5 flex size-3.5 shrink-0 items-center justify-center rounded-full border hover:border-accent focus-visible:border-accent ${done ? 'border-success' : 'border-fg-dim'}`}>
+                    <Icon name="action.check" size="xs" tone={done ? 'success' : 'accent'} className={done ? '' : 'opacity-0 group-hover/check:opacity-100'} />
+                  </button>
+                  <button type="button" onClick={() => {
                     setSelectedItem(task);
                     setIsFullscreenEditorOpen(true);
-                  }}
-                  className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-rose-500/20 hover:border-rose-500/40 transition-colors text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
-                    isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
-                  }`}
-                >
-                  <div className="flex items-start gap-2">
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        toggleTaskComplete(task.id);
-                      }}
-                      className="mt-0.5 w-3.5 h-3.5 rounded-full border border-fg-dim hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
-                    >
-                      <Icon name="action.check" size="xs" tone="accent" className="opacity-0 hover:opacity-100" />
-                    </button>
-                    <span className="text-xs font-medium text-fg-soft leading-snug line-clamp-2">
-                      {task.title || 'Безымянная задача'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-3xs font-mono text-rose-400 pt-1 border-t border-tint-4">
-                    <span>Срок: {task.dueDate}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-1 text-3xs font-mono">
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleQuickSchedule(task, getTodayString());
-                      }}
-                      className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                    >
-                      Сегодня
-                    </button>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleQuickSchedule(task, getTomorrowString());
-                      }}
-                      className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                    >
-                      Завтра
-                    </button>
-                    <button
-                      onClick={e => {
-                        e.stopPropagation();
-                        handleQuickSchedule(task, getNextWeekString());
-                      }}
-                      className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                    >
-                      +Неделя
-                    </button>
-                  </div>
-                </div>
-              ))
-            )
-          ) : unscheduledTasks.length === 0 ? (
-            <div className="py-12 text-center text-xs text-fg-dim font-mono">
-              Все задачи имеют срок выполнения
-            </div>
-          ) : (
-            unscheduledTasks.map(task => (
-              <div
-                key={task.id}
-                data-draggable="true"
-                onPointerDown={e =>
-                  handlePointerDown(e, {
-                    type: 'task',
-                    id: task.id,
-                    title: task.title || 'Таска',
-                  })
-                }
-                onClick={() => {
-                  setSelectedItem(task);
-                  setIsFullscreenEditorOpen(true);
-                }}
-                className={`p-2.5 rounded-lg bg-surface hover:bg-surface-elevated border border-tint-6 hover:border-tint-12 transition-colors text-left space-y-2 shadow-sm cursor-grab active:cursor-grabbing touch-none ${
-                  isDragging && draggingTaskId === task.id ? 'opacity-40 ring-1 ring-blue-500/50 scale-[0.98]' : ''
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      toggleTaskComplete(task.id);
-                    }}
-                    className="mt-0.5 w-3.5 h-3.5 rounded-full border border-fg-dim hover:border-blue-400 flex items-center justify-center shrink-0 cursor-pointer"
-                  >
-                    <Icon name="action.check" size="xs" tone="accent" className="opacity-0 hover:opacity-100" />
-                  </button>
-                  <span className="text-xs font-medium text-fg-soft leading-snug line-clamp-2">
-                    {task.title || 'Безымянная задача'}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 pt-1 text-3xs font-mono border-t border-tint-4">
-                  <span className="text-fg-muted mr-auto">Назначить:</span>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleQuickSchedule(task, getTodayString());
-                    }}
-                    className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                  >
-                    Сегодня
-                  </button>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleQuickSchedule(task, getTomorrowString());
-                    }}
-                    className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                  >
-                    Завтра
-                  </button>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      handleQuickSchedule(task, getNextWeekString());
-                    }}
-                    className="px-2 py-0.5 rounded bg-tint-4 hover:bg-tint-10 text-fg-tertiary transition-colors cursor-pointer"
-                  >
-                    +Неделя
+                  }} className="line-clamp-2 min-w-0 text-start text-xs font-medium leading-snug text-fg-soft hover:text-fg-primary">
+                    {title}
                   </button>
                 </div>
+                {isOverdueTab && <p className="border-t border-tint-4 pt-1 font-mono text-3xs text-danger">Срок: {task.dueDate}</p>}
+                {!done && <div className="flex items-center gap-1.5 pt-1 font-mono text-3xs">
+                  {!isOverdueTab && <span className="mr-auto text-fg-muted">Назначить:</span>}
+                  {([
+                    ['Сегодня', getTodayString], ['Завтра', getTomorrowString], ['+Неделя', getNextWeekString],
+                  ] as const).map(([label, getDate]) => (
+                    <button key={label} type="button" onPointerDown={e => e.stopPropagation()}
+                      onClick={() => handleQuickSchedule(task, getDate())}
+                      className="rounded bg-tint-4 px-2 py-0.5 text-fg-tertiary transition-colors hover:bg-tint-10 focus-visible:bg-tint-10">
+                      {label}
+                    </button>
+                  ))}
+                </div>}
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { Composer } from '../Feed/Composer';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { MobileCalendarView } from './MobileCalendarView';
 import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
+import { FolderViewButton } from '../Feed/FolderViewButton';
 import { Icon } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -35,7 +36,6 @@ export const MobileFoldersView: React.FC = () => {
     setMobileFolderInfoOpen,
     setIsSearchOpen,
     openCreateFolderModal,
-    openFolderViewModal,
     feedViewMode,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
@@ -279,16 +279,7 @@ export const MobileFoldersView: React.FC = () => {
               </button>
             )}
 
-            {/* View & Filter Options (3-dots button) */}
-            <button
-              type="button"
-              onClick={openFolderViewModal}
-              className="relative w-9 h-9 rounded-full hover:bg-tint-6 text-fg-secondary hover:text-white flex items-center justify-center motion-press cursor-pointer"
-              title="Вид и фильтры папки"
-              aria-label="Вид и фильтры папки"
-            >
-              <Icon name="action.more" size="lg" tone="inherit" />
-            </button>
+            <FolderViewButton mobile />
           </div>
         }
       />

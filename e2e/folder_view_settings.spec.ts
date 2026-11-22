@@ -13,12 +13,17 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(header.getByRole('button', { name: 'Запустить ИИ-Сортировку' })).toHaveText('');
     await dots.click();
     const modal = page.getByRole('dialog', { name: 'Вид и фильтры', exact: true });
+    await modal.getByRole('button', { name: /^Фильтры/ }).click();
+    await expect(modal.getByRole('button', { name: 'Назад' })).toBeFocused();
     await modal.getByRole('button', { name: 'Таски', exact: true }).click();
     await modal.getByText('Скрыть выполненные', { exact: true }).click();
     await modal.getByText('Только закрепленные', { exact: true }).click();
     await page.keyboard.press('Escape');
+    await expect(modal.getByRole('button', { name: /^Фильтры/ })).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
-    await expect(dots.locator(':scope > *')).toHaveCount(1);
+    await expect(dots).toBeFocused();
+    await expect(dots).toHaveAttribute('data-filtered', 'true');
     await header.screenshot({ path: `test-results/screenshots/inbox-header-filtered-${viewport.width}.png` });
 
     const type = page.getByRole('button', { name: 'Сбросить фильтр по типу', exact: true });
@@ -54,7 +59,8 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
 
     // 1. Verify clean header: no segmented mode switcher, only folder title and 3-dots button
     const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]');
-    await expect(dotsBtn).toBeVisible();
+    await expect(dotsBtn.locator('[data-icon="action.more"]')).toBeVisible();
+    await expect(dotsBtn).toHaveText('');
 
     // Verify segmented switcher is not cluttering the header
     const oldSegmented = page.locator('header nav[aria-label="Режимы представления"]');
@@ -67,9 +73,21 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     await expect(modal).toBeVisible();
 
     // Verify sections inside the modal
-    await expect(modal.locator('text=Режим отображения')).toBeVisible();
-    await expect(modal.locator('text=Сортировка')).toBeVisible();
-    await expect(modal.locator('text=Фильтрация записей')).toBeVisible();
+    const layouts = modal.getByRole('group', { name: 'Режим отображения' });
+    await expect(layouts).toBeVisible();
+    await page.mouse.move(0, 0);
+    await expect(layouts).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(layouts.locator('button[aria-pressed="false"]').first()).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(layouts.locator('button[aria-pressed="true"]')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(modal.getByRole('button', { name: 'Сортировка' })).toBeVisible();
+    await expect(modal.getByRole('button', { name: /^Фильтры/ })).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Таски' })).not.toBeVisible();
+    await modal.getByRole('button', { name: 'Сортировка' }).click();
+    await modal.getByRole('button', { name: 'По названию' }).click();
+    await modal.getByRole('button', { name: /^Направление/ }).click();
+    await expect(modal.getByRole('button', { name: /^Направление/ })).toContainText('Я → А');
+    await modal.getByRole('button', { name: 'Назад' }).click();
+    await expect(modal.getByRole('button', { name: 'Сортировка' })).toContainText('По названию');
 
     // Capture visual screenshot of the Todoist-style view modal
     await page.screenshot({
@@ -96,9 +114,12 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     const feedModalBtn = modal.locator('button', { hasText: 'Лента' });
     await feedModalBtn.click();
 
+    await modal.getByRole('button', { name: /^Фильтры/ }).click();
     const taskFilterBtn = modal.locator('button', { hasText: 'Таски' });
     await taskFilterBtn.click();
+    await expect(modal.getByRole('group', { name: 'Разбор входящих' })).toBeVisible();
 
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
 
@@ -143,9 +164,9 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     // Reset settings for "Карьера" via "Сбросить вид" icon
     await dotsBtn.click();
     await expect(modal).toBeVisible();
-    const resetBtn = modal.locator('button[aria-label="Сбросить вид"]');
+    const resetBtn = modal.getByRole('button', { name: 'Сбросить вид' });
     await resetBtn.click();
-    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
 
     // Verify "Карьера" reverted to default Feed view
     await expect(page.locator('h3', { hasText: 'Бэклог' })).not.toBeVisible();

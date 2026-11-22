@@ -2,7 +2,7 @@
 import * as chronoRu from 'chrono-node/ru';
 import * as chronoEn from 'chrono-node/en';
 import type { RecurrenceRule } from '../../types';
-import { protectSpoilers, withoutSpoilers } from '../text/noteDisclosure';
+import { protectSpoilers, withoutSpoilers } from '../text/noteDisclosure.ts';
 
 export interface ParsedTodoistTask {
   /** The first line with the date, time, priority, repeat, duration and tags cut out. */

@@ -1,10 +1,11 @@
 import YAML from 'yaml';
 import type { SlagItem, SlagItemType, SlagAttachment } from '../../types';
-import { parseSubtasksFromContent } from '../tasks/taskUtils';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath';
-import { normalizeReminder } from '../time/reminder';
-import { withoutSpoilers } from '../text/noteDisclosure';
+import { parseSubtasksFromContent } from '../tasks/taskUtils.ts';
+import { DEFAULT_INBOX_FOLDER } from '../../config/storage.ts';
+import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath.ts';
+import { normalizeReminder } from '../time/reminder.ts';
+import { withoutSpoilers } from '../text/noteDisclosure.ts';
+import { frontmatterTags } from './noteSemantics.ts';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -72,6 +73,7 @@ export function serializeItemToMarkdown(item: SlagItem, registryBodyDigest?: str
       ...(att.waveform ? { waveform: att.waveform } : {}),
       ...(att.extractedText ? { extractedText: att.extractedText } : {}),
       ...(att.summary ? { summary: att.summary } : {}),
+      ...(att.enrichmentError ? { enrichmentError: att.enrichmentError } : {}),
       // `processing` is a live promise, not a fact: a note saved mid-run must not come back
       // from disk claiming a job that nobody is running any more.
       ...(att.enrichmentStatus && att.enrichmentStatus !== 'processing'
@@ -80,6 +82,7 @@ export function serializeItemToMarkdown(item: SlagItem, registryBodyDigest?: str
     }));
   }
 
+  if (item.customProps && Object.keys(item.customProps).length) frontmatterData.customProps = item.customProps;
   if (registryBodyDigest) frontmatterData.slagRegistryBody = registryBodyDigest;
   const yamlString = YAML.stringify(frontmatterData).trim();
   const body = (item.content || '').trim();
@@ -91,7 +94,7 @@ export function serializeItemToMarkdown(item: SlagItem, registryBodyDigest?: str
  * Parses raw Markdown text with YAML frontmatter into a SlagItem.
  */
 export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER,
-  onRegistryBody?: (digest: string) => void): SlagItem {
+  onRegistryBody?: (digest: string) => void, includeInlineTags = true): SlagItem {
   let frontmatter: Record<string, any> = {};
   let body = rawContent;
 
@@ -125,17 +128,12 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     }
   }
 
-  // Tags fallback
-  let tags: string[] = [];
-  if (Array.isArray(frontmatter.tags)) {
-    tags = frontmatter.tags.map(t => String(t).replace(/^#/, ''));
-  } else if (typeof frontmatter.tags === 'string') {
-    tags = frontmatter.tags.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean);
-  }
+  const tags = frontmatterTags(frontmatter.tags);
 
   // Also extract inline #hashtags from body if any
-  const inlineTags = Array.from(visibleBody.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
-  const allTags = Array.from(new Set([...tags, ...inlineTags]));
+  const allTags = includeInlineTags
+    ? Array.from(new Set([...tags, ...Array.from(visibleBody.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g), (match) => match[1])]))
+    : tags;
 
   const item: SlagItem = {
     id,
@@ -160,6 +158,8 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
     isArchived: Boolean(frontmatter.archived),
     replyToId: frontmatter.replyTo || undefined,
     linkedItemIds: Array.isArray(frontmatter.linked) ? frontmatter.linked : undefined,
+    ...(frontmatter.customProps && typeof frontmatter.customProps === 'object' && !Array.isArray(frontmatter.customProps)
+      ? { customProps: frontmatter.customProps } : {}),
   };
 
   if (type === 'task') {

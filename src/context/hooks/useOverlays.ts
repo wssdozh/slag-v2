@@ -1,4 +1,4 @@
-﻿// Everything above the app: modals, lightbox, context menu, toasts, confirm, attach sheet.
+// Everything above the app: modals, lightbox, context menu, toasts, confirm, attach sheet.
 import { useCallback, useRef, useState } from 'react';
 import type {
   ConfirmOptions,
@@ -71,7 +71,6 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
   const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
   const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
   const [folderMoveTarget, setFolderMoveTarget] = useState<string | null>(null);
-  const [isFolderViewModalOpen, setIsFolderViewModalOpen] = useState(false);
 
   const openFolderInfoModal = useCallback((folderPath?: string) => {
     setFolderInfoTarget(folderPath || currentFolder);
@@ -207,8 +206,6 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
     setIsFolderInfoModalOpen,
     folderInfoTarget,
     setFolderInfoTarget,
-    isFolderViewModalOpen,
-    setIsFolderViewModalOpen,
     openFolderInfoModal,
     closeFolderInfoModal,
     folderMoveTarget,

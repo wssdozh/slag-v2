@@ -94,7 +94,8 @@ test('cold disk edits use the last durable base, never a newer relay revision', 
     const [intent] = cold.saved().pending;
     assert.equal(cold.saved().pending.length, 1);
     assert.equal(intent.kind, 'update');
-    assert.deepEqual(intent.base, before.confirmed.edited);
+    const { revision, item } = before.confirmed.edited;
+    assert.deepEqual(intent.base, { revision, item });
     await cold.replica.catchUp();
     await until(() => !cold.replica.pendingCount && cold.saved().cursor === 4);
     assert.equal(server.events.length, 4);
@@ -165,7 +166,7 @@ test('attachment upload must succeed before a durable attempt or revision is cre
   const item = note('photo', { attachments: [attachment] });
   const failed = device(t, server, { uploadAttachment: async () => { throw new Error('upload failed'); } });
   await failed.replica.catchUp();
-  await failed.replica.record([change('create', item)]);
+  await failed.replica.record([{ ...change('create', item), intentId: 'add-attachment' }]);
   await until(() => failed.errors.length);
   assert.equal(server.sends(), 0);
   assert.equal(failed.saved().pending[0].attempt, undefined);
@@ -174,13 +175,14 @@ test('attachment upload must succeed before a durable attempt or revision is cre
 
   const blob = 'd'.repeat(64);
   const resumed = device(t, server, { state, uploadAttachment: async (selected) => {
-    assert.deepEqual(selected, attachment);
+    assert.deepEqual(selected, selected.registryBlobId ? { ...attachment, registryBlobId: blob } : attachment);
     return blob;
   }, channel: { ...server.view, send: async (...args) => {
     const [{ attempt }] = resumed.saved().pending;
     assert.deepEqual(attempt.op.mediaIds, [blob]);
     assert.equal(attempt.item.attachments[0].registryBlobId, blob);
-    if (attempt.op.kind === 'create') await resumed.replica.record([change('update', { ...item, content: 'dependent edit' })]);
+    if (attempt.op.kind === 'create') await resumed.replica.record([{ ...change('update', { ...item, content: 'dependent edit' }),
+      previous: item, origin: { intentId: 'add-attachment' } }]);
     return server.view.send(...args);
   } } });
   await resumed.replica.catchUp();
@@ -514,7 +516,7 @@ test('a lost group receipt survives restart and replays the same sealed request'
   const resumed = device(t, server, { ...options, state: saved });
   await resumed.replica.catchUp();
   await until(() => resumed.replica.pendingCount === 0);
-  assert.deepEqual(projections, [{ notes: [{ id: item.id, item }], tree: folders }]);
+  assert.deepEqual(projections, [{ notes: [{ id: item.id, item, revision: 3 }], tree: folders }]);
   assert.equal(resumed.saved().confirmed[item.id].revision, 3);
   assert.equal(resumed.saved().confirmed[FOLDER_TREE_ID].revision, 4);
   assert.equal(resumed.saved().cursor, 2, 'receipt is not the ordered feed');
@@ -548,7 +550,7 @@ test('a stale member preserves the whole proposal until all reviewed revisions m
   await first.replica.recordFolderGroup([{ id: item.id, kind: 'update', item, previous }], folders, oldTree);
   await until(() => first.replica.conflicts.length === 2);
   assert.equal(first.replica.pendingCount, 0);
-  assert.deepEqual(projections, [{ notes: [{ id: item.id, item: remote }], tree: oldTree }]);
+  assert.deepEqual(projections, [{ notes: [{ id: item.id, item: remote, revision: 3 }], tree: oldTree }]);
   const envelope = { version: 1, room, generation, journal: first.saved() };
   const saved = loadNoteJournal(envelope, room, generation);
   assert.throws(() => loadNoteJournal({ ...envelope, journal: { ...saved, conflicts: saved.conflicts.slice(1) } }, room, generation), /Incomplete persisted folder conflict/);
@@ -565,7 +567,7 @@ test('a stale member preserves the whole proposal until all reviewed revisions m
   assert.equal(resumed.replica.conflicts.length, 0);
   assert.notEqual(requests[1][0].opId, requests[0][0].opId);
   assert.deepEqual(requests[1].map(({ baseRevision }) => baseRevision), [3, 2]);
-  assert.deepEqual(projections[1], { notes: [{ id: item.id, item }], tree: folders });
+  assert.deepEqual(projections[1], { notes: [{ id: item.id, item, revision: 4 }], tree: folders });
 });
 
 test('a folder group is validated in full before any projection or cursor change', async (t) => {
@@ -588,7 +590,7 @@ test('a folder group is validated in full before any projection or cursor change
   assert.equal(replica.confirmedValue(item.id), undefined);
   feed = events;
   await replica.catchUp();
-  assert.deepEqual(projections, [{ notes: [{ id: item.id, item }], tree: folders }]);
+  assert.deepEqual(projections, [{ notes: [{ id: item.id, item, revision: 3 }], tree: folders }]);
   assert.equal(saved().cursor, 4);
 });
 
@@ -661,7 +663,7 @@ test('batches immediate edits and catches up without further requests when idle'
   assert.deepEqual(b.errors, []);
 });
 
-test('a stale edit and its dependent delete never write over a confirmed revision', async (t) => {
+test('a stale independent edit merges, but its dependent delete cannot remove the merged result', async (t) => {
   const server = relay();
   const a = device(t, server);
   const b = device(t, server);
@@ -676,11 +678,11 @@ test('a stale edit and its dependent delete never write over a confirmed revisio
   const local = { ...base, tags: ['local'], updatedAt: 9_000_000 };
   await b.replica.record([change('update', local), change('delete', null, base.id)]);
   await until(() => b.replica.pendingCount === 0);
-  assert.equal(server.events.length, 2);
-  assert.equal(server.sends(), 3);
-  assert.deepEqual(b.local.get(base.id), accepted);
-  assert.deepEqual(b.conflicts.map(({ fields }) => fields), [['update'], ['predecessor']]);
-  assert.deepEqual(b.conflicts[0].item, local);
+  assert.equal(server.events.length, 3);
+  assert.equal(server.sends(), 4);
+  assert.equal(b.local.get(base.id).title, 'relay');
+  assert.deepEqual(b.local.get(base.id).tags, ['local']);
+  assert.deepEqual(b.conflicts.map(({ fields }) => fields), [['delete']]);
 });
 
 test('a stale delete cannot remove a restored note with the same content', async (t) => {
@@ -716,7 +718,7 @@ test('relay deletion stays authoritative until an explicit conflict retry after 
   const local = { ...base, content: 'local rejected copy' };
   await peer.replica.record([change('update', local)]);
   await until(() => peer.replica.pendingCount === 0);
-  assert.deepEqual(writes.at(-1), { id: base.id, item: null, discardLiveCopy: true });
+  assert.deepEqual(writes.at(-1), { id: base.id, item: null, revision: 2, discardLiveCopy: true });
   assert.equal(server.events.length, 2);
   const snapshot = { version: 1, room, generation, journal: peer.saved() };
   peer.stop();
@@ -884,4 +886,94 @@ test('acceptance with lost reply survives restart and expired feed', async (t) =
   assert.equal(b.replica.pendingCount, 0);
   assert.equal(b.local.get('persist').content, 'base');
   assert.equal(server.events.length, 1);
+});
+
+for (const prune of [false, true]) {
+  test(`a restored note rejects an older edit even after another update (pruned=${prune})`, async (t) => {
+    const server = relay();
+    const a = device(t, server), b = device(t, server);
+    await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
+    const base = note('new-lifetime');
+    await a.replica.record([change('create', base)]);
+    await until(() => b.saved()?.cursor === 1);
+    server.pause();
+    await a.replica.record([change('delete', null, base.id), change('restore', base)]);
+    await until(() => a.saved().cursor === 3);
+    await a.replica.record([change('update', { ...base, title: 'restored' })]);
+    await until(() => a.saved().cursor === 4);
+    if (prune) server.prune();
+    const local = { ...base, content: 'unfinished local text' };
+    await b.replica.record([{ ...change('update', local), previous: base, origin: { revision: 1 } }]);
+    await until(() => b.saved().cursor === 4 && !b.replica.pendingCount);
+    assert.equal(server.events.length, 4);
+    assert.equal(b.local.get(base.id).content, base.content);
+    assert.deepEqual(b.conflicts.map(({ fields, item }) => ({ fields, item })), [{ fields: ['lifecycle'], item: local }]);
+  });
+}
+
+for (const reversed of [false, true]) {
+  test(`adjacent lines, paragraphs and tags converge after restart (reverse=${reversed})`, async (t) => {
+    const server = relay();
+    const a = device(t, server), offline = device(t, server);
+    await Promise.all([a.replica.catchUp(), offline.replica.catchUp()]);
+    const base = note('adjacent', { content: 'Alpha\nBeta', tags: ['project', 'old'] });
+    const paragraphs = note('paragraphs', { content: 'First\n\nLast', tags: ['base'] });
+    const unsafe = note('unsafe', { content: 'Before\nParagraph\nExample\nAfter' });
+    const left = [{ ...base, content: 'New Alpha\nBeta', tags: ['project'] },
+      { ...paragraphs, content: 'New First\nSecond line\n\nLast', tags: ['base', 'z'] },
+      { ...unsafe, content: 'Before\n```\nParagraph\nExample\n```\nAfter' }];
+    const right = [{ ...base, content: 'Alpha\nNew Beta', tags: ['project', 'old', 'new'] },
+      { ...paragraphs, content: 'First\n\nNew Last', tags: ['base', 'a'] },
+      { ...unsafe, content: 'Before\nParagraph\n# Heading\nExample\nAfter' }];
+    const originals = [base, paragraphs, unsafe];
+    await a.replica.record(originals.map((item) => change('create', item)));
+    await until(() => offline.saved()?.cursor === 3);
+    const journal = offline.saved();
+    offline.stop();
+    const edits = (items) => items.map((item, index) => ({ ...change('update', item), previous: originals[index],
+      origin: { revision: journal.confirmed[item.id].revision } }));
+    const [winner, stale] = reversed ? [right, left] : [left, right];
+    await a.replica.record(edits(winner));
+    await until(() => a.saved()?.cursor === 6 && !a.replica.pendingCount);
+    const resumed = device(t, server, { state: journal });
+    await resumed.replica.catchUp();
+    await resumed.replica.record(edits(stale));
+    await until(() => server.events.length === 8 && !resumed.replica.pendingCount && resumed.saved().cursor === 8 && a.saved().cursor === 8);
+    for (const d of [a, resumed]) {
+      assert.deepEqual(d.errors, []);
+      assert.equal(d.local.get(base.id).content, 'New Alpha\nNew Beta');
+      assert.deepEqual(d.local.get(base.id).tags, ['project', 'new']);
+      assert.equal(d.local.get(paragraphs.id).content, 'New First\nSecond line\n\nNew Last');
+      assert.deepEqual(d.local.get(paragraphs.id).tags, ['base', 'a', 'z']);
+      assert.equal(d.local.get(unsafe.id).content, winner[2].content);
+    }
+    assert.deepEqual(a.conflicts, []);
+    assert.deepEqual(resumed.conflicts.map(({ fields, item }) => ({ fields, item })), [{ fields: ['content'], item: stale[2] }]);
+  });
+}
+
+test('a queued successor can undo its own preceding edit without undoing the remote edit', async (t) => {
+  const server = relay();
+  const send = server.view.send;
+  let release, entered;
+  const paused = new Promise((resolve) => { entered = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  const a = device(t, server), b = device(t, server);
+  await Promise.all([a.replica.catchUp(), b.replica.catchUp()]);
+  const base = note('successive');
+  await a.replica.record([change('create', base)]);
+  await until(() => b.saved()?.cursor === 1);
+  await a.replica.record([change('update', { ...base, title: 'remote title' })]);
+  await until(() => b.saved().cursor === 2);
+  server.view.send = async (...args) => { entered(); await gate; return send(...args); };
+  const edited = { ...base, content: 'typing' };
+  await b.replica.record([{ ...change('update', edited), previous: base, origin: { revision: 1 }, intentId: 'first-edit' }]);
+  await paused;
+  await b.replica.record([{ ...change('update', base), previous: edited, origin: { intentId: 'first-edit' } }]);
+  release();
+  await until(() => b.saved().cursor === 4 && !b.replica.pendingCount);
+  assert.deepEqual(b.conflicts, []);
+  assert.equal(b.local.get(base.id).title, 'remote title');
+  assert.equal(b.local.get(base.id).content, base.content);
+  assert.equal(server.events.length, 4);
 });

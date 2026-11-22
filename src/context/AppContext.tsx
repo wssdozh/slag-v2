@@ -43,7 +43,7 @@ import { setPref } from '../lib/storage/prefs';
 const uiLog = logger.scope('UI');
 const appLog = logger.scope('APP');
 
-import type { AppContextType } from './appContext.types';
+import type { AppContextType, FolderViewSection, FolderViewTarget } from './appContext.types';
 export type { ToastMessage, AttachSheetRequest, ContextMenuTarget } from './appContext.types';
 
 const AI_SETTINGS_KEY = STORAGE_KEYS.AI_SETTINGS;
@@ -95,9 +95,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sortBy, setSortBy, sortOrder, setSortOrder,
     hideCompletedTasks, setHideCompletedTasks,
     aiItemFilter, applyAiFilter, clearAiFilter,
-    filteredItems, folderSettings, setFolderSettings,
+    folderSettings, setFolderSettings,
     updateCurrentFolderViewSettings, resetCurrentFolderViewSettings,
-  } = useFeedView(currentFolder, items, initialWorkspace);
+  } = useFeedView(currentFolder, initialWorkspace);
 
   const {
     chatMessages, setChatMessages, isChatLoading,
@@ -114,7 +114,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFolderModalOpen, setIsFolderModalOpen, folderModalParent, setFolderModalParent,
     isFolderInfoModalOpen, setIsFolderInfoModalOpen, folderInfoTarget, setFolderInfoTarget,
     folderMoveTarget, openFolderMoveModal, closeFolderMoveModal,
-    isFolderViewModalOpen, setIsFolderViewModalOpen,
     openFolderInfoModal, closeFolderInfoModal,
     isVaultModalOpen, setIsVaultModalOpen, openVaultModal, closeVaultModal,
     isTriageModalOpen, setIsTriageModalOpen,
@@ -124,6 +123,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     toasts, addToast, removeToast, confirmRequest, resolveConfirm, confirmAction,
     attachSheet, openAttachSheet, closeAttachSheet,
   } = useOverlays(currentFolder, initialWorkspace);
+
+  const [folderViewTarget, setFolderViewTarget] = useState<FolderViewTarget | null>(null);
+  const [folderViewSection, setFolderViewSection] = useState<FolderViewSection>('main');
+  const isFolderViewModalOpen = folderViewTarget !== null;
+  const openFolderViewModal = useCallback((target: FolderViewTarget) => {
+    setFolderViewSection('main');
+    setFolderViewTarget(target);
+  }, []);
+  const closeFolderViewModal = useCallback(() => {
+    folderViewTarget?.anchor.focus({ preventScroll: true });
+    setFolderViewTarget(null);
+  }, [folderViewTarget]);
 
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
@@ -364,7 +375,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { isOpen: contextMenu !== null, close: closeContextMenu },
     { isOpen: isLogViewerOpen, close: () => setIsLogViewerOpen(false) },
     { isOpen: isFolderModalOpen, close: () => { setIsFolderModalOpen(false); setFolderModalParent(null); } },
-    { isOpen: isFolderViewModalOpen, close: () => setIsFolderViewModalOpen(false), depth: 0 },
+    { isOpen: isFolderViewModalOpen, close: () => {
+      if (folderViewSection === 'main') closeFolderViewModal();
+      else setFolderViewSection('main');
+    }, depth: 0 },
     { isOpen: isVaultModalOpen, close: () => setIsVaultModalOpen(false) },
     { isOpen: folderMoveTarget !== null, close: closeFolderMoveModal },
     { isOpen: isFolderInfoModalOpen, close: () => { setIsFolderInfoModalOpen(false); setFolderInfoTarget(null); } },
@@ -464,12 +478,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTimeout(() => {
       setHighlightedItemId(prev => (prev === found.id ? null : prev));
     }, 2400);
-  }, [addToast]);
+  }, [addToast, setCurrentFolder]);
 
   const navigateToFolder = useCallback((folder: string, itemId?: string) => {
-    if (currentFolder !== folder) {
-      setCurrentFolder(folder);
-    }
+    setCurrentFolder(folder);
     if (isMobile) {
       setMobileActiveFolder(folder);
       setActiveMobileTab('folders');
@@ -500,7 +512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }, 2400);
     }
   }, [
-    currentFolder,
+    setCurrentFolder,
     isMobile,
     setMobileActiveFolder,
     setActiveMobileTab,
@@ -604,14 +616,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('Созданы стартовые демо-заметки и папки', 'success');
   }, [refreshData, addToast]);
 
-  const openFolderViewModal = useCallback(() => {
-    setIsFolderViewModalOpen(true);
-  }, [setIsFolderViewModalOpen]);
-
-  const closeFolderViewModal = useCallback(() => {
-    setIsFolderViewModalOpen(false);
-  }, [setIsFolderViewModalOpen]);
-
   const {
     backupSnapshots, backupSettings, refreshBackupSnapshots, updateBackupSettings,
     createManualBackup, restoreSnapshot, deleteSnapshot, downloadSnapshot,
@@ -632,7 +636,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isKanbanMaterialsOpen,
         setIsKanbanMaterialsOpen,
         items,
-        filteredItems,
         today,
         selectedItem,
         activeTypeFilter,
@@ -701,7 +704,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openComposerModal,
         closeComposerModal,
         isFolderViewModalOpen,
-        setIsFolderViewModalOpen,
+        folderViewTarget,
+        folderViewSection,
+        setFolderViewSection,
         openFolderViewModal,
         closeFolderViewModal,
         sortBy,

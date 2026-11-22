@@ -1,5 +1,6 @@
 // The Kanban board: columns by status, drag between them, and the materials dock.
-import React, { useState, useMemo, useCallback } from 'react';
+import { matchesTaskQuickFilter, type TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -11,7 +12,7 @@ import { KanbanMaterialsDock } from './kanban/KanbanMaterialsDock';
 import { KanbanColumn } from './kanban/KanbanColumn';
 import { KANBAN_COLUMNS } from './kanban/kanbanModel';
 
-export const KanbanBoard: React.FC = () => {
+export const KanbanBoard: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilter }) => {
   const { items, currentFolder, updateItem, addToast, isMobile } = useApp();
 
   // Active status dropdown card ID
@@ -75,18 +76,12 @@ export const KanbanBoard: React.FC = () => {
     });
   }, [items, currentFolder]);
 
-  // Cards glide between columns instead of teleporting.
-  useFlipLayout(kanbanBoardRef, folderItems.map(item => `${item.id}:${item.status ?? ''}`).join('|'));
-
-  // TRIZ Materials: Notes and Articles in this folder
-  const folderMaterials = useMemo(() => {
-    return folderItems.filter(item => item.type === 'note' || item.type === 'article');
-  }, [folderItems]);
-
-  // Tasks in this folder
-  const tasks = useMemo(() => {
-    return folderItems.filter(item => item.type === 'task');
-  }, [folderItems]);
+  const folderMaterials = useMemo(() => folderItems.filter(item => item.type === 'note' || item.type === 'article'), [folderItems]);
+  const tasks = useMemo(() => folderItems.filter(item => taskFilter
+    ? (currentFolder !== DEFAULT_INBOX_FOLDER || item.folder === currentFolder) && matchesTaskQuickFilter(item, taskFilter)
+    : item.type === 'task'), [folderItems, currentFolder, taskFilter]);
+  const layoutKey = useMemo(() => tasks.map(item => `${item.id}:${item.status ?? ''}`).join('|'), [tasks]);
+  useFlipLayout(kanbanBoardRef, layoutKey);
 
   // Group tasks by status
   const tasksByStatus = useMemo(() => {
@@ -109,6 +104,13 @@ export const KanbanBoard: React.FC = () => {
     return map;
   }, [tasks]);
 
+  const filterId = taskFilter?.id;
+  useEffect(() => {
+    const board = kanbanBoardRef.current;
+    if (!board || !filterId) return;
+    board.scrollLeft = filterId === 'completed' ? board.scrollWidth : 0;
+  }, [filterId, kanbanBoardRef]);
+
   const draggingItemId = isDragging && draggingPayload ? draggingPayload.id : null;
 
   return (
@@ -116,11 +118,11 @@ export const KanbanBoard: React.FC = () => {
       {/* ============================================================== */}
       {/* TRIZ Dock on the left: [ 📚 Материалы папки ] (collapsible)   */}
       {/* ============================================================== */}
-      <KanbanMaterialsDock
+      {!taskFilter && <KanbanMaterialsDock
         materials={folderMaterials}
         draggingItemId={draggingItemId}
         onItemPointerDown={handlePointerDown}
-      />
+      />}
 
       {/* ============================================================== */}
       {/* Linear Kanban Columns Area                                     */}

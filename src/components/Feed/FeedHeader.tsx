@@ -3,19 +3,23 @@ import React, { useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { folderIconName } from '../UI/icons/icons';
 import { ActiveFilterBadges } from './ActiveFilterBadges';
+import { FolderViewButton } from './FolderViewButton';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
 import { Icon } from '../UI/icons/Icon';
+import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import type { FeedViewMode } from '../../types';
 
 export interface FeedHeaderProps {
   viewMode?: FeedViewMode;
+  taskFilter?: TaskQuickFilter;
   onViewModeChange?: (mode: FeedViewMode) => void;
 }
 
 export const FeedHeader: React.FC<FeedHeaderProps> = ({
   viewMode: controlledViewMode,
-  onViewModeChange: _onViewModeChange,
+  onViewModeChange,
+  taskFilter,
 }) => {
   const {
     currentFolder,
@@ -26,7 +30,6 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
     openFolderInfoModal,
-    openFolderViewModal,
   } = useApp();
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -36,8 +39,8 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
 
   const folderMaterialsCount = useMemo(
-    () => materialsInFolder(items, currentFolder).length,
-    [items, currentFolder],
+    () => activeViewMode === 'kanban' && !taskFilter ? materialsInFolder(items, currentFolder).length : 0,
+    [items, currentFolder, activeViewMode, taskFilter],
   );
 
   const canTriageInbox = isInbox && items.some(i => i.folder === DEFAULT_INBOX_FOLDER);
@@ -61,7 +64,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     >
       {/* Left Column: Active Filter Badges */}
       <div className="flex items-center gap-1.5 justify-self-start min-w-0 z-10 overflow-x-auto scrollbar-none py-1">
-        <ActiveFilterBadges />
+        <ActiveFilterBadges ignoreTypeAndCompletion={Boolean(taskFilter)} />
       </div>
 
       {/* Center Column: Prominent Folder Title Button */}
@@ -83,7 +86,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
       {/* Right Column: Actions (Materials, AI triage, 3-dots popover button) */}
       <div className="flex items-center gap-1.5 justify-self-end min-w-0 shrink-0 z-10">
         {/* Kanban Materials Dock Toggle */}
-        {activeViewMode === 'kanban' && (
+        {activeViewMode === 'kanban' && !taskFilter && (
           <button
             type="button"
             onClick={() => setIsKanbanMaterialsOpen(prev => !prev)}
@@ -116,16 +119,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           </button>
         )}
 
-        {/* View & Filter Options (3-dots button) */}
-        <button
-          type="button"
-          onClick={openFolderViewModal}
-          className="h-ctrl-sm w-ctrl-sm flex items-center justify-center rounded-lg text-fg-secondary hover:text-white hover:bg-tint-8 motion-press cursor-pointer"
-          title="Вид и фильтры папки"
-          aria-label="Вид и фильтры папки"
-        >
-          <Icon name="action.more" size="md" tone="inherit" />
-        </button>
+        <FolderViewButton mode={activeViewMode} changeLocalMode={onViewModeChange} />
       </div>
     </header>
   );

@@ -1,4 +1,6 @@
 // The feed: render window, sentinels and the composition of cards; the edges live in `list/`.
+import { selectVisibleItems } from '../../context/feed/feedView';
+import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import React, {
   useEffect,
   useLayoutEffect,
@@ -38,9 +40,8 @@ import {
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
 
-export const FeedList: React.FC = () => {
+export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilter }) => {
   const {
-    filteredItems,
     today,
     items,
     openContextMenu,
@@ -95,6 +96,12 @@ export const FeedList: React.FC = () => {
     return { countMap, firstReplyMap };
   }, [items]);
 
+  const filteredItems = useMemo(() => selectVisibleItems(items, {
+    currentFolder, inboxMode, activeTypeFilter, activeTagFilter, isPinnedOnlyFilter,
+    hideCompletedTasks, aiItemFilter, sortBy, sortOrder,
+  }, taskFilter), [items, currentFolder, inboxMode, activeTypeFilter, activeTagFilter,
+    isPinnedOnlyFilter, hideCompletedTasks, aiItemFilter, sortBy, sortOrder, taskFilter]);
+
   // Windowed items: последние `windowSize` записей, новее всегда в кадре
   const { history, scheduledToday, overdue } = useMemo(() => partitionFeedBySchedule(filteredItems, today), [filteredItems, today]);
   const windowedItems = useMemo(() => takeWindow(history, windowSize), [history, windowSize]);
@@ -132,7 +139,7 @@ export const FeedList: React.FC = () => {
   }, [attachmentSrcs, filteredItems, openLightbox]);
 
   // Sync state during render on folder or filter change (React pure pattern)
-  const filterKey = `${currentFolder}:${activeTypeFilter}:${activeTagFilter || ''}`;
+  const filterKey = JSON.stringify([currentFolder, activeTypeFilter, activeTagFilter, taskFilter?.id, taskFilter?.today]);
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
@@ -462,13 +469,15 @@ export const FeedList: React.FC = () => {
         {/* Drag & Drop Visual Dropzone Overlay */}
         <FeedDropOverlay isVisible={isDraggingOver} />
 
-        {filteredItems.length === 0 ? (
-          items.length === 0 && !isPinnedOnlyFilter ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-fg-secondary">
-              <Icon name="system.ai" size="none" tone="inherit" className="size-9" />
-              <p className="text-xs font-medium">Хранилище пустое</p>
-            </div>
-          ) : <EmptyState
+        {filteredItems.length === 0 ? taskFilter ? (
+          <EmptyState icon={<Icon name="action.filter" size="lg" />} title="Нет задач по этому фильтру" />
+        ) : items.length === 0 && !isPinnedOnlyFilter ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-fg-secondary">
+            <Icon name="system.ai" size="none" tone="inherit" className="size-9" />
+            <p className="text-xs font-medium">Хранилище пустое</p>
+          </div>
+        ) : (
+          <EmptyState
             icon={
               isPinnedOnlyFilter ? (
                 <Icon name="action.pin" size="lg" tone="warning" className="rotate-45" />

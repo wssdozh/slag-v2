@@ -19,7 +19,7 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
       const item = { id: 'test-note', type: 'note', title: 'План релиза', content: '1. Проверить сборку\n2. Обновить документацию\n3. Передать на проверку', tags: ['проект'], attachments: [], folder: 'Inbox', createdAt: 1, updatedAt: 1 };
       let latest = 12;
       let closed = false;
-      syncEngine.getNoteConflicts = () => closed ? [] : [{ intentId: 'test-intent', noteId: item.id, kind: 'update', fields: ['update'],
+      syncEngine.getNoteConflicts = () => closed ? [] : [{ intentId: 'test-intent', noteId: item.id, kind: 'update', fields: ['content', 'tags'],
         item: { ...item, tags: ['проект', 'на проверке'], content: item.content.replace('2. Обновить документацию', '2. Обновить инструкцию и скриншоты') },
         currentRevision: latest, currentItem: item }];
       syncEngine.resolveNoteConflict = async (_id: string, decision: string, revision: number, content?: string) => {
@@ -34,6 +34,7 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
     await compare.click({ timeout: 20_000 });
     const dialog = page.getByRole('dialog', { name: 'Конфликт синхронизации' });
     await expect(dialog.getByText('Теги:', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Не удалось объединить: Текст, Теги')).toBeVisible();
     if (layout === 'mobile') {
       await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
       await dialog.getByRole('button', { name: 'Скопировать текст' }).click();
