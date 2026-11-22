@@ -5,8 +5,8 @@ import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
 import { NoteChannel } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
-import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteJournal, RegistryValue } from './journal.ts';
-import { relayNote } from './merge.ts';
+import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteIntentSource, NoteJournal, RegistryValue } from './journal.ts';
+import { noteDifferences, relayNote } from './merge.ts';
 import { isSharedRegistryId } from './sharedBody.ts';
 import type { SharedBody, SharedMutation } from './sharedBody.ts';
 import { checkedSharedBody, isNoteItem } from './wire.ts';
@@ -32,6 +32,7 @@ interface NoteReplicaHost {
   onError: (error: unknown) => void;
   onProgress: () => void;
   onDeliveryChange?: () => void;
+  log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
 }
 
 const PUSH_DELAY_MS = 50;
@@ -85,6 +86,16 @@ export class NoteReplica {
   private connectionEpoch = 0;
   private applyingBatch = false;
   private failedIntents = new Set<string>();
+  private sendingIntents = new Set<string>();
+  private batchLogs?: (() => void)[];
+
+  private logIntent(event: string, intent: NoteIntent, data: Record<string, unknown> = {}, warning = false) {
+    const source = intent.source;
+    this.host.log?.(event, { generation: this.host.generation, intentId: intent.intentId, kind: intent.kind,
+      source: source === 'app' || source === 'disk-watch' || source === 'cold-recovery' || source === 'retry' ? source : 'unknown',
+      baseRevision: intent.attempt?.op.baseRevision ?? intent.base?.revision, opId: intent.attempt?.op.opId,
+      groupId: intent.folderGroup?.id, ...data }, warning);
+  }
 
   private readonly host: NoteReplicaHost;
   constructor(host: NoteReplicaHost, state = emptyJournal()) {
@@ -134,6 +145,7 @@ export class NoteReplica {
       const members = this.conflicts.filter(({ folderGroup }) => folderGroup?.id === groupId);
       if (!members.length) throw new Error('Папочный конфликт уже разобран');
       let next = this.state;
+      let retryGroupId: string | undefined;
       for (const { noteId } of members) {
         if (!Object.hasOwn(reviewed, noteId) || reviewed[noteId] !== (confirmedNote(next, noteId)?.revision ?? 0)
             || next.pending.some(({ id }) => id === noteId)) {
@@ -153,30 +165,39 @@ export class NoteReplica {
         if (omittedFolderMembers(next, new Set(changes.map(({ id }) => id)), previous, tree.item)) {
           throw new Error('В исходной папке появились другие записи; заново запустите операцию по текущему дереву');
         }
-        next = recordFolderGroup(next, crypto.randomUUID(), changes, tree.item, previous);
+        retryGroupId = crypto.randomUUID();
+        next = recordFolderGroup(next, retryGroupId, changes, tree.item, previous, 'retry');
       }
       await this.persist({ ...next, conflicts: this.conflicts.filter(({ folderGroup }) => folderGroup?.id !== groupId) });
+      this.host.log?.('Note group conflict resolved', { generation: this.host.generation, groupId, retryGroupId, resolution, count: members.length });
       this.schedule();
     });
   }
 
-  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number): Promise<void> {
+  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string): Promise<void> {
     return this.enqueue(async () => {
       const conflict = this.conflicts.find((entry) => entry.intentId === intentId);
       if (!conflict) throw new Error('Конфликт уже разобран');
       if (conflict.folderGroup) throw new Error('Папочную операцию нужно разобрать целиком');
       let next = this.state;
+      const current = confirmedNote(next, conflict.noteId);
+      if ((current?.revision ?? 0) !== reviewedRevision || next.pending.some(({ id }) => id === conflict.noteId)) {
+        throw new Error('Версия изменилась или есть ожидающая правка; проверьте конфликт ещё раз');
+      }
+      let retryIntentId: string | undefined;
       if (resolution === 'retry') {
         if (this.host.readOnly) throw new Error('На этом устройстве запись отключена');
-        const current = confirmedNote(next, conflict.noteId);
-        if ((current?.revision ?? 0) !== reviewedRevision || next.pending.some(({ id }) => id === conflict.noteId)) {
-          throw new Error('Версия изменилась или есть ожидающая правка; проверьте конфликт ещё раз');
-        }
         const kind = conflict.item === null ? (current?.item ? 'delete' : null)
           : !current ? 'create' : current.item === null ? 'restore' : 'update';
-        if (kind) next = recordNote(next, { id: conflict.noteId, intentId: crypto.randomUUID(), kind, item: conflict.item });
+        let item = conflict.item;
+        if (content !== undefined) {
+          if (!isNoteItem(item)) throw new Error('У этого конфликта нельзя изменить текст');
+          item = { ...item, content };
+        }
+        if (kind) next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind, item, source: 'retry' });
       }
       await this.persist({ ...next, conflicts: this.conflicts.filter((entry) => entry !== conflict) });
+      this.host.log?.('Note conflict resolved', { generation: this.host.generation, intentId, revision: reviewedRevision, resolution, retryIntentId });
       this.schedule();
     });
   }
@@ -187,6 +208,7 @@ export class NoteReplica {
     if (this.conflicts.some(({ noteId }) => noteId === item.id)) return 'conflict';
     const pending = this.state.pending.filter(({ id }) => id === item.id);
     if (pending.length) {
+      if (pending.every(({ intentId }) => this.sendingIntents.has(intentId))) return 'sending';
       return pending.some(({ intentId }) => this.failedIntents.has(intentId)) ? 'error' : 'pending';
     }
     const confirmed = this.confirmedValue(item.id);
@@ -225,6 +247,7 @@ export class NoteReplica {
       this.journalFailed = false;
     } catch (error) {
       this.journalFailed = true;
+      this.host.log?.('Note journal write failed', { generation: this.host.generation, cursor: state.cursor }, true);
       throw error;
     }
   }
@@ -234,6 +257,7 @@ export class NoteReplica {
   private async batch(apply: () => Promise<void>) {
     const original = this.state;
     this.applyingBatch = true;
+    const logs = this.batchLogs = [] as (() => void)[];
     try {
       await apply();
       this.host.signal.throwIfAborted();
@@ -243,7 +267,9 @@ export class NoteReplica {
       throw error;
     } finally {
       this.applyingBatch = false;
+      this.batchLogs = undefined;
     }
+    logs.forEach((log) => log());
   }
 
   recordFolderTree(folders: FolderMeta[], previous: FolderMeta[]): Promise<void> {
@@ -254,7 +280,7 @@ export class NoteReplica {
       const id = FOLDER_TREE_ID;
       const kind = confirmedNote(this.state, id) || this.state.pending.some((entry) => entry.id === id) ? 'update' : 'create';
       await this.persist(recordNote(this.state, { id, intentId: crypto.randomUUID(), kind,
-        item: readFolderTree(folders, kind), previous }));
+        item: readFolderTree(folders, kind), previous, source: 'app' }));
       this.schedule();
     }).catch((err: unknown) => { this.error(err); throw err; });
   }
@@ -320,11 +346,13 @@ export class NoteReplica {
       item: shared === null ? null : { shared }, previous: prior === null ? undefined : { shared: prior } });
   }
 
-  record(changes: NoteMutation[]): Promise<void> {
+  record(changes: NoteMutation[], source: NoteIntentSource = 'app'): Promise<void> {
     if (this.host.readOnly) return Promise.resolve();
     const run = this.enqueue(async () => {
-      const state = changes.reduce((journal, change) => recordNote(journal, { ...change, intentId: crypto.randomUUID() }), this.state);
+      const before = this.state.pending;
+      const state = changes.reduce((journal, change) => recordNote(journal, { ...change, source, intentId: crypto.randomUUID() }), this.state);
       await this.persist(state);
+      for (const intent of state.pending) if (!before.includes(intent)) this.logIntent('Note intent recorded', intent);
       this.schedule();
     });
     return run.catch((err: unknown) => { this.error(err); throw err; });
@@ -358,10 +386,11 @@ export class NoteReplica {
         if (Number.isSafeInteger(projected) && projected > state.confirmed[copy.id].revision
             && marker === await this.registryBodyMarker(copy.id, projected, copy.content)) continue;
         // Keep the confirmed base. A newer remote revision must conflict, not rebase this edit.
-        next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous,
+        next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous, source: 'cold-recovery',
           item: { ...previous, content: copy.content } });
       }
       await this.persist(next);
+      for (const intent of next.pending) if (!state.pending.includes(intent)) this.logIntent('Note intent recorded', intent);
     });
   }
 
@@ -372,7 +401,7 @@ export class NoteReplica {
     const item = relayNote(event.payload);
     if (!isNoteItem(item) || item.id !== event.id) return Promise.reject(new Error('Invalid note from disk watcher'));
     const head = confirmedNote(this.state, event.id);
-    return this.record([{ id: event.id, kind: head ? 'update' : 'create', item, previous: event.previous }]);
+    return this.record([{ id: event.id, kind: head ? 'update' : 'create', item, previous: event.previous }], 'disk-watch');
   }
 
   private error(error: unknown) {
@@ -435,10 +464,28 @@ export class NoteReplica {
     if (!next.pending.some((entry) => entry.id === intent.id)) {
       const current = confirmedNote(next, intent.id);
       if (current || fields.includes('folder')) {
-        await this.applyValue(intent.id, current?.item ?? null, current?.revision ?? 0, !!current && !current.item && !!intent.item && fields.length > 0);
+        try {
+          await this.applyValue(intent.id, current?.item ?? null, current?.revision ?? 0, !!current && !current.item && !!intent.item && fields.length > 0);
+        } catch (error) {
+          this.logIntent('Note projection failed', intent, { revision: current?.revision }, true);
+          throw error;
+        }
       }
     }
     await this.persist(next);
+    const log = () => {
+      if (!this.host.log) return;
+      const changed = fields.length && isNoteItem(intent.item) && isNoteItem(head.item) ? noteDifferences(intent.item, head.item) : undefined;
+      const known = ['title', 'type', 'folder', 'tags', 'attachments', 'status', 'priority', 'dueDate', 'reminder', 'duration', 'recurrence',
+        'subtasks', 'kanbanColumn', 'isPinned', 'isArchived', 'replyToId', 'linkedItemIds', 'streak', 'history', 'lastCompletedDate', 'summary', 'readingTimeMinutes'];
+      const reason = ['predecessor', 'folder', 'folders'].includes(fields[0]) ? fields[0]
+        : fields.length ? intent.base?.revision === head.revision ? 'different_base_or_transition' : 'revision_changed' : undefined;
+      this.logIntent(fields.length ? 'Note conflict saved' : intent.attempt ? 'Note accepted' : 'Equivalent note update skipped', intent,
+        { revision: head.revision, stage: intent.attempt ? 'receipt-or-feed' : 'prepare', reason,
+          bodyEqual: changed && !changed.includes('content'), properties: changed?.filter((key) => known.includes(key)) }, fields.length > 0);
+    };
+    if (this.batchLogs) this.batchLogs.push(log);
+    else log();
   }
 
   private async accept(head: NoteHead, applyKnown = false) {
@@ -745,7 +792,13 @@ export class NoteReplica {
     const timeout = setTimeout(() => this.results?.receive(null), WS_ACK_MS);
     try {
       const live = this.host.sendLive(JSON.stringify(data));
-      const response = (live ? await socketResult : null) ?? await this.host.channel.send(data.generation, requestId, ops, observedHead);
+      const meta = { generation: data.generation, requestId, count: ops.length, opIds: ops.map(({ opId }) => opId) };
+      if (live) this.host.log?.('Sending note operations', { ...meta, transport: 'ws' });
+      let response = live ? await socketResult : null;
+      if (!response) {
+        this.host.log?.('Sending note operations', { ...meta, transport: 'http', fallback: live });
+        response = await this.host.channel.send(data.generation, requestId, ops, observedHead);
+      }
       if (response.generation !== data.generation || response.requestId !== requestId
           || response.results.length !== ops.length || response.results.some((result, i) => result.opId !== ops[i].opId)) {
         throw new Error('Incomplete note operation results');
@@ -829,11 +882,18 @@ export class NoteReplica {
     if (!this.host.applyFolderGroup) throw new Error('Atomic folder projection is unavailable');
     if (folders || notes.length) await this.host.applyFolderGroup(notes, folders);
     await this.persist(next);
+    this.host.log?.(conflict ? 'Note group conflict saved' : 'Note group accepted', {
+      generation: this.host.generation, groupId: members[0].folderGroup?.id, count: members.length,
+      reason: conflict, acceptedStart,
+    }, Boolean(conflict));
   }
 
   private async clearRejectedAttempts(results: NoteResult[]) {
     // Only an explicit rejection proves these opIds did not commit. Network failures keep them intact.
     const rejected = new Set(results.filter(headRejected).map(({ opId }) => opId));
+    for (const intent of this.state.pending) if (intent.attempt && rejected.has(intent.attempt.op.opId)) {
+      this.logIntent('Note requires catch-up', intent, { reason: 'head_changed' });
+    }
     await this.persist({ ...this.state, pending: this.state.pending.map((intent) =>
       intent.attempt && rejected.has(intent.attempt.op.opId) ? { ...intent, attempt: undefined } : intent) });
   }
@@ -875,6 +935,7 @@ export class NoteReplica {
       const next = candidate(intent, head);
       await this.settle(intent, head, next.skip ? next.conflicts : [intent.kind]);
     } else {
+      this.logIntent('Note rejected', intent, { reason: result.code }, true);
       if (result.code === 'note_media_not_found') await this.refreshAttemptMedia(intent);
       throw new Error(`Релей не принял правку: ${result.code}`);
     }
@@ -884,18 +945,23 @@ export class NoteReplica {
     if (this.sending || this.host.signal.aborted) return;
     this.sending = true;
     let delay = PUSH_DELAY_MS;
-    let sendingIntents: string[] = [];
+    let dispatched: ReadonlySet<string> = this.sendingIntents;
     try {
       const pendingBefore = this.pendingCount;
       const { ops, observedHead } = await this.prepare();
       if (ops.length) {
         const ids = new Set(ops.map(({ opId }) => opId));
-        sendingIntents = this.state.pending.filter(({ attempt }) => attempt && ids.has(attempt.op.opId)).map(({ intentId }) => intentId);
-        if (sendingIntents.some((id) => this.failedIntents.has(id))) {
-          sendingIntents.forEach((id) => this.failedIntents.delete(id));
-          this.host.onDeliveryChange?.();
-        }
-        const results = await this.send(ops, observedHead);
+        const intents = this.state.pending.filter(({ attempt }) => attempt && ids.has(attempt.op.opId));
+        dispatched = this.sendingIntents = new Set(intents.map(({ intentId }) => intentId));
+        intents.forEach((intent) => {
+          const retry = this.failedIntents.delete(intent.intentId);
+          this.logIntent('Note attempt dispatched', intent, { retry });
+        });
+        const response = this.send(ops, observedHead);
+        this.host.onDeliveryChange?.();
+        const results = await response;
+        this.sendingIntents = new Set();
+        this.host.onDeliveryChange?.();
         await this.enqueue(async () => {
           if (ops[0].group) return this.applyGroupReceipt(ops, results);
           let failure: unknown;
@@ -916,10 +982,17 @@ export class NoteReplica {
       }
     } catch (error) {
       const pending = new Set(this.state.pending.map(({ intentId }) => intentId));
-      sendingIntents.forEach((id) => { if (pending.has(id)) this.failedIntents.add(id); });
+      for (const id of dispatched) if (pending.has(id)) this.failedIntents.add(id);
+      this.host.log?.('Note flush failed', { generation: this.host.generation,
+        stage: this.sendingIntents.size ? 'transport' : this.journalFailed ? 'journal' : 'prepare-or-receipt',
+        intentIds: [...dispatched] }, true);
       this.error(error);
       delay = RETRY_MS;
     } finally {
+      if (this.sendingIntents.size) {
+        this.sendingIntents.clear();
+        this.host.onDeliveryChange?.();
+      }
       this.sending = false;
       this.schedule(delay);
     }

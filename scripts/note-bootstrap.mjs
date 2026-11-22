@@ -97,6 +97,7 @@ else if (values.out) {
     ? await sealFolderRegistrySeed(keys, room, generation, plan, JSON.parse(await readFile(values['reviewed-folders'], 'utf8')), reviewedShared, prepareMedia)
     : { room, generation, ops: await sealBootstrap(keys, room, generation, plan, reviewedShared, prepareMedia) };
   if (unused?.size) throw new Error('Review contains unreferenced files');
+  Object.assign(seed, { writers: [...required].sort(), atomicGroups: Boolean(values['reviewed-folders']) });
   if (prepareMedia) Object.assign(seed, { registryMedia: true, media: [...media.values()] });
   if (reviewedShared !== undefined) seed.sharedRecords = true;
   await writeFile(values.out, JSON.stringify(seed), { flag: 'wx', mode: 0o600 });

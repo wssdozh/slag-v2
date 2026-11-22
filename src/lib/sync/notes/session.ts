@@ -13,6 +13,8 @@ export async function openNoteSession(options: {
   port: VaultPort; headers: (json: boolean) => Record<string, string>; readOnly: boolean;
   sendLive: (message: string) => boolean; onProgress: () => void; onError: (error: unknown) => void;
   onDeliveryChange?: () => void;
+  log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
+  onStatus?: (status: import('./wire.ts').NoteStatus) => void;
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
   hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => boolean;
 }, captureOnly = false) {
@@ -29,6 +31,7 @@ export async function openNoteSession(options: {
   const channel = new NoteChannel({ ...options, atomicGroups: supportsGroups, sharedRecords: supportsShared, registryMedia: supportsMedia });
   const status = captureOnly ? undefined : await channel.status();
   assertScope();
+  if (status) options.onStatus?.(status);
   if (status?.mode === 'legacy') {
     const stored = await options.port.readNoteRegistry?.();
     assertScope();
@@ -211,6 +214,7 @@ export async function openNoteSession(options: {
     verifyEnrollment: async (readOnly: boolean) => {
     const live = await channel.status();
     assertScope();
+    options.onStatus?.(live);
     if (live.mode !== 'registry' || live.generation !== generation || (live.folderTree === true) !== folderTree
         || (live.atomicGroups === true) !== atomicGroups || (live.sharedRecords === true) !== sharedRecords || (live.registryMedia === true) !== registryMedia) {
       throw new Error('Режим или поколение реестра изменились; локальная очередь сохранена');

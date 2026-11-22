@@ -104,6 +104,7 @@ export function loadNoteJournal(value: unknown, room: string, generation: number
     if (typeof id !== 'string' || !id || typeof intentId !== 'string' || !intentId || seen.has(intentId)
         || (kind !== 'create' && kind !== 'update' && kind !== 'delete' && kind !== 'restore')
         || !validItem(item, id) || (kind === 'delete') !== (item === null)
+        || (entry.source !== undefined && (typeof entry.source !== 'string' || !['app', 'disk-watch', 'cold-recovery', 'retry'].includes(entry.source)))
         || (predecessorConflict !== undefined && (predecessorConflict !== true || predecessor !== undefined || entry.attempt !== undefined))
         || predecessor !== chain.get(id)) throw new Error('Invalid persisted note intent');
     seen.add(intentId);

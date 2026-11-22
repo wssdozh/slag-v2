@@ -25,8 +25,11 @@ export interface JournalAttempt {
   item: RegistryValue;
   conflicts: string[];
 }
+export type NoteIntentSource = 'app' | 'disk-watch' | 'cold-recovery' | 'retry';
+
 export interface NoteIntent {
   intentId: string;
+  source?: NoteIntentSource;
   id: string;
   kind: JournalKind;
   item: RegistryValue;
@@ -67,7 +70,7 @@ export function confirmedNote(state: NoteJournal, id: string): NoteBase | undefi
   return Object.hasOwn(state.confirmed, id) ? state.confirmed[id] : undefined;
 }
 
-type JournalChange = Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item' | 'folderGroup'> & { previous?: Exclude<RegistryValue, null> };
+type JournalChange = Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item' | 'folderGroup' | 'source'> & { previous?: Exclude<RegistryValue, null> };
 
 export function recordNote(state: NoteJournal, change: JournalChange): NoteJournal {
   const normalize = (value: Exclude<RegistryValue, null>) => Array.isArray(value) || 'shared' in value ? value : relayNote(value);
@@ -82,13 +85,14 @@ export function recordNote(state: NoteJournal, change: JournalChange): NoteJourn
   if (!change.folderGroup && !previous && change.kind === 'update' && base && sameRegistryValue(base.item, item)) return state;
   // An unsent create/restore can absorb typing without changing what transition it proves.
   if (previous && !previous.attempt && !previous.folderGroup && !change.folderGroup && change.kind === 'update' && previous.item !== null) {
-    return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, item } : entry) };
+    return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, item, source: change.source ?? entry.source } : entry) };
   }
   return { ...state, pending: [...state.pending, { id: change.id, intentId: change.intentId, kind: change.kind,
-    item, base, predecessor: previous?.intentId, ...(change.folderGroup ? { folderGroup: change.folderGroup } : {}) }] };
+    item, base, predecessor: previous?.intentId, ...(change.source ? { source: change.source } : {}),
+    ...(change.folderGroup ? { folderGroup: change.folderGroup } : {}) }] };
 }
 
-export function recordFolderGroup(state: NoteJournal, groupId: string, changes: NoteMutation[], folders: FolderMeta[], previous: FolderMeta[]): NoteJournal {
+export function recordFolderGroup(state: NoteJournal, groupId: string, changes: NoteMutation[], folders: FolderMeta[], previous: FolderMeta[], source: NoteIntentSource = 'app'): NoteJournal {
   if (!groupId || state.pending.some(({ folderGroup }) => folderGroup?.id === groupId)
       || !changes.length || changes.length >= NOTE_BATCH_COUNT
       || new Set(changes.map(({ id }) => id)).size !== changes.length
@@ -99,7 +103,7 @@ export function recordFolderGroup(state: NoteJournal, groupId: string, changes: 
   const kind = confirmedNote(state, id) || state.pending.some((entry) => entry.id === id) ? 'update' : 'create';
   const members: Omit<JournalChange, 'intentId' | 'folderGroup'>[] = [...changes, { id, kind, item: readFolderTree(folders, kind), previous }];
   return members.reduce((journal, change, index) => recordNote(journal, { ...change,
-    intentId: crypto.randomUUID(), folderGroup: { id: groupId, index, size: members.length } }), state);
+    intentId: crypto.randomUUID(), source, folderGroup: { id: groupId, index, size: members.length } }), state);
 }
 
 export function firstPerNote(state: NoteJournal): NoteIntent[] {

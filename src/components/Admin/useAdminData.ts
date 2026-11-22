@@ -91,6 +91,8 @@ export interface AuditLog {
   createdAt: string | null;
 }
 
+export type RoomMigrationAction = 'note-freeze' | 'note-thaw' | 'note-activate';
+
 export interface AdminRoom {
   roomId: string;
   vaultId: string | null;
@@ -98,6 +100,9 @@ export interface AdminRoom {
   createdAt: string | null;
   bundlesCount: number;
   cacheBytes: number;
+  noteStatus?: { mode: 'legacy' | 'frozen' | 'registry'; generation: number; head: number };
+  noteMigration?: boolean;
+  noteWriters?: { id: string; name: string }[];
 }
 
 export interface AnalyticsData {

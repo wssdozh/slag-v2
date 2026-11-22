@@ -287,15 +287,27 @@ test('a confirmed task missing from a disk watch is not an explicit deletion', a
   assert.equal(server.sends(), 1);
 });
 
-test('the registry indicator tracks the current version and failed operation, not the socket', async (t) => {
+test('the indicator and journal distinguish equivalent versions, queue, transport and failure', async (t) => {
   const server = relay();
-  const { replica, errors } = device(t, server);
-  const item = note('card');
+  const send = server.view.send;
+  const logs = [];
+  const { replica, errors } = device(t, server, { log: (event, data) => logs.push({ event, data }) });
+  const item = note('card', { title: 'private diagnostic fixture' });
   assert.equal(replica.deliveryStatus(item), 'unconfirmed');
   await replica.catchUp();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  server.view.send = async (...args) => { await gate; return send(...args); };
   await replica.record([change('create', item)]);
   assert.equal(replica.deliveryStatus(item), 'pending');
+  await until(() => replica.deliveryStatus(item) === 'sending');
+  release();
   await until(() => replica.deliveryStatus(item) === 'accepted');
+  const equivalent = { ...item, isPinned: false, isArchived: false, replyToId: undefined };
+  assert.equal(replica.deliveryStatus(equivalent), 'accepted');
+  await replica.record([change('update', equivalent)]);
+  assert.equal(replica.pendingCount, 0);
+  assert.equal(replica.conflicts.length, 0);
   const edit = { ...item, content: 'second version' };
   assert.equal(replica.deliveryStatus(edit), 'unconfirmed');
   server.view.send = async () => { throw new Error('offline'); };
@@ -303,6 +315,10 @@ test('the registry indicator tracks the current version and failed operation, no
   await until(() => errors.length === 1);
   assert.equal(replica.deliveryStatus(edit), 'error');
   assert.equal(replica.pendingCount, 1);
+  const dispatched = logs.find(({ event }) => event === 'Note attempt dispatched');
+  assert.ok(dispatched?.data.opId);
+  assert.ok(logs.some(({ event, data }) => event === 'Note accepted' && data.intentId === dispatched.data.intentId));
+  assert.doesNotMatch(JSON.stringify(logs), /private diagnostic fixture|second version/);
 });
 
 test('read-only folder writes cannot be mistaken for durable intent capture', async (t) => {
@@ -685,14 +701,15 @@ test('relay deletion stays authoritative until an explicit conflict retry after 
   const [conflict] = reopened.conflicts;
   assert.deepEqual(conflict.item, local);
   await reopened.replica.catchUp();
-  await assert.rejects(reopened.replica.resolveConflict(conflict.intentId, 'retry', 1));
-  assert.equal(reopened.conflicts.length, 1);
-  await reopened.replica.resolveConflict(conflict.intentId, 'retry', 2);
+  const content = 'manually combined text';
+  await assert.rejects(reopened.replica.resolveConflict(conflict.intentId, 'retry', 1, content));
+  assert.deepEqual(reopened.conflicts[0].item, local);
+  await reopened.replica.resolveConflict(conflict.intentId, 'retry', 2, content);
   assert.equal(reopened.saved().pending[0].kind, 'restore');
   assert.deepEqual(reopened.saved().conflicts, []);
   await until(() => reopened.replica.pendingCount === 0);
   assert.equal(server.events.at(-1).kind, 'restore');
-  assert.deepEqual(reopened.local.get(base.id), local);
+  assert.deepEqual(reopened.local.get(base.id), { ...local, content });
 });
 
 test('failed conflict resolution keeps the alternative and never submits the retry', async (t) => {

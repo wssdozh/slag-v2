@@ -1,5 +1,8 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
 import React, { useEffect, useState } from 'react';
+import { DiffModal } from '../Modals/DiffModal';
+import { noteDifferences } from '../../lib/sync/notes/merge';
+import { isNoteItem } from '../../lib/sync/notes/wire';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { accountClient } from '../../lib/sync/account';
@@ -8,10 +11,17 @@ import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
 
+const propertyLabels: Record<string, string> = {
+  title: 'Заголовок', type: 'Тип', folder: 'Папка', tags: 'Теги', attachments: 'Вложения', status: 'Статус',
+  priority: 'Приоритет', dueDate: 'Срок', reminder: 'Напоминание', duration: 'Длительность', recurrence: 'Повтор',
+  subtasks: 'Подзадачи', isPinned: 'Закрепление', isArchived: 'Архив', linkedItemIds: 'Связанные записи',
+};
+
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
+  const noteRoom = syncEngine.getNoteRoomStatus();
   const conflicts = syncEngine.getNoteConflicts();
   const sections = new Map<string, typeof conflicts>();
   for (const entry of conflicts) {
@@ -20,24 +30,34 @@ export const SyncSettingsTab: React.FC = () => {
     if (entries) entries.push(entry);
     else sections.set(key, [entry]);
   }
-  const resolveConflict = async (entries: typeof conflicts, resolution: 'keep' | 'retry') => {
-    const [entry] = entries;
-    const groupId = entry.folderGroup?.id;
-    const keep = resolution === 'keep';
-    const retryLabel = groupId ? 'Повторить всю операцию' : 'Применить локальную';
-    if (!await confirmAction({
-      title: keep ? 'Оставить версию релея?' : groupId ? 'Повторить всю папочную операцию?' : 'Применить локальную правку?',
-      description: groupId ? (keep ? 'Весь перенос будет отклонён. Папки и заметки останутся как на релее.'
-        : 'Локальные версии дерева и всех записей будут отправлены вместе. Если хотя бы одна ревизия сменилась, пакет не применится.')
-        : keep ? 'Отклонённая правка будет удалена из списка конфликтов.'
-        : `Локальная правка будет отправлена поверх подтверждённой ревизии ${entry.currentRevision}. Если версия сменилась, синхронизация не перезапишет её.`,
-      confirmLabel: keep ? 'Оставить версию релея' : retryLabel, isDestructive: true,
-    })) return;
+  const [review, setReview] = useState<{ key: string; revisions: Record<string, number> }>();
+  const [decision, setDecision] = useState<'keep' | 'retry' | 'close'>();
+  const [draft, setDraft] = useState<string>();
+  const [reviewError, setReviewError] = useState('');
+  const [resolving, setResolving] = useState(false);
+  const reviewed = review ? sections.get(review.key) ?? [] : [];
+  const revisions = (entries: typeof conflicts) => Object.fromEntries(entries.map(({ noteId, currentRevision }) => [noteId, currentRevision]));
+  const changed = review && reviewed.some(({ noteId, currentRevision }) => review.revisions[noteId] !== currentRevision);
+  const dismissReview = () => { setDraft(undefined); setReview(undefined); setDecision(undefined); setReviewError(''); };
+  const closeReview = () => {
+    if (resolving) return;
+    if (draft !== undefined) setDecision('close');
+    else dismissReview();
+  };
+  const resolveConflict = async () => {
+    if (decision === 'close') { dismissReview(); return; }
+    if (!review || !decision || resolving || changed || !reviewed.length) return;
+    const [entry] = reviewed;
+    setResolving(true);
     try {
-      if (groupId) await syncEngine.resolveFolderConflict(groupId, resolution, Object.fromEntries(entries.map(({ noteId, currentRevision }) => [noteId, currentRevision])));
-      else await syncEngine.resolveNoteConflict(entry.intentId, resolution, entry.currentRevision);
+      if (entry.folderGroup) await syncEngine.resolveFolderConflict(entry.folderGroup.id, decision, review.revisions);
+      else await syncEngine.resolveNoteConflict(entry.intentId, decision, review.revisions[entry.noteId], decision === 'retry' ? draft : undefined);
+      dismissReview();
     } catch (error) {
-      addToast(error instanceof Error ? error.message : String(error), 'error');
+      setReviewError(error instanceof Error ? error.message : String(error));
+      setDecision(undefined);
+    } finally {
+      setResolving(false);
     }
   };
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
@@ -91,6 +111,9 @@ export const SyncSettingsTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-3">
       <SettingsGroup title="Синхронизация" action={<span className="text-2xs font-mono text-fg-dim">E2EE</span>}>
+        <SettingsRow label="Протокол заметок" description={noteRoom?.mode === 'registry' ? `Реестр · поколение ${noteRoom.generation}`
+          : noteRoom?.mode === 'frozen' ? `Подготовка · поколение ${noteRoom.generation}`
+            : noteRoom?.mode === 'legacy' ? 'Старый протокол' : 'Не подтверждён релеем'} />
         <SettingsRow label="Статус" description={
           <span role="status" className="flex flex-col gap-0.5 break-words">
             <span className="inline-flex items-center gap-1.5">
@@ -127,42 +150,56 @@ export const SyncSettingsTab: React.FC = () => {
       {conflicts.length > 0 && (
         <SettingsGroup title="Конфликты синхронизации">
           {[...sections].map(([key, entries]) => (
-            <React.Fragment key={key}>
-              {entries[0].folderGroup && <SettingsRow label="Папочная операция" description="Дерево и записи можно принять или отклонить только вместе." />}
-              {entries.map((entry) => <React.Fragment key={entry.intentId}>
-              <SettingsRow
-                label={Array.isArray(entry.item) ? 'Дерево папок' : entry.item && 'title' in entry.item ? entry.item.title || entry.noteId : entry.noteId}
-                description={`Локальная правка не принята · ревизия релея ${entry.currentRevision}`}
-              />
-              <SettingsRow label={(
-                <details className="text-xs text-fg-secondary">
-                  <summary className="cursor-pointer">Сравнить версии</summary>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {[['Релей', entry.currentItem], ['Локально', entry.item]].map(([label, item]) => (
-                      <div key={String(label)} className="min-w-0">
-                        <p className="text-fg-primary">{String(label)}</p>
-                        <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all">{
-                          item === null ? 'Нет записи' : JSON.stringify(item, null, 2)
-                        }</pre>
-                      </div>
-                    ))}
-                  </div>
-                </details>
-              )} />
-              </React.Fragment>)}
-              <SettingsRow label="Решение" right={(
-                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1">
-                  <button type="button" className="text-xs text-fg-primary hover:underline" onClick={() => void resolveConflict(entries, 'keep')}>Оставить версию релея</button>
-                  <button type="button" disabled={config.localSyncMode === 'receive-only' || (!!entries[0].folderGroup && entries.some(({ currentItem }) => currentItem === null))} className="text-xs text-fg-primary hover:underline disabled:opacity-40" onClick={() => void resolveConflict(entries, 'retry')}>
-                    {entries[0].folderGroup ? 'Повторить всю операцию' : 'Применить локальную'}
-                  </button>
-                </div>
-              )} />
-              <SettingsDivider />
-            </React.Fragment>
+            <SettingsRow key={key}
+              label={entries[0].folderGroup ? 'Папочная операция' : isNoteItem(entries[0].item) ? entries[0].item.title || 'Запись' : isNoteItem(entries[0].currentItem) ? entries[0].currentItem.title || 'Запись' : 'Запись'}
+              description={entries[0].folderGroup ? `Записей и дерево: ${entries.length}` : `Локальная правка не принята · ревизия релея ${entries[0].currentRevision}`}
+              right={<button type="button" className="px-3 py-2 text-xs hover:underline" onClick={() => {
+                setDecision(undefined); setReviewError(''); setReview({ key, revisions: revisions(entries) });
+              }}>Сравнить</button>}
+            />
           ))}
         </SettingsGroup>
       )}
+
+      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ item, currentItem, currentRevision, folderGroup }) => {
+        const before = isNoteItem(currentItem) ? currentItem : undefined;
+        const after = isNoteItem(item) ? item : undefined;
+        const show = (value: unknown) => typeof value === 'string' ? value || 'Пусто' : value === undefined ? 'Не задано' : JSON.stringify(value);
+        const properties = before && after ? noteDifferences(before, after).filter((key) => key !== 'content').map((key) => ({
+          label: propertyLabels[key] ?? key,
+          oldValue: show((before as unknown as Record<string, unknown>)[key]),
+          newValue: show((after as unknown as Record<string, unknown>)[key]),
+        })) : [];
+        const snapshot = (value: typeof item) => Array.isArray(value)
+          ? value.map((folder) => JSON.stringify(folder)).join('\n')
+          : value && 'shared' in value ? JSON.stringify(value.shared, null, 2) : '';
+        const sample = item ?? currentItem;
+        return { title: (after ?? before)?.title || (Array.isArray(sample) ? 'Дерево папок' : sample && 'shared' in sample ? 'Общие данные' : 'Запись'), comparison: {
+          before: before?.content ?? snapshot(currentItem), after: draft ?? after?.content ?? snapshot(item), properties,
+          onEdit: after && !folderGroup && config.localSyncMode !== 'receive-only' && !reviewed[0]?.folderGroup && !resolving && !decision
+            ? (value: string) => setDraft(value === after.content ? undefined : value) : undefined,
+          message: !currentItem ? currentRevision ? 'Запись удалена на релее' : 'Версия релея недоступна' : !item ? 'Локальная операция: удалить запись' : undefined,
+        } };
+      })} actions={(
+        <div className="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-2 text-xs">
+          {changed && decision !== 'close' ? <>
+            <span role="status">Версия изменилась. Сравнение обновлено.</span>
+            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" onClick={() => {
+              if (review) setReview({ ...review, revisions: revisions(reviewed) });
+              setDecision(undefined); setReviewError('');
+            }}>Проверить новую версию</button>
+          </> : decision ? <>
+            <span>{decision === 'close' ? 'Закрыть без изменений? Несохранённый текст пропадёт.' : decision === 'keep' ? 'Удалить отклонённую правку из списка?' : 'Отправить правку поверх просмотренной версии?'}</span>
+            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" disabled={resolving} onClick={() => void resolveConflict()}>Подтвердить</button>
+            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" disabled={resolving} onClick={() => setDecision(undefined)}>Отмена</button>
+          </> : <>
+            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" onClick={() => setDecision('keep')}>Оставить версию релея</button>
+            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover disabled:opacity-40" disabled={config.localSyncMode === 'receive-only' || (!!reviewed[0]?.folderGroup && reviewed.some(({ currentItem }) => currentItem === null))}
+              onClick={() => setDecision('retry')}>{reviewed[0]?.folderGroup ? 'Повторить всю операцию' : 'Отправить мою правку'}</button>
+          </>}
+          {reviewError && <span role="alert" className="text-danger">{reviewError}</span>}
+        </div>
+      )} />
 
       <SettingsGroup title="Безопасность">
         <SettingsRow label="Смена ключа хранилища" danger right={

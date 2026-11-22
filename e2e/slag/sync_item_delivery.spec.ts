@@ -27,6 +27,7 @@ test('the note dot follows a failed push and the relay receipt for the current v
     syncEngine.scheduleRetry = () => {};
     const op = { opId: 'card-dot-op', kind: 'item', action: 'upsert', id, timestamp: item.updatedAt, payload: item };
     syncEngine.getOutbox().enqueue(op);
+    syncEngine.itemDeliveryLedger = undefined;
     window.testItemDeliveryPush = () => syncEngine.deliverPushOverHttp({ bundleId: 'card-dot-bundle', encrypted: {},
       frame: new Uint8Array(), stateHash: 'test', opIds: [op.opId], packedHashes: { [key]: hash },
       changes: 1, settled: false, fallbackTimer: null });
@@ -44,7 +45,7 @@ test('the note dot follows a failed push and the relay receipt for the current v
     const card = element.parentElement!.getBoundingClientRect();
     return [point.top - card.top, card.right - point.right, point.width];
   });
-  expect(insets).toEqual([6, 6, 6]);
+  expect(insets).toEqual([6, 6, 12]);
   await card.screenshot({ path: 'test-results/screenshots/sync-item-delivery.png' });
   const edited = await page.evaluate(async (id) => {
     const { syncEngine, storage } = await import('/src/lib/sync/syncEngine.ts');

@@ -4,13 +4,16 @@ import { stripAttachmentData } from '../../../lib/storage/attachmentData';
 import { computeHash } from '../../../lib/sync/crypto';
 import { syncEngine } from '../../../lib/sync/syncEngine';
 
+import { Icon } from '../../UI/icons/Icon';
+
 const indicators = {
-  local: ['Только на этом устройстве', 'border border-fg-muted'],
-  unconfirmed: ['Нет подтверждения от релея', 'border border-fg-secondary'],
-  pending: ['Ожидает отправки или подтверждения', 'bg-warning'],
-  accepted: ['Версия записи принята релеем', 'bg-success'],
-  error: ['Ошибка отправки: подтверждение не получено', 'bg-danger'],
-  conflict: ['Конфликт версий — откройте настройки синхронизации', 'bg-danger'],
+  local: ['Только на этом устройстве', 'status.todo', 'text-fg-muted'],
+  unconfirmed: ['Нет подтверждения от релея', 'status.backlog', 'text-fg-secondary'],
+  pending: ['В очереди на отправку', 'time.time', 'text-fg-secondary'],
+  sending: ['Отправляем или ждём ответа релея', 'action.refresh', 'text-accent motion-safe:animate-spin'],
+  accepted: ['Версия записи принята релеем', 'status.checked', 'text-success'],
+  error: ['Ошибка отправки: подтверждение не получено', 'status.alert', 'text-danger'],
+  conflict: ['Конфликт версий — откройте настройки синхронизации', 'status.warning', 'text-danger'],
 } as const;
 
 const subscribe = (listener: () => void) => syncEngine.subscribe(listener);
@@ -29,8 +32,8 @@ export function ItemSyncDot({ item }: { item: SlagItem }) {
   const hash = fingerprint?.item === item ? fingerprint.hash : undefined;
   const snapshot = useCallback(() => syncEngine.getItemDeliveryStatus(item, hash), [item, hash]);
   const status = useSyncExternalStore(subscribe, snapshot);
-  const [label, color] = indicators[status];
-  // On the 12px card radius, a 6px inset leaves the 6px dot ~4.8px of air at the diagonal.
-  return <span className={`absolute end-1.5 top-1.5 z-30 size-1.5 rounded-full ${color}`}
-    role="img" aria-label={label} title={label} data-sync-status={status} />;
+  const [label, icon, tone] = indicators[status];
+  return <span className="absolute end-1.5 top-1.5 z-30" role="img" aria-label={label} title={label} data-sync-status={status}>
+    <Icon name={icon} tone="inherit" className={`size-3 ${tone}`} />
+  </span>;
 }

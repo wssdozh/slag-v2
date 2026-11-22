@@ -118,6 +118,9 @@ export class SyncEngine {
   public activeRoomId: string | null = null;
   private noteAbort?: AbortController;
   private noteSession: Awaited<ReturnType<typeof openNoteSession>> = null;
+  private noteRoomStatus?: import('./notes/wire').NoteStatus;
+
+  getNoteRoomStatus() { return this.noteRoomStatus; }
   private noteError: string | null = null;
   get noteGeneration() { return this.noteSession?.generation; }
   get hasFolderTreeRegistry() { return this.noteSession?.folderTree === true; }
@@ -403,7 +406,7 @@ export class SyncEngine {
     const queued = ledger.queued.has(item.id);
     if (this.activeRoomId && hash) {
       if (ledger.sent[key] === hash && !queued) return 'accepted';
-      if ([...this.pendingPushes.values()].some((push) => push.packedHashes[key] === hash)) return 'pending';
+      if ([...this.pendingPushes.values()].some((push) => push.packedHashes[key] === hash)) return 'sending';
       if (this.failedItemHashes.get(key) === hash) return 'error';
     }
     return queued ? 'pending' : 'unconfirmed';
@@ -417,10 +420,10 @@ export class SyncEngine {
     }) ?? [];
   }
 
-  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number) {
+  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string) {
     const replica = this.noteSession?.replica;
     if (!replica) throw new Error('Реестр синхронизации недоступен');
-    await replica.resolveConflict(intentId, resolution, reviewedRevision);
+    await replica.resolveConflict(intentId, resolution, reviewedRevision, content);
   }
 
   public async resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>) {
@@ -1082,11 +1085,13 @@ export class SyncEngine {
       const accountRoom = async (id: string) =>
         `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', id, legacyRoomId]))).slice(0, 32)}`;
       const controller = this.noteAbort = new AbortController();
-      const noteOptions = (roomId: string, syncVaultId: string) => ({
+      const noteOptions = (roomId: string, syncVaultId: string): Parameters<typeof openNoteSession>[0] => ({
         serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
         signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
         readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
         onDeliveryChange: () => this.notify(),
+        onStatus: (status) => { if (generation === this.initGeneration) { this.noteRoomStatus = status; this.notify(); } },
+        log: (event, data, warning) => warning ? syncLog.warn(event, data) : syncLog.debug(event, data),
         onError: (error: unknown) => this.reportNoteError(error), onProgress: () => {
           if (controller.signal.aborted) return;
           if (this.noteSession?.replica.syncHealth === 'current') this.noteError = null;
@@ -1563,6 +1568,7 @@ export class SyncEngine {
     this.noteAbort?.abort();
     this.noteAbort = undefined;
     this.noteSession = null;
+    this.noteRoomStatus = undefined;
     this.noteError = null;
     // A retry belongs to the session it was armed in; a vault switch must not inherit it.
     this.clearRetryTimer();

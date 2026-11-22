@@ -1,7 +1,8 @@
 // Admin relay tab: uptime, rooms, storage and the purge/cleanup/vacuum controls.
 import React from 'react';
+import { RoomMigration } from './RoomMigration';
 import { BarChart } from '../Charts';
-import type { AdminRoom, AdminStats, AnalyticsData } from '../useAdminData';
+import type { AdminRoom, AdminStats, AnalyticsData, RoomMigrationAction } from '../useAdminData';
 import { formatBytes } from '../../../lib/text/formatBytes';
 import { shortId } from '../../../lib/text/shortId';
 import { Icon } from '../../UI/icons/Icon';
@@ -14,6 +15,7 @@ interface RelayTabProps {
   onPurgeRoom: (roomId: string) => void;
   onCleanup: () => void;
   onVacuum: () => void;
+  onMigrateRoom: (roomId: string, action: RoomMigrationAction, body: object) => Promise<void>;
 }
 
 function formatUptime(seconds: number): string {
@@ -34,6 +36,7 @@ export const RelayTab: React.FC<RelayTabProps> = ({
   onPurgeRoom,
   onCleanup,
   onVacuum,
+  onMigrateRoom,
 }) => {
   return (
     <div className="flex flex-col gap-6">
@@ -211,6 +214,7 @@ export const RelayTab: React.FC<RelayTabProps> = ({
                   </span>
                 )}
               </div>
+              <RoomMigration key={r.roomId} room={r} onAction={onMigrateRoom} disabled={actionBusy} />
               <div className="flex items-center gap-4 text-2xs font-mono text-fg-secondary shrink-0">
                 <span>бандлов: {r.bundlesCount}</span>
                 <span>кеш: {formatBytes(r.cacheBytes) || '0 B'}</span>
