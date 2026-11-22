@@ -5,6 +5,7 @@ import { getTodayString } from '../lib/time/dateUtils';
 import { getRecurringOccurrencesInRange } from '../lib/time/recurrenceHelper';
 import { reminderClock, reminderToIso } from '../lib/time/reminder';
 import { DEFAULT_INBOX_FOLDER } from '../config';
+import { matchesTaskQuickFilter, type TaskQuickFilter } from '../lib/tasks/taskQuickFilter';
 
 export interface CalendarTask extends SlagItem {
   isVirtual?: boolean;
@@ -16,6 +17,7 @@ export interface UseCalendarScheduleParams {
   filterByFolder?: boolean;
   rangeStart?: string;
   rangeEnd?: string;
+  taskFilter?: TaskQuickFilter;
 }
 
 export interface CalendarScheduleResult {
@@ -32,10 +34,12 @@ export function useCalendarSchedule({
   filterByFolder = false,
   rangeStart,
   rangeEnd,
+  taskFilter,
 }: UseCalendarScheduleParams): CalendarScheduleResult {
-  const todayStr = useMemo(() => getTodayString(), []);
+  const initialDay = useMemo(() => getTodayString(), []);
+  const todayStr = taskFilter?.today ?? initialDay;
 
-  const scopedTasks = useMemo(() => {
+  const folderTasks = useMemo(() => {
     return items.filter((item) => {
       const isTaskLike =
         item.type === 'task' || (item.subtasks && item.subtasks.length > 0);
@@ -48,6 +52,10 @@ export function useCalendarSchedule({
     });
   }, [items, currentFolder, filterByFolder]);
 
+  const scopedTasks = useMemo(() => taskFilter
+    ? folderTasks.filter(item => (currentFolder !== DEFAULT_INBOX_FOLDER || item.folder === currentFolder)
+      && matchesTaskQuickFilter(item, taskFilter)) : folderTasks, [folderTasks, currentFolder, taskFilter]);
+
   const overdueTasks = useMemo(() => {
     return scopedTasks
       .filter((t) => t.status !== 'done' && t.dueDate && t.dueDate < todayStr)
@@ -55,15 +63,15 @@ export function useCalendarSchedule({
   }, [scopedTasks, todayStr]);
 
   const unscheduledTasks = useMemo(() => {
-    return scopedTasks.filter((t) => t.status !== 'done' && !t.dueDate);
-  }, [scopedTasks]);
+    return scopedTasks.filter((t) => !t.dueDate && (taskFilter?.id === 'completed' || t.status !== 'done'));
+  }, [scopedTasks, taskFilter?.id]);
 
   const tasksByDate = useMemo(() => {
     const map = new Map<string, CalendarTask[]>();
 
     // 1. Place real tasks
     scopedTasks.forEach((task) => {
-      if (task.dueDate) {
+      if (task.dueDate && (taskFilter?.id !== 'today' || task.dueDate === todayStr)) {
         const list = map.get(task.dueDate) || [];
         list.push(task);
         map.set(task.dueDate, list);
@@ -78,7 +86,8 @@ export function useCalendarSchedule({
       if (task.recurrence && task.dueDate && task.status !== 'done') {
         const occurrences = getRecurringOccurrencesInRange(task, startRange, endRange);
         occurrences.forEach((occDate) => {
-          if (occDate !== task.dueDate) {
+          const matchesDate = !taskFilter || (taskFilter.id === 'today' ? occDate === todayStr : occDate > todayStr);
+          if (occDate !== task.dueDate && matchesDate) {
             const list = map.get(occDate) || [];
             if (!list.some((it) => it.id.startsWith(task.id + '_virtual_'))) {
               // Проекция несёт тот же час, но свой день: собираем момент тем же модулем, что и
@@ -102,7 +111,7 @@ export function useCalendarSchedule({
     });
 
     return map;
-  }, [scopedTasks, todayStr, rangeStart, rangeEnd]);
+  }, [scopedTasks, todayStr, rangeStart, rangeEnd, taskFilter]);
 
   return {
     allTasks: scopedTasks,

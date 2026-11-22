@@ -1,6 +1,7 @@
 // Which records the feed shows and in what order — the inbox's three modes as a pure filter.
 import type { AiItemFilter, InboxMode, SlagItem, SlagItemType, SortField, SortOrder } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { matchesTaskQuickFilter, type TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 
 /**
  * Which records the feed shows, and in what order.
@@ -21,7 +22,14 @@ export interface FeedViewQuery {
   sortOrder: SortOrder;
 }
 
-export function selectVisibleItems(items: SlagItem[], query: FeedViewQuery): SlagItem[] {
+export function hasFeedFilters(query: Omit<FeedViewQuery, 'sortBy' | 'sortOrder'>): boolean {
+  return query.activeTypeFilter !== 'all' ||
+    (query.currentFolder === DEFAULT_INBOX_FOLDER && query.inboxMode !== 'all') ||
+    query.isPinnedOnlyFilter || query.hideCompletedTasks ||
+    Boolean(query.activeTagFilter) || Boolean(query.aiItemFilter);
+}
+
+export function selectVisibleItems(items: SlagItem[], query: FeedViewQuery, taskFilter?: TaskQuickFilter): SlagItem[] {
   const {
     currentFolder,
     inboxMode,
@@ -34,13 +42,14 @@ export function selectVisibleItems(items: SlagItem[], query: FeedViewQuery): Sla
     sortOrder,
   } = query;
 
+  const itemIds = aiItemFilter ? new Set(aiItemFilter.itemIds) : null;
   return items
     .filter((item) => {
       let matchesFolder = false;
-      if (aiItemFilter) {
+      if (aiItemFilter && !taskFilter) {
         matchesFolder = true;
       } else if (currentFolder === DEFAULT_INBOX_FOLDER) {
-        if (inboxMode === 'unsorted') {
+        if (taskFilter || inboxMode === 'unsorted') {
           matchesFolder = item.folder === DEFAULT_INBOX_FOLDER;
         } else if (inboxMode === 'all') {
           matchesFolder = true;
@@ -52,11 +61,15 @@ export function selectVisibleItems(items: SlagItem[], query: FeedViewQuery): Sla
       }
 
       if (!matchesFolder) return false;
-      if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
+      if (taskFilter) {
+        if (!matchesTaskQuickFilter(item, taskFilter)) return false;
+      } else {
+        if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
+        if (hideCompletedTasks && item.type === 'task' && item.status === 'done') return false;
+      }
       if (activeTagFilter && !item.tags.includes(activeTagFilter)) return false;
       if (isPinnedOnlyFilter && !item.isPinned) return false;
-      if (aiItemFilter && !aiItemFilter.itemIds.includes(item.id)) return false;
-      if (hideCompletedTasks && item.type === 'task' && item.status === 'done') return false;
+      if (aiItemFilter && !itemIds?.has(item.id)) return false;
 
       return true;
     })

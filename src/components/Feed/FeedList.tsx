@@ -1,4 +1,6 @@
 // The feed: render window, sentinels and the composition of cards; the edges live in `list/`.
+import { selectVisibleItems } from '../../context/feed/feedView';
+import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import React, {
   useEffect,
   useLayoutEffect,
@@ -47,9 +49,8 @@ function getTodayMidnight() {
   return d.getTime();
 }
 
-export const FeedList: React.FC = () => {
+export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilter }) => {
   const {
-    filteredItems,
     items,
     seedDemoData,
     openContextMenu,
@@ -104,6 +105,12 @@ export const FeedList: React.FC = () => {
     return { countMap, firstReplyMap };
   }, [items]);
 
+  const filteredItems = useMemo(() => selectVisibleItems(items, {
+    currentFolder, inboxMode, activeTypeFilter, activeTagFilter, isPinnedOnlyFilter,
+    hideCompletedTasks, aiItemFilter, sortBy, sortOrder,
+  }, taskFilter), [items, currentFolder, inboxMode, activeTypeFilter, activeTagFilter,
+    isPinnedOnlyFilter, hideCompletedTasks, aiItemFilter, sortBy, sortOrder, taskFilter]);
+
   // Windowed items: последние `windowSize` записей, новее всегда в кадре
   const windowedItems = useMemo(() => takeWindow(filteredItems, windowSize), [filteredItems, windowSize]);
 
@@ -140,7 +147,7 @@ export const FeedList: React.FC = () => {
   }, [attachmentSrcs, filteredItems, openLightbox]);
 
   // Sync state during render on folder or filter change (React pure pattern)
-  const filterKey = `${currentFolder}:${activeTypeFilter}:${activeTagFilter || ''}`;
+  const filterKey = JSON.stringify([currentFolder, activeTypeFilter, activeTagFilter, taskFilter?.id, taskFilter?.today]);
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
   if (prevFilterKey !== filterKey) {
     setPrevFilterKey(filterKey);
@@ -460,7 +467,9 @@ export const FeedList: React.FC = () => {
         {/* Drag & Drop Visual Dropzone Overlay */}
         <FeedDropOverlay isVisible={isDraggingOver} />
 
-        {filteredItems.length === 0 ? (
+        {filteredItems.length === 0 ? taskFilter ? (
+          <EmptyState icon={<Icon name="action.filter" size="lg" />} title="Нет задач по этому фильтру" />
+        ) : (
           <EmptyState
             icon={
               isPinnedOnlyFilter ? (

@@ -1,5 +1,5 @@
 // The desktop calendar: month and week grids, drag to reschedule, and the overdue drawer.
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { getTaskTimeSlot } from '../../lib/time/todoistTaskParser';
 import { computeAntiOverlapLayout } from '../../lib/time/calendarLayout';
@@ -28,10 +28,11 @@ import { AllDayTaskPill, TimedTaskBlock } from './CalendarTaskBlock';
 import { CalendarMonthView } from './CalendarMonthView';
 import { CalendarExpandedDayModal } from './CalendarExpandedDayModal';
 import { CalendarDrawer } from './CalendarDrawer';
+import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-export const CalendarView: React.FC = () => {
+export const CalendarView: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilter }) => {
   const {
     items,
     currentFolder,
@@ -258,6 +259,7 @@ export const CalendarView: React.FC = () => {
   }, [viewMode, weekDays, monthCells]);
 
   const {
+    allTasks,
     overdueTasks,
     unscheduledTasks,
     tasksByDate: tasksByDueDate,
@@ -268,7 +270,39 @@ export const CalendarView: React.FC = () => {
     filterByFolder: true,
     rangeStart,
     rangeEnd,
+    taskFilter,
   });
+
+  const filterId = taskFilter?.id;
+  const [previousFilter, setPreviousFilter] = useState<typeof filterId>();
+  if (previousFilter !== filterId) {
+    setPreviousFilter(filterId);
+    if (filterId === 'today') {
+      setCurrentDate(new Date(`${todayStr}T12:00:00`));
+      setDrawerTab('overdue');
+      setIsDrawerOpen(overdueTasks.length > 0);
+    } else if (filterId === 'upcoming') {
+      const firstDate = allTasks.reduce<string | undefined>((first, task) =>
+        task.dueDate && (!first || task.dueDate < first) ? task.dueDate : first, undefined);
+      if (firstDate) setCurrentDate(new Date(`${firstDate}T12:00:00`));
+      setIsDrawerOpen(false);
+    } else if (filterId === 'undated' || filterId === 'completed') {
+      setDrawerTab('unscheduled');
+      setIsDrawerOpen(filterId === 'undated' || unscheduledTasks.length > 0);
+    }
+  }
+
+  const scrollWeekToDay = useCallback((day: string, behavior: ScrollBehavior = 'instant') => {
+    const container = weekHorizontalScrollRef.current;
+    const index = weekDays.findIndex(date => getISODateString(date) === day);
+    if (!container || index < 0 || container.scrollWidth <= container.clientWidth) return;
+    const columnWidth = (container.scrollWidth - 56) / 7;
+    container.scrollTo({ left: Math.max(0, 56 + index * columnWidth - container.clientWidth / 2), behavior });
+  }, [weekDays]);
+
+  const revealTodayAfterDrawerOpens = useCallback(() => {
+    if (filterId === 'today') scrollWeekToDay(todayStr);
+  }, [filterId, scrollWeekToDay, todayStr]);
 
   useEffect(() => {
     if (viewMode === 'week') {
@@ -277,17 +311,13 @@ export const CalendarView: React.FC = () => {
         const scrollHour = Math.max(0, currentHour - 1);
         timeGridRef.current.scrollTop = scrollHour * hourHeightRef.current;
       }
-      if (weekHorizontalScrollRef.current) {
-        const container = weekHorizontalScrollRef.current;
-        const todayIndex = weekDays.findIndex(d => getISODateString(d) === todayStr);
-        if (todayIndex > 1 && container.scrollWidth > container.clientWidth) {
-          const colWidth = (container.scrollWidth - 56) / 7;
-          const targetScrollLeft = Math.max(0, 56 + todayIndex * colWidth - container.clientWidth / 2);
-          container.scrollLeft = targetScrollLeft;
-        }
-      }
     }
-  }, [viewMode, currentDate, weekDays, todayStr, nowMinute, hourHeightRef]);
+  }, [viewMode, currentDate, nowMinute, hourHeightRef]);
+
+  useEffect(() => {
+    if (filterId === 'upcoming') scrollWeekToDay(getISODateString(currentDate));
+    else scrollWeekToDay(todayStr);
+  }, [currentDate, filterId, scrollWeekToDay, todayStr, viewMode]);
 
   const handlePrev = () => {
     setCurrentDate(prev => {
@@ -315,15 +345,7 @@ export const CalendarView: React.FC = () => {
 
   const handleToday = () => {
     setCurrentDate(new Date());
-    if (weekHorizontalScrollRef.current) {
-      const container = weekHorizontalScrollRef.current;
-      const todayIndex = weekDays.findIndex(d => getISODateString(d) === todayStr);
-      if (todayIndex >= 0 && container.scrollWidth > container.clientWidth) {
-        const colWidth = (container.scrollWidth - 56) / 7;
-        const targetScrollLeft = Math.max(0, 56 + todayIndex * colWidth - container.clientWidth / 2);
-        container.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
-      }
-    }
+    scrollWeekToDay(todayStr, 'smooth');
   };
 
   const headerTitle = useMemo(() => {
@@ -500,6 +522,8 @@ export const CalendarView: React.FC = () => {
           setIsDrawerOpen={setIsDrawerOpen}
           overdueTasks={overdueTasks}
           unscheduledTasks={unscheduledTasks}
+          isCompletedFilter={filterId === 'completed'}
+          onOpenTransitionEnd={revealTodayAfterDrawerOpens}
           isDragging={isDragging}
           activeZoneData={activeZoneData}
           draggingTaskId={draggingTaskId}

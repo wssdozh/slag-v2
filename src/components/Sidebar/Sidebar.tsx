@@ -7,6 +7,16 @@ import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Icon } from '../UI/icons/Icon';
 import { SyncStatusButton } from './SyncStatusButton';
+import { TASK_QUICK_FILTER_LABELS } from '../../lib/tasks/taskQuickFilter';
+import { useWorkspaceTaskFilterContext } from '../Workspace/workspaceTaskFilterContext';
+
+const taskLinks = [
+  { id: 'today', icon: 'time.date', color: 'text-warning' },
+  { id: 'upcoming', icon: 'time.agenda', color: 'text-accent' },
+  { id: 'undated', icon: 'time.time', color: 'text-fg-secondary' },
+  { id: 'completed', icon: 'entity.taskList', color: 'text-success' },
+] as const;
+
 export const Sidebar: React.FC = () => {
   const {
     vault,
@@ -23,6 +33,8 @@ export const Sidebar: React.FC = () => {
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
   const bottomBarRef = useRef<HTMLDivElement>(null);
   const getVaultAnchor = useCallback(() => bottomBarRef.current, []);
+  const { panelId, filter, toggleFilter } = useWorkspaceTaskFilterContext();
+  const isInboxActive = currentFolder === DEFAULT_INBOX_FOLDER;
 
   return (
     <aside
@@ -31,24 +43,29 @@ export const Sidebar: React.FC = () => {
       {/* Main Folder Navigation */}
       <div className="flex-1 overflow-y-auto px-2 py-3 flex flex-col gap-3">
         {/* Pinned Inbox */}
-        <div>
-          <button
+        <nav aria-label="Входящие">
+          <button type="button" aria-current={isInboxActive ? 'page' : undefined}
             onClick={() => setCurrentFolder(DEFAULT_INBOX_FOLDER)}
-            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors ${
-              currentFolder === DEFAULT_INBOX_FOLDER
-                ? 'bg-tint-8 text-white font-medium'
-                : 'text-fg-tertiary hover:text-white hover:bg-tint-4'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Icon name="entity.inbox" size="md" tone="tertiary" />
-              <span>{DEFAULT_INBOX_FOLDER}</span>
-            </div>
+            className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors focus-visible:bg-tint-10 ${isInboxActive ? 'bg-tint-8 font-medium text-fg-primary' : 'text-fg-secondary hover:bg-tint-4 hover:text-fg-primary'}`}>
+            <Icon name="entity.inbox" size="md" tone="inherit" className="shrink-0 text-accent" />
+            <span>{DEFAULT_INBOX_FOLDER}</span>
           </button>
+        </nav>
+        <div role="group" aria-label="Быстрые фильтры задач" data-testid="task-quick-filters">
+          {taskLinks.map(({ id, icon, color }) => {
+            const active = filter?.id === id;
+            return (
+              <button key={id} type="button" onClick={() => toggleFilter?.(id)} disabled={!panelId} aria-pressed={active}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors focus-visible:bg-tint-10 disabled:opacity-50 ${active ? 'bg-tint-8 font-medium text-fg-primary' : 'text-fg-secondary hover:bg-tint-4 hover:text-fg-primary'}`}>
+                <Icon name={icon} size="md" tone="inherit" className={`shrink-0 ${color}`} />
+                <span className="min-w-0 flex-1 truncate text-start">{TASK_QUICK_FILTER_LABELS[id]}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Folders Section Header */}
-        <div className="pt-2 flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between px-2.5 py-1 text-2xs font-mono font-medium text-fg-muted tracking-wider uppercase">
             <span>Папки</span>
             <button

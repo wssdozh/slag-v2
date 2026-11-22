@@ -25,8 +25,8 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
     const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]');
     await expect(dotsBtn).toBeVisible();
 
-    // Verify SVG icon inside 3-dots button has MoreVertical icon (3 vertical dots: vertical line of circles/paths)
     await expect(dotsBtn.locator('[data-icon="action.more"]')).toBeVisible();
+    await expect(dotsBtn).toHaveText('');
 
     // Verify old segmented filter bars are NOT rendered on the screen
     await expect(page.locator('div[aria-label="Фильтр входящих"]')).not.toBeVisible();
@@ -45,9 +45,12 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
     await expect(modal).toBeVisible();
 
     // Verify modal content
-    await expect(modal.locator('text=Режим отображения')).toBeVisible();
-    await expect(modal.locator('text=Сортировка')).toBeVisible();
-    await expect(modal.locator('text=Фильтрация записей')).toBeVisible();
+    await expect(modal.getByRole('group', { name: 'Режим отображения' })).toBeVisible();
+    await expect(modal.getByRole('button', { name: 'Сортировка' })).toBeVisible();
+    await expect(modal.getByRole('button', { name: /^Фильтры/ })).toBeVisible();
+    const bounds = (await modal.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
 
     // Capture screenshot of the modal open on mobile
     await page.screenshot({
@@ -56,6 +59,7 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
     });
 
     // 6. Select "Таски" type filter in modal
+    await modal.getByRole('button', { name: /^Фильтры/ }).click();
     const taskFilterBtn = modal.locator('button', { hasText: 'Таски' });
     await expect(taskFilterBtn).toBeVisible();
     await taskFilterBtn.click();

@@ -2,12 +2,14 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
+import { hasFeedFilters } from '../../context/feed/feedView';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { Icon, type IconProps } from '../UI/icons/Icon';
 
 export interface ActiveFilterBadgesProps {
   className?: string;
   badgeClassName?: string;
+  ignoreTypeAndCompletion?: boolean;
 }
 
 const FilterBadge: React.FC<{
@@ -34,6 +36,7 @@ const FilterBadge: React.FC<{
 export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
   className = '',
   badgeClassName = 'h-6 text-2xs',
+  ignoreTypeAndCompletion = false,
 }) => {
   const {
     currentFolder,
@@ -53,13 +56,8 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
 
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
 
-  const hasAnyFilter =
-    activeTypeFilter !== 'all' ||
-    (isInbox && inboxMode !== 'all') ||
-    isPinnedOnlyFilter ||
-    hideCompletedTasks ||
-    Boolean(activeTagFilter) ||
-    Boolean(aiItemFilter);
+  const hasAnyFilter = hasFeedFilters({ currentFolder, activeTypeFilter: ignoreTypeAndCompletion ? 'all' : activeTypeFilter, inboxMode, isPinnedOnlyFilter,
+    hideCompletedTasks: !ignoreTypeAndCompletion && hideCompletedTasks, activeTagFilter, aiItemFilter });
 
   const { ref: filterBarRef, phase: filterBarPhase, isPresent: isFilterBarPresent, onTransitionEnd: onFilterBarTransitionEnd } =
     usePresence(hasAnyFilter);
@@ -79,7 +77,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
     >
       {/* Padding lives inside the clipped row so a collapsed bar takes no height. */}
       <div className={`motion-accordion-inner flex items-center gap-1.5 min-w-0 overflow-x-auto scrollbar-none py-0.5 ${className}`}>
-        {activeTypeFilter !== 'all' && (
+        {!ignoreTypeAndCompletion && activeTypeFilter !== 'all' && (
           <FilterBadge
             icon={activeTypeFilter === 'note' ? 'entity.note' : activeTypeFilter === 'task' ? 'entity.task' : 'entity.article'}
             title={activeTypeFilter === 'note' ? 'Заметки' : activeTypeFilter === 'task' ? 'Таски' : 'Статьи'}
@@ -106,7 +104,7 @@ export const ActiveFilterBadges: React.FC<ActiveFilterBadgesProps> = ({
             className={badgeClassName}
           />
         )}
-        {hideCompletedTasks && (
+        {!ignoreTypeAndCompletion && hideCompletedTasks && (
           <FilterBadge
             icon="action.hide"
             title="Без готовых"

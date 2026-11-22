@@ -1,10 +1,9 @@
 // The feed's view state: folder, mode, filters, sorting, persisted per folder.
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type {
   AiItemFilter,
   FolderViewSettings,
   InboxMode,
-  SlagItem,
   SlagItemType,
   SortField,
   SortOrder,
@@ -14,18 +13,15 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
 import { isMobilePlatform } from '../../lib/platform/windowControls';
 import { UI_BREAKPOINTS } from '../../config';
-import { selectVisibleItems } from '../feed/feedView';
 
 /**
  * How the feed is looking: which folder, which view, which filters, which order.
  *
  * One reason to change — the rules of what the feed shows. It knows nothing about
- * saving a note or opening a modal; it needs the folder and the records, the caller
- * owns both.
+ * saving a note or opening a modal.
  */
 export function useFeedView(
   currentFolder: string,
-  items: SlagItem[],
   initialWorkspace: WorkspaceState,
 ) {
   const initialCurFolder =
@@ -108,34 +104,6 @@ export function useFeedView(
     setAiItemFilter(null);
   }, []);
 
-  // Memoized to prevent layout churn.
-  const filteredItems = useMemo(
-    () =>
-      selectVisibleItems(items, {
-        currentFolder,
-        inboxMode,
-        activeTypeFilter,
-        activeTagFilter,
-        isPinnedOnlyFilter,
-        hideCompletedTasks,
-        aiItemFilter,
-        sortBy,
-        sortOrder,
-      }),
-    [
-      items,
-      currentFolder,
-      inboxMode,
-      activeTypeFilter,
-      activeTagFilter,
-      isPinnedOnlyFilter,
-      hideCompletedTasks,
-      aiItemFilter,
-      sortBy,
-      sortOrder,
-    ],
-  );
-
   const updateCurrentFolderViewSettings = useCallback(
     (partial: Partial<FolderViewSettings>) => {
       if (partial.viewMode !== undefined) setFeedViewMode(partial.viewMode);
@@ -168,6 +136,7 @@ export function useFeedView(
     setSortBy('createdAt');
     setSortOrder('asc');
     setHideCompletedTasks(false);
+    setIsPinnedOnlyFilter(false);
 
     setFolderSettings((prev) => {
       const next = { ...prev };
@@ -204,7 +173,6 @@ export function useFeedView(
     setAiItemFilter,
     applyAiFilter,
     clearAiFilter,
-    filteredItems,
     folderSettings,
     setFolderSettings,
     updateCurrentFolderViewSettings,

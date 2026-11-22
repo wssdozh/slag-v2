@@ -90,6 +90,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
+| быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/hooks/useLocalDay.ts` — локальная дата |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
 | память ассистента: факты, типы, темы, скоринг | `src/lib/memory.ts`, `src/lib/ai/prompt.ts`, `src/lib/sync/applyBundle.ts` |

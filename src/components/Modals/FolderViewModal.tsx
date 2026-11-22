@@ -1,280 +1,157 @@
-// The per-folder view settings sheet: layout, sort, filters, and resetting them.
-import React, { useEffect } from 'react';
+// The folder's layout is one click away; detailed choices stay on their own page.
+import { useCallback, useLayoutEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import type { FeedViewMode, SlagItemType, SortField, InboxMode } from '../../types';
-import { Icon } from '../UI/icons/Icon';
+import { hasFeedFilters } from '../../context/feed/feedView';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
+import { Icon, type IconProps } from '../UI/icons/Icon';
 import { AnchoredPopover } from '../UI/AnchoredPopover';
+import { Button } from '../UI/Button';
 
-const getTrigger = () => document.querySelector<HTMLElement>('button[aria-label="Вид и фильтры папки"]');
+const modes = [
+  ['feed', 'Лента', 'entity.layers'], ['kanban', 'Канбан', 'entity.kanban'],
+  ['calendar', 'Календарь', 'time.date'],
+] as const satisfies ReadonlyArray<readonly [string, string, IconProps['name']]>;
+const sorts = { createdAt: 'По созданию', updatedAt: 'По изменению', title: 'По названию', dueDate: 'По сроку' } as const;
+const types = [['all', 'Все записи'], ['note', 'Заметки'], ['task', 'Таски'], ['article', 'Статьи']] as const;
+const inboxModes = [['all', 'Все'], ['sorted', 'Разобранные'], ['unsorted', 'Неразобранные']] as const;
+const row = 'flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2 text-start hover:bg-tint-6 focus-visible:bg-tint-10';
 
-export const FolderViewModal: React.FC = () => {
-  const {
-    isFolderViewModalOpen,
-    closeFolderViewModal,
-    feedViewMode,
-    activeTypeFilter,
-    inboxMode,
-    sortBy,
-    sortOrder,
-    hideCompletedTasks,
-    setHideCompletedTasks,
-    isPinnedOnlyFilter,
-    setIsPinnedOnlyFilter,
-    updateCurrentFolderViewSettings,
-    resetCurrentFolderViewSettings,
-    currentFolder,
-  } = useApp();
+function Choice({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className={`${row} ${selected ? 'bg-tint-10 font-medium text-fg-primary' : 'text-fg-secondary'}`} aria-pressed={selected} onClick={onClick}>
+      {label}
+      {selected && <Icon name="action.check" size="sm" tone="inherit" className="text-accent" />}
+    </button>
+  );
+}
 
-  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <button type="button" className={row} role="switch" aria-checked={checked} onClick={() => onChange(!checked)}>
+      {label}
+      <span aria-hidden="true" className={`flex h-4 w-7 shrink-0 items-center rounded-full px-0.5 transition-colors ${checked ? 'bg-accent' : 'bg-switch-off'}`}>
+        <span className={`size-3 rounded-full bg-fg-primary transition-transform ${checked ? 'translate-x-3' : ''}`} />
+      </span>
+    </button>
+  );
+}
+
+export function FolderViewModal() {
+  const app = useApp();
+  const { isFolderViewModalOpen, closeFolderViewModal, folderViewTarget: target,
+    folderViewSection: section, setFolderViewSection: setSection, updateCurrentFolderViewSettings: update,
+    sortBy, sortOrder, currentFolder } = app;
   const { ref, phase, isPresent, onTransitionEnd } = usePresence(isFolderViewModalOpen);
+  const getAnchor = useCallback(() => target?.anchor ?? null, [target]);
+  const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
+  const activeMode = target?.changeLocalMode ? target.mode : app.feedViewMode;
+  const direction = sortBy === 'title' ? (sortOrder === 'asc' ? 'А → Я' : 'Я → А')
+    : sortBy === 'dueDate' ? (sortOrder === 'asc' ? 'Ближайшие' : 'Дальние')
+    : sortOrder === 'asc' ? 'Старые' : 'Новые';
 
-  // Close on Escape key
-  useEffect(() => {
-    if (!isFolderViewModalOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        closeFolderViewModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFolderViewModalOpen, closeFolderViewModal]);
+  useLayoutEffect(() => {
+    if (isFolderViewModalOpen) ref.current?.querySelector<HTMLElement>('[data-initial-focus]')?.focus({ preventScroll: true });
+  }, [isFolderViewModalOpen, section, ref]);
 
   if (!isPresent) return null;
 
-  const viewModes: { id: FeedViewMode; label: string; icon: React.ReactNode }[] = [
-    { id: 'feed', label: 'Лента', icon: <Icon name="entity.layers" size="sm" tone="inherit" className="shrink-0" /> },
-    { id: 'kanban', label: 'Канбан', icon: <Icon name="entity.kanban" size="sm" tone="inherit" className="shrink-0" /> },
-    { id: 'calendar', label: 'Календарь', icon: <Icon name="time.date" size="sm" tone="inherit" className="shrink-0" /> },
-  ];
-
-  const sortFields: { id: SortField; label: string }[] = [
-    { id: 'createdAt', label: 'Создание' },
-    { id: 'updatedAt', label: 'Изменение' },
-    { id: 'title', label: 'Название' },
-    { id: 'dueDate', label: 'Дедлайн' },
-  ];
-
-  const typeOptions: { id: SlagItemType | 'all'; label: string }[] = [
-    { id: 'all', label: 'Все' },
-    { id: 'note', label: 'Заметки' },
-    { id: 'task', label: 'Таски' },
-    { id: 'article', label: 'Статьи' },
-  ];
-
-  const inboxOptions: { id: InboxMode; label: string }[] = [
-    { id: 'all', label: 'Все' },
-    { id: 'sorted', label: 'Разобранные' },
-    { id: 'unsorted', label: 'Неразобранные' },
-  ];
-
-  const directionLabel =
-    sortBy === 'title'
-      ? sortOrder === 'asc'
-        ? 'А → Я'
-        : 'Я → А'
-      : sortOrder === 'asc'
-        ? 'Старые'
-        : 'Новые';
-
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none select-none">
-      {/* Invisible backdrop to dismiss popover on outside click without darkening screen */}
-      <div
-        className="fixed inset-0 pointer-events-auto bg-transparent"
-        onClick={closeFolderViewModal}
-      />
-
-      {/* Lightweight Linear Dark dropdown popover */}
-      <AnchoredPopover
-        surfaceRef={ref}
-        getAnchor={getTrigger}
-        isOpen={isFolderViewModalOpen}
-        align="end"
-        role="dialog"
-        aria-label="Вид и фильтры"
-        aria-modal="true"
-        data-motion-state={phase}
-        onTransitionEnd={onTransitionEnd}
-        className="pointer-events-auto z-50 select-none w-[310px] rounded-2xl bg-surface-elevated/98 border border-tint-8 shadow-2xl shadow-scrim-90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-fg-soft"
-      >
-        {/* Section 1: View Modes with Reset Icon in top-right */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted">
-              Режим отображения
-            </span>
-            <button
-              type="button"
-              onClick={resetCurrentFolderViewSettings}
-              className="p-1 -mr-1 rounded-md text-fg-muted hover:text-fg-soft hover:bg-tint-6 transition-colors cursor-pointer"
-              title="Сбросить вид по умолчанию"
-              aria-label="Сбросить вид"
-            >
-              <Icon name="action.retry" size="sm" tone="inherit" />
-            </button>
-          </div>
-          <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
-            {viewModes.map((m) => {
-              const isActive = feedViewMode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => updateCurrentFolderViewSettings({ viewMode: m.id })}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-[color,background-color,box-shadow] cursor-pointer ${
-                    isActive
-                      ? 'bg-tint-10 text-white shadow-sm'
-                      : 'text-fg-secondary hover:text-fg-soft'
-                  }`}
-                >
-                  {m.icon}
-                  <span>{m.label}</span>
+    <>
+      {isFolderViewModalOpen && <div className="fixed inset-0 z-50" onClick={closeFolderViewModal} />}
+      <AnchoredPopover surfaceRef={ref} getAnchor={getAnchor} isOpen={isFolderViewModalOpen} align="end"
+        role="dialog" aria-label="Вид и фильтры" aria-modal="true" data-motion-state={phase} onTransitionEnd={onTransitionEnd}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab') return;
+          const buttons = event.currentTarget.querySelectorAll('button');
+          const first = buttons[0];
+          const last = buttons[buttons.length - 1];
+          if (event.shiftKey ? event.target === first : event.target === last) {
+            event.preventDefault();
+            (event.shiftKey ? last : first)?.focus();
+          }
+        }}
+        className="z-50 w-72 select-none rounded-xl border border-tint-8 bg-surface-elevated p-2 text-xs text-fg-soft shadow-xl shadow-scrim-90 motion-popover">
+        {section === 'main' ? (
+          <>
+            <div role="group" aria-label="Режим отображения" className="mb-1 flex gap-0.5">
+              {modes.map(([id, label, icon]) => (
+                <button key={id} type="button" aria-pressed={activeMode === id} data-initial-focus={activeMode === id ? '' : undefined}
+                  className={`flex min-h-9 flex-1 items-center justify-center gap-1 rounded-md px-1 font-medium hover:bg-tint-6 focus-visible:bg-tint-10 ${activeMode === id ? 'bg-tint-10 text-fg-primary' : 'text-fg-secondary'}`}
+                  onClick={() => {
+                    if (target?.changeLocalMode) {
+                      target.changeLocalMode(id);
+                      app.openFolderViewModal({ ...target, mode: id });
+                    } else update({ viewMode: id });
+                  }}>
+                  <Icon name={icon} size="sm" tone="inherit" className="shrink-0" />{label}
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Section 2: Sorting */}
-        <div className="space-y-1.5 pt-0.5">
-          <div className="flex items-center justify-between">
-            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted">
+              ))}
+            </div>
+            <button type="button" className={row} aria-label="Сортировка" onClick={() => setSection('sort')}>
               Сортировка
-            </span>
-            <button
-              type="button"
-              onClick={() => updateCurrentFolderViewSettings({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}
-              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-tint-6 text-2xs font-mono text-fg-secondary hover:text-white transition-colors cursor-pointer"
-              title="Переключить направление сортировки"
-            >
-              <span>{directionLabel}</span>
-              {sortOrder === 'asc' ? (
-                <Icon name="action.sortAsc" size="sm" />
-              ) : (
-                <Icon name="action.sortDesc" size="sm" />
-              )}
+              <span className="flex items-center gap-1 text-2xs text-fg-secondary">
+                {sorts[sortBy]}
+                <Icon name={sortOrder === 'asc' ? 'action.sortAsc' : 'action.sortDesc'} size="xs" tone="inherit" />
+                <Icon name="nav.next" size="xs" tone="inherit" />
+              </span>
             </button>
-          </div>
-
-          <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
-            {sortFields.map((sf) => {
-              const isActive = sortBy === sf.id;
-              return (
-                <button
-                  key={sf.id}
-                  type="button"
-                  onClick={() => updateCurrentFolderViewSettings({ sortBy: sf.id })}
-                  className={`flex-1 py-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer ${
-                    isActive
-                      ? 'bg-tint-10 text-white font-medium shadow-sm'
-                      : 'text-fg-secondary hover:text-fg-soft'
-                  }`}
-                >
-                  {sf.label}
+            <button type="button" className={row} aria-description={hasFeedFilters(app) ? 'Фильтры включены' : undefined} onClick={() => setSection('filters')}>
+              Фильтры
+              <span className="flex items-center gap-1.5 text-fg-secondary">
+                {hasFeedFilters(app) && <span className="size-1.5 rounded-full bg-accent" aria-hidden="true" />}
+                <Icon name="nav.next" size="xs" tone="inherit" />
+              </span>
+            </button>
+            <div className="mt-1 border-t border-tint-6 pt-2">
+              <Button variant="secondary" size="sm" className="w-full focus-visible:border-accent" onClick={() => {
+                app.resetCurrentFolderViewSettings();
+                target?.changeLocalMode?.('feed');
+                closeFolderViewModal();
+              }}>Сбросить вид</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mb-1 flex items-center gap-1 border-b border-tint-6 pb-1">
+              <button type="button" data-initial-focus aria-label="Назад" onClick={() => setSection('main')}
+                className="grid size-9 shrink-0 place-items-center rounded-md hover:bg-tint-6 focus-visible:bg-tint-10">
+                <Icon name="nav.next" size="sm" tone="inherit" className="rotate-180" />
+              </button>
+              <h2 className="font-semibold">{section === 'sort' ? 'Сортировка' : 'Фильтры'}</h2>
+            </div>
+            {section === 'sort' ? (
+              <>
+                {(Object.keys(sorts) as (keyof typeof sorts)[]).map((id) => (
+                  <Choice key={id} label={sorts[id]} selected={sortBy === id} onClick={() => update({ sortBy: id })} />
+                ))}
+                <button type="button" className={`${row} mt-1 border-t border-tint-6`} onClick={() => update({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })}>
+                  Направление
+                  <span className="flex items-center gap-1 text-fg-secondary">
+                    {direction}<Icon name={sortOrder === 'asc' ? 'action.sortAsc' : 'action.sortDesc'} size="sm" tone="inherit" />
+                  </span>
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Section 3: Filters */}
-        <div className="space-y-2 pt-0.5">
-          <div>
-            <span className="text-3xs font-mono uppercase tracking-wider text-fg-muted block mb-1.5">
-              Фильтрация записей
-            </span>
-            <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
-              {typeOptions.map((opt) => {
-                const isActive = activeTypeFilter === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => updateCurrentFolderViewSettings({ typeFilter: opt.id })}
-                    className={`flex-1 py-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer ${
-                      isActive
-                        ? 'bg-tint-10 text-white font-medium shadow-sm'
-                        : 'text-fg-secondary hover:text-fg-soft'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Inbox mode filter */}
-          {isInbox && (
-            <div className="flex p-0.5 rounded-lg bg-tint-4 border border-tint-4">
-              {inboxOptions.map((opt) => {
-                const isActive = inboxMode === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => updateCurrentFolderViewSettings({ inboxMode: opt.id })}
-                    className={`flex-1 py-1 px-1 rounded-md text-2xs text-center transition-[color,background-color,box-shadow] cursor-pointer whitespace-nowrap truncate ${
-                      isActive
-                        ? 'bg-tint-10 text-white font-medium shadow-sm'
-                        : 'text-fg-secondary hover:text-fg-soft'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Section 4: iOS / Linear Switches */}
-        <div className="pt-2 border-t border-tint-6 space-y-1.5">
-          <div
-            onClick={() => setHideCompletedTasks(!hideCompletedTasks)}
-            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-tint-4 cursor-pointer transition-colors group"
-          >
-            <span className="text-fg-tertiary group-hover:text-white transition-colors text-xs">
-              Скрыть выполненные
-            </span>
-            <div
-              className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
-                hideCompletedTasks ? 'bg-white' : 'bg-tint-12 group-hover:bg-tint-18'
-              }`}
-            >
-              <div
-                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
-                  hideCompletedTasks ? 'translate-x-3 bg-black' : 'translate-x-0 bg-fg-secondary'
-                }`}
-              />
-            </div>
-          </div>
-
-          <div
-            onClick={() => setIsPinnedOnlyFilter(!isPinnedOnlyFilter)}
-            className="flex items-center justify-between py-0.5 px-1 rounded-md hover:bg-tint-4 cursor-pointer transition-colors group"
-          >
-            <span className="text-fg-tertiary group-hover:text-white transition-colors text-xs">
-              Только закрепленные
-            </span>
-            <div
-              className={`w-7 h-4 rounded-full transition-colors relative shrink-0 ${
-                isPinnedOnlyFilter ? 'bg-white' : 'bg-tint-12 group-hover:bg-tint-18'
-              }`}
-            >
-              <div
-                className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full transition-transform ${
-                  isPinnedOnlyFilter ? 'translate-x-3 bg-black' : 'translate-x-0 bg-fg-secondary'
-                }`}
-              />
-            </div>
-          </div>
-        </div>
+              </>
+            ) : (
+              <>
+                <div role="group" aria-label="Тип записи">
+                  {types.map(([id, label]) => <Choice key={id} label={label} selected={app.activeTypeFilter === id} onClick={() => update({ typeFilter: id })} />)}
+                </div>
+                {isInbox && <div role="group" aria-label="Разбор входящих" className="my-1 flex gap-0.5">
+                  {inboxModes.map(([id, label]) => (
+                    <button key={id} type="button" aria-pressed={app.inboxMode === id} onClick={() => update({ inboxMode: id })}
+                      className={`min-h-9 flex-1 rounded-md px-1 text-2xs hover:bg-tint-6 focus-visible:bg-tint-10 ${app.inboxMode === id ? 'bg-tint-10 text-fg-primary' : 'text-fg-secondary'}`}>{label}</button>
+                  ))}
+                </div>}
+                <div className="mt-1 border-t border-tint-6 pt-1">
+                  <Toggle label="Скрыть выполненные" checked={app.hideCompletedTasks} onChange={app.setHideCompletedTasks} />
+                  <Toggle label="Только закрепленные" checked={app.isPinnedOnlyFilter} onChange={app.setIsPinnedOnlyFilter} />
+                </div>
+              </>
+            )}
+          </>
+        )}
       </AnchoredPopover>
-    </div>
+    </>
   );
-};
+}

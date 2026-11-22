@@ -57,6 +57,14 @@ export interface ContextMenuTarget {
   folder?: FolderMeta;
 }
 
+export interface FolderViewTarget {
+  anchor: HTMLButtonElement;
+  mode?: FeedViewMode;
+  changeLocalMode?: (mode: FeedViewMode) => void;
+}
+
+export type FolderViewSection = 'main' | 'sort' | 'filters';
+
 export interface AppContextType {
   vault: VaultMeta;
   vaults: VaultMeta[];
@@ -69,7 +77,6 @@ export interface AppContextType {
   isKanbanMaterialsOpen: boolean;
   setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   items: SlagItem[];
-  filteredItems: SlagItem[];
   selectedItem: SlagItem | null;
   activeTypeFilter: SlagItemType | 'all';
   activeTagFilter: string | null;
@@ -152,8 +159,10 @@ export interface AppContextType {
 
   // Folder View & Filter Settings (Todoist / Linear style)
   isFolderViewModalOpen: boolean;
-  setIsFolderViewModalOpen: (open: boolean) => void;
-  openFolderViewModal: () => void;
+  folderViewTarget: FolderViewTarget | null;
+  folderViewSection: FolderViewSection;
+  setFolderViewSection: (section: FolderViewSection) => void;
+  openFolderViewModal: (target: FolderViewTarget) => void;
   closeFolderViewModal: () => void;
   sortBy: SortField;
   setSortBy: (sort: SortField) => void;

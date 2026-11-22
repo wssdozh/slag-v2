@@ -51,7 +51,10 @@ test.describe('Folder profile', () => {
 
     // Switching the feed to tasks only must not move the folder counters.
     await page.locator('header button[aria-label="Вид и фильтры папки"]').first().click();
-    await page.getByRole('dialog', { name: 'Вид и фильтры' }).getByRole('button', { name: 'Таски', exact: true }).click();
+    const view = page.getByRole('dialog', { name: 'Вид и фильтры' });
+    await view.getByRole('button', { name: 'Фильтры' }).click();
+    await view.getByRole('button', { name: 'Таски', exact: true }).click();
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     expect(await readStats(dock)).toEqual(dockValues);
 

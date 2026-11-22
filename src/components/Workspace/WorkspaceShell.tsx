@@ -24,6 +24,10 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isDesktopApp, startDraggingWindow } from '../../lib/platform/windowControls';
 import { useDockPanels } from './useDockPanels';
 import { syncAllGroupConstraints } from './dockPanelUtils';
+import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
+import { useLocalDay } from '../../hooks/useLocalDay';
+import { useWorkspaceTaskFilter } from './useWorkspaceTaskFilter';
+import { WorkspaceTaskFilterContext, useWorkspaceTaskFilterContext } from './workspaceTaskFilterContext';
 import { useCrossWindowDnd } from './useCrossWindowDnd';
 
 const WorkspaceContentPanel: React.FC<{
@@ -31,7 +35,9 @@ const WorkspaceContentPanel: React.FC<{
   defaultMode?: FeedViewMode;
   syncWithGlobal?: boolean;
 }> = ({ panelProps, defaultMode, syncWithGlobal = false }) => {
-  const { feedViewMode, setFeedViewMode, currentFolder } = useApp();
+  const { feedViewMode, currentFolder } = useApp();
+  const { panelId, filter } = useWorkspaceTaskFilterContext();
+  const taskFilter: TaskQuickFilter | undefined = panelId === panelProps.api.id ? filter : undefined;
   const [localMode, setLocalMode] = useState<FeedViewMode>(() => defaultMode || feedViewMode);
   // The feed scrolls under the composer, so the panel publishes the dock height for the list.
   const [attachComposerDock, composerInset] = useComposerInset();
@@ -40,35 +46,25 @@ const WorkspaceContentPanel: React.FC<{
 
   const handleModeChange = useCallback(
     (mode: FeedViewMode) => {
-      if (syncWithGlobal) {
-        setFeedViewMode(mode);
-      } else {
-        setLocalMode(mode);
-        const title =
-          mode === 'kanban'
-            ? 'Канбан'
-            : mode === 'calendar'
-              ? 'Календарь'
-              : currentFolder || DEFAULT_INBOX_FOLDER;
-        panelProps.api.setTitle(title);
-      }
+      setLocalMode(mode);
+      panelProps.api.setTitle(mode === 'kanban' ? 'Канбан' : mode === 'calendar' ? 'Календарь' : currentFolder || DEFAULT_INBOX_FOLDER);
     },
-    [syncWithGlobal, setFeedViewMode, currentFolder, panelProps.api]
+    [currentFolder, panelProps.api]
   );
 
   return (
     <main className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-0">
-      <FeedHeader viewMode={activeMode} onViewModeChange={handleModeChange} />
+      <FeedHeader viewMode={activeMode} taskFilter={taskFilter} onViewModeChange={syncWithGlobal ? undefined : handleModeChange} />
       {activeMode === 'kanban' ? (
-        <KanbanBoard />
+        <KanbanBoard taskFilter={taskFilter} />
       ) : activeMode === 'calendar' ? (
-        <CalendarView />
+        <CalendarView taskFilter={taskFilter} />
       ) : (
         <div
           className="flex-1 min-h-0 relative flex flex-col overflow-hidden"
           style={{ '--composer-inset': composerInset ? `${composerInset}px` : undefined } as React.CSSProperties}
         >
-          <FeedList />
+          <FeedList taskFilter={taskFilter} />
           <div
             ref={attachComposerDock}
             data-testid="composer-dock"
@@ -85,11 +81,7 @@ const WorkspaceContentPanel: React.FC<{
 };
 
 const components: Record<string, React.FC<IDockviewPanelProps>> = {
-  sidebar: () => (
-    <aside className="w-full h-full bg-panel overflow-hidden flex flex-col">
-      <Sidebar />
-    </aside>
-  ),
+  sidebar: Sidebar,
   feed: (props) => (
     <WorkspaceContentPanel
       panelProps={props}
@@ -136,7 +128,11 @@ export interface WorkspaceShellProps {
 }
 
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) => {
-  const { currentFolder } = useApp();
+  const { currentFolder, vault } = useApp();
+  const [dockApi, setDockApi] = useState<DockviewApi | null>(null);
+  const { panelId, activeFilter, toggleFilter } = useWorkspaceTaskFilter(dockApi, JSON.stringify([vault.id, currentFolder]));
+  const today = useLocalDay();
+  const taskFilterContext = useMemo(() => ({ panelId, toggleFilter, filter: activeFilter ? { id: activeFilter, today } : undefined }), [panelId, toggleFilter, activeFilter, today]);
   const apiRef = useRef<DockviewApi | null>(null);
 
   const effectiveInitialPanel = useMemo(() => {
@@ -173,6 +169,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
   const captionRef = useRef<HTMLDivElement>(null);
   const handleReady = useCallback((event: DockviewReadyEvent) => {
     onReady(event);
+    setDockApi(event.api);
     const caption = captionRef.current;
     if (!caption) return;
 
@@ -301,14 +298,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         />
       )}
 
-      <DockviewReact
-        components={components}
-        rightHeaderActionsComponent={GroupHeaderActions}
-        getTabContextMenuItems={getTabContextMenuItems}
-        onReady={handleReady}
-        className="dockview-theme-slag w-full h-full"
-        popoutUrl="/popout.html"
-      />
+      <WorkspaceTaskFilterContext.Provider value={taskFilterContext}>
+        <DockviewReact
+          components={components}
+          rightHeaderActionsComponent={GroupHeaderActions}
+          getTabContextMenuItems={getTabContextMenuItems}
+          onReady={handleReady}
+          className="dockview-theme-slag w-full h-full"
+          popoutUrl="/popout.html"
+        />
+      </WorkspaceTaskFilterContext.Provider>
     </div>
   );
 };
