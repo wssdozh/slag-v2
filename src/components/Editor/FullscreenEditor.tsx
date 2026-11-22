@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagItemStatus, SlagItemType } from '../../types';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
+import { FOLDED_QUOTE_PREFIX, SPOILER_MARKER } from '../../lib/text/noteDisclosure';
 import { AtomicCodeMirrorEditor, type AtomicCodeMirrorEditorHandle } from '@atomic-editor/editor';
 import { EditorView, ViewPlugin } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
@@ -270,9 +271,12 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     }
     const selection = view.state.selection.main;
     const selectedText = view.state.sliceDoc(selection.from, selection.to);
-    const replacement = `${prefix}${selectedText || 'текст'}${suffix}`;
+    let formatted = selectedText || 'текст';
+    if (prefix === FOLDED_QUOTE_PREFIX) formatted = formatted.replace(/\n/g, '\n> ');
+    if (prefix === SPOILER_MARKER) formatted = formatted.replace(/\r?\n/g, '||\n||');
+    const replacement = `${prefix}${formatted}${suffix}`;
     const insertPos = selection.from + prefix.length;
-    const endPos = insertPos + (selectedText ? selectedText.length : 5);
+    const endPos = insertPos + formatted.length;
 
     view.dispatch({
       changes: { from: selection.from, to: selection.to, insert: replacement },

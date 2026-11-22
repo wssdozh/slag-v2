@@ -1,10 +1,12 @@
 // Renders markdown with GFM, Obsidian [[wiki links]] as in-app jumps and ![[files]] as embeds.
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Icon } from './icons/Icon';
 import type { SlagAttachment } from '../../types';
 import { formatBytes } from '../../lib/text/formatBytes';
+import { isNativeWebview, openExternalUrl } from '../../lib/platform/openExternal';
+import { protectSpoilers, remarkNoteDisclosure } from '../../lib/text/noteDisclosure';
 import {
   attachmentEmbedSrc,
   attachmentNameFromHref,
@@ -169,6 +171,24 @@ const AttachmentEmbedView: React.FC<AttachmentEmbedViewProps> = ({
   );
 };
 
+function NoteSpoiler({ children }: React.PropsWithChildren) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-expanded={revealed}
+      aria-label={revealed ? undefined : 'Раскрыть спойлер'}
+      className="rounded px-1 bg-tint-10 hover:bg-tint-14 focus-visible:bg-tint-14 text-fg-soft select-text cursor-pointer"
+      onClick={(event) => {
+        event.stopPropagation();
+        if (window.getSelection()?.isCollapsed !== false) setRevealed(!revealed);
+      }}
+    >
+      {revealed ? children : 'Спойлер'}
+    </button>
+  );
+}
+
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   onWikiLinkClick,
@@ -179,10 +199,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   onAttachmentClick,
 }) => {
   // Embeds are pulled out first: the wiki transform would otherwise eat the inner `[[name]]`.
-  const transformed = useMemo(
-    () => transformWikiLinks(markdownWithAttachmentEmbeds(content, attachments)),
-    [content, attachments],
-  );
+  const { transformed, plugins } = useMemo(() => {
+    const { markdown, spoilers } = protectSpoilers(content);
+    const transformed = transformWikiLinks(markdownWithAttachmentEmbeds(markdown, attachments));
+    return { transformed, plugins: [remarkGfm, () => remarkNoteDisclosure(spoilers)] };
+  }, [content, attachments]);
 
   const components: Components = useMemo(
     () => ({
@@ -231,7 +252,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (href && /^https?:\/\//i.test(href) && isNativeWebview()) {
+                e.preventDefault();
+                void openExternalUrl(href);
+              }
+            }}
             className="text-blue-400 hover:text-blue-300 hover:underline break-all"
             {...props}
           >
@@ -300,6 +327,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           {children}
         </pre>
       ),
+      span: ({ children, node }) => 'data-note-spoiler' in (node?.properties ?? {})
+        ? <NoteSpoiler>{children}</NoteSpoiler> : <span>{children}</span>,
+      details: ({ children }) => (
+        <details className="my-1.5 border-l-2 border-tint-14 pl-2.5">
+          <summary className="cursor-pointer text-fg-secondary" onClick={(event) => event.stopPropagation()}>Цитата</summary>
+          {children}
+        </details>
+      ),
       blockquote: ({ children }) => (
         <blockquote className="border-l-2 border-tint-14 pl-2.5 my-1.5 text-fg-secondary italic">
           {children}
@@ -329,7 +364,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     return (
       <span className={`slag-markdown inline text-xs ${className}`}>
         <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
+          remarkPlugins={plugins}
           components={components}
           urlTransform={safeMarkdownUrl}
         >
@@ -342,7 +377,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   return (
     <div className={`slag-markdown text-xs text-fg-tertiary font-normal ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={plugins}
         components={components}
         urlTransform={safeMarkdownUrl}
       >

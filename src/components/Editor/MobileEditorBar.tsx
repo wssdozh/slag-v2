@@ -2,6 +2,7 @@
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { SendButton } from '../UI/SendButton';
+import { FOLDED_QUOTE_PREFIX, SPOILER_MARKER } from '../../lib/text/noteDisclosure';
 
 export interface MobileEditorBarProps {
   ref?: React.Ref<HTMLDivElement>;
@@ -112,6 +113,21 @@ export const MobileEditorBar: React.FC<MobileEditorBarProps> = ({
               <Icon name="format.code" size="md" />
               <span>Моноширинный</span>
             </button>
+            {[
+              ['Сворачиваемая цитата', FOLDED_QUOTE_PREFIX, '\n\n'],
+              ['Спойлер', SPOILER_MARKER, SPOILER_MARKER],
+            ].map(([label, prefix, suffix]) => (
+              <button key={label} type="button"
+                onClick={() => {
+                  onInsertMarkdown(prefix, suffix);
+                  onSetActivePopover(null);
+                }}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs text-fg-soft hover:bg-tint-8 motion-press text-left"
+              >
+                {prefix === SPOILER_MARKER ? <span className="font-mono">||</span> : <Icon name="format.quote" size="md" />}
+                <span>{label}</span>
+              </button>
+            ))}
           </div>
         </div>
       )}

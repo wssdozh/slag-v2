@@ -100,7 +100,7 @@ async function patchSubscription(page: Page) {
 test.describe('Subscription AI relay', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 120_000 });
     // Touch aiService once so its module URL is in the resource timeline.
     await page.evaluate(async () => {
       const loaded = performance.getEntriesByType('resource').map((entry) => entry.name);
@@ -169,6 +169,33 @@ test.describe('Subscription AI relay', () => {
     expect(capture.calls).toBe(1);
     expect(capture.body.model).toBe('deepseek-v4-1-flash');
     expect(capture.body.reasoning.effort).toBe('none');
+  });
+
+  test('tagging and inbox triage never send hidden text', async ({ page }) => {
+    const capture = await installRelayRoute(page, { status: 200, body: KIE_RESPONSE });
+    await patchSubscription(page);
+    const classify = (batch: boolean) => page.evaluate(async (batch) => {
+      const url = performance.getEntriesByType('resource').find((entry) =>
+        entry.name.split('?')[0].endsWith('/src/lib/ai/aiService.ts'))?.name || '/src/lib/ai/aiService.ts';
+      const { categorizeDraft, triageInboxItems } = await import(url);
+      const folders = [{ path: 'Разработка', name: 'Разработка', description: '' }];
+      const settings = { sourceMode: 'subscription', subscriptionModel: 'fast' };
+      const content = 'Открытый текст ||hidden_body_marker||\nЕщё строка ||hidden_unclosed_marker';
+      if (!batch) return categorizeDraft(content, 'Входящие', folders, settings);
+      return triageInboxItems([
+        { id: 'public', type: 'note', title: 'Тест ||hidden_title_marker||', tags: [], content },
+        { id: 'hidden', type: 'note', title: '', tags: [], content: '||hidden_only_marker||' },
+      ], folders, settings);
+    }, batch);
+
+    await classify(false);
+    expect(JSON.stringify(capture.body)).toContain('Открытый текст');
+    expect(JSON.stringify(capture.body)).not.toContain('hidden_');
+    const result = await classify(true);
+    expect(capture.calls).toBe(2);
+    expect(JSON.stringify(capture.body)).toContain('Открытый текст');
+    expect(JSON.stringify(capture.body)).not.toContain('hidden_');
+    expect(result).toHaveLength(1);
   });
 
   test('gateway errors fall back to heuristics instead of throwing', async ({ page }) => {

@@ -4,6 +4,7 @@ import { parseSubtasksFromContent } from '../tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath';
 import { normalizeReminder } from '../time/reminder';
+import { withoutSpoilers } from '../text/noteDisclosure';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -111,14 +112,15 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   if (typeof frontmatter.slagRegistryBody === 'string') onRegistryBody?.(frontmatter.slagRegistryBody);
   const type: SlagItemType = (['note', 'article', 'task'].includes(frontmatter.type) ? frontmatter.type : 'note') as SlagItemType;
   
+  const visibleBody = withoutSpoilers(body);
   // Title fallback: from frontmatter -> from first # Heading -> first line -> Untitled
   let title = typeof frontmatter.title === 'string' ? frontmatter.title.trim() : '';
   if (!title) {
-    const headingMatch = body.match(/^#\s+(.+)$/m);
+    const headingMatch = visibleBody.match(/^#\s+(.+)$/m);
     if (headingMatch) {
       title = headingMatch[1].trim();
     } else {
-      const firstLine = body.split('\n')[0]?.trim();
+      const firstLine = visibleBody.split('\n')[0]?.trim();
       title = firstLine ? firstLine.slice(0, 40) : 'Без названия';
     }
   }
@@ -132,7 +134,7 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   }
 
   // Also extract inline #hashtags from body if any
-  const inlineTags = Array.from(body.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
+  const inlineTags = Array.from(visibleBody.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
   const allTags = Array.from(new Set([...tags, ...inlineTags]));
 
   const item: SlagItem = {

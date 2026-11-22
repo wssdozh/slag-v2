@@ -2,6 +2,7 @@
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
 import { storage } from '../../lib/storage';
+import { FOLDED_QUOTE_PREFIX, SPOILER_MARKER } from '../../lib/text/noteDisclosure';
 import type { MarkdownPaletteProps } from './editorToolbarParts';
 
 export const MarkdownPalette: React.FC<MarkdownPaletteProps> = ({
@@ -300,6 +301,18 @@ export const MarkdownPalette: React.FC<MarkdownPaletteProps> = ({
           </button>
 
           <div className="h-3.5 w-px bg-tint-8 mx-0.5 shrink-0" />
+
+          {[
+            ['Сворачиваемая цитата', FOLDED_QUOTE_PREFIX, '\n\n'],
+            ['Спойлер', SPOILER_MARKER, SPOILER_MARKER],
+          ].map(([label, prefix, suffix]) => (
+            <button key={label} type="button" title={label} aria-label={label}
+              onClick={() => onInsertMarkdown(prefix, suffix)}
+              className="p-1.5 rounded-md hover:text-white hover:bg-tint-6 focus-visible:bg-tint-8 motion-press cursor-pointer"
+            >
+              {prefix === SPOILER_MARKER ? <span className="font-mono text-xs">||</span> : <Icon name="format.quote" size="md" />}
+            </button>
+          ))}
 
           {/* Anchor / Link (⚓) */}
           <button

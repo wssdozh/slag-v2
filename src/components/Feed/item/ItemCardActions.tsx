@@ -2,11 +2,10 @@
 import React, { memo } from 'react';
 import { Icon } from '../../UI/icons/Icon';
 export interface ItemCardActionsProps {
-  /** A bubble keeps its buttons outside the card; a row-wide note keeps them in the corner. */
-  isFloating: boolean;
   isArticle: boolean;
   onReply: () => void;
   onOpenArticle: () => void;
+  onDragStart?: React.DragEventHandler<HTMLSpanElement>;
 }
 
 /**
@@ -14,27 +13,34 @@ export interface ItemCardActionsProps {
  * editor for an article. Actions on the note itself live on the right click.
  */
 const ItemCardActionsComponent: React.FC<ItemCardActionsProps> = ({
-  isFloating,
   isArticle,
   onReply,
   onOpenArticle,
+  onDragStart,
 }) => (
   <div
-    className={`absolute top-1.5 right-1.5 sm:top-2 sm:right-2 ${
-      isFloating
-        ? 'sm:right-auto sm:left-full sm:pl-1.5 flex flex-col'
-        : 'flex items-center'
-    } gap-1 sm:gap-0 sm:group-hover:gap-1 z-20 pointer-events-auto`}
+    className="pointer-events-auto absolute top-1.5 right-1.5 z-20 flex items-center gap-1 rounded-md bg-surface-hover sm:pointer-events-none sm:top-auto sm:bottom-1 sm:right-1 sm:opacity-0 sm:transition-opacity sm:duration-150 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100"
   >
     <button
+      type="button"
       onClick={onReply}
-      className="w-7 h-7 sm:w-0 sm:h-6 sm:opacity-0 sm:overflow-hidden sm:group-hover:w-6 sm:group-hover:opacity-100 rounded-md text-fg-secondary hover:text-fg-soft hover:bg-tint-8 transition-[color,background-color,opacity,width] duration-150 cursor-pointer hidden sm:flex items-center justify-center shrink-0"
+      className="hidden shrink-0 items-center justify-center rounded-md text-fg-secondary transition-colors hover:bg-tint-8 hover:text-fg-soft focus-visible:bg-tint-8 sm:flex sm:size-6 cursor-pointer"
       title="Ответить (R)"
     >
       <Icon name="action.reply" size="sm" tone="inherit" className="shrink-0" />
     </button>
 
-    {/* Действия с карточкой живут на ПКМ: кнопка в углу дублировала меню и шумела. */}
+    {onDragStart && (
+      <span
+        draggable
+        onDragStart={onDragStart}
+        data-testid="item-drag-handle"
+        title="Перетащить в папку"
+        className="hidden sm:flex size-6 shrink-0 items-center justify-center rounded-md text-fg-muted hover:bg-tint-8 cursor-grab active:cursor-grabbing"
+      >
+        <Icon name="action.dragHandle" size="sm" tone="inherit" />
+      </span>
+    )}
 
     {/* Article Focus Editor Button in top-right corner - kept in place on the far right */}
     {isArticle && (

@@ -133,23 +133,28 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     }
   });
 
-  test('ItemCard floating action buttons on hover outside the card and clean header', async ({ page }) => {
+  test('ItemCard reveals actions in its bottom-right corner without resizing', async ({ page }) => {
     const card = page.locator('main [id^="item-"]').first();
-    await expect(card).toBeVisible();
+    await card.scrollIntoViewIfNeeded();
+    const reply = card.getByRole('button', { name: 'Ответить (R)' });
+    const actions = reply.locator('..');
+    await expect(actions).toHaveCSS('opacity', '0');
+    await expect(actions).toHaveCSS('pointer-events', 'none');
+    const before = (await card.boundingBox())!;
 
-    // Take screenshot without hover
-    await page.screenshot({ path: 'test-results/screenshots/card-no-hover.png' });
-
-    // Hover over the card
     await card.hover();
-    await page.waitForTimeout(200);
+    await expect(actions).toHaveCSS('opacity', '1');
+    const overlay = (await actions.boundingBox())!;
+    expect(await card.boundingBox()).toEqual(before);
+    expect(overlay.x).toBeGreaterThanOrEqual(before.x);
+    expect(overlay.x + overlay.width).toBeCloseTo(before.x + before.width - 4);
+    expect(overlay.y + overlay.height).toBeCloseTo(before.y + before.height - 4);
+    await card.screenshot({ path: 'test-results/screenshots/card-hover-corner.png' });
 
-    // Verify action buttons appear
-    const replyBtn = card.locator('button[title*="Ответить"]').first();
-    await expect(replyBtn).toBeVisible();
-
-    // Take screenshot with hover
-    await page.screenshot({ path: 'test-results/screenshots/card-hover-outside.png' });
+    await page.mouse.move(0, 0);
+    await expect(actions).toHaveCSS('opacity', '0');
+    await reply.focus();
+    await expect(actions).toHaveCSS('opacity', '1');
   });
 
   // Skipped, and not on a selector: the editor stops being a modal at some point in this flow,

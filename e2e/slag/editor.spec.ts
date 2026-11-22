@@ -1692,6 +1692,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // The card's own action button opens the note in the fullscreen editor.
     const card = page.locator('.group').filter({ hasText: 'fsafdadfsasf' }).first();
     await expect(card).toBeVisible();
+    await card.hover();
     await card.locator('button[aria-label="Открыть в фокус-редакторе"]').first().click();
 
     const editor = page.locator('[data-testid="fullscreen-editor-modal"]');

@@ -10,6 +10,7 @@ import { extractFocalContext } from '../../lib/media/enrichment/text';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { FOLDED_QUOTE, withoutSpoilers } from '../../lib/text/noteDisclosure';
 import { resolveAttachmentEmbeds } from '../../lib/text/attachmentEmbed';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
@@ -163,10 +164,16 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     }
   };
 
+  const hasTextSelection = (target: EventTarget | null) => {
+    const selection = window.getSelection();
+    return target instanceof Element && !selection?.isCollapsed &&
+      Boolean(selection?.containsNode(target, true));
+  };
+
   const handleCardClick = (e: React.MouseEvent) => {
-    if (!isMobile) return;
+    if (!isMobile || hasTextSelection(e.target)) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, a, input, textarea, [role="button"], .cursor-pointer')) return;
+    if (target?.closest('button, a, input, textarea, summary, [role="button"], .cursor-pointer')) return;
     if (suppressTapRef.current) {
       suppressTapRef.current = false;
       return;
@@ -287,7 +294,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {formattedTime}<ItemSyncDot item={item} />
     </span>
   );
-  const hasFloatingActions = !isArticle;
 
   const handleImageClick = useCallback((img: SlagAttachment) => {
     if (onImageClick) {
@@ -431,7 +437,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
   const isCompactText = !isArticle && !hasBottomMeta && !item.replyToId &&
-    !item.attachments.length && !item.subtasks?.length && repliesCount === 0;
+    !item.attachments.length && !item.subtasks?.length && repliesCount === 0 && !item.content.includes(FOLDED_QUOTE);
 
   // The step before the card is a number, so its style object outlives the list's re-renders.
   const cardStyle = useMemo<React.CSSProperties | undefined>(
@@ -452,8 +458,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   );
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
+    if (hasTextSelection(e.target)) return;
+    e.preventDefault();
     openContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -463,12 +470,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent) => {
-    // If dragging an interactive element (wiki-link, tag, button, input), prevent card drag
-    const target = e.target as HTMLElement | null;
-    if (target?.closest('a, button, [role="button"], input, textarea, .cursor-pointer')) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('text/plain', item.id);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -508,8 +509,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         id={`item-${item.id}`}
         data-flip-id={item.id}
         onClick={handleCardClick}
-        draggable={!isMobile}
-        onDragStart={handleDragStart}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -530,12 +529,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
-        {/* Text and media keep their full width; only articles reserve an inside action. */}
         <ItemCardActions
-          isFloating={hasFloatingActions}
           isArticle={isArticle}
           onReply={handleReply}
           onOpenArticle={handleOpenArticle}
+          onDragStart={isMobile ? undefined : handleDragStart}
         />
 
       {/* Reply Parent Quote Banner */}
@@ -571,14 +569,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   content={item.title}
                   inline
                   onWikiLinkClick={scrollToItem}
-                  className={item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}
+                  className={`select-text ${item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}`}
                   {...attachmentMarkdownProps}
                 />
               </h3>
 
               {taskBodyContent && (
                 <div className="mt-1 text-sm text-fg-tertiary leading-relaxed font-normal">
-                  <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
+                  <CardMarkdown content={taskBodyContent} className="select-text" onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
                 </div>
               )}
             </div>
@@ -596,17 +594,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
+            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-9 sm:pr-0"
           >
             <Icon name="entity.article" size="md" className="shrink-0" />
             <span>{item.title}</span>
           </h3>
 
           <p
-            onClick={handleOpenArticle}
-            className="text-sm text-fg-tertiary line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-fg-primary transition-colors"
+            onClick={(event) => { if (!hasTextSelection(event.target)) handleOpenArticle(); }}
+            className="text-sm text-fg-tertiary line-clamp-3 leading-relaxed font-normal select-text cursor-text"
           >
-            {item.summary || item.content.slice(0, 200)}
+            {withoutSpoilers(item.summary || item.content).slice(0, 200)}
           </p>
         </div>
       ) : (
@@ -626,7 +624,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 <CardMarkdown
                   content={textToRender}
                   onWikiLinkClick={scrollToItem}
-                  className={isCompactText ? 'inline [&>p:last-child]:inline [&>p:last-child]:mb-0' : undefined}
+                  className={`select-text ${isCompactText ? 'inline [&>p:last-child]:inline [&>p:last-child]:mb-0' : ''}`}
                   {...attachmentMarkdownProps}
                 />
                 {isCompactText && (
