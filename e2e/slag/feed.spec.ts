@@ -28,11 +28,17 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
   test('note text is selectable, links open, and disclosure stays out of the way', async ({ page }) => {
     const composer = page.locator('main textarea');
-    await composer.fill('Выделяемый фрагмент. [Ссылка проверки](https://example.com/slag-note) ||Текст спойлера||\n\n> [!quote]-\n> Текст цитаты');
+    await composer.fill('Выделяемый фрагмент. [Ссылка проверки](https://example.com/slag-note) ||Текст спойлера||\n\n> [!quote]-\n> Первая строка цитаты\n> Вторая строка цитаты\n> Третья строка цитаты\n> Конец цитаты\n\n> [!quote]-\n> Короткая цитата');
     await page.locator('button[title*="Отправить"]').click();
     const card = page.locator('[data-flip-id]').filter({ hasText: 'Выделяемый фрагмент.' });
     const paragraph = card.locator('p').first();
+    const background = await card.evaluate((element) => getComputedStyle(element).backgroundColor);
     await paragraph.hover({ position: { x: 4, y: 6 } });
+    await card.evaluate(async (element) => {
+      void getComputedStyle(element).backgroundColor;
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
+    await expect(card).toHaveCSS('background-color', background);
     const points = await paragraph.evaluate((element) => {
       const range = document.createRange();
       range.setStart(element.firstChild!, 0);
@@ -61,15 +67,34 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     await expect(await popup).toHaveURL('https://example.com/slag-note');
     await (await popup).close();
 
-    await expect(card.getByText('Текст спойлера')).toHaveCount(0);
+    const spoilerText = card.getByText('Текст спойлера', { exact: true });
+    await expect(spoilerText).toHaveCSS('visibility', 'hidden');
     const spoiler = card.getByRole('button', { name: 'Раскрыть спойлер' });
-    await spoiler.focus();
-    await page.keyboard.press('Enter');
-    await expect(card.getByText('Текст спойлера')).toBeVisible();
-    await expect(card.getByText('Текст цитаты')).not.toBeVisible();
-    await card.locator('summary').click();
-    await expect(card.getByText('Текст цитаты')).toBeVisible();
-    await card.screenshot({ path: 'test-results/screenshots/note-disclosure.png' });
+    const maskedWidth = (await spoiler.boundingBox())?.width;
+    const quote = card.locator('blockquote').filter({ hasText: 'Первая строка цитаты' });
+    const shortQuote = card.locator('blockquote').filter({ hasText: 'Короткая цитата' });
+    const collapsedHeight = (await quote.boundingBox())!.height;
+    const shortHeight = (await shortQuote.boundingBox())!.height;
+    const preview = await quote.locator('[inert]').evaluate((element) => ({
+      height: element.clientHeight,
+      lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+    }));
+    expect(preview.height).toBeCloseTo(preview.lineHeight * 2, 0);
+    await page.mouse.move(0, 0);
+    await card.screenshot({ path: 'test-results/screenshots/quotes-collapsed.png' });
+    await quote.getByRole('button', { name: 'Раскрыть цитату' }).click();
+    await shortQuote.getByRole('button', { name: 'Раскрыть цитату' }).click();
+    await expect(quote.getByRole('button', { name: 'Свернуть цитату' })).toHaveAttribute('aria-expanded', 'true');
+    await expect(shortQuote.getByRole('button', { name: 'Свернуть цитату' })).toHaveAttribute('aria-expanded', 'true');
+    expect((await quote.boundingBox())!.height).toBeGreaterThan(collapsedHeight);
+    expect((await shortQuote.boundingBox())!.height).toBe(shortHeight);
+    await page.mouse.move(0, 0);
+    await card.screenshot({ path: 'test-results/screenshots/quotes-expanded.png' });
+    await spoiler.press('Enter');
+    await expect(spoilerText).toBeVisible();
+    expect((await spoilerText.boundingBox())?.width).toBe(maskedWidth);
+    await quote.getByRole('button', { name: 'Свернуть цитату' }).press('Space');
+    expect((await quote.boundingBox())!.height).toBe(collapsedHeight);
   });
 
   test('2. Task creation & direct in-feed completion toggle', async ({ page }) => {

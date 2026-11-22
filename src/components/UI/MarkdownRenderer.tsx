@@ -174,18 +174,50 @@ const AttachmentEmbedView: React.FC<AttachmentEmbedViewProps> = ({
 function NoteSpoiler({ children }: React.PropsWithChildren) {
   const [revealed, setRevealed] = useState(false);
   return (
-    <button
-      type="button"
+    <span
+      role="button"
+      tabIndex={0}
       aria-expanded={revealed}
       aria-label={revealed ? undefined : 'Раскрыть спойлер'}
-      className="rounded px-1 bg-tint-10 hover:bg-tint-14 focus-visible:bg-tint-14 text-fg-soft select-text cursor-pointer"
+      className={`box-decoration-clone rounded-md cursor-pointer focus-visible:outline focus-visible:outline-accent ${revealed ? 'select-text' : 'bg-fg-secondary/30 select-none'}`}
       onClick={(event) => {
         event.stopPropagation();
         if (window.getSelection()?.isCollapsed !== false) setRevealed(!revealed);
       }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        setRevealed(!revealed);
+      }}
     >
-      {revealed ? children : 'Спойлер'}
-    </button>
+      <span className={revealed ? undefined : 'invisible'}>{children}</span>
+    </span>
+  );
+}
+
+function FoldedQuote({ children }: React.PropsWithChildren) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = React.useId();
+  return (
+    <blockquote className="relative my-1.5 rounded-lg bg-accent/8 py-2 pl-4 pr-10 text-fg-tertiary leading-relaxed before:absolute before:inset-y-2 before:left-1.5 before:w-0.5 before:bg-accent/60">
+      <div id={contentId} inert={!expanded} className={expanded ? undefined : 'max-h-[2lh] overflow-clip'}>
+        {children}
+      </div>
+      <button
+        type="button"
+        aria-label={expanded ? 'Свернуть цитату' : 'Раскрыть цитату'}
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        className="absolute right-1.5 bottom-1.5 grid size-7 cursor-pointer place-items-center rounded-md text-fg-secondary hover:bg-tint-6 focus-visible:outline focus-visible:outline-accent"
+        onClick={(event) => {
+          event.stopPropagation();
+          setExpanded(!expanded);
+        }}
+      >
+        <Icon name="nav.down" size="sm" tone="inherit" className={expanded ? 'rotate-180' : undefined} />
+      </button>
+    </blockquote>
   );
 }
 
@@ -329,12 +361,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       ),
       span: ({ children, node }) => 'data-note-spoiler' in (node?.properties ?? {})
         ? <NoteSpoiler>{children}</NoteSpoiler> : <span>{children}</span>,
-      details: ({ children }) => (
-        <details className="my-1.5 border-l-2 border-tint-14 pl-2.5">
-          <summary className="cursor-pointer text-fg-secondary" onClick={(event) => event.stopPropagation()}>Цитата</summary>
-          {children}
-        </details>
-      ),
+      details: ({ children }) => <FoldedQuote>{children}</FoldedQuote>,
       blockquote: ({ children }) => (
         <blockquote className="border-l-2 border-tint-14 pl-2.5 my-1.5 text-fg-secondary italic">
           {children}
