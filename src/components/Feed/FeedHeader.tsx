@@ -22,18 +22,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     feedViewMode: contextViewMode,
     folders,
     items,
-    filteredItems,
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
     openFolderInfoModal,
     openFolderViewModal,
-    activeTypeFilter,
-    sortBy,
-    sortOrder,
-    hideCompletedTasks,
-    isPinnedOnlyFilter,
-    inboxMode,
   } = useApp();
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -47,9 +40,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     [items, currentFolder],
   );
 
-  const inboxUnsortedCount = useMemo(() => {
-    return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;
-  }, [items, isInbox]);
+  const canTriageInbox = isInbox && items.some(i => i.folder === DEFAULT_INBOX_FOLDER);
 
   const folderIconComp = folderMeta?.icon ? (
     <Icon
@@ -62,16 +53,6 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   ) : (
     <Icon name="entity.folder" size="md" className="group-hover:text-fg-soft transition-colors shrink-0" />
   );
-
-  // Check if current folder has customized view/filter/sort settings
-  const isCustomized =
-    activeViewMode !== 'feed' ||
-    activeTypeFilter !== 'all' ||
-    sortBy !== 'createdAt' ||
-    sortOrder !== 'asc' ||
-    hideCompletedTasks ||
-    isPinnedOnlyFilter ||
-    (isInbox && inboxMode !== 'all');
 
   return (
     <header
@@ -96,9 +77,6 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
           <h2 className="text-xs sm:text-sm font-bold text-fg-primary group-hover:text-white tracking-tight transition-colors truncate max-w-[240px]">
             {folderMeta?.name || currentFolder}
           </h2>
-          <span className="text-2xs sm:text-xs font-mono text-fg-muted group-hover:text-fg-secondary transition-colors shrink-0">
-            ({filteredItems.length})
-          </span>
         </button>
       </div>
 
@@ -126,17 +104,15 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         )}
 
         {/* AI Triage button in Inbox */}
-        {isInbox && inboxUnsortedCount > 0 && (
+        {canTriageInbox && (
           <button
             type="button"
             onClick={() => setIsTriageModalOpen(true)}
-            title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+            title="ИИ-Сортировка"
             aria-label="Запустить ИИ-Сортировку"
-            className="h-ctrl-sm px-2 rounded-md flex items-center gap-1.5 text-fg-secondary hover:text-fg-soft hover:bg-tint-6 cursor-pointer motion-press"
+            className="flex items-center justify-center h-ctrl-sm w-ctrl-sm rounded-md text-fg-secondary hover:text-fg-soft hover:bg-tint-6 cursor-pointer motion-press"
           >
-            <Icon name="action.sort" size="sm" tone="inherit" className="shrink-0" />
-            <span key={inboxUnsortedCount} className="font-mono text-2xs motion-count">{inboxUnsortedCount}</span>
-            <span className="sr-only">Запустить ИИ-Сортировку</span>
+            <Icon name="action.sort" size="sm" tone="inherit" />
           </button>
         )}
 
@@ -144,14 +120,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         <button
           type="button"
           onClick={openFolderViewModal}
-          className="relative h-ctrl-sm w-ctrl-sm flex items-center justify-center rounded-lg text-fg-secondary hover:text-white hover:bg-tint-8 motion-press cursor-pointer"
+          className="h-ctrl-sm w-ctrl-sm flex items-center justify-center rounded-lg text-fg-secondary hover:text-white hover:bg-tint-8 motion-press cursor-pointer"
           title="Вид и фильтры папки"
           aria-label="Вид и фильтры папки"
         >
           <Icon name="action.more" size="md" tone="inherit" />
-          {isCustomized && (
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
-          )}
         </button>
       </div>
     </header>

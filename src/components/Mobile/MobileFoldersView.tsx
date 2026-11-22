@@ -66,9 +66,7 @@ export const MobileFoldersView: React.FC = () => {
     [items, currentFolder],
   );
 
-  const inboxUnsortedCount = useMemo(() => {
-    return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;
-  }, [items, isInbox]);
+  const canTriageInbox = isInbox && items.some(i => i.folder === DEFAULT_INBOX_FOLDER);
 
   // Root folders vs Direct subfolders of mobileActiveFolder
   const directSubfolders = useMemo(() => {
@@ -217,6 +215,7 @@ export const MobileFoldersView: React.FC = () => {
       {/* Top Header */}
       <MobileScreenHeader
         onBack={handleBack}
+        iconOnlyBack
         backLabel={
           mobileActiveFolder.includes('/')
             ? mobileActiveFolder.split('/')[mobileActiveFolder.split('/').length - 2]
@@ -235,9 +234,11 @@ export const MobileFoldersView: React.FC = () => {
             <span className="text-sm font-bold text-white truncate max-w-full">
               {activeMeta?.name || mobileActiveFolder}
             </span>
-            <span className="text-3xs font-mono text-fg-muted truncate max-w-full">
-              {isInbox ? 'Лента входящих' : mobileActiveFolder}
-            </span>
+            {!isInbox && (
+              <span className="text-3xs font-mono text-fg-muted truncate max-w-full">
+                {mobileActiveFolder}
+              </span>
+            )}
           </button>
         }
         rightSlot={
@@ -264,17 +265,15 @@ export const MobileFoldersView: React.FC = () => {
             )}
 
             {/* AI Triage button in Inbox */}
-            {isInbox && inboxUnsortedCount > 0 && (
+            {canTriageInbox && (
               <button
                 type="button"
                 onClick={() => setIsTriageModalOpen(true)}
-                title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+                title="ИИ-Сортировка"
                 aria-label="Запустить ИИ-Сортировку"
-                className="h-8 px-2 rounded-lg flex items-center gap-1 text-fg-secondary hover:text-fg-soft hover:bg-tint-6 motion-press cursor-pointer"
+                className="flex items-center justify-center size-12 rounded-lg text-fg-secondary hover:text-fg-soft hover:bg-tint-6 motion-press cursor-pointer"
               >
-                <Icon name="action.sort" size="sm" tone="inherit" className="shrink-0" />
-                <span key={inboxUnsortedCount} className="font-mono text-2xs motion-count">{inboxUnsortedCount}</span>
-                <span className="sr-only">Запустить ИИ-Сортировку</span>
+                <Icon name="action.sort" size="sm" tone="inherit" />
               </button>
             )}
 

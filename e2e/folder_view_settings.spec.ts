@@ -7,13 +7,19 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     if (viewport.width < 768) {
       await page.getByRole('button', { name: /^Входящие/ }).first().click();
     }
-    await page.getByRole('button', { name: 'Вид и фильтры папки' }).click();
+    const dots = page.getByRole('button', { name: 'Вид и фильтры папки' });
+    const header = dots.locator('xpath=ancestor::header');
+    await expect(header.getByRole('button', { name: 'Информация о папке' })).toHaveText('Входящие');
+    await expect(header.getByRole('button', { name: 'Запустить ИИ-Сортировку' })).toHaveText('');
+    await dots.click();
     const modal = page.getByRole('dialog', { name: 'Вид и фильтры', exact: true });
     await modal.getByRole('button', { name: 'Таски', exact: true }).click();
     await modal.getByText('Скрыть выполненные', { exact: true }).click();
     await modal.getByText('Только закрепленные', { exact: true }).click();
     await page.keyboard.press('Escape');
     await expect(modal).not.toBeVisible();
+    await expect(dots.locator(':scope > *')).toHaveCount(1);
+    await header.screenshot({ path: `test-results/screenshots/inbox-header-filtered-${viewport.width}.png` });
 
     const type = page.getByRole('button', { name: 'Сбросить фильтр по типу', exact: true });
     const pinned = page.getByRole('button', { name: 'Сбросить фильтр закрепленных', exact: true });
