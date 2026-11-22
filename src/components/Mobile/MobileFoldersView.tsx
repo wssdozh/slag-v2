@@ -102,6 +102,7 @@ export const MobileFoldersView: React.FC = () => {
       <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
         {/* Top Header */}
         <MobileScreenHeader
+          className="border-none"
           title={
             <button
               type="button"
@@ -145,7 +146,7 @@ export const MobileFoldersView: React.FC = () => {
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
           {/* Pinned Inbox Card */}
-          <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden">
+          <div className="rounded-2xl bg-surface/80 overflow-hidden">
             <button
               onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
               onPointerDown={flashTap}
@@ -174,7 +175,7 @@ export const MobileFoldersView: React.FC = () => {
               Папки
             </div>
 
-            <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden divide-y divide-tint-4">
+            <div className="rounded-2xl bg-surface/80 overflow-hidden">
               {directSubfolders
                 .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
                 .map(folder => {

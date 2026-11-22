@@ -84,7 +84,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
 
     // Press feedback: a folder row tints the moment the finger lands, then fades back.
-    const folderRow = page.locator('.divide-y > button').first();
+    const folderRow = page.getByText('Папки', { exact: true }).locator('..').getByRole('button').first();
+    await expect(folderRow).toBeVisible();
+    await expect(folderRow).toHaveCSS('border-bottom-width', '0px');
     const rowBox = await folderRow.boundingBox();
     if (rowBox) {
       await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
