@@ -59,6 +59,23 @@ test.describe('Folder profile', () => {
     expect(await readStats(modal)).toEqual(dockValues);
   });
 
+  test('the folder icon and color can be changed from navigation', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const row = folderRow(page, 'Проекты');
+    const icon = row.getByRole('button', { name: 'Сменить иконку папки' });
+    await icon.click();
+    await page.getByRole('button', { name: 'Цвет: Синий' }).click();
+    const choice = page.getByRole('button', { name: /^Иконка:/ }).and(page.locator('[aria-pressed="false"]')).first();
+    const chosenName = await choice.getAttribute('aria-label');
+    await choice.click();
+    await expect(icon).toHaveAttribute('data-folder-color', 'blue');
+    await expect(page.getByRole('button', { name: chosenName! })).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({ path: 'test-results/screenshots/folder-appearance.png' });
+    await page.keyboard.press('Escape');
+    await row.getByText('Проекты', { exact: true }).click();
+    await expect(dockProfile(page).getByRole('button', { name: 'Сменить иконку папки' })).toHaveAttribute('data-folder-color', 'blue');
+  });
+
   test('inline rename moves the folder and keeps its records', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Проекты').click();

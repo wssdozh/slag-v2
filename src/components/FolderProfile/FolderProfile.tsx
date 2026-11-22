@@ -58,7 +58,6 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
     folders,
     renameFolder,
     updateFolderDescription,
-    saveFolder,
     addToast,
   });
 
@@ -86,6 +85,7 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
         itemCount={folderItems.length}
         variant={variant}
         edit={edit}
+        onSaveFolder={saveFolder}
         onMove={handleMove}
         onDelete={handleDelete}
         onClose={onClose}

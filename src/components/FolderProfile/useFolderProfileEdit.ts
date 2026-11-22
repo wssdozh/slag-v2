@@ -15,7 +15,6 @@ export interface FolderProfileEditOptions {
   folders: FolderMeta[];
   renameFolder: (oldPath: string, updatedFolder: FolderMeta) => void;
   updateFolderDescription: (path: string, description: string) => void;
-  saveFolder: (folder: FolderMeta) => void;
   addToast: (text: string, type?: 'info' | 'success' | 'error') => void;
 }
 
@@ -30,7 +29,6 @@ export interface FolderProfileEdit {
   updateDescriptionDraft: (value: string) => void;
   commitName: () => void;
   commitDescription: () => void;
-  selectIcon: (icon: string) => void;
 }
 
 /**
@@ -45,7 +43,6 @@ export function useFolderProfileEdit({
   folders,
   renameFolder,
   updateFolderDescription,
-  saveFolder,
   addToast,
 }: FolderProfileEditOptions): FolderProfileEdit {
   const [mode, setMode] = useState<FolderProfileEditMode>(null);
@@ -92,14 +89,6 @@ export function useFolderProfileEdit({
     setMode(null);
   }, [descriptionDraft, folder, path, updateFolderDescription]);
 
-  const selectIcon = useCallback(
-    (icon: string) => {
-      if (!folder) return;
-      saveFolder({ ...folder, icon });
-    },
-    [folder, saveFolder]
-  );
-
   return {
     mode,
     nameDraft,
@@ -111,6 +100,5 @@ export function useFolderProfileEdit({
     updateDescriptionDraft: setDescriptionDraft,
     commitName,
     commitDescription,
-    selectIcon,
   };
 }

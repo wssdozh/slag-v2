@@ -16,6 +16,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { getSafeNoteFilename, withIdSuffix } from '../vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../vault/safePath';
 import { folderMetaFor } from './folderSource';
+import { isFolderColor } from '../vault/folderColor';
 import type { AttachmentStore } from './attachments';
 import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
 import { mergeRegistryDeviceWorkspace } from '../sync/notes/sharedWorkspace';
@@ -903,6 +904,7 @@ function toFolderMeta(value: unknown): FolderMeta | undefined {
     description: typeof record.description === 'string' ? record.description : '',
   };
   if (typeof record.icon === 'string') folder.icon = record.icon;
+  if (isFolderColor(record.color)) folder.color = record.color;
   if (typeof record.order === 'number' && Number.isFinite(record.order)) folder.order = record.order;
   if (typeof record.showReferenceColumn === 'boolean') folder.showReferenceColumn = record.showReferenceColumn;
   if (Array.isArray(record.kanbanColumns)) folder.kanbanColumns = record.kanbanColumns.filter(isKanbanColumn);

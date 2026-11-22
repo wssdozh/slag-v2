@@ -406,19 +406,15 @@ test('a browser without view transitions still switches vaults', async ({ page }
   await expect(page.locator('aside button', { hasText: 'второе' })).toHaveCount(1);
 });
 
-test('the inbox counter pops when its number changes', async ({ page }) => {
+test('the inbox in the sidebar has no counter even with records', async ({ page }) => {
   await page.goto('/');
-  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
-  const badge = page.getByTestId('inbox-count');
-  await expect(badge).toBeVisible();
-  const before = (await badge.innerText()).trim();
-
-  await createTask(page, 'Счётчик ' + Date.now());
-  await expect(badge).not.toHaveText(before);
-  const running = await badge.evaluate(el => el.getAnimations().filter(animation => animation.playState === 'running').length);
-  expect(running).toBeGreaterThan(0);
-
-  await page.locator('aside').first().screenshot({ path: 'test-results/screenshots/motion_count.png' });
+  const inbox = page.locator('aside button').filter({ hasText: 'Входящие' });
+  await expect(inbox).toHaveText('Входящие', { timeout: 60_000 });
+  const composer = page.locator('main textarea');
+  await composer.fill('Заметка без счётчика');
+  await page.locator('button[title*="Отправить"]').click();
+  await expect(page.locator('[data-flip-id]').filter({ hasText: 'Заметка без счётчика' })).toBeVisible();
+  await expect(inbox).toHaveText('Входящие');
 });
 
 test('shared modal exits before unmount and becomes inert immediately', async ({ page }) => {

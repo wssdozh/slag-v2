@@ -13,7 +13,6 @@ export const Sidebar: React.FC = () => {
     vaults,
     currentFolder,
     setCurrentFolder,
-    items,
     setIsSettingsOpen,
     openSettingsModal,
     setIsLogViewerOpen,
@@ -47,8 +46,6 @@ export const Sidebar: React.FC = () => {
     };
   }, [isVaultDropdownOpen]);
 
-  const inboxItemsCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
-
   return (
     <aside
       className="w-full h-full flex flex-col bg-panel select-none text-fg-secondary overflow-hidden"
@@ -69,15 +66,6 @@ export const Sidebar: React.FC = () => {
               <Icon name="entity.inbox" size="md" tone="tertiary" />
               <span>{DEFAULT_INBOX_FOLDER}</span>
             </div>
-            {inboxItemsCount > 0 && (
-              <span
-                key={inboxItemsCount}
-                data-testid="inbox-count"
-                className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-tint-10 text-fg-soft motion-count"
-              >
-                {inboxItemsCount}
-              </span>
-            )}
           </button>
         </div>
 

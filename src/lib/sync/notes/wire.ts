@@ -1,6 +1,7 @@
 // The authenticated relay sees routing metadata, never the note's identity or body.
 import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
 import { safeVaultRelativePath } from '../../vault/safePath.ts';
+import { isFolderColor } from '../../vault/folderColor.ts';
 import { readSharedBody, isSharedRegistryId } from './sharedBody.ts';
 import type { SharedBody } from './sharedBody.ts';
 
@@ -259,6 +260,7 @@ function isFolderMeta(value: unknown): value is FolderMeta {
     && folder.path.split('/').every((segment) => !segment.startsWith('.'))
     && typeof folder.name === 'string' && typeof folder.description === 'string'
     && (folder.icon === undefined || typeof folder.icon === 'string')
+    && (folder.color === undefined || typeof folder.color === 'string')
     && (folder.order === undefined || (typeof folder.order === 'number' && Number.isFinite(folder.order)))
     && (folder.showReferenceColumn === undefined || typeof folder.showReferenceColumn === 'boolean')
     && (folder.kanbanColumns === undefined || (Array.isArray(folder.kanbanColumns)
@@ -276,7 +278,8 @@ export function readFolderTree(value: unknown, kind: NoteKind): FolderMeta[] {
   if (new Set(value.map((folder) => folder.path.normalize('NFC').toLowerCase())).size !== value.length) {
     throw new Error('Duplicate folder path in registry');
   }
-  return value;
+  return value.map((folder) => folder.color === undefined || isFolderColor(folder.color)
+    ? folder : { ...folder, color: undefined });
 }
 
 export async function openAnyRegistryBody(keys: NoteKeys, room: string, generation: number, op: NoteHead): Promise<RegistryBody | SharedBody> {

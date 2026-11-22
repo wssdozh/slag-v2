@@ -81,11 +81,14 @@ export interface KanbanColumn {
   statusMapping?: 'backlog' | 'todo' | 'in_progress' | 'done';
 }
 
+export type FolderColor = 'blue' | 'green' | 'amber' | 'rose';
+
 export interface FolderMeta {
   path: string; // Relative path, e.g. "Входящие", "Проекты/SLAG"
   name: string; // Display name
   description: string; // Detailed description used by AI triage
   icon?: string;
+  color?: FolderColor;
   kanbanColumns?: KanbanColumn[];
   showReferenceColumn?: boolean;
   /** Manual position in the tree; absent while the folder was never dragged. */
