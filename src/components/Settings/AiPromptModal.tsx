@@ -1,6 +1,6 @@
 // One dialog per prompt field: instructions and persona are edited apart, and saved apart.
-// The dialog is mounted only while it is open, so its first render reads the vault — that is
-// also how a prompt synced from another device shows up without an effect.
+// The dialog outlives its answer by one exit, so it leaves like the rest of the overlays; a new
+// field opened inside that window reuses the surface but starts from the stored text again.
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../UI/icons/Icon';
@@ -10,13 +10,24 @@ import { SettingsSwitch } from './SettingsUI';
 import { storage } from '../../lib/storage';
 import { getPref, setPref } from '../../lib/storage/prefs';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 export type PromptField = 'prompt' | 'persona';
 
 interface AiPromptModalProps {
-  field: PromptField;
+  field: PromptField | null;
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface PromptDraft {
+  field: PromptField;
+  session: number;
+  value: string;
+  initial: string;
+  enabled: boolean;
+  enabledInitial: boolean;
+  saveFailed: boolean;
 }
 
 const TITLES: Record<PromptField, string> = { prompt: 'Промпт', persona: 'Персона' };
@@ -31,31 +42,42 @@ const HINTS: Record<PromptField, string> = {
 /** Desktop only: a long prompt is read like a document, not like a field. */
 const SIZE_KEY = 'slag_ai_prompt_modal_wide';
 
-function readField(field: PromptField): string {
+/** A fresh draft reads the vault: a prompt synced from another device shows up without an effect. */
+function createDraft(field: PromptField, session: number): PromptDraft {
   const workspace = storage.getWorkspaceState();
-  return field === 'prompt' ? workspace.aiPrompt ?? '' : workspace.aiPersona ?? '';
+  const value = field === 'prompt' ? workspace.aiPrompt ?? '' : workspace.aiPersona ?? '';
+  const enabled = workspace.aiPersonaEnabled === true;
+  return { field, session, value, initial: value, enabled, enabledInitial: enabled, saveFailed: false };
 }
 
-export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onClose }) => {
-  const isMobile = useIsMobile();
-  const [value, setValue] = useState(() => readField(field));
-  const [initial] = useState(value);
-  const [enabled, setEnabled] = useState(() => storage.getWorkspaceState().aiPersonaEnabled === true);
-  const [enabledInitial] = useState(enabled);
-  const [wide, setWide] = useState(() => getPref(SIZE_KEY) === '1');
+interface PromptDialogProps {
+  field: PromptField;
+  session: number;
+  isOpen: boolean;
+  onClose: () => void;
+  presence: ReturnType<typeof usePresence>;
+}
 
+const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onClose, presence }) => {
+  const isMobile = useIsMobile();
+  const [draft, setDraft] = useState(() => createDraft(field, session));
+  // Every opening starts from the stored text, even when the surface is still fading the previous
+  // field out: the draft is component state here, not a remount, so the exit is not cut short.
+  if (draft.session !== session || draft.field !== field) setDraft(createDraft(field, session));
+
+  const [wide, setWide] = useState(() => getPref(SIZE_KEY) === '1');
   const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
+
   const save = async () => {
     setSaving(true);
-    setSaveFailed(false);
+    setDraft((previous) => ({ ...previous, saveFailed: false }));
     try {
       const at = Date.now(); // Legacy rooms still carry the timestamp; registry rooms use revisions.
-      await storage.saveWorkspaceState(field === 'prompt' ? { aiPrompt: value.trim(), aiPromptAt: at }
-        : { aiPersona: value.trim(), aiPersonaEnabled: enabled, aiPersonaAt: at });
+      await storage.saveWorkspaceState(field === 'prompt' ? { aiPrompt: draft.value.trim(), aiPromptAt: at }
+        : { aiPersona: draft.value.trim(), aiPersonaEnabled: draft.enabled, aiPersonaAt: at });
       onClose();
     } catch {
-      setSaveFailed(true);
+      setDraft((previous) => ({ ...previous, saveFailed: true }));
     } finally {
       setSaving(false);
     }
@@ -68,8 +90,9 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
     });
   };
 
-  const personaOff = field === 'persona' && !enabled;
-  const dirty = value !== initial || (field === 'persona' && enabled !== enabledInitial);
+  const personaOff = field === 'persona' && !draft.enabled;
+  const dirty = draft.value !== draft.initial
+    || (field === 'persona' && draft.enabled !== draft.enabledInitial);
 
   const hint = <span className="text-xs leading-relaxed text-fg-muted">{HINTS[field]}</span>;
 
@@ -78,18 +101,22 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
       <span className="min-w-0 flex flex-col gap-0.5">
         <span className="text-sm font-medium text-fg-primary">Персона включена</span>
         <span className="text-xs leading-relaxed text-fg-muted">
-          {enabled ? 'ассистент говорит от её лица' : 'выключено — только правила промпта'}
+          {draft.enabled ? 'ассистент говорит от её лица' : 'выключено — только правила промпта'}
         </span>
       </span>
-      <SettingsSwitch checked={enabled} onChange={(next) => { if (!saving) setEnabled(next); }} label="Персона включена" />
+      <SettingsSwitch
+        checked={draft.enabled}
+        onChange={(next) => { if (!saving) setDraft((previous) => ({ ...previous, enabled: next })); }}
+        label="Персона включена"
+      />
     </div>
   );
 
   const editor = (
     <textarea
       rows={isMobile ? 10 : 16}
-      value={value}
-      onChange={(event) => setValue(event.target.value)}
+      value={draft.value}
+      onChange={(event) => setDraft((previous) => ({ ...previous, value: event.target.value }))}
       placeholder={PLACEHOLDERS[field]}
       aria-label={TITLES[field]}
       data-testid={`ai-${field}-text`}
@@ -100,8 +127,8 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
 
   const actions = (
     <div className="flex items-center justify-end gap-2">
-      {saveFailed ? <span role="alert" className="mr-auto text-xs text-fg-secondary">Не удалось сохранить. Текст остался в редакторе.</span>
-        : <span className="mr-auto text-2xs font-mono text-fg-dim">{value.length}</span>}
+      {draft.saveFailed ? <span role="alert" className="mr-auto text-xs text-fg-secondary">Не удалось сохранить. Текст остался в редакторе.</span>
+        : <span className="mr-auto text-2xs font-mono text-fg-dim">{draft.value.length}</span>}
       <button
         type="button"
         onClick={onClose}
@@ -125,9 +152,16 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
     // A full-screen surface of its own, not a dialog inside the settings screen: that screen
     // carries `translate`, which makes it a containing block for `fixed` and clipped this sheet
     // to its box. Portal + its own layer keeps the editor above everything, full height.
-    if (!isOpen) return null;
+    const { ref: surfaceRef, phase, onTransitionEnd } = presence;
     return createPortal(
-      <div className="fixed inset-0 z-[60] flex flex-col bg-canvas motion-fade">
+      <div
+        ref={surfaceRef}
+        data-motion-state={phase}
+        onTransitionEnd={onTransitionEnd}
+        inert={!isOpen}
+        aria-hidden={!isOpen || undefined}
+        className="fixed inset-0 z-[60] flex flex-col bg-canvas motion-fade"
+      >
         <div
           className="flex items-center gap-2 px-3 py-2.5 border-b border-border-subtle shrink-0 bg-panel"
           style={{ paddingTop: 'max(var(--sat), 0.625rem)' }}
@@ -135,6 +169,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
           <button
             type="button"
             onClick={onClose}
+            aria-label="Назад"
             className="p-1.5 -ml-1 text-fg-muted hover:text-fg-primary cursor-pointer motion-press"
             title="Назад"
           >
@@ -160,6 +195,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
 
   return (
     <BaseModal
+      presence={presence}
       isOpen={isOpen}
       onClose={onClose}
       portal
@@ -188,5 +224,31 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
         {editor}
       </div>
     </BaseModal>
+  );
+};
+
+export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onClose }) => {
+  const presence = usePresence(isOpen);
+  const [snapshot, setSnapshot] = useState<{ open: boolean; field: PromptField | null }>({ open: isOpen, field });
+  const [session, setSession] = useState(0);
+  // The close keeps the field it is fading; the next open starts a session and reads the vault.
+  // Compare against the shown field, not the prop: a closed modal has no field of its own.
+  const shownField = field ?? snapshot.field;
+  if (snapshot.open !== isOpen || snapshot.field !== shownField) {
+    setSnapshot({ open: isOpen, field: shownField });
+    if (isOpen) setSession(previous => previous + 1);
+  }
+
+  if (!presence.isPresent) return null;
+  if (!shownField) return null;
+
+  return (
+    <PromptDialog
+      field={shownField}
+      session={session}
+      isOpen={isOpen}
+      onClose={onClose}
+      presence={presence}
+    />
   );
 };
