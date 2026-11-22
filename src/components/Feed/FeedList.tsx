@@ -59,6 +59,11 @@ export const FeedList: React.FC = () => {
     currentFolder,
     activeTypeFilter,
     activeTagFilter,
+    inboxMode,
+    hideCompletedTasks,
+    aiItemFilter,
+    sortBy,
+    sortOrder,
     addToast,
     highlightedItemId,
     openLightbox,
@@ -154,7 +159,9 @@ export const FeedList: React.FC = () => {
     }
   }
 
-  const prependAnchorRef = useRef<{ card: HTMLElement; top: number } | null>(null);
+  const prependAnchorRef = useRef<{ id: string; top: number; viewKey: string; aiFilter: typeof aiItemFilter } | null>(null);
+  const skipPrependMotionRef = useRef(false);
+  const viewKey = JSON.stringify([highlightKey, inboxMode, isPinnedOnlyFilter, hideCompletedTasks, sortBy, sortOrder]);
 
   const todayMidnight = useSyncExternalStore(subscribeToNow, getTodayMidnight, () => 0);
 
@@ -167,13 +174,16 @@ export const FeedList: React.FC = () => {
     // Предыдущая догрузка ещё держит анкор: вторая подряд даёт скачок.
     if (prependAnchorRef.current) return;
 
-    const card = container.querySelector<HTMLElement>('[data-flip-id]');
-    if (card) {
-      prependAnchorRef.current = { card, top: card.getBoundingClientRect().top };
+    const viewport = container.getBoundingClientRect();
+    for (const card of container.querySelectorAll<HTMLElement>('[data-flip-id]')) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom <= viewport.top || rect.top >= viewport.bottom) continue;
+      prependAnchorRef.current = { id: card.dataset.flipId!, top: rect.top - viewport.top, viewKey, aiFilter: aiItemFilter };
+      break;
     }
 
     setWindowSize(prev => nextWindowSize(prev, filteredItems.length));
-  }, [hasMoreOlder, filteredItems.length]);
+  }, [hasMoreOlder, filteredItems.length, viewKey, aiItemFilter]);
 
   const isStuckToBottomRef = useRef(true);
 
@@ -186,11 +196,15 @@ export const FeedList: React.FC = () => {
     if (!container) return;
 
     const anchor = prependAnchorRef.current;
-    if (anchor) {
-      prependAnchorRef.current = null;
-      if (container.contains(anchor.card)) {
+    prependAnchorRef.current = null;
+    skipPrependMotionRef.current = false;
+    if (anchor && anchor.viewKey === viewKey && anchor.aiFilter === aiItemFilter) {
+      skipPrependMotionRef.current = true;
+      const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(anchor.id)}"]`);
+      if (card) {
         // Correct only the movement that remains after any browser anchoring.
-        container.scrollTop += anchor.card.getBoundingClientRect().top - anchor.top;
+        const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        container.scrollTop += offset - anchor.top;
         return;
       }
     }
@@ -206,6 +220,7 @@ export const FeedList: React.FC = () => {
   // boxes are the final ones and the delta carries the scroll the list just took.
   useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'), {
     enterFromBelow: true,
+    skipMotionRef: skipPrependMotionRef,
   });
 
   // The keyboard and a growing composer resize the scrollport without rendering this list.

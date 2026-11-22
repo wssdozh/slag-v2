@@ -10,6 +10,8 @@ interface Options {
    * out from under the composer; a board without a dock keeps the plain landing.
    */
   enterFromBelow?: boolean;
+  /** Read after the caller has compensated a prepend in its layout effect. */
+  skipMotionRef?: React.RefObject<boolean>;
 }
 
 interface Point {
@@ -38,7 +40,7 @@ interface Snapshot {
 export function useFlipLayout(
   containerRef: React.RefObject<HTMLElement | null>,
   signature: string,
-  { selector = '[data-flip-id]', enterFromBelow = false }: Options = {},
+  { selector = '[data-flip-id]', enterFromBelow = false, skipMotionRef }: Options = {},
 ) {
   const previousRef = useRef<Snapshot | null>(null);
   const scrollRef = useRef<Point>({ top: 0, left: 0 });
@@ -80,7 +82,7 @@ export function useFlipLayout(
     previousRef.current = { ids, boxes };
     scrollRef.current = { top: scrollTop, left: scrollLeft };
     if (!previous) return;
-    if (prefersReducedMotion()) return;
+    if (skipMotionRef?.current || prefersReducedMotion()) return;
 
     const added = [...ids].filter(id => !previous.ids.has(id));
     const grew = ids.size > previous.ids.size;
@@ -135,7 +137,7 @@ export function useFlipLayout(
         { duration: motionMs('slow'), easing: motionEase('standard') },
       ));
     }
-  }, [containerRef, signature, selector, enterFromBelow]);
+  }, [containerRef, signature, selector, enterFromBelow, skipMotionRef]);
 
   useLayoutEffect(() => {
     const animations = animationsRef.current;

@@ -155,6 +155,45 @@ test('a fresh note lands, and the list settles when one is deleted', async ({ pa
   expect(travelled).toBe(true);
 });
 
+test('loading older notes keeps a visible card still from the first frame', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.addInitScript(() => {
+    const day = new Date().setHours(12, 0, 0, 0);
+    localStorage.setItem('slag_items_default_vault', JSON.stringify(Array.from({ length: 45 }, (_, i) => ({
+      id: `prepend-${i}`, type: 'note', folder: 'Входящие', title: '', content: `Запись ${i}\n\nИстория ленты`,
+      createdAt: day + i * 60_000, updatedAt: day + i * 60_000, tags: [], attachments: [],
+    }))));
+  });
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 1600ms; }' });
+  const feed = page.getByTestId('feed-list-container');
+  await expect(feed.locator('[data-flip-id]')).toHaveCount(15);
+
+  const firstFrame = await feed.locator('#item-prepend-30').evaluate(async (card) => {
+    const list = card.closest<HTMLElement>('[data-testid="feed-list-container"]')!;
+    const top = () => card.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    list.scrollTop = 0;
+    const before = top();
+    const olderId = '#item-prepend-15';
+    const deadline = performance.now() + 5000;
+    while (!list.querySelector(olderId) && performance.now() < deadline) {
+      await new Promise(requestAnimationFrame);
+      // Initial bottom settling can run before the top sentinel's first notification.
+      if (!list.querySelector(olderId) && list.scrollTop > 0) list.scrollTop = 0;
+    }
+    return {
+      count: list.querySelectorAll('[data-flip-id]').length,
+      shift: Math.abs(top() - before),
+      animated: card.getAnimations().some(({ effect }) =>
+        effect instanceof KeyframeEffect && effect.getKeyframes().some(frame => 'transform' in frame)),
+    };
+  });
+  expect(firstFrame.count).toBe(30);
+  expect(firstFrame.shift).toBeLessThanOrEqual(2);
+  expect(firstFrame.animated).toBe(false);
+  await page.screenshot({ path: 'test-results/screenshots/feed_prepend_no_jump.png' });
+});
+
 test('a sent note rises from the composer, and the cards above it do not jump', async ({ page }) => {
   await page.goto('/');
   // Long enough to read the start keyframe before the animation ends.
