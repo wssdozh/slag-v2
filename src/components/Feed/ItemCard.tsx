@@ -521,8 +521,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         onTouchCancel={handleTouchEnd}
         style={{
           transform: swipeOffset ? `translateX(${swipeOffset}px)` : undefined,
-          // One declaration for the card: a separate `transition-colors` class would
-          // be overridden here, which is why the hover colour used to snap.
           transition: swipeOffset ? 'none' : CARD_TRANSITION,
           ...cardStyle,
         }}
@@ -531,7 +529,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         } ${isCompactText ? 'px-2.5 sm:px-3 py-1.5' : 'p-2.5 sm:p-3'} rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
-            : 'bg-surface hover:bg-surface-hover'
+            : 'bg-surface'
         }`}
       >
         <ItemCardActions
