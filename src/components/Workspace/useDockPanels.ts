@@ -167,6 +167,12 @@ export function useDockPanels({
       event.api.onDidAddPanel(() => {
         syncAllGroupConstraints(event.api);
       });
+      event.api.onDidMovePanel(() => {
+        syncAllGroupConstraints(event.api);
+      });
+      event.api.onDidMaximizedGroupChange(() => {
+        syncAllGroupConstraints(event.api);
+      });
 
       event.api.onDidRemovePanel(() => {
         wsLog.info('Panel removed from workspace layout', { remainingPanels: event.api.totalPanels });

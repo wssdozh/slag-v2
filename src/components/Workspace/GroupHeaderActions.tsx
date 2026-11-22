@@ -72,7 +72,7 @@ export const GroupHeaderActions: React.FC<IDockviewHeaderActionsProps> = (props)
     <div className="relative flex items-center h-full px-0.5 gap-0.5">
       <button
         onClick={() => setIsOpen(prev => !prev)}
-        className="w-6 h-6 rounded-md text-fg-muted hover:text-fg-soft hover:bg-tint-6 flex items-center justify-center transition-colors cursor-pointer"
+        className="w-6 h-6 rounded-md text-fg-muted hover:text-fg-soft flex items-center justify-center transition-colors cursor-pointer"
         title="Добавить вкладку в эту группу"
       >
         <Icon name="action.add" size="sm" tone="inherit" />

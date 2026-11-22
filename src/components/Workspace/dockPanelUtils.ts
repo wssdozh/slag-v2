@@ -49,21 +49,36 @@ export const getPanelComponent = (panel: IDockviewPanel): string => {
  * panes just squeeze.
  */
 export const syncAllGroupConstraints = (api: DockviewApi) => {
+  // Serializing would temporarily unmaximize the grid. Recompute when it is restored instead.
+  if (api.hasMaximizedGroup()) return;
   const entries = api.groups
     .map(group => ({ group, active: group.activePanel }))
     .filter((entry): entry is { group: (typeof entry.group); active: IDockviewPanel } => Boolean(entry.active));
-  const totalMin = entries.reduce((sum, entry) => sum + getPanelMinWidth(getPanelComponent(entry.active)), 0);
-  // Sashes between the columns eat width too, and rounding lands on the wrong side of the edge;
-  // without this inset the minimums add up to the whole frame and the last pane pokes past it.
-  const available = api.width - 8 * Math.max(0, entries.length - 1) - 8;
-  const scale = available > 0 && totalMin > available ? available / totalMin : 1;
+  const widths = new Map(entries.map(({ group, active }) => [group.id, getPanelMinWidth(getPanelComponent(active))]));
+  const { root, orientation } = api.toJSON().grid;
+  const requiredWidth = (node: typeof root, horizontal: boolean): number => {
+    if (node.visible === false) return 0;
+    if (!Array.isArray(node.data)) return widths.get(node.data.id) ?? 0;
+    return node.data.reduce((width, child) => {
+      const childWidth = requiredWidth(child, !horizontal);
+      return horizontal ? width + (childWidth ? childWidth + 8 : 0) : Math.max(width, childWidth);
+    }, 0);
+  };
+  // Side-by-side panes add up (with a small divider allowance); stacked panes share the same width.
+  // Floating panes do not participate in the grid width budget.
+  const totalMin = requiredWidth(root, orientation === 'HORIZONTAL');
+  const scale = api.width > 0 && totalMin > api.width ? api.width / totalMin : 1;
+  const gridGroups = entries.filter(({ group }) => group.api.location.type === 'grid').length;
   entries.forEach(({ group, active }) => {
     const comp = getPanelComponent(active);
-    const maxWidth = getPanelMaxWidth(comp);
+    const isDocked = group.api.location.type === 'grid';
+    // With no neighboring group to take the rest, a standalone pane fills its window.
+    const maxWidth = isDocked && gridGroups === 1 ? undefined : getPanelMaxWidth(comp);
     try {
       group.api.setConstraints({
-        minimumWidth: Math.floor(getPanelMinWidth(comp) * scale),
-        maximumWidth: maxWidth,
+        minimumWidth: Math.floor(getPanelMinWidth(comp) * (isDocked ? scale : 1)),
+        // Dockview leaves the old group maximum in place when passed undefined.
+        maximumWidth: maxWidth ?? Number.MAX_SAFE_INTEGER,
       });
       if (maxWidth && group.api.width > maxWidth) {
         group.api.setSize({ width: maxWidth });

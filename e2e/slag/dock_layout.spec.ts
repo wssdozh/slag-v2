@@ -63,6 +63,50 @@ test('panes squeeze inside the window instead of staying columns wider than it',
   expect(widestEdge(back)).toBeLessThanOrEqual(1602);
 });
 
+test('a mixed tab group releases and restores the width cap when switching tabs', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 720 });
+  await page.addInitScript(() => {
+    localStorage.setItem('slag_workspace_layout_v2', JSON.stringify({
+      grid: {
+        width: 1200, height: 720, orientation: 'HORIZONTAL',
+        root: { type: 'branch', size: 720, data: [
+          { type: 'leaf', size: 700, data: { id: 'left', views: ['panel_feed'], activeView: 'panel_feed' } },
+          { type: 'leaf', size: 500, data: { id: 'right', views: ['panel_info', 'right_feed'], activeView: 'panel_info' } },
+        ] },
+      },
+      panels: {
+        panel_feed: { id: 'panel_feed', contentComponent: 'feed', title: 'Входящие' },
+        panel_info: { id: 'panel_info', contentComponent: 'folder-info', title: 'Инфо' },
+        right_feed: { id: 'right_feed', contentComponent: 'feed', title: 'Вторая лента' },
+      },
+      activeGroup: 'right',
+    }));
+  });
+  await page.goto('/');
+
+  const rightGroup = page.locator('.dv-groupview').filter({ hasText: 'Вторая лента' });
+  const rightWidth = () => rightGroup.evaluate(el => el.getBoundingClientRect().width);
+  const dragLeft = async () => {
+    const sash = await page.locator('.dv-horizontal > .dv-sash-container > .dv-sash').boundingBox();
+    if (!sash) throw new Error('Missing column divider');
+    const x = sash.x + sash.width / 2;
+    const y = sash.y + sash.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 180, y, { steps: 8 });
+    await page.mouse.up();
+  };
+
+  await rightGroup.getByText('Вторая лента', { exact: true }).click();
+  await dragLeft();
+  await expect.poll(rightWidth).toBeGreaterThan(600);
+  await page.screenshot({ path: 'test-results/screenshots/dock-mixed-tabs.png' });
+
+  await rightGroup.getByText('Инфо', { exact: true }).click();
+  await dragLeft();
+  await expect.poll(rightWidth).toBeLessThanOrEqual(541);
+});
+
 test('a layout saved in a narrow window is stretched to the current one', async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1600, height: 900 });

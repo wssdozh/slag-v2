@@ -48,6 +48,34 @@ async function openAssistantDock(page: import('@playwright/test').Page) {
 }
 
 test.describe('Assistant layout', () => {
+  test('a narrow assistant keeps all controls on one line and uses borderless bubbles', async ({ page }) => {
+    await page.setViewportSize({ width: 280, height: 720 });
+    await seedAssistantHistory(page);
+    await page.goto('/?panel=assistant&title=Ассистент');
+    const stream = page.getByTestId('assistant-messages');
+    await expect(stream).toContainText('Вот сводка по хранилищу.', { timeout: 30_000 });
+    const bubble = stream.locator('.rounded-xl').filter({ hasText: 'Вот сводка по хранилищу.' });
+    await expect(bubble).toHaveCSS('border-top-width', '0px');
+
+    const toolbar = page.locator('.composer-toolbar');
+    await page.getByRole('button', { name: 'Поиск в интернете' }).click();
+    await expect(page.getByRole('button', { name: 'Поиск в интернете' })).toHaveAttribute('aria-pressed', 'true');
+    const geometry = await toolbar.evaluate(el => {
+      const row = el.getBoundingClientRect();
+      return [...el.querySelectorAll('button')].map(button => {
+        const box = button.getBoundingClientRect();
+        return {
+          center: Math.round(box.top + box.height / 2),
+          inside: box.left >= row.left && box.right <= row.right,
+        };
+      });
+    });
+    expect(geometry).toHaveLength(4);
+    expect(new Set(geometry.map(box => box.center)).size).toBe(1);
+    expect(geometry.every(box => box.inside)).toBe(true);
+    await page.screenshot({ path: 'test-results/screenshots/assistant-narrow-toolbar.png' });
+  });
+
   test('long unbroken content never scrolls the message stream sideways', async ({ page }) => {
     await seedAssistantHistory(page);
     await page.goto('/');

@@ -4,11 +4,12 @@ import { Icon } from './icons/Icon';
 import { isDesktopApp, minimizeWindow, toggleMaximizeWindow, closeWindow } from '../../lib/platform/windowControls';
 
 // ponytail: fixed top-right 34px controls matching dockview tab row. ceiling: windows 11 snap layout preview. upgrade: tauri-plugin-frame if native snap menu hover required
-export const WindowControls: React.FC = () => {
+export const WindowControls: React.FC<{ ref?: React.Ref<HTMLDivElement> }> = ({ ref }) => {
   if (!isDesktopApp()) return null;
 
   return (
     <div
+      ref={ref}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       className="fixed top-0 right-0 h-[34px] z-50 flex items-center pr-1 pl-2 select-none bg-panel border-b border-tint-6 pointer-events-auto"
     >

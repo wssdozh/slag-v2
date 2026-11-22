@@ -1224,6 +1224,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
     await expect(page.locator('nav[aria-label="Мобильная навигация"]')).not.toBeVisible();
+    await expect.poll(async () => (await dockviewContainer.locator('.dv-groupview').boundingBox())?.width).toBe(550);
 
     // 2. Verify the detached panel is present as a tab
     const sidebarTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Навигация' }).first();
@@ -1237,6 +1238,14 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const closeBtn = page.locator('button[title="Закрыть"]').first();
     await expect(closeBtn).toBeVisible();
     await expect(closeBtn).toBeEnabled();
+    const minimizeBtn = page.getByRole('button', { name: 'Свернуть' });
+    await expect.poll(async () => {
+      const [add, minimize] = await Promise.all([addPanelBtn.boundingBox(), minimizeBtn.boundingBox()]);
+      return Boolean(add && minimize && add.x + add.width <= minimize.x);
+    }).toBe(true);
+    await addPanelBtn.click();
+    await expect(page.getByRole('button', { name: 'Канбан' })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // 5. Capture screenshot of the detached window
     await page.screenshot({

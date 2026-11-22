@@ -69,7 +69,7 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
               : `Спросите о «${folderLabel.length > 20 ? folderLabel.slice(0, 18) + '…' : folderLabel}»...`
           }
           leftControls={
-            <div className="composer-toolbar-group flex min-w-0 flex-1 flex-wrap items-center gap-1">
+            <div className="@container flex min-w-0 flex-1 items-center gap-1">
               {/* Provider badge - Embedded Linear Monochrome */}
               {isConnected ? (
                 <button
@@ -132,7 +132,7 @@ export const AssistantComposer: React.FC<AssistantComposerProps> = ({
                 aria-pressed={aiSettings.webSearchEnabled}
               >
                 <Icon name="system.web" size="md" tone="inherit" />
-                <span className="hidden sm:inline">Сеть</span>
+                <span className="hidden @min-[180px]:inline">Сеть</span>
               </button>
             </div>
           }
