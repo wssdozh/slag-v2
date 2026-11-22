@@ -303,6 +303,11 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(item.attachments);
 
   const shape = itemCardShape(item, attachmentCounts(attachmentGroups));
+  const timestamp = (
+    <span data-testid="item-time" className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-mono text-2xs leading-none text-fg-muted select-none">
+      {formattedTime}<ItemSyncDot item={item} />
+    </span>
+  );
   const isVoiceBubble = shape === 'voice';
   const isFileBubble = shape === 'file';
 
@@ -557,7 +562,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
-        <ItemSyncDot item={item} />
         {/* Text and media keep their full width; only articles reserve an inside action. */}
         <ItemCardActions
           isFloating={hasFloatingActions}
@@ -658,8 +662,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   {...attachmentMarkdownProps}
                 />
                 {isCompactText && (
-                  <span data-testid="item-time" className="relative top-0.5 float-right ml-3 whitespace-nowrap text-2xs font-mono leading-[1lh] text-fg-muted select-none">
-                    {formattedTime}
+                  <span className="relative top-0.5 float-right ml-3">{timestamp}
                   </span>
                 )}
               </div>
@@ -680,7 +683,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         attachments={attachmentGroups.audio}
         srcs={attachmentSrcs}
         isVoiceBubble={isVoiceBubble}
-        formattedTime={formattedTime}
+        timestamp={timestamp}
         onEnrich={handleEnrichAttachment}
       />
 
@@ -701,7 +704,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         attachments={attachmentGroups.file}
         srcs={attachmentSrcs}
         isFileBubble={isFileBubble}
-        formattedTime={formattedTime}
+        timestamp={timestamp}
       />
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
@@ -798,11 +801,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             </div>
           ) : null}
 
-          {!isVoiceBubble && (
-            <span className="text-2xs font-mono text-fg-muted select-none ml-auto shrink-0 leading-none">
-              {formattedTime}
-            </span>
-          )}
+          {!isVoiceBubble && !isFileBubble && <span className="ml-auto inline-flex shrink-0">{timestamp}</span>}
         </div>
       )}
 

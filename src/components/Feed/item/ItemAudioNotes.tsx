@@ -11,7 +11,7 @@ export interface ItemAudioNotesProps {
   /** A card that is nothing but its voice note hugs the player and borrows the timestamp. */
   isVoiceBubble: boolean;
   /** Time of the note itself; the bubble has no footer left to keep it in. */
-  formattedTime: string;
+  timestamp: React.ReactNode;
   onEnrich: (attachment: SlagAttachment) => void;
 }
 
@@ -20,7 +20,7 @@ const ItemAudioNotesComponent: React.FC<ItemAudioNotesProps> = ({
   attachments,
   srcs,
   isVoiceBubble,
-  formattedTime,
+  timestamp,
   onEnrich,
 }) => (
   <>
@@ -31,7 +31,7 @@ const ItemAudioNotesComponent: React.FC<ItemAudioNotesProps> = ({
           name={att.name}
           duration={att.duration}
           waveform={att.waveform}
-          timeContext={isVoiceBubble ? formattedTime : undefined}
+          timeContext={isVoiceBubble ? timestamp : undefined}
           transcript={att.extractedText}
           summary={att.summary}
           enrichmentStatus={att.enrichmentStatus}

@@ -33,7 +33,7 @@ export function ItemSyncDot({ item }: { item: SlagItem }) {
   const snapshot = useCallback(() => syncEngine.getItemDeliveryStatus(item, hash), [item, hash]);
   const status = useSyncExternalStore(subscribe, snapshot);
   const [label, icon, tone] = indicators[status];
-  return <span className="absolute end-1.5 top-1.5 z-30" role="img" aria-label={label} title={label} data-sync-status={status}>
+  return <span className="inline-flex shrink-0" role="img" aria-label={label} title={label} data-sync-status={status}>
     <Icon name={icon} tone="inherit" className={`size-3 ${tone}`} />
   </span>;
 }

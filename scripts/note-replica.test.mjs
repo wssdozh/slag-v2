@@ -292,7 +292,7 @@ test('the indicator and journal distinguish equivalent versions, queue, transpor
   const send = server.view.send;
   const logs = [];
   const { replica, errors } = device(t, server, { log: (event, data) => logs.push({ event, data }) });
-  const item = note('card', { title: 'private diagnostic fixture' });
+  const item = note('card', { title: 'private diagnostic fixture', subtasks: [] });
   assert.equal(replica.deliveryStatus(item), 'unconfirmed');
   await replica.catchUp();
   let release;
@@ -304,7 +304,9 @@ test('the indicator and journal distinguish equivalent versions, queue, transpor
   release();
   await until(() => replica.deliveryStatus(item) === 'accepted');
   const equivalent = { ...item, isPinned: false, isArchived: false, replyToId: undefined };
+  delete equivalent.subtasks; // Ordinary notes lose the empty checklist on a Markdown round trip.
   assert.equal(replica.deliveryStatus(equivalent), 'accepted');
+  assert.equal(replica.deliveryStatus({ ...equivalent, subtasks: [{ id: 'sub', text: 'real change', done: false }] }), 'unconfirmed');
   await replica.record([change('update', equivalent)]);
   assert.equal(replica.pendingCount, 0);
   assert.equal(replica.conflicts.length, 0);

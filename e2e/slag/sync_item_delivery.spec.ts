@@ -17,6 +17,7 @@ test('the note dot follows a failed push and the relay receipt for the current v
     const { syncEngine, storage } = await import('/src/lib/sync/syncEngine.ts');
     const { computeHash } = await import('/src/lib/sync/crypto.ts');
     const { stripAttachmentData } = await import('/src/lib/storage/attachmentData.ts');
+    await syncEngine.init(); // Finish real startup before replacing its config for the synthetic push.
     const item = storage.getItemById(id);
     if (!item) throw new Error('Card has no matching note');
     const key = `item:${id}`;
@@ -40,12 +41,13 @@ test('the note dot follows a failed push and the relay receipt for the current v
   await page.route('**/api/rooms/card-dot-test/bundle?*', (route) => route.fulfill({ status: 200 }));
   await page.evaluate(() => window.testItemDeliveryPush());
   await expect(dot).toHaveAccessibleName('Версия записи принята релеем');
-  const insets = await dot.evaluate((element) => {
-    const point = element.getBoundingClientRect();
-    const card = element.parentElement!.getBoundingClientRect();
-    return [point.top - card.top, card.right - point.right, point.width];
+  await expect(card.getByTestId('item-time').locator('[data-sync-status]')).toHaveCount(1);
+  const gapAfterTime = await dot.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNode(element.previousSibling!);
+    return element.getBoundingClientRect().left - range.getBoundingClientRect().right;
   });
-  expect(insets).toEqual([6, 6, 12]);
+  expect(gapAfterTime).toBeCloseTo(4, 0);
   await card.screenshot({ path: 'test-results/screenshots/sync-item-delivery.png' });
   const edited = await page.evaluate(async (id) => {
     const { syncEngine, storage } = await import('/src/lib/sync/syncEngine.ts');

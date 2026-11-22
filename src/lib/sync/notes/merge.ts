@@ -24,7 +24,7 @@ export function relayNote(item: SlagItem): SlagItem {
 
 function comparisonValue(item: SlagItem) {
   const { updatedAt: _updatedAt, createdAt: _createdAt, ...value } = relayNote(item);
-  return { ...value, isPinned: value.isPinned ?? false, isArchived: value.isArchived ?? false,
+  return { ...value, subtasks: value.subtasks ?? [], isPinned: value.isPinned ?? false, isArchived: value.isArchived ?? false,
     ...(value.type === 'task' && { status: value.status ?? 'todo', priority: value.priority ?? 'none' }) };
 }
 
