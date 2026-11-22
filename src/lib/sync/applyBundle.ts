@@ -2,10 +2,11 @@ import type { SyncEngine } from './syncEngine';
 import type { SyncBundle, EncryptedBundle, AttachmentRequestPayload, AssistantPromptPayload } from './types';
 import { decryptBundle } from './crypto';
 import { touchDeviceLastSeen } from './devices';
-import { loadDraftTombstone, loadSentHashes, loadTombstones, saveDraftTombstone, saveSentHashes, saveTombstones } from './localBookkeeping';
+import { loadDraftTombstone, loadSentHashes, loadTombstones, requireSyncSectionFlushed, saveDraftTombstone, saveSentHashes, saveTombstones } from './localBookkeeping';
 import { attachmentSignature } from './attachmentSignature';
 import { logger } from '../logger/logger';
 import { vault } from '../storage/port';
+import { isLegacySharedKind } from './notes/sharedBody';
 import type { ComposerDraft, FolderMeta, FullscreenDraft, MemoryItem, SlagAttachment, SlagItem, WorkspaceState } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 
@@ -53,15 +54,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       if (bundle.fromDeviceId === engine.config.deviceId) {
         return; // ignore self echo
       }
-      if (engine.appliedBundleIds.has(bundle.bundleId)) {
-        // ponytail: relay re-delivers pending bundles until ACK; skip a re-apply we already did.
-        // If this id is still sitting in the import buffer, the ACK belongs to that write —
-        // sending it here would confirm a bundle this device has not persisted yet.
-        if (!engine.importBuffer?.bundles.includes(bundle.bundleId)) {
-          await engine.sendAck(bundle.bundleId);
-        }
-        return;
-      }
+      if (engine.appliedBundleIds.has(bundle.bundleId)) return; // The owning write sends the ACK.
 
       let sender = engine.config.trustedDevices.find((d) => d.id === bundle.fromDeviceId);
       if (!sender && engine.usesAccountSync()) {
@@ -127,16 +120,21 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
       // The notes this bundle says are gone. Collected as it goes: the write takes exactly these off
       // the disk, instead of every note the payload happens not to list.
       const removedIds: string[] = [];
-      const tombstones = loadTombstones(engine.bookkeeping);
-      let tombstonesDirty = false;
+      const itemDeletes: { itemId: string | null; decision: string; deletedAt?: number; localUpdatedAt?: number }[] = [];
+      const originalTombstones = loadTombstones(engine.bookkeeping);
+      const tombstones = { ...originalTombstones };
+      const changedTombstones = new Set<string>();
 
+      const registry = Boolean(engine.noteGeneration);
       for (const ch of bundle.changes) {
+        if (registry && (ch.type === 'item' || ch.type === 'trash')) continue;
+        if (engine.hasSharedRegistry && isLegacySharedKind(ch.type)) continue;
+        if (engine.hasRegistryMedia && (ch.type === 'attachment' || ch.type === 'attachment_request')) continue;
         if (ch.type === 'item') {
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as SlagItem;
-            const tomb = tombstones[ch.id];
-            // ponytail: wall-clock LWW; server-assigned version when clocks skew matters.
-            if (tomb !== undefined && (incoming.updatedAt ?? 0) < tomb) continue;
+            // A legacy full resend is not an explicit restore, even if its clock is ahead.
+            if (tombstones[ch.id] !== undefined) continue;
             const idx = currentItems.findIndex((it) => it.id === ch.id);
             if (idx >= 0) {
               if ((incoming.updatedAt ?? 0) < (currentItems[idx].updatedAt ?? 0)) continue;
@@ -144,25 +142,29 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             } else {
               currentItems.unshift(incoming);
             }
-            if (tomb !== undefined) {
-              delete tombstones[ch.id];
-              tombstonesDirty = true;
-            }
             hasItemsChanged = true;
           } else if (ch.action === 'delete') {
             const deletedAt = (ch.payload as { deletedAt?: number } | undefined)?.deletedAt ?? Date.now();
             const idx = currentItems.findIndex((it) => it.id === ch.id);
-            if (idx >= 0 && (currentItems[idx].updatedAt ?? 0) <= deletedAt) {
+            const localUpdatedAt = idx >= 0 ? (currentItems[idx].updatedAt ?? 0) : undefined;
+            const remove = localUpdatedAt !== undefined && localUpdatedAt <= deletedAt;
+            if (itemDeletes.length < 8) itemDeletes.push({
+              itemId: /^item_[\w-]{1,64}$/.test(ch.id) ? ch.id : null,
+              decision: remove ? 'staged' : idx < 0 ? 'already-absent' : 'newer-local-copy',
+              deletedAt, localUpdatedAt,
+            });
+            if (remove) {
               currentItems.splice(idx, 1);
               removedIds.push(ch.id);
               hasItemsChanged = true;
             }
             if (deletedAt > (tombstones[ch.id] ?? 0)) {
               tombstones[ch.id] = deletedAt;
-              tombstonesDirty = true;
+              changedTombstones.add(ch.id);
             }
           }
         } else if (ch.type === 'folder') {
+          if (engine.hasFolderTreeRegistry) continue;
           if (ch.action === 'upsert' && ch.payload) {
             const incoming = ch.payload as FolderMeta;
             const idx = currentFolders.findIndex((f) => f.path === ch.id);
@@ -186,7 +188,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
               currentFolders.push(...remaining);
               hasFoldersChanged = true;
               // Reroute child items to inbox
-              for (let i = 0; i < currentItems.length; i++) {
+              for (let i = 0; !registry && i < currentItems.length; i++) {
                 if (currentItems[i].folder === folderPath || currentItems[i].folder.startsWith(folderPath + '/')) {
                   currentItems[i] = { ...currentItems[i], folder: DEFAULT_INBOX_FOLDER, updatedAt: Date.now() };
                   hasItemsChanged = true;
@@ -209,7 +211,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
                   hasFoldersChanged = true;
                 }
               }
-              for (let i = 0; i < currentItems.length; i++) {
+              for (let i = 0; !registry && i < currentItems.length; i++) {
                 if (currentItems[i].folder === oldPath) {
                   currentItems[i] = { ...currentItems[i], folder: updatedFolder.path, updatedAt: Date.now() };
                   hasItemsChanged = true;
@@ -224,6 +226,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         } else if (ch.type === 'trash') {
           if (ch.action === 'restore' && ch.payload) {
             const restored = ch.payload as SlagItem;
+            if ((tombstones[restored.id] ?? 0) > restored.updatedAt) continue;
             const idx = currentItems.findIndex((it) => it.id === restored.id);
             if (idx >= 0) {
               currentItems[idx] = restored;
@@ -232,7 +235,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
             }
             if (tombstones[restored.id] !== undefined) {
               delete tombstones[restored.id];
-              tombstonesDirty = true;
+              changedTombstones.add(restored.id);
             }
             hasItemsChanged = true;
           }
@@ -379,15 +382,25 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         void engine.requestMissingAttachments();
       }
 
-      if (tombstonesDirty) {
-        saveTombstones(engine.bookkeeping, tombstones);
-      }
-
-      const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
       if (generation !== engine.initGeneration) {
         settleStatus(engine);
         return;
       }
+      if (changedTombstones.size > 0) {
+        const latest = loadTombstones(engine.bookkeeping);
+        for (const id of changedTombstones) {
+          // An attachment import can yield to a local delete or restore. Do not replace that intent.
+          if (latest[id] !== originalTombstones[id]) continue;
+          if (tombstones[id] === undefined) delete latest[id];
+          else latest[id] = tombstones[id];
+        }
+        saveTombstones(engine.bookkeeping, latest);
+      }
+
+      const staged = hasItemsChanged || hasFoldersChanged || hasWorkspaceChanged || hasDraftsChanged || hasMemoryChanged;
+      if (itemDeletes.length > 0) syncLog.debug('Legacy bundle: explicit note deletes evaluated', {
+        bundleId: bundle.bundleId, stagedDeletes: removedIds.length, itemDeletes,
+      });
 
       engine.appliedBundleIds.add(bundle.bundleId);
       if (engine.batchUpdating) engine.status.initialSync.processed++;
@@ -402,7 +415,14 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
           memory: hasMemoryChanged,
         }, bundle.bundleId);
       } else {
-        // Nothing to persist: no write exists for the ACK to outrun.
+        // A delete of an already-absent note may only have a journal write to wait for.
+        try {
+          await requireSyncSectionFlushed();
+        } catch (error) {
+          engine.appliedBundleIds.delete(bundle.bundleId);
+          throw error;
+        }
+        if (generation !== engine.initGeneration) return;
         await engine.sendAck(bundle.bundleId);
         if (generation !== engine.initGeneration) {
           settleStatus(engine);
@@ -410,10 +430,7 @@ export async function persistIncomingBundle(engine: SyncEngine, bundlePayload: u
         }
       }
 
-      // A bundle we took, even one that changed nothing, is a fact the room needs: the next check
-      // republishes our row, so its `at` moves past the peer's resend. Without it a peer that
-      // accepted a resend but kept its root looks like it refused the notes, and auto-resolve
-      // would act on "has not looked yet".
+      // Publish the next comparison after processing this bundle.
       engine.manifestPostedRoot = null;
       engine.status.lastSyncTime = new Date().toLocaleTimeString();
       engine.status.state = engine.batchUpdating ? 'syncing' : 'connected';

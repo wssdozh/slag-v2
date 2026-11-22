@@ -84,11 +84,38 @@ test('delete wins over stale upsert and restore wins over delete', async ({ page
       await deliver(makeBundle('b3', [
         { id: 'n1', type: 'item', action: 'upsert', version: 1, hash: 'h', payload: { ...base, updatedAt: 300 } },
       ]));
+      const newerSnapshotRejected = !storage.getItems().some((it) => it.id === 'n1');
+      await deliver(makeBundle('b4', [
+        { id: 'n1', type: 'trash', action: 'restore', version: 1, hash: 'r', payload: { ...base, updatedAt: 300 } },
+      ]));
       const restored = storage.getItems().some((it) => it.id === 'n1');
-      return { deleted, staleNotResurrected, restored };
+      return { deleted, staleNotResurrected, newerSnapshotRejected, restored };
     });
   });
-  expect(result).toEqual({ deleted: true, staleNotResurrected: true, restored: true });
+  expect(result).toEqual({ deleted: true, staleNotResurrected: true, newerSnapshotRejected: true, restored: true });
+});
+
+test('a delayed ACK cannot undo a subsequent deletion or explicit restore', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 90_000 });
+  const result = await page.evaluate(async () => {
+    const { withSyncHarness } = await import(/* @vite-ignore */ '/e2e/support/syncHarness.ts');
+    const { loadTombstones, saveTombstones } = await import(/* @vite-ignore */ '/src/lib/sync/localBookkeeping.ts');
+    return withSyncHarness(async ({ engine, init }) => {
+      window.fetch = async () => Response.json({ bundles: [] });
+      await init('synthetic delayed ack seed');
+      const outbox = engine.getOutbox();
+      outbox.enqueue({ opId: 'old-delete', id: 'restored', kind: 'item', action: 'delete', timestamp: 100 });
+      const delayed = { bundleId: 'old-packet', settled: false, stateHash: 'old', packedHashes: {}, opIds: ['old-delete'], changes: 1,
+        tombstones: { restored: 100 } }; // Old snapshot, deliberately ignored by commitPush.
+      saveTombstones(engine.bookkeeping, { ...loadTombstones(engine.bookkeeping), incoming: 200 });
+      outbox.enqueue({ opId: 'restore', id: 'restored', kind: 'trash', action: 'restore', timestamp: 300 });
+      outbox.enqueue({ opId: 'new-delete', id: 'new', kind: 'item', action: 'delete', timestamp: 400 });
+      engine.commitPush(delayed);
+      return { tombstones: loadTombstones(engine.bookkeeping), pending: outbox.pending().map((op: { opId: string }) => op.opId) };
+    });
+  });
+  expect(result).toEqual({ tombstones: { incoming: 200, new: 400 }, pending: ['restore', 'new-delete'] });
 });
 
 test('folder rename and deletion propagate to folders, nested items, and outbox', async ({ page }) => {

@@ -27,7 +27,6 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   await expect(panel.getByTestId('integrity-server')).toContainText('нет данных');
   await expect(panel.getByTestId('integrity-server-last')).toContainText('ни разу');
   await expect(panel.getByTestId('integrity-autocheck')).toHaveAttribute('aria-checked', 'true');
-  await expect(panel.getByTestId('integrity-autoresolve')).toHaveAttribute('aria-checked', 'true');
   await expect(panel.getByTestId('integrity-dryrun')).toHaveAttribute('aria-checked', 'true');
 
   await page.waitForTimeout(250);
@@ -43,7 +42,7 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
   // By name, not `.last()`: the settings dialog is a dialog too, and after this one closes it
   // becomes the last one on the page.
   const dialog = page.getByRole('dialog', { name: 'Сверка с сервером' });
-  await expect(dialog).toContainText('Комната хранит один корень');
+  await expect(dialog).toContainText('Сверка ничего не удаляет');
   // Off the icon, then one beat for the entrance: otherwise the shot catches the bubble over the
   // block and the dialog at zero opacity.
   await page.mouse.move(700, 900);
@@ -56,13 +55,31 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
 
   await panel.getByTestId('integrity-verify').click();
   await expect(section.getByRole('status')).toContainText('доступна в приложении', { timeout: 15000 });
+
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.noteSession = { generation: 1, replica: { catchUp: async (force: boolean) => {
+      document.documentElement.dataset.testRegistryRefresh = String(force);
+    } } };
+    syncEngine.notify();
+  });
+  const refresh = panel.getByTestId('integrity-registry-refresh');
+  await expect(refresh).toBeDisabled();
+  await expect(panel.getByTestId('integrity-autocheck')).toHaveCount(0);
+  await expect(panel.getByTestId('integrity-server-info')).toHaveCount(0);
+  await expect(panel.getByTestId('integrity-verify')).toBeEnabled();
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    syncEngine.activeRoomId = 'test-room';
+    syncEngine.notify();
+  });
+  await expect(refresh).toBeEnabled();
+  await refresh.click();
+  await expect(page.locator('html')).toHaveAttribute('data-test-registry-refresh', 'true');
+  await page.screenshot({ path: `${SHOT_DIR}/vault-integrity-registry.png` });
 });
 
-/**
- * A divergence the room can name: the peer sent its leaves, so the panel says which side is short
- * instead of shrugging, and offers the one repair sync is allowed to make — the trash.
- */
-test('a named divergence offers the trash instead of «нужен разбор»', async ({ page }) => {
+test('a named divergence is only diagnostic', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
   await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
@@ -100,12 +117,9 @@ test('a named divergence offers the trash instead of «нужен разбор»
   });
 
   await expect(panel.getByTestId('integrity-server')).toContainText('у соседа нет 2 заметок');
-  await expect(panel.getByTestId('integrity-drop-extra')).toContainText('Убрать 2 лишние в корзину');
+  await expect(panel.getByTestId('integrity-drop-extra')).toHaveCount(0);
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${SHOT_DIR}/vault-integrity-diverged.png` });
 
-  // Unknown ids: the click has to be harmless, not a crash.
-  await panel.getByTestId('integrity-drop-extra').click();
-  await expect(panel).toBeVisible();
 });

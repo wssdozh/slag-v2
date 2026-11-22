@@ -5,9 +5,10 @@ import { MenuDropdown } from '../UI/MenuDropdown';
 import { IconButton } from '../UI/IconButton';
 
 export interface FolderActionsMenuProps {
-  onRename: () => void;
-  onMove: () => void;
-  onDelete: () => void;
+  onRename?: () => void;
+  onMove?: () => void;
+  onDelete?: () => void;
+  onDescription?: () => void;
 }
 
 const itemClass =
@@ -15,7 +16,7 @@ const itemClass =
   'hover:bg-tint-6 hover:text-fg-primary transition-colors outline-none ring-0 cursor-pointer';
 
 /** The single `⋯` entry point for folder actions in every container. */
-export const FolderActionsMenu: React.FC<FolderActionsMenuProps> = ({ onRename, onMove, onDelete }) => {
+export const FolderActionsMenu: React.FC<FolderActionsMenuProps> = ({ onRename, onMove, onDelete, onDescription }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Every entry opens its own surface (an input or a dialog). Dismiss the popover
@@ -41,14 +42,21 @@ export const FolderActionsMenu: React.FC<FolderActionsMenuProps> = ({ onRename, 
         </IconButton>
       }
     >
-      <button type="button" className={itemClass} onClick={runAction(onRename)}>
+      {onDescription && (
+        <button type="button" className={itemClass} onClick={runAction(onDescription)}>
+          <Icon name="entity.note" size="sm" tone="inherit" className="shrink-0" />
+          <span>Описание для ИИ</span>
+        </button>
+      )}
+      {onRename && <button type="button" className={itemClass} onClick={runAction(onRename)}>
         <Icon name="action.edit" size="sm" tone="inherit" className="shrink-0" />
         <span>Переименовать</span>
-      </button>
-      <button type="button" className={itemClass} onClick={runAction(onMove)}>
+      </button>}
+      {onMove && <button type="button" className={itemClass} onClick={runAction(onMove)}>
         <Icon name="action.folderMove" size="sm" tone="inherit" className="shrink-0" />
         <span>Переместить</span>
-      </button>
+      </button>}
+      {onDelete && <>
       <div className="my-0.5 border-t border-subtle" />
       <button
         type="button"
@@ -58,6 +66,7 @@ export const FolderActionsMenu: React.FC<FolderActionsMenuProps> = ({ onRename, 
         <Icon name="action.delete" size="sm" tone="inherit" className="shrink-0" />
         <span>Удалить папку</span>
       </button>
+      </>}
     </MenuDropdown>
   );
 };

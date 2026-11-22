@@ -12,7 +12,7 @@ export interface ItemFilesProps {
   /** A card that is nothing but one file drops the plate and keeps the row. */
   isFileBubble: boolean;
   /** Time of the note itself; the bubble has no footer left to keep it in. */
-  formattedTime: string;
+  timestamp: React.ReactNode;
 }
 
 /** File attachments: one download row each, with size and the summary the enrichment left. */
@@ -20,7 +20,7 @@ const ItemFilesComponent: React.FC<ItemFilesProps> = ({
   attachments,
   srcs,
   isFileBubble,
-  formattedTime,
+  timestamp,
 }) => {
   if (attachments.length === 0) return null;
 
@@ -63,11 +63,7 @@ const ItemFilesComponent: React.FC<ItemFilesProps> = ({
 
         {/* Right Action: Timestamp + Download for pure file, or Download icon */}
         <div className="flex items-center gap-2 shrink-0 ml-1">
-          {isFileBubble && (
-            <span className="text-2xs font-mono text-fg-muted select-none leading-none">
-              {formattedTime}
-            </span>
-          )}
+          {isFileBubble && timestamp}
           <div
             className="w-7 h-7 rounded-lg text-fg-secondary group-hover/file:text-white group-hover/file:bg-tint-8 flex items-center justify-center transition-colors"
             title="Скачать файл"

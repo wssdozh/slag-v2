@@ -2,6 +2,7 @@
 import type { SlagItem, FolderMeta, AiSettings } from '../../types';
 import { storage } from '../storage';
 import { logger } from '../logger/logger';
+import { withoutSpoilers } from '../text/noteDisclosure';
 import { completeJson } from './aiClient';
 import {
   assistantOrchestrator,
@@ -167,6 +168,8 @@ export async function categorizeDraft(
   folders: FolderMeta[],
   settings: AiSettings
 ): Promise<CategorizeResult> {
+  content = withoutSpoilers(content).trim();
+  if (!content) return { targetFolder: currentFolder, tags: [], reason: 'Нет открытого текста' };
   const tagUsage = collectTagUsage();
   const maxTags = settings.maxTagsPerNote || 4;
   const style = settings.tagCaseStyle || 'lowercase';
@@ -257,6 +260,11 @@ export async function triageInboxItems(
   settings: AiSettings,
   onProgress?: TriageProgressCallback
 ): Promise<TriageSuggestion[]> {
+  inboxItems = inboxItems.map((item) => ({
+    ...item,
+    title: withoutSpoilers(item.title).trim(),
+    content: withoutSpoilers(item.content).trim(),
+  })).filter((item) => item.title || item.content);
   const eligibleFolders = folders.filter((f) => f.path !== DEFAULT_INBOX_FOLDER);
   if (inboxItems.length === 0 || eligibleFolders.length === 0) {
     return [];

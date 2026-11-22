@@ -4,11 +4,12 @@ import { parseSubtasksFromContent } from '../tasks/taskUtils';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath';
 import { normalizeReminder } from '../time/reminder';
+import { withoutSpoilers } from '../text/noteDisclosure';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
  */
-export function serializeItemToMarkdown(item: SlagItem): string {
+export function serializeItemToMarkdown(item: SlagItem, registryBodyDigest?: string): string {
   const frontmatterData: Record<string, any> = {
     id: item.id,
     type: item.type,
@@ -66,6 +67,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
       mimeType: att.mimeType,
       size: att.size,
       relativePath: att.relativePath,
+      ...(att.registryBlobId ? { registryBlobId: att.registryBlobId } : {}),
       ...(att.duration !== undefined ? { duration: att.duration } : {}),
       ...(att.waveform ? { waveform: att.waveform } : {}),
       ...(att.extractedText ? { extractedText: att.extractedText } : {}),
@@ -78,6 +80,7 @@ export function serializeItemToMarkdown(item: SlagItem): string {
     }));
   }
 
+  if (registryBodyDigest) frontmatterData.slagRegistryBody = registryBodyDigest;
   const yamlString = YAML.stringify(frontmatterData).trim();
   const body = (item.content || '').trim();
 
@@ -87,7 +90,8 @@ export function serializeItemToMarkdown(item: SlagItem): string {
 /**
  * Parses raw Markdown text with YAML frontmatter into a SlagItem.
  */
-export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER): SlagItem {
+export function parseMarkdownToItem(rawContent: string, fallbackId: string, fallbackFolder: string = DEFAULT_INBOX_FOLDER,
+  onRegistryBody?: (digest: string) => void): SlagItem {
   let frontmatter: Record<string, any> = {};
   let body = rawContent;
 
@@ -105,16 +109,18 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   const id = typeof frontmatter.id === 'string' && isSafeVaultRelativePath(frontmatter.id)
     ? frontmatter.id
     : fallbackId;
+  if (typeof frontmatter.slagRegistryBody === 'string') onRegistryBody?.(frontmatter.slagRegistryBody);
   const type: SlagItemType = (['note', 'article', 'task'].includes(frontmatter.type) ? frontmatter.type : 'note') as SlagItemType;
   
+  const visibleBody = withoutSpoilers(body);
   // Title fallback: from frontmatter -> from first # Heading -> first line -> Untitled
   let title = typeof frontmatter.title === 'string' ? frontmatter.title.trim() : '';
   if (!title) {
-    const headingMatch = body.match(/^#\s+(.+)$/m);
+    const headingMatch = visibleBody.match(/^#\s+(.+)$/m);
     if (headingMatch) {
       title = headingMatch[1].trim();
     } else {
-      const firstLine = body.split('\n')[0]?.trim();
+      const firstLine = visibleBody.split('\n')[0]?.trim();
       title = firstLine ? firstLine.slice(0, 40) : 'Без названия';
     }
   }
@@ -128,7 +134,7 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   }
 
   // Also extract inline #hashtags from body if any
-  const inlineTags = Array.from(body.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
+  const inlineTags = Array.from(visibleBody.matchAll(/#([a-zA-Zа-яА-Я0-9_-]+)/g)).map(m => m[1]);
   const allTags = Array.from(new Set([...tags, ...inlineTags]));
 
   const item: SlagItem = {

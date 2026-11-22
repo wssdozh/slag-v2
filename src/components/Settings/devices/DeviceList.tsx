@@ -9,9 +9,10 @@ import { DeviceIcon } from './DeviceIcon';
 import { DeviceName, DeviceRevokeButton } from './DeviceActions';
 import { SettingsDivider, SettingsGroup, SettingsRow } from '../SettingsUI';
 
-/** A dot plus the word: one glance answers "is anyone else with me right now". */
 const Presence: React.FC<{ online: boolean }> = ({ online }) => (
-  <span className={`inline-block h-1.5 w-1.5 rounded-full ${online ? 'bg-success' : 'bg-fg-dim'}`} aria-hidden />
+  <span className={`inline-block size-1.5 shrink-0 rounded-full ${online ? 'bg-success' : 'bg-fg-dim'}`}>
+    <span className="sr-only">{online ? 'Онлайн' : 'Не в сети'}</span>
+  </span>
 );
 
 interface DeviceListProps {
@@ -45,10 +46,9 @@ export const DeviceList: React.FC<DeviceListProps> = ({
   onPair,
   pairDisabled,
 }) => {
-  const onlineCount = 1 + devices.filter((device) => devicePresence(device.lastSeenAt).online).length;
   return (
   <SettingsGroup title="Подключённые устройства" action={<span className="flex items-center gap-2">
-    <span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices} · онлайн {onlineCount}</span>
+    <span className="text-2xs font-mono text-fg-muted" title={limitsKnown ? undefined : 'Лимит устройств станет известен после входа'}>{limitsKnown ? `${activeDevices} / ${maxDevices}` : activeDevices}</span>
     <IconButton
       size="sm"
       aria-label="Привязать устройство"
@@ -60,7 +60,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({
       className="text-fg-secondary hover:bg-surface-hover"
     />
   </span>}>
-    <SettingsRow testId="device-row-current" icon={<DeviceIcon platform={isMobile ? 'mobile' : 'desktop'} />} label={<span className="flex items-center gap-1.5"><Presence online />{currentDeviceName}</span>} description={<span className="font-mono">{currentDeviceId} · это устройство · онлайн</span>} />
+    <SettingsRow testId="device-row-current" icon={<DeviceIcon platform={isMobile ? 'mobile' : 'desktop'} />} label={<span className="flex items-center gap-1.5"><Presence online />{currentDeviceName}</span>} description={<span className="font-mono">{currentDeviceId} · это устройство</span>} />
     {devices.map((device) => {
       const isAccountDevice = 'status' in device;
       const pending = isAccountDevice && device.status === 'pending';
@@ -72,7 +72,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({
             testId={`device-row-${device.id}`}
             icon={<DeviceIcon platform={device.platform} />}
             label={<span className="flex items-center gap-1.5"><Presence online={presence.online} /><DeviceName deviceId={device.id} name={device.name} onRename={onRename} /></span>}
-            description={<span className="font-mono break-all">{device.id}{pending ? ' · ожидает подтверждения' : presence.label ? ` · ${presence.label}` : ''}</span>}
+            description={<span className="font-mono break-all">{device.id}{pending ? ' · ожидает подтверждения' : !presence.online && presence.label ? ` · ${presence.label}` : ''}</span>}
             right={<span className="flex items-center gap-2">
               {pending ? (
                 <button type="button" onClick={() => void onApprove(device.id)} className="text-2xs text-fg-secondary cursor-pointer">Подтвердить</button>

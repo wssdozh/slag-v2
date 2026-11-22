@@ -28,7 +28,6 @@ export const STORAGE_KEYS = {
   UPDATE_DISMISSED: 'slag_update_dismissed_version',
   UPDATE_CHANNEL: 'slag_update_channel',
   MANIFEST_AUTOCHECK: 'slag_manifest_autocheck_v1',
-  MANIFEST_AUTORESOLVE: 'slag_manifest_autoresolve_v1',
 } as const;
 
 export const DEFAULT_WORKSPACE_STATE: WorkspaceState = {

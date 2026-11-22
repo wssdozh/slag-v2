@@ -18,28 +18,23 @@ export interface FolderStatsProps {
  */
 export const FolderStats: React.FC<FolderStatsProps> = ({ mediaData, variant }) => {
   if (variant === 'rows') {
+    const records = [
+      ['notes', mediaData.notesCount, ['заметка', 'заметки', 'заметок']],
+      ['tasks', mediaData.tasksCount, ['задача', 'задачи', 'задач']],
+      ['articles', mediaData.articlesCount, ['статья', 'статьи', 'статей']],
+    ] as const;
     return (
-      <div className="flex flex-col text-xs">
-        {FOLDER_STATS.map(({ key, label, icon, count }) => {
-          const value = count(mediaData);
-          const hasItems = value > 0;
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-secondary">
+        {records.map(([key, count, forms], index) => {
+          const form = new Intl.PluralRules('ru').select(count);
           return (
-            <div
-              key={key}
-              data-testid={`folder-stat-${key}`}
-              className="flex items-center justify-between py-1.5 border-b border-subtle last:border-b-0"
-            >
-              <span className={`flex items-center gap-2 ${hasItems ? 'text-fg-secondary' : 'text-fg-dim'}`}>
-                <Icon name={icon} size="sm" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
-                <span>{label}</span>
+            <React.Fragment key={key}>
+              {index > 0 && <span aria-hidden="true">·</span>}
+              <span data-testid={`folder-stat-${key}`} className="whitespace-nowrap">
+                <span data-testid={`folder-stat-${key}-value`} className="tabular-nums">{count}</span>
+                {' '}{forms[form === 'one' ? 0 : form === 'few' ? 1 : 2]}
               </span>
-              <span
-                data-testid={`folder-stat-${key}-value`}
-                className={`font-mono text-xs ${hasItems ? 'text-fg-primary font-medium' : 'text-fg-dim'}`}
-              >
-                {value}
-              </span>
-            </div>
+            </React.Fragment>
           );
         })}
       </div>

@@ -12,6 +12,7 @@ dist
 dist-ssr
 # Local data
 notes/
+!/src/lib/sync/notes/
 .trash/
 .attachments/
 *.local

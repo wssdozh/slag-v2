@@ -3,6 +3,7 @@ import React from 'react';
 import { useApp } from '../../../context/AppContext';
 import type { SlagItem, TaskStatus } from '../../../types';
 import { Icon } from '../../UI/icons/Icon';
+import { MenuDropdown } from '../../UI/MenuDropdown';
 import { LinearSignalBars } from '../../UI/PriorityBadge';
 import { TagChip } from '../../UI/TagChip';
 import type { DragItemPayload } from '../../../hooks/gestures/usePointerDnd';
@@ -89,39 +90,35 @@ const KanbanCardComponent: React.FC<KanbanCardProps> = ({
       {/* Top bar: Task Key, Status Trigger, Linear Signal Bars Priority */}
       <div className="flex items-center justify-between gap-1.5">
         <div className="flex items-center gap-1.5">
-          {/* Status quick switcher button */}
-          <div className="relative">
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                onStatusMenuChange(isMenuOpen ? null : task.id);
-              }}
-              className="p-0.5 rounded hover:bg-tint-10 transition-colors"
-              title="Сменить статус задачи"
+          <div onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+            <MenuDropdown
+              minWidth={144}
+              isOpen={isMenuOpen}
+              onOpenChange={open => onStatusMenuChange(open ? task.id : null)}
+              trigger={
+                <button
+                  type="button"
+                  aria-expanded={isMenuOpen}
+                  className="p-0.5 rounded hover:bg-tint-10 transition-colors"
+                  title="Сменить статус задачи"
+                >
+                  <KanbanStatusIcon iconType={column.iconType} iconColor={column.iconColor} />
+                </button>
+              }
             >
-              <KanbanStatusIcon iconType={column.iconType} iconColor={column.iconColor} />
-            </button>
-
-            {/* Status Dropdown Menu */}
-            {isMenuOpen && (
-              <div
-                onClick={e => e.stopPropagation()}
-                className="absolute left-0 top-full mt-1 w-36 rounded-lg bg-surface-elevated border border-tint-12 shadow-xl py-1 z-30 space-y-0.5 motion-popover"
+            {KANBAN_COLUMNS.map(col => (
+              <button
+                key={col.id}
+                onClick={() => handleStatusChange(col.id)}
+                className={`w-full px-2.5 py-1 text-left text-xs flex items-center gap-2 hover:bg-tint-8 transition-colors ${
+                  task.status === col.id ? 'text-white font-medium bg-tint-4' : 'text-fg-secondary'
+                }`}
               >
-                {KANBAN_COLUMNS.map(col => (
-                  <button
-                    key={col.id}
-                    onClick={() => handleStatusChange(col.id)}
-                    className={`w-full px-2.5 py-1 text-left text-xs flex items-center gap-2 hover:bg-tint-8 transition-colors ${
-                      task.status === col.id ? 'text-white font-medium bg-tint-4' : 'text-fg-secondary'
-                    }`}
-                  >
-                    <KanbanStatusIcon iconType={col.iconType} iconColor={col.iconColor} />
-                    <span>{col.title}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+                <KanbanStatusIcon iconType={col.iconType} iconColor={col.iconColor} />
+                <span>{col.title}</span>
+              </button>
+            ))}
+            </MenuDropdown>
           </div>
 
           {/* Linear Task Key (e.g. TSK-12) */}

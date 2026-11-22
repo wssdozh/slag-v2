@@ -1,5 +1,7 @@
 // What an AI edit would change, before it is applied: the line diff and the accept/reject pair.
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { ConflictTextPane } from './ConflictTextPane';
 import { Icon } from '../UI/icons/Icon';
 import type { SlagItem, ItemUpdates } from '../../types';
 import { applyItemUpdates } from '../../lib/vault/itemUpdates';
@@ -10,6 +12,7 @@ export interface DiffModalItemEntry {
   title: string;
   targetItem?: SlagItem;
   updates?: ItemUpdates;
+  comparison?: { before: string; after: string; properties: ReturnType<typeof computeMetadataDiff>; message?: string; onEdit?: (value: string) => void };
 }
 
 export interface DiffModalProps {
@@ -20,6 +23,7 @@ export interface DiffModalProps {
   initialIndex?: number;
   onApply?: () => void;
   isApplied?: boolean;
+  actions?: React.ReactNode;
 }
 
 interface FullscreenDiffEditorProps {
@@ -30,6 +34,7 @@ interface FullscreenDiffEditorProps {
   onApply?: () => void;
   isApplied: boolean;
   presencePhase?: string;
+  actions?: React.ReactNode;
 }
 
 /**
@@ -112,7 +117,16 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
   onApply,
   isApplied,
   presencePhase,
+  actions,
 }) => {
+  const dialog = useRef<HTMLDivElement>(null);
+  const firstButton = useRef<HTMLButtonElement>(null);
+  const [showText, setShowText] = useState(false);
+  useEffect(() => {
+    const trigger = document.activeElement;
+    firstButton.current?.focus();
+    return () => { if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus(); };
+  }, []);
   const [selectedIndex, setSelectedIndex] = useState<number>(() =>
     Math.min(Math.max(initialIndex, 0), Math.max(0, items.length - 1))
   );
@@ -120,8 +134,19 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
   // Synchronized Esc and Enter keyboard handlers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (actions && e.key === 'Tab' && dialog.current) {
+        const focusable = [...dialog.current.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled]), [href], [tabindex="0"]')]
+          .filter((element) => element.getClientRects().length);
+        const first = focusable[0];
+        const last = focusable.at(-1);
+        if (!dialog.current.contains(document.activeElement) || document.activeElement === (e.shiftKey ? first : last)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first)?.focus();
+        }
+      }
+      if (e.key === 'Escape' && (actions || dialog.current?.contains(document.activeElement))) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         onClose();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         if (!isApplied && onApply) {
@@ -131,20 +156,21 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, onApply, isApplied]);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onClose, onApply, isApplied, actions]);
 
   const currentEntry = items[selectedIndex] || items[0];
   const oldItem = currentEntry.targetItem;
   const rawUpdates = currentEntry.updates;
 
-  const oldText = oldItem?.content || '';
-  const currentProposedText = rawUpdates?.content !== undefined
+  const comparison = currentEntry.comparison;
+  const oldText = comparison?.before ?? oldItem?.content ?? '';
+  const currentProposedText = comparison?.after ?? (rawUpdates?.content !== undefined
     ? rawUpdates.content
     : rawUpdates?.appendContent
       ? (oldText ? `${oldText}\n\n${rawUpdates.appendContent}` : rawUpdates.appendContent)
-      : oldText;
+      : oldText);
 
   const tempNewItem: SlagItem | undefined = useMemo(() => {
     if (!oldItem) return undefined;
@@ -157,8 +183,8 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
   );
 
   const metaDiff = useMemo(
-    () => computeMetadataDiff(oldItem, tempNewItem),
-    [oldItem, tempNewItem]
+    () => comparison?.properties ?? computeMetadataDiff(oldItem, tempNewItem),
+    [comparison, oldItem, tempNewItem]
   );
 
   const handleApplyClick = () => {
@@ -170,9 +196,10 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
   return (
     <div
+      ref={dialog}
       role="dialog"
       aria-modal="true"
-      aria-label="Сравнение изменений"
+      aria-label={comparison ? _title : "Сравнение изменений"}
       data-motion-state={presencePhase}
       className="fixed inset-0 z-[100] bg-canvas flex flex-col text-fg-primary motion-fade select-none overflow-hidden"
     >
@@ -186,6 +213,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
+              ref={firstButton}
               onClick={onClose}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer shrink-0"
               title="Вернуться назад (Esc)"
@@ -224,7 +252,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                 </span>
               )}
               {diffResult.removedCount === 0 && diffResult.addedCount === 0 && (
-                <span className="text-fg-muted text-2xs hidden sm:inline">Без изменений</span>
+                <span className="text-fg-muted text-2xs hidden sm:inline">{comparison ? 'Текст не изменился' : 'Без изменений'}</span>
               )}
             </div>
 
@@ -252,6 +280,8 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
           </div>
         </div>
       </header>
+      {actions}
+      {comparison?.message && <p className="px-4 py-2 text-sm text-fg-secondary md:px-8">{comparison.message}</p>}
 
       {/* Sub-bar: Existing-style borderless rounded tabs & flat metadata */}
       {(items.length > 1 || metaDiff.length > 0) && (
@@ -262,10 +292,8 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                 {items.map((item, idx) => {
                   const isSelected = idx === selectedIndex;
-                  const curOld = item.targetItem?.content || '';
-                  const curNew = item.updates?.content !== undefined
-                    ? item.updates.content
-                    : curOld;
+                  const curOld = item.comparison?.before ?? item.targetItem?.content ?? '';
+                  const curNew = item.comparison?.after ?? item.updates?.content ?? curOld;
                   const tabDiff = computeSideBySideDiff(curOld, curNew);
 
                   return (
@@ -304,11 +332,11 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                   Свойства:
                 </span>
                 {metaDiff.map((md, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5 text-xs font-mono">
+                  <div key={idx} className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
                     <span className="text-fg-secondary">{md.label}:</span>
-                    <span className="text-rose-400/90 line-through">{md.oldValue}</span>
+                    <span className="break-all text-rose-400/90 line-through">{md.oldValue}</span>
                     <Icon name="nav.forward" size="sm" tone="dim" className="inline" />
-                    <span className="text-emerald-400 font-semibold">{md.newValue}</span>
+                    <span className="break-all text-emerald-400 font-semibold">{md.newValue}</span>
                   </div>
                 ))}
               </div>
@@ -317,6 +345,18 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
         </div>
       )}
 
+      {comparison && (
+        <>
+          {!showText && <div className="hidden shrink-0 border-b border-subtle px-8 md:flex">
+            <button type="button" className="min-h-11 rounded-md px-3 text-xs hover:bg-surface-hover" onClick={() => setShowText(true)}>
+              {comparison.onEdit ? 'Редактировать или копировать текст' : 'Открыть текст для копирования'}
+            </button>
+          </div>}
+          <ConflictTextPane key={`${selectedIndex}:${showText}`} before={comparison.before} after={comparison.after} onEdit={comparison.onEdit}
+            onBack={showText ? () => setShowText(false) : undefined} />
+        </>
+      )}
+      <div className={showText ? 'hidden' : comparison ? 'hidden min-h-0 flex-1 flex-col md:flex' : 'flex min-h-0 flex-1 flex-col'}>
       {/* Editor Subheaders: Flat single plane with hairline divider */}
       <div className="border-b border-tint-6 bg-panel shrink-0 select-none">
         <div className="max-w-6xl mx-auto w-full px-4 md:px-8">
@@ -325,7 +365,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <div className="flex items-center justify-between pr-4 pl-1">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 shadow-xs shadow-rose-500/50" />
-                <span className="text-xs font-semibold text-fg-soft">Было (Текущая версия)</span>
+                <span className="text-xs font-semibold text-fg-soft">{comparison ? 'Версия релея' : 'Было (Текущая версия)'}</span>
               </div>
               {diffResult.removedCount > 0 && (
                 <span className="text-2xs font-mono font-medium text-rose-400">
@@ -338,7 +378,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             <div className="flex items-center justify-between pl-4 pr-1">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/50" />
-                <span className="text-xs font-semibold text-fg-soft">Стало (Предлагаемая версия)</span>
+                <span className="text-xs font-semibold text-fg-soft">{comparison ? 'Моя правка' : 'Стало (Предлагаемая версия)'}</span>
               </div>
               {diffResult.addedCount > 0 && (
                 <span className="text-2xs font-mono font-medium text-emerald-400">
@@ -353,7 +393,9 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
       {/* Flat Editor Canvas: No cards, no box-in-a-box, full height with rich contrast */}
       <div className="flex-1 min-h-0 overflow-y-auto bg-canvas">
         <div className="max-w-6xl mx-auto w-full min-h-full px-4 md:px-8 flex flex-col">
-          {diffResult.rows.length === 0 ? (
+          {comparison && oldText === currentProposedText ? (
+            <p className="py-5 text-fg-secondary">{comparison.message ? 'Разницы в отображаемом тексте нет' : 'Текст совпадает'}</p>
+          ) : diffResult.rows.length === 0 ? (
             <div className="grid grid-cols-2 divide-x divide-tint-6 flex-1 min-h-[300px]">
               <div className="p-16 flex items-center justify-center text-fg-muted text-xs font-mono">
                 Текст заметки пустой
@@ -369,10 +411,10 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                 const isAdded = row.newType === 'added';
 
                 return (
-                  <div key={idx} className="grid grid-cols-2 divide-x divide-tint-6">
+                  <div key={idx} className={comparison ? "grid md:grid-cols-2 md:divide-x md:divide-tint-6" : "grid grid-cols-2 divide-x divide-tint-6"}>
                     {/* Left Pane (Old Version) */}
                     <div
-                      className={`flex items-start min-w-0 transition-colors ${
+                      className={`flex items-start min-w-0 transition-colors ${comparison && row.oldType !== 'removed' ? 'max-md:hidden' : ''} ${
                         isRemoved
                           ? 'bg-rose-500/[0.10] text-rose-100'
                           : row.oldType === 'empty'
@@ -417,7 +459,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
                     {/* Right Pane (New Version) */}
                     <div
-                      className={`flex items-start min-w-0 transition-colors ${
+                      className={`flex items-start min-w-0 transition-colors ${comparison && row.newType === 'empty' ? 'max-md:hidden' : ''} ${
                         isAdded
                           ? 'bg-emerald-500/[0.10] text-emerald-100'
                           : row.newType === 'empty'
@@ -478,6 +520,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
           )}
         </div>
       </div>
+      </div>
     </div>
   );
 };
@@ -490,6 +533,7 @@ export const DiffModal: React.FC<DiffModalProps> = ({
   initialIndex = 0,
   onApply,
   isApplied = false,
+  actions,
 }) => {
   const isDiffOpen = isOpen && items.length > 0;
   const { ref, phase, isPresent, onTransitionEnd } = usePresence(isDiffOpen);
@@ -504,7 +548,7 @@ export const DiffModal: React.FC<DiffModalProps> = ({
 
   const instanceKey = effectiveItems.map(it => it.title).join('|') + `_${initialIndex}`;
 
-  return (
+  const surface = (
     <div
       ref={ref}
       data-motion-state={phase}
@@ -521,7 +565,9 @@ export const DiffModal: React.FC<DiffModalProps> = ({
         onApply={onApply}
         isApplied={isApplied}
         presencePhase={phase}
+        actions={actions}
       />
     </div>
   );
+  return actions ? createPortal(surface, document.body) : surface;
 };

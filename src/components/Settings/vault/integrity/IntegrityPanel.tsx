@@ -17,15 +17,11 @@ export interface IntegrityPanelProps {
   lastScan: string | null;       // ISO или null
   /** Последняя сверка с комнатой: её ведёт движок синка, сканер её не трогает. */
   remote: ManifestStatus | null;
+  registryMode: 'inactive' | 'starting' | 'ready';
   /** Автосверка после запуска и после отправки. Выключена — остаётся только кнопка. */
   autoCheck: boolean;
   onToggleAutoCheck(next: boolean): void;
-  /** Убирать ли отвергнутое соседом в корзину без кнопки. */
-  autoResolve: boolean;
-  onToggleAutoResolve(next: boolean): void;
   onCheckServer(): void;
-  /** Take this device's notes the neighbour rejected off to the trash. */
-  onDropExtra(ids: string[]): void;
   onVerify(): void;
   onRepair(dryRun: boolean): void;
 }
@@ -82,7 +78,6 @@ function serverState(remote: ManifestStatus | null): { value: string; tone: stri
   // Старая общая строка комнаты больше не обновляется: «разошлось с тем, кого нельзя спросить» —
   // это отсутствие данных, а не красная тревога. Реальный разошедшийся сосед важнее и покажется ниже.
   if (anonymousOnlyDrift(remote.peers)) return { value: 'нет данных о соседе', tone: 'text-fg-secondary' };
-  if (remote.action === 'reconcile') return { value: 'разошлось — отправляю заново', tone: 'text-fg-secondary' };
   // The peer sent its leaves, so the drift can be named instead of shrugged at.
   if (remote.extra.length > 0) {
     const n = remote.extra.length;
@@ -101,18 +96,15 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   busy,
   lastScan,
   remote,
+  registryMode,
   autoCheck,
   onToggleAutoCheck,
-  autoResolve,
-  onToggleAutoResolve,
   onCheckServer,
-  onDropExtra,
   onVerify,
   onRepair,
 }) => {
   const [dryRun, setDryRun] = useState(true);
   const server = serverState(remote);
-  const extra = remote?.extra ?? [];
 
   /* ── диск: что нашлось ─────────────────────────────── */
   let findingsValue = 'ещё не сверяли';
@@ -132,7 +124,18 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
   return (
     <div className="flex flex-col gap-3 select-none" data-testid="integrity-panel">
       {/* ── сервер ─────────────────────────────────────── */}
-      <SettingsGroup
+      {registryMode !== 'inactive' ? (
+        <SettingsGroup title="Реестр синхронизации">
+          <SettingsRow
+            label="Перечитать реестр"
+            description={registryMode === 'starting' ? 'Дождитесь подключения к реестру' : 'Загрузить подтверждённые версии с релея'}
+            onClick={onCheckServer}
+            disabled={busy || registryMode !== 'ready'}
+            chevron
+            testId="integrity-registry-refresh"
+          />
+        </SettingsGroup>
+      ) : <SettingsGroup
         title="Сверка с сервером"
         action={
           <InfoHint
@@ -140,26 +143,8 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
             hint="сравниваю корень хранилища с корнем комнаты: при запуске и после отправки"
             title="Сверка с сервером"
           >
-            <p>
-              Корень — отпечаток всех заметок и папок. Комната хранит один корень на хранилище,
-              поэтому «сходится» значит: моя копия и копия соседа совпали.
-            </p>
-            <p>
-              Проверяю при запуске и после каждой отправки, не чаще раза в 5 секунд. Разошлось —
-              отправляю состояние целиком, один раз. Дальше показываю расхождение и жду человека:
-              молча перезаписать чужое однажды стоило 84 заметок.
-            </p>
-            <p>
-              Если сосед прислал свои заметки, расхождение называется по имени: «у соседа нет
-              N заметок» — значит он их отверг, обычно потому что удалил раньше. С «Разбирать сам»
-              такие заметки уезжают в корзину сами: только те, что уже были в переотправке,
-              не больше восьми за проход и не больше 5% хранилища. Крупное расхождение так не
-              «чинится» — это сломанная копия, и её должен увидеть человек.
-            </p>
-            <p>
-              Автосверка выключена — проверяю и публикую только по кнопке. Тогда другое устройство
-              не узнает мой корень, пока я не нажму.
-            </p>
+            <p>Релей хранит последний отпечаток каждого устройства. Сверка показывает, где эти снимки различались, а не какая копия правильная.</p>
+            <p>Сверка ничего не удаляет и не отправляет правки. При расхождении устройство может дочитать уже сохранённые пакеты.</p>
           </InfoHint>
         }
       >
@@ -188,38 +173,13 @@ export const IntegrityPanel: React.FC<IntegrityPanelProps> = ({
         />
         <SettingsDivider />
         <SettingsRow
-          label="Разбирать сам"
-          right={
-            <SettingsSwitch
-              checked={autoResolve}
-              onChange={onToggleAutoResolve}
-              disabled={busy}
-              label="Разбирать сам"
-              testId="integrity-autoresolve"
-            />
-          }
-        />
-        <SettingsDivider />
-        {extra.length > 0 && (
-          <>
-            <SettingsRow
-              label={`Убрать ${extra.length} ${pluralRu(extra.length, ['лишнюю', 'лишние', 'лишних'])} в корзину`}
-              onClick={() => onDropExtra(extra)}
-              disabled={busy}
-              chevron
-              testId="integrity-drop-extra"
-            />
-            <SettingsDivider />
-          </>
-        )}
-        <SettingsRow
           label="Сверить сейчас"
           onClick={onCheckServer}
           disabled={busy}
           chevron
           testId="integrity-server-check"
         />
-      </SettingsGroup>
+      </SettingsGroup>}
 
       {/* ── диск ───────────────────────────────────────── */}
       <SettingsGroup

@@ -1,5 +1,5 @@
 // The composer draft on disk: restore, autosave, reset, and repairing pre-reply stubs.
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, useLayoutEffect } from 'react';
 import type {
   SlagItemType,
   SlagAttachment,
@@ -10,6 +10,7 @@ import type {
 } from '../../../types';
 import { storage } from '../../../lib/storage';
 import { extractFolderToken } from '../../../lib/time/todoistTaskParser';
+import { equal } from '../../../lib/sync/notes/merge';
 import { UI_DELAYS } from '../../../config';
 import type { ComposerFieldHandle } from './field';
 
@@ -40,6 +41,7 @@ export interface UseComposerDraftOptions {
   isActive?: boolean;
   isFullscreenEditorOpen?: boolean;
   onResetExtra?: () => void;
+  addToast: (message: string, type: 'error' | 'info') => void;
 }
 
 /**
@@ -69,6 +71,7 @@ export const useComposerDraft = ({
   isActive = true,
   isFullscreenEditorOpen = false,
   onResetExtra,
+  addToast,
 }: UseComposerDraftOptions) => {
   const [initialDraft] = useState(() => storage.getComposerDraft(activeFolder));
 
@@ -114,6 +117,37 @@ export const useComposerDraft = ({
     duration,
     recurrence,
   });
+  const lastSavedDraftRef = useRef<ComposerDraftState | null>(null);
+  const canonicalPendingRef = useRef(false);
+  const alternativeWriteRef = useRef<{ snapshot: ComposerDraftState; promise: Promise<void> } | null>(null);
+  const preserveAlternative = useCallback((snapshot: ComposerDraftState) => {
+    const existing = alternativeWriteRef.current;
+    if (existing?.snapshot === snapshot) return existing.promise;
+    const { targetFolder, ...draft } = snapshot;
+    const promise = storage.keepComposerDraftAlternative(activeFolder,
+      draft.content.trim() || draft.attachments.length ? { ...draft, targetFolder: targetFolder ?? undefined, updatedAt: Date.now() } : null);
+    const write = { snapshot, promise };
+    alternativeWriteRef.current = write;
+    void promise.catch(() => {
+      if (alternativeWriteRef.current === write) alternativeWriteRef.current = null;
+    });
+    return promise;
+  }, [activeFolder]);
+
+  // Layout cleanup captures the departing folder's input before the next folder can replace it.
+  useLayoutEffect(() => {
+    if (!isActive) return;
+    const vault = storage.getCurrentVault();
+    return () => {
+      if (!canonicalPendingRef.current || equal(draftRef.current, lastSavedDraftRef.current)) return;
+      if (storage.getCurrentVault() !== vault) {
+        addToast('Хранилище сменилось до сохранения локальной правки', 'error');
+        return;
+      }
+      void preserveAlternative(draftRef.current).catch(() => addToast('Не удалось сохранить локальную правку при закрытии черновика', 'error'));
+    };
+  }, [isActive, preserveAlternative, addToast]);
+  const needsCanonicalBaselineRef = useRef(false);
   const isApplyingRemoteDraftRef = useRef(false);
   const lastAdoptedRemoteDraftUpdatedAtRef = useRef<number>(initialDraft?.updatedAt ?? 0);
   const lastLocalUserEditTimeRef = useRef<number>(0);
@@ -131,8 +165,12 @@ export const useComposerDraft = ({
     return stampedAt;
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     draftRef.current = { content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence };
+    if (!lastSavedDraftRef.current || needsCanonicalBaselineRef.current) {
+      needsCanonicalBaselineRef.current = false;
+      lastSavedDraftRef.current = draftRef.current;
+    }
   }, [content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence]);
 
   const onResetExtraRef = useRef(onResetExtra);
@@ -175,6 +213,7 @@ export const useComposerDraft = ({
   // Synchronize with stored draft when folder changes, on focus or when returning to tab
   useEffect(() => {
     const syncWithStorage = () => {
+      if (canonicalPendingRef.current) return;
       // If user is actively typing right now in focused window, don't overwrite
       if (
         typeof document !== 'undefined' &&
@@ -248,6 +287,7 @@ export const useComposerDraft = ({
   useEffect(() => {
     if (!isActive) return;
     return () => {
+      if (isApplyingRemoteDraftRef.current || canonicalPendingRef.current || equal(draftRef.current, lastSavedDraftRef.current)) return;
       const d = draftRef.current;
       if (d.content.trim() || d.attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
@@ -274,6 +314,7 @@ export const useComposerDraft = ({
   useEffect(() => {
     if (!isActive || isFullscreenEditorOpen) return;
     const timer = setTimeout(() => {
+      if (canonicalPendingRef.current) return;
       // If we just applied an incoming remote draft, skip echoing it back out
       if (isApplyingRemoteDraftRef.current) {
         isApplyingRemoteDraftRef.current = false;
@@ -284,6 +325,8 @@ export const useComposerDraft = ({
       // does not undo a delete that happened elsewhere, and clearing the tombstone would let a
       // stale copy of the old text come back on the next catch-up.
 
+      const snapshot = draftRef.current;
+      if (equal(snapshot, lastSavedDraftRef.current)) return;
       if (content.trim() || attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
           content,
@@ -297,19 +340,19 @@ export const useComposerDraft = ({
           duration,
           recurrence,
           updatedAt: localDraftStamp(),
-        });
+        }).then(() => { lastSavedDraftRef.current = snapshot; }, () => addToast('Не удалось сохранить черновик', 'error'));
       } else if (lastLocalUserEditTimeRef.current > 0) {
-        storage.deleteComposerDraft(activeFolder);
+        storage.deleteComposerDraft(activeFolder).then(() => { lastSavedDraftRef.current = snapshot; }, () => addToast('Не удалось удалить черновик', 'error'));
       }
     }, UI_DELAYS.COMPOSER_AUTOSAVE_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive, isFullscreenEditorOpen, localDraftStamp]);
+  }, [activeFolder, content, itemType, priority, dueDate, tags, attachments, replyTarget, targetFolder, duration, recurrence, isModal, isActive, isFullscreenEditorOpen, localDraftStamp, addToast]);
 
   // Handle beforeunload to avoid lost text on immediate tab close/refresh
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (isApplyingRemoteDraftRef.current) return;
+      if (isApplyingRemoteDraftRef.current || canonicalPendingRef.current || equal(draftRef.current, lastSavedDraftRef.current)) return;
       const d = draftRef.current;
       if (d.content.trim() || d.attachments.length > 0) {
         storage.saveComposerDraft(activeFolder, {
@@ -335,12 +378,57 @@ export const useComposerDraft = ({
 
   // Listen to draft changes (typing on another device, quick composer window, or editor sync)
   useEffect(() => {
+    let active = true;
+    let latest: ComposerDraft | null = null;
+    let savingAlternative = false;
+    const adoptCanonical = async () => {
+      if (savingAlternative) return;
+      savingAlternative = true;
+      canonicalPendingRef.current = true;
+      // Keep saving while the user types during the journal write. Never project a
+      // stale local snapshot onto the relay head, even if it has the same text.
+      try {
+        while (active && !equal(draftRef.current, lastSavedDraftRef.current)) {
+          const snapshot = draftRef.current;
+          await preserveAlternative(snapshot);
+          if (!active) return;
+          lastSavedDraftRef.current = snapshot;
+          addToast('Локальная правка сохранена в конфликтах синхронизации', 'info');
+        }
+      } catch {
+        if (active) addToast('Не удалось сохранить локальную правку; черновик оставлен в редакторе', 'error');
+        return;
+      } finally {
+        savingAlternative = false;
+      }
+      if (!active) return;
+      canonicalPendingRef.current = false;
+      needsCanonicalBaselineRef.current = true;
+      isApplyingRemoteDraftRef.current = true;
+      lastAdoptedRemoteDraftUpdatedAtRef.current = latest?.updatedAt ?? 0;
+      if (!latest) { resetDraftState(); return; }
+      setContent(latest.content || '');
+      setItemType(latest.itemType || 'note');
+      setPriority(latest.priority || 'none');
+      setDueDate(latest.dueDate || '');
+      setTags(latest.tags || []);
+      setAttachments(latest.attachments || []);
+      setReplyTarget(reviveReplyTarget(latest.replyTarget));
+      setTargetFolder(latest.targetFolder || null);
+      setDuration(latest.duration);
+      setRecurrence(latest.recurrence);
+    };
     const unsubscribe = storage.subscribeChanges((event) => {
       if (event.kind === 'draft') {
         const isCurrentFolder = event.id === `composer:${activeFolder}`;
         // Эхо собственной записи: состояние уже актуально, применять его обратно нельзя —
         // иначе только что выбранная папка/теги откатываются к предыдущему черновику.
         if (isCurrentFolder && event.origin === 'local') return;
+        if (isCurrentFolder && event.registry) {
+          latest = event.action === 'upsert' ? event.payload as ComposerDraft : null;
+          void adoptCanonical();
+          return;
+        }
         if (isCurrentFolder) {
           if (event.action === 'upsert' && event.payload) {
             const incomingDraft = event.payload as ComposerDraft;
@@ -365,12 +453,12 @@ export const useComposerDraft = ({
             if (isIdentical) return;
 
             const hasLocalUnsavedChanges = draftRef.current.content.trim().length > 0;
-            const shouldAdopt =
+            const shouldAdopt = (
               !isUserActivelyTyping &&
               // A draft older than this window's own last write is not news, whatever its reader.
               incomingTs > lastLocalDraftWriteAtRef.current &&
               ((!hasLocalUnsavedChanges && draftRef.current.attachments.length === 0) ||
-                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current);
+                incomingTs >= lastAdoptedRemoteDraftUpdatedAtRef.current));
 
             if (shouldAdopt) {
               isApplyingRemoteDraftRef.current = true;
@@ -381,7 +469,7 @@ export const useComposerDraft = ({
               setDueDate(incomingDraft.dueDate || '');
               setTags(incomingDraft.tags || []);
               setAttachments(incomingDraft.attachments || []);
-              if (incomingDraft.replyTarget) setReplyTarget(reviveReplyTarget(incomingDraft.replyTarget));
+              if (incomingDraft.replyTarget) setReplyTarget(incomingDraft.replyTarget ? reviveReplyTarget(incomingDraft.replyTarget) : null);
               setTargetFolder(incomingDraft.targetFolder || null);
               setDuration(incomingDraft.duration);
               setRecurrence(incomingDraft.recurrence);
@@ -394,8 +482,8 @@ export const useComposerDraft = ({
         }
       }
     });
-    return unsubscribe;
-  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder, field]);
+    return () => { active = false; canonicalPendingRef.current = false; unsubscribe(); };
+  }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder, field, addToast, preserveAlternative]);
 
   const notifyUserEdit = useCallback(() => {
     lastLocalUserEditTimeRef.current = Date.now();

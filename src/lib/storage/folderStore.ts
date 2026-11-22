@@ -8,6 +8,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { folderName, moveFolderPaths, sortFolders, type FolderDropMode } from '../vault/folderTree';
 import { folderPathUnder, isFolderPathFree, isSelfOrDescendant, parentPathOf } from '../vault/folderPaths';
 import type { StorageChangeEvent } from '.';
+import type { NoteMutation } from './noteRegistry';
 
 const fsLog = logger.scope('FS');
 
@@ -20,12 +21,15 @@ const foldersInMemory = new Map<string, FolderMeta[]>();
 export interface FolderStoreHost {
   currentVault: VaultMeta;
   files: {
-    renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[]): Promise<void>;
-    deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[]): Promise<void>;
+    renameFolderOnDisk(oldPath: string, newPath: string, items: SlagItem[], vault?: VaultMeta, strict?: boolean): Promise<void>;
+    deleteFolderOnDisk(path: string, movedItems: { item: SlagItem; oldFolder: string }[], vault?: VaultMeta, strict?: boolean): Promise<void>;
   };
   /** Remembers the list and hands its metadata to `state.json`. */
-  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): void;
+  persistFolders(folders: FolderMeta[], origin: 'local' | 'remote'): Promise<void> | undefined;
   emitChange(event: StorageChangeEvent): void;
+  persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined;
+  captureFolderCascade?(changes: NoteMutation[], folders: FolderMeta[]): Promise<void> | undefined;
+  queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void>;
   getItems(folder?: string): SlagItem[];
   cacheItems(key: string, items: SlagItem[]): void;
   getItemsKey(): string;
@@ -67,8 +71,9 @@ export function renameFolderTree(
   store: FolderStoreHost,
   oldPath: string,
   updatedFolder: FolderMeta,
-  origin: 'local' | 'remote' = 'local'
-): void {
+  origin: 'local' | 'remote' = 'local',
+  orderedPaths?: string[],
+): Promise<void> | undefined {
   if (oldPath === DEFAULT_INBOX_FOLDER) return; // Cannot rename system inbox
 
   // A rename remaps metadata and notes. Whether a folder exists is still the directory's call.
@@ -83,10 +88,12 @@ export function renameFolderTree(
     }
     return f;
   });
-  store.persistFolders(folders, origin);
+  const ranks = new Map(orderedPaths?.map((path, index) => [path, index]));
+  const nextFolders = folders.map((folder) => ranks.has(folder.path) ? { ...folder, order: ranks.get(folder.path) } : folder);
 
   // Update items belonging to this folder and its subfolders
-  const items = store.getItems().map(it => {
+  const previousItems = store.getItems();
+  const items = updatedFolder.path === oldPath ? previousItems : previousItems.map(it => {
     if (it.folder === oldPath) {
       return { ...it, folder: updatedFolder.path, updatedAt: Date.now() };
     }
@@ -96,13 +103,28 @@ export function renameFolderTree(
     }
     return it;
   });
+  const changes = origin === 'local' && updatedFolder.path !== oldPath ? items
+    .flatMap((item, index): NoteMutation[] => item === previousItems[index] ? [] : [{ id: item.id, kind: 'update', item, previous: previousItems[index] }]) : [];
+  const group = store.captureFolderCascade?.(changes, nextFolders);
+  if (group) return group;
+  const folderWrite = store.persistFolders(nextFolders, origin);
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(changes) : undefined;
+  const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
+  const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), items);
 
   fsLog.info(`Renamed folder "${oldPath}" to "${updatedFolder.path}"`);
   if (isTauri()) {
-    void store.files.renameFolderOnDisk(oldPath, updatedFolder.path, items);
+    void store.queueNoteFileWrite(() => store.files.renameFolderOnDisk(oldPath, updatedFolder.path, items, vault, !!before), before);
   }
   store.emitChange({ kind: 'folder', action: 'rename', id: updatedFolder.path, payload: updatedFolder, oldPath, origin });
+  // Legacy still needs per-path ordering events; registry only captures the final tree above.
+  for (const folder of folders) {
+    const order = ranks.get(folder.path);
+    if (folder.path !== updatedFolder.path && order !== undefined && order !== folder.order) {
+      store.emitChange({ kind: 'folder', action: 'upsert', id: folder.path, payload: { ...folder, order }, origin });
+    }
+  }
 }
 
 /**
@@ -133,6 +155,7 @@ export interface FolderMoveResult {
   reason?: 'missing' | 'cycle' | 'exists';
   /** Where the folder ended up; a same-level move keeps its path. */
   path?: string;
+  queued?: Promise<void>;
 }
 
 /**
@@ -181,9 +204,11 @@ export function moveFolderTree(
   if (nextPath !== movedPath) {
     const movedFolder: FolderMeta = { ...moved, path: nextPath, name: folderName(nextPath) };
     if (rank >= 0) movedFolder.order = rank;
-    renameFolderTree(store, movedPath, movedFolder, 'local');
+    const queued = renameFolderTree(store, movedPath, movedFolder, 'local', order);
+    return { ok: true, path: nextPath, ...(queued ? { queued } : {}) };
+  } else {
+    applyFolderOrder(store, order);
   }
-  applyFolderOrder(store, order);
   return { ok: true, path: nextPath };
 }
 
@@ -208,11 +233,9 @@ export function describeFolder(
   }
 }
 
-export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): void {
+export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
   if (path === DEFAULT_INBOX_FOLDER) return; // Cannot delete system inbox
   const folders = readFolders(store).filter(f => f.path !== path && !f.path.startsWith(path + '/'));
-  store.persistFolders(folders, origin);
-
   // Move orphan items to inbox
   const items = store.getItems();
   const movedItems: { item: SlagItem; oldFolder: string }[] = [];
@@ -225,6 +248,14 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
     }
     return it;
   });
+  const changes = origin === 'local' ? updatedItems.flatMap((item, index): NoteMutation[] => item === items[index]
+    ? [] : [{ id: item.id, kind: 'update', item, previous: items[index] }]) : [];
+  const group = store.captureFolderCascade?.(changes, folders);
+  if (group) return group;
+  const folderWrite = store.persistFolders(folders, origin);
+  const noteWrite = origin === 'local' ? store.persistNoteIntents(changes) : undefined;
+  const before = folderWrite && noteWrite ? Promise.all([folderWrite, noteWrite]).then(() => undefined) : folderWrite ?? noteWrite;
+  const vault = store.currentVault;
   store.cacheItems(store.getItemsKey(), updatedItems);
 
   // Clean up drafts for deleted folder and any subfolders
@@ -235,7 +266,7 @@ export function eraseFolder(store: FolderStoreHost, path: string, origin: 'local
   }
 
   if (isTauri()) {
-    void store.files.deleteFolderOnDisk(path, movedItems);
+    void store.queueNoteFileWrite(() => store.files.deleteFolderOnDisk(path, movedItems, vault, !!before), before);
   }
 
   fsLog.info(`Deleted folder "${path}", items re-routed to Inbox`);

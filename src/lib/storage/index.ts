@@ -58,6 +58,7 @@ import {
   recoverFromTrash,
 } from './trashStore';
 import {
+  projectSharedSettings,
   readComposerDrafts,
   readComposerDraft,
   writeComposerDraft,
@@ -86,6 +87,14 @@ import {
   type VaultImportPayload,
 } from './vaultTransfer';
 import { notesRemovedByImport } from './noteRemoval';
+import type { AcceptedNote, FolderGroupListener, FolderTreeListener, NoteMutation } from './noteRegistry';
+import type { VaultPort } from './port';
+import { parseSharedRegistryId, readSharedBody, sharedRegistryId } from '../sync/notes/sharedBody';
+import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
+import type { SharedBody, SharedMutation } from '../sync/notes/sharedBody';
+import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } from './sharedProjection';
+import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
+import { equal, sameNote } from '../sync/notes/merge';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -97,24 +106,24 @@ import {
 export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 
 /**
- * Who wrote the change. `local` is the app's own edit and the only value the sync engine packs
- * into an operation; `remote` is an incoming bundle; `external` is a file that changed on disk
- * under us — the MCP server, an outside editor — and is never re-pushed, or the relay would echo
- * the same note back and the two devices would ping-pong it forever.
+ * `local` came from the app, `remote` from sync, `external` from the disk watcher. Registry
+ * rooms may turn an external note edit into an intent if it differs from the known note.
  */
 export type StorageOrigin = 'local' | 'remote' | 'external';
 
 export type StorageChangeEvent =
-  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; origin?: StorageOrigin }
+  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: StorageOrigin }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: StorageOrigin }
   | { kind: 'trash'; action: 'restore' | 'purge'; id: string; payload?: SlagItem; origin?: StorageOrigin }
-  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: StorageOrigin }
+  | { kind: 'draft'; action: 'upsert' | 'delete'; id: string; payload?: ComposerDraft | FullscreenDraft; origin?: StorageOrigin; registry?: true }
   // One event per memory write, not per fact: the sync packer reads the list from storage.
   | { kind: 'memory'; action: 'upsert'; id: string; payload?: undefined; origin?: StorageOrigin };
 
 export type StorageChangeListener = (event: StorageChangeEvent) => void;
+
+
 
 /** What a sweep of `notes/` reports: note paths that changed or went, folders that came or left. */
 export interface VaultDiskChange {
@@ -128,10 +137,20 @@ const fsLog = logger.scope('FS');
 /** Attachment bytes: which file was asked for, and where the answer came from. */
 
 const ITEMS_STORAGE_PREFIX = STORAGE_KEYS.ITEMS_PREFIX;
+type SharedListener = Parameters<NonNullable<VaultPort['subscribeSharedIntents']>>[0];
 
 export class StorageService {
   public currentVault: VaultMeta;
   private changeListeners: Set<StorageChangeListener> = new Set();
+  private noteIntentListeners = new Set<(changes: NoteMutation[]) => Promise<void>>();
+  private folderTreeListeners = new Map<string, { tree: FolderTreeListener; group?: FolderGroupListener }>();
+  private registryAtomicFolderVaults = new Set<string>();
+  private registryFolderVaults = new Set<string>();
+  private sharedListeners = new Map<string, SharedListener | null>();
+  private sharedEnrollmentReads = new Map<string, Promise<void>>();
+  private checkedSharedEnrollment = new Set<string>();
+  private noteFileWrite: Promise<void> = Promise.resolve();
+
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
   private currentVaultRead: Promise<boolean> = Promise.resolve(true);
@@ -147,6 +166,7 @@ export class StorageService {
     getItemsKey: () => this.getItemsKey(),
     getTrashKey: () => this.getTrashKey(),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
+    hydrateRegistryFolders: (folders) => this.hydrateRegistryFolders(folders),
     attachments: this.attachments,
   });
 
@@ -164,6 +184,14 @@ export class StorageService {
 
   public async importSyncedAttachment(attachment: SlagAttachment, dataUrl: string): Promise<boolean> {
     return this.attachments.importSynced(attachment, dataUrl);
+  }
+
+  public readRegistryAttachment(attachment: SlagAttachment): Promise<Uint8Array> {
+    return this.attachments.readForRegistry(attachment);
+  }
+
+  public writeAcceptedAttachment(attachment: SlagAttachment, bytes: Uint8Array): Promise<void> {
+    return this.attachments.writeAccepted(attachment, bytes);
   }
 
   public async hasAttachmentBytes(id: string, relativePath: string): Promise<boolean> {
@@ -232,6 +260,252 @@ export class StorageService {
     return () => this.changeListeners.delete(listener);
   }
 
+  public subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void {
+    this.noteIntentListeners.add(listener);
+    return () => this.noteIntentListeners.delete(listener);
+  }
+
+  public persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined {
+    if (!changes.length || !this.noteIntentListeners.size) return;
+    return Promise.all([...this.noteIntentListeners].map((listener) => listener(changes))).then(() => undefined);
+  }
+
+  private serializeNoteWrite(write: () => Promise<void>): Promise<void> {
+    const run = this.noteFileWrite.then(write, write);
+    this.noteFileWrite = run;
+    return run;
+  }
+
+  public queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void> {
+    if (!before) return write();
+    // Enter the disk queue only after the journal is durable. A remote apply can itself hold the
+    // journal lock; awaiting an uncommitted intent in the disk queue would deadlock both.
+    const run = before.then(() => this.serializeNoteWrite(write));
+    void run.catch((error: unknown) => fsLog.error('Could not persist note intent or note file', error));
+    return run;
+  }
+
+  public readNoteRegistry(): Promise<unknown> {
+    const vault = this.currentVault;
+    return isTauri() ? this.files.readRegistryState(vault) : Promise.resolve().then(() => {
+      const value = localStorage.getItem(`slag_note_registry_${vault.id}`);
+      return value === null ? undefined : JSON.parse(value) as unknown;
+    });
+  }
+
+  public async writeNoteRegistry(value: unknown): Promise<void> {
+    if (isTauri()) {
+      const captured = this.currentVault;
+      if (hasSharedRegistryEnrollment(value) && !this.sharedListeners.has(captured.id)) this.sharedListeners.set(captured.id, null);
+      await this.files.writeRegistryState(captured, value);
+    } else localStorage.setItem(`slag_note_registry_${this.currentVault.id}`, JSON.stringify(value));
+  }
+
+  public async allowLegacySharedMigration(vault: VaultMeta): Promise<boolean> {
+    await this.prepareSharedWrites(vault);
+    return this.checkedSharedEnrollment.has(vault.id) && !this.sharedListeners.has(vault.id);
+  }
+
+  public prepareSharedWrites(vault = this.currentVault): Promise<void> {
+    if (!isTauri() || this.sharedListeners.has(vault.id) || this.checkedSharedEnrollment.has(vault.id)) return Promise.resolve();
+    const existing = this.sharedEnrollmentReads.get(vault.id);
+    if (existing) return existing;
+    const read = this.files.readRegistryState(vault).then((stored) => {
+      if (hasSharedRegistryEnrollment(stored) && !this.sharedListeners.has(vault.id)) this.sharedListeners.set(vault.id, null);
+      this.checkedSharedEnrollment.add(vault.id);
+    }).finally(() => this.sharedEnrollmentReads.delete(vault.id));
+    // Keep a failed read closed too: unreadable state does not prove there is no registry.
+    this.sharedEnrollmentReads.set(vault.id, read);
+    return read;
+  }
+
+  public get applyAcceptedShared() {
+    return isTauri() ? (body: SharedBody) => projectSharedSettings(this, body) : undefined;
+  }
+
+  public get subscribeSharedIntents() {
+    return isTauri() ? (listener: SharedListener) => {
+      const id = this.currentVault.id;
+      this.sharedListeners.set(id, listener);
+      return () => {
+        if (this.sharedListeners.get(id) === listener) this.sharedListeners.set(id, null);
+      };
+    } : undefined;
+  }
+
+  private captureSharedWrite(origin: 'local' | 'remote', collect: () => SharedMutation[], applyLocal?: () => void): Promise<void> | undefined {
+    const vaultId = this.currentVault.id;
+    const listener = this.sharedListeners.get(vaultId);
+    if (listener === undefined) {
+      if (isTauri() && !this.checkedSharedEnrollment.has(vaultId)) {
+        void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
+        if (origin === 'local') return Promise.reject(new Error('Хранилище ещё проверяет режим общих записей'));
+        return Promise.resolve();
+      }
+      return undefined;
+    }
+    if (origin !== 'local') return Promise.resolve();
+    const assertScope = () => {
+      if (this.currentVault.id !== vaultId || this.sharedListeners.get(vaultId) !== listener) {
+        throw new Error('Shared registry session changed before local write');
+      }
+    };
+    if (!listener) return Promise.reject(new Error('Синхронизация общих записей ещё не готова'));
+    let changes: SharedMutation[] = [];
+    return listener(() => {
+      assertScope();
+      changes = collect();
+      return changes;
+    }, async () => {
+      for (const { id, value, keepAlternative } of changes) {
+        assertScope();
+        if (keepAlternative) continue;
+        await projectSharedSettings(this, readSharedBody(id, value, value === null ? 'delete' : 'update'), 'local');
+      }
+      assertScope();
+      applyLocal?.();
+    });
+  }
+
+  private captureShared(origin: 'local' | 'remote', collect: () => SharedMutation[], applyLocal?: () => void): boolean {
+    const write = this.captureSharedWrite(origin, collect, applyLocal);
+    if (!write) return false;
+    void write.catch((error: unknown) => fsLog.error('Could not persist shared edit', error));
+    return true;
+  }
+
+  public applyAcceptedNote(note: AcceptedNote): Promise<void> {
+    const vault = this.currentVault;
+    return this.serializeNoteWrite(async () => {
+      await this.projectAcceptedNotes([note], undefined, vault);
+      // If the feed expired, heads recovery releases the durable fence one note at a time.
+      if (isTauri()) {
+        const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
+        if (Object.hasOwn(fenced, note.id)) await this.updateFolderProjectionFence(vault, [], [note.id]);
+      }
+    });
+  }
+
+  public applyAcceptedFolderGroup(notes: AcceptedNote[], folders: FolderMeta[] | undefined): Promise<void> {
+    const vault = this.currentVault;
+    return this.serializeNoteWrite(async () => {
+      if (notes.length) await this.updateFolderProjectionFence(vault, notes.map(({ id }) => id), []);
+      await this.projectAcceptedNotes(notes, folders, vault);
+      if (notes.length) await this.updateFolderProjectionFence(vault, [], notes.map(({ id }) => id));
+    });
+  }
+
+  public async readRegistryNoteCopies(ids: Set<string>): Promise<{ item: SlagItem; marker?: string }[]> {
+    if (!isTauri() || !ids.size) return [];
+    const vault = this.currentVault;
+    let copies: { item: SlagItem; marker?: string }[] = [];
+    await this.serializeNoteWrite(async () => {
+      if (vault.id !== this.currentVault.id) throw new Error('Vault changed during disk scan');
+      const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
+      const eligible = new Set([...ids].filter((id) => !Object.hasOwn(fenced, id)));
+      if (eligible.size) copies = await this.files.readRegistryNoteCopies(vault, eligible);
+    });
+    return copies;
+  }
+
+  public async hasIncompleteFolderProjection(): Promise<boolean> {
+    if (!isTauri()) return false;
+    return Object.keys(await this.files.readStateSection('pendingFolderProjection', this.currentVault, true)).length > 0;
+  }
+
+  private updateFolderProjectionFence(vault: VaultMeta, add: string[], remove: string[]): Promise<void> {
+    return this.files.writeStateSection('pendingFolderProjection', (current) => {
+      const next = new Map(Object.entries(current));
+      for (const id of add) next.set(id, true);
+      for (const id of remove) next.delete(id);
+      return Object.fromEntries(next);
+    }, vault, true, true);
+  }
+
+  private async writeAcceptedNote({ id, item, discardLiveCopy, registryBodyMarker }: AcceptedNote, previous: SlagItem | undefined,
+    trashed: SlagItem | undefined, vault: VaultMeta): Promise<SlagItem | null> {
+    const applied = item ? { ...item, filename: getSafeNoteFilename(item.title, id) } : null;
+    if (applied) {
+      if (item?.id !== id) throw new Error('Canonical note id mismatch');
+      safeVaultRelativePath(id);
+      safeVaultRelativePath(applied.folder || DEFAULT_INBOX_FOLDER);
+      await this.files.flushItemToDisk(applied, previous?.folder, previous?.filename, vault, true, undefined, registryBodyMarker);
+      if (trashed) await this.files.removeTrashCopy(trashed, trashed.filename, vault);
+    } else if (previous) {
+      await this.files.removeItemFromDisk(previous, vault, true, discardLiveCopy);
+    }
+    return applied;
+  }
+
+  private async projectAcceptedNotes(notes: AcceptedNote[], folders: FolderMeta[] | undefined, vault: VaultMeta): Promise<void> {
+    const assertVault = () => {
+      if (vault.id !== this.currentVault.id) throw new Error('Vault changed while applying registry projection');
+    };
+    assertVault();
+    const previousFolders = this.getFolders();
+    const previousItems = new Map(this.getItems().map((item) => [item.id, item]));
+    const previousTrash = new Map(this.getTrashItems().map((item) => [item.id, item]));
+    // On restart fenced copies were deliberately excluded from the index. Recover their disk paths
+    // for replacement or tombstoning without publishing them as live notes.
+    const missing = notes.filter(({ id }) => !previousItems.has(id)).map(({ id }) => id);
+    const fenced = isTauri() && missing.length ? await this.files.readStateSection('pendingFolderProjection', vault, true) : {};
+    const recover = new Set(missing.filter((id) => Object.hasOwn(fenced, id)));
+    const diskCopies = new Map<string, SlagItem[]>();
+    for (const copy of recover.size ? await this.files.readProjectionCopies(vault, recover) : []) {
+      const copies = diskCopies.get(copy.id);
+      if (copies) copies.push(copy);
+      else diskCopies.set(copy.id, [copy]);
+    }
+    const written = new Map<string, SlagItem | null>();
+    // Disk replacements are replayable from the old cursor. Publish no partial indexes or events
+    // if any replacement or the final tree write fails.
+    for (const note of notes) {
+      assertVault();
+      const copies = diskCopies.get(note.id) ?? [];
+      const previous = previousItems.get(note.id) ?? copies[0];
+      if (note.item || previous) {
+        const applied = await this.writeAcceptedNote(note, previous, previousTrash.get(note.id), vault);
+        for (const copy of copies) {
+          if (!applied || copy.folder !== applied.folder || copy.filename !== applied.filename) await this.files.removeProjectionCopy(copy, vault);
+        }
+        written.set(note.id, applied);
+      }
+    }
+    assertVault();
+    if (folders) await this.writeAcceptedFolderProjection(folders, previousFolders, vault);
+    assertVault();
+    const items = new Map(this.getItems().map((item) => [item.id, item]));
+    const trash = new Map(this.getTrashItems().map((item) => [item.id, item]));
+    let trashChanged = false;
+    const events: StorageChangeEvent[] = [];
+    for (const { id, discardLiveCopy } of notes) {
+      const applied = written.get(id);
+      const previous = previousItems.get(id);
+      // A local optimistic edit made during I/O belongs to its own journal intent.
+      if (applied === undefined || JSON.stringify(items.get(id)) !== JSON.stringify(previous)) continue;
+      items.delete(id);
+      if (applied) {
+        trashChanged = trash.delete(id) || trashChanged;
+      } else {
+        const removed = previous ?? diskCopies.get(id)?.[0];
+        if (removed && !discardLiveCopy) { trash.set(id, removed); trashChanged = true; }
+      }
+      events.push({ kind: 'item', action: applied ? 'upsert' : 'delete', id, payload: applied ?? undefined, origin: 'remote' });
+    }
+    if (events.length) {
+      const key = this.getItemsKey();
+      const upserts = events.flatMap((event) => event.kind === 'item' && event.payload ? [event.payload] : []);
+      const stored = stripAttachmentData([...upserts, ...items.values()]);
+      if (!isTauri()) localStorage.setItem(key, JSON.stringify(stored));
+      this.itemsIndex.set(key, stored);
+    }
+    if (trashChanged) this.cacheTrash([...trash.values()]);
+    const foldersChanged = folders && JSON.stringify(previousFolders) === JSON.stringify(this.getFolders());
+    if (foldersChanged) this.hydrateRegistryFolders(folders);
+    for (const event of events) this.emitChange(event);
+    if (foldersChanged) window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasFoldersChanged: true } }));
+  }
+
   public emitChange(event: StorageChangeEvent): void {
     for (const listener of this.changeListeners) {
       try {
@@ -263,6 +537,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public syncCurrentVaultFs(): Promise<boolean> {
+    if (isTauri()) {
+      void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
+    }
     this.currentVaultRead = isTauri() ? this.files.syncCurrentVaultFs() : Promise.resolve(true);
     return this.currentVaultRead;
   }
@@ -299,6 +576,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       this.currentVaultRead = this.initTauriFs();
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
+      const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
+      if (folders !== null) this.hydrateRegistryFolders(JSON.parse(folders) as FolderMeta[]);
       this.hydrated = true;
     }
   }
@@ -334,15 +613,16 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       this.crossWindowDraftChannel = new BroadcastChannel('slag_cross_window_drafts_v1');
       this.crossWindowDraftChannel.onmessage = (event) => {
         const data = event.data;
-        if (data && data.senderId !== this.instanceId && data.type === 'DRAFT_CHANGED') {
-          this.emitChange({
-            kind: 'draft',
-            action: data.action,
-            id: `composer:${data.folderPath}`,
-            payload: data.draft,
-            origin: 'remote',
-          });
-        }
+        const vault = this.currentVault;
+        if (!data || data.senderId === this.instanceId || data.type !== 'DRAFT_CHANGED' || data.vaultId !== vault.id) return;
+        const applyLegacyDraft = () => {
+          if (this.currentVault !== vault || this.sharedListeners.has(vault.id)) return;
+          this.emitChange({ kind: 'draft', action: data.action, id: `composer:${data.folderPath}`, payload: data.draft, origin: 'remote' });
+        };
+        if (!isTauri()) applyLegacyDraft();
+        else void this.prepareSharedWrites(vault).then(applyLegacyDraft, (error: unknown) => {
+          fsLog.warn('Could not verify cross-window draft scope', error);
+        });
       };
     } catch {
       this.crossWindowDraftChannel = null;
@@ -394,6 +674,12 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       // The vault is gone from the registry and the disk; what this session still remembered of
       // it must not become the content of a new vault that later reuses the id.
       forgetVaultFolders(vaultId);
+      this.registryFolderVaults.delete(vaultId);
+      this.folderTreeListeners.delete(vaultId);
+      this.sharedListeners.delete(vaultId);
+      this.checkedSharedEnrollment.delete(vaultId);
+      this.registryAtomicFolderVaults.delete(vaultId);
+      if (!isTauri()) localStorage.removeItem(`slag_registry_folders_${vaultId}`);
       this.itemsIndex.delete(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
       this.itemsIndex.delete(`${STORAGE_KEYS.TRASH_PREFIX}${vaultId}`);
     }
@@ -422,21 +708,79 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * answers; `state.json` takes the metadata by path, never a verdict on what exists. An
    * `external` change came from the disk itself, so there is nothing to tell the disk back.
    */
-  public persistFolders(folders: FolderMeta[], origin: StorageOrigin): void {
+  public subscribeFolderTreeIntents(listener: FolderTreeListener, group?: FolderGroupListener): () => void {
+    const vaultId = this.currentVault.id;
+    this.registryFolderVaults.add(vaultId);
+    if (group) this.registryAtomicFolderVaults.add(vaultId);
+    const listeners = { tree: listener, group };
+    this.folderTreeListeners.set(vaultId, listeners);
+    return () => {
+      if (this.folderTreeListeners.get(vaultId) === listeners) this.folderTreeListeners.delete(vaultId);
+    };
+  }
+
+  public captureFolderCascade(changes: NoteMutation[], folders: FolderMeta[]): Promise<void> | undefined {
+    const vaultId = this.currentVault.id;
+    if (!this.registryAtomicFolderVaults.has(vaultId) || !changes.length) return;
+    const group = this.folderTreeListeners.get(vaultId)?.group;
+    if (!group) return Promise.reject(new Error('Групповая синхронизация папок ещё не готова'));
+    // Leave both tree and notes at their confirmed paths until the group receipt arrives.
+    return group(changes, folders, this.getFolders());
+  }
+
+  public persistFolders(folders: FolderMeta[], origin: StorageOrigin): Promise<void> | undefined {
+    const vault = this.currentVault;
+    const previous = this.getFolders();
+    const hasRegistry = this.registryFolderVaults.has(vault.id);
+    if (hasRegistry && origin !== 'local') return;
+    const listener = this.folderTreeListeners.get(vault.id)?.tree;
+    if (hasRegistry && !listener) {
+      throw new Error('Синхронизация папок ещё не готова; дерево не изменено');
+    }
     rememberFolders(this, folders);
-    if (isTauri() && origin !== 'external') {
-      void this.files.writeFolderMeta(folders).catch((err: unknown) => {
-        fsLog.warn('Failed to write folder metadata to state.json', { error: String(err) });
+    if (origin === 'external') return;
+    const next = this.getFolders();
+    const captured = listener?.(next, previous);
+    if (captured) {
+      const saved = captured.then(() => this.writeRegistryFolders(next, vault));
+      void saved.catch((error: unknown) => fsLog.error('Could not persist folder tree intent or metadata', error));
+      return saved;
+    } else if (isTauri()) {
+      void this.files.writeFolderMeta(folders, vault).catch((error: unknown) => {
+        fsLog.warn('Failed to write folder metadata to state.json', error);
       });
     }
+  }
+
+  private hydrateRegistryFolders(folders: FolderMeta[]): void {
+    this.registryFolderVaults.add(this.currentVault.id);
+    rememberFolders(this, folders);
+  }
+
+  private async writeRegistryFolders(folders: FolderMeta[], vault: VaultMeta): Promise<void> {
+    if (isTauri()) await this.files.writeFolderMeta(folders, vault, true);
+    else localStorage.setItem(`slag_registry_folders_${vault.id}`, JSON.stringify(folders));
+  }
+
+  public applyAcceptedFolderTree(folders: FolderMeta[]): Promise<void> {
+    return this.applyAcceptedFolderGroup([], folders);
+  }
+
+  private async writeAcceptedFolderProjection(folders: FolderMeta[], previous: FolderMeta[], vault: VaultMeta): Promise<void> {
+    await this.writeRegistryFolders(folders, vault);
+    const present = new Set(folders.map((entry) => entry.path));
+    for (const entry of previous.slice().sort((a, b) => b.path.length - a.path.length)) {
+      if (!present.has(entry.path)) await this.files.removeFolderFromDisk(entry.path, vault);
+    }
+
   }
 
   public saveFolder(folder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
     writeFolder(this, folder, origin);
   }
 
-  public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): void {
-    renameFolderTree(this, oldPath, updatedFolder, origin);
+  public renameFolder(oldPath: string, updatedFolder: FolderMeta, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
+    return renameFolderTree(this, oldPath, updatedFolder, origin);
   }
 
   public moveFolder(path: string, targetPath: string, mode: FolderDropMode): FolderMoveResult {
@@ -447,8 +791,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     describeFolder(this, path, description, origin);
   }
 
-  public deleteFolder(path: string, origin: 'local' | 'remote' = 'local'): void {
-    eraseFolder(this, path, origin);
+  public deleteFolder(path: string, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
+    return eraseFolder(this, path, origin);
   }
 
   // Items API
@@ -466,7 +810,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.getItems().find(i => i.id === id);
   }
 
-  public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local'): SlagItem {
+  public saveItem(item: SlagItem, origin: 'local' | 'remote' = 'local', restoring = false): SlagItem {
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
@@ -485,6 +829,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
     }
 
+    const before = origin === 'local' ? this.persistNoteIntents([{
+      id: updatedItem.id, kind: restoring ? 'restore' : oldItem ? 'update' : 'create', item: updatedItem, previous: oldItem,
+    }]) : undefined;
+    const vault = this.currentVault;
     this.attachments.persistNew([updatedItem]);
     this.cacheItems(this.getItemsKey(), items);
 
@@ -492,10 +840,14 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
       // A local edit is the only one that can be stale: a remote bundle is applied state, and a
       // note without a file behind it has nothing to lose.
-      if (origin === 'local' && oldItem && oldFilename) {
+      if (before) {
+        void this.queueNoteFileWrite(() => restoring ? this.files.restoreItemOnDisk(updatedItem, vault, true)
+          : this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true), before);
+      } else if (origin === 'local' && oldItem && oldFilename) {
         void this.flushGuarded(updatedItem, oldItem, oldFilename);
       } else {
-        void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+        if (!restoring) void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
+        else void this.files.restoreItemOnDisk(updatedItem, vault);
       }
     }
 
@@ -545,15 +897,21 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         updated.unshift(item);
       }
     }
+    const before = origin === 'local' ? this.persistNoteIntents([...saveMap.values()].map((item) => ({
+      id: item.id, kind: oldItemsMap.has(item.id) ? 'update' : 'create', item, previous: oldItemsMap.get(item.id),
+    }))) : undefined;
+    const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);
     this.cacheItems(this.getItemsKey(), updated);
 
     if (isTauri()) {
-      for (const it of saveMap.values()) {
-        const old = oldItemsMap.get(it.id);
-        const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
-        void this.files.flushItemToDisk(it, old?.folder, oldFilename);
-      }
+      void this.queueNoteFileWrite(async () => {
+        for (const it of saveMap.values()) {
+          const old = oldItemsMap.get(it.id);
+          const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
+          await this.files.flushItemToDisk(it, old?.folder, oldFilename, vault, !!before);
+        }
+      }, before);
     }
 
     for (const it of saveMap.values()) {
@@ -571,29 +929,43 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    */
   public async reloadFromDisk(change: VaultDiskChange): Promise<{ updated: number; removed: number }> {
     if (!isTauri()) return { updated: 0, removed: 0 };
+    const vault = this.currentVault;
+    let result = { updated: 0, removed: 0 };
+    await this.serializeNoteWrite(async () => {
+      if (vault.id === this.currentVault.id) result = await this.readDiskChanges(change, vault);
+    });
+    return result;
+  }
 
-    this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
+  private async readDiskChanges(change: VaultDiskChange, vault: VaultMeta): Promise<{ updated: number; removed: number }> {
 
     const { items: parsed, missing } = await this.files.reloadNotesFromDisk(change.changed);
+    if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
+    // On failure the watcher may see files already written by a group whose cursor did not move.
+    // Leave those IDs alone until registry replay finishes the projection.
+    const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
+    if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
+    if (!Object.keys(fenced).length) this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
     const current = this.getItems();
     const byId = new Map(current.map(item => [item.id, item]));
     const events: StorageChangeEvent[] = [];
 
     for (const item of parsed) {
+      if (Object.hasOwn(fenced, item.id)) continue;
       const cached = byId.get(item.id);
-      if (cached && cached.updatedAt === item.updatedAt && cached.content === item.content) continue;
+      if (cached && sameNote(cached, item)) continue;
       byId.set(item.id, item);
-      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, origin: 'external' });
+      events.push({ kind: 'item', action: 'upsert', id: item.id, payload: item, previous: cached, origin: 'external' });
     }
 
     let removed = 0;
     for (const relativePath of missing) {
       const normalized = relativePath.replace(/\\/g, '/');
       const gone = current.find(item => `${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename ?? ''}` === normalized);
-      if (!gone) continue;
+      if (!gone || Object.hasOwn(fenced, gone.id) || parsed.some((item) => item.id === gone.id)) continue;
       byId.delete(gone.id);
       removed++;
-      events.push({ kind: 'item', action: 'delete', id: gone.id, origin: 'external' });
+      events.push({ kind: 'item', action: 'delete', id: gone.id, previous: gone, origin: 'external' });
     }
 
     if (events.length === 0) return { updated: 0, removed: 0 };
@@ -609,7 +981,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * `external`: the disk changed, not the person, and the relay must not hear its own echo.
    */
   private mergeDiskFolders(added: string[], removed: string[]): void {
-    if (added.length === 0 && removed.length === 0) return;
+    if (this.registryFolderVaults.has(this.currentVault.id) || (added.length === 0 && removed.length === 0)) return;
 
     const current = this.getFolders();
     const gone = new Set(removed);
@@ -679,15 +1051,39 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readComposerDraft(this, folderPath);
   }
 
-  public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): void {
-    // The stored draft keeps metadata only, so the bytes have to be in the store before that
-    // strip — otherwise the draft is the last place a just-attached photo ever existed.
-    this.attachments.persistDrafts(draft.attachments ?? []);
-    writeComposerDraft(this, folderPath, draft, origin);
+  public async keepComposerDraftAlternative(folderPath: string, draft: ComposerDraft | null): Promise<void> {
+    if (draft) this.attachments.persistDrafts(draft.attachments ?? []);
+    const vault = this.currentVault;
+    for (const attachment of draft?.attachments ?? []) await this.attachments.readForRegistry(attachment);
+    if (this.currentVault !== vault) throw new Error('Хранилище изменилось во время записи черновика');
+    const write = this.captureSharedWrite('local', () => [{ id: sharedRegistryId('composer', folderPath), previous: null, value: draft, keepAlternative: true }]);
+    if (!write) throw new Error('Синхронизация черновиков не готова');
+    await write;
   }
 
-  public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): void {
-    eraseComposerDraft(this, folderPath, origin);
+  public saveComposerDraft(folderPath: string, draft: ComposerDraft, origin: 'local' | 'remote' = 'local'): Promise<void> {
+    this.attachments.persistDrafts(draft.attachments ?? []);
+    return this.writeComposerDraftIntent(folderPath, draft, origin);
+  }
+
+  public deleteComposerDraft(folderPath: string, origin: 'local' | 'remote' = 'local'): Promise<void> {
+    return this.writeComposerDraftIntent(folderPath, null, origin);
+  }
+
+  private writeComposerDraftIntent(folderPath: string, draft: ComposerDraft | null, origin: 'local' | 'remote'): Promise<void> {
+    const seen = this.getComposerDraft(folderPath);
+    const write = this.captureSharedWrite(origin, () => {
+      const changes = draftSharedMutation('composer', folderPath, seen, draft);
+      const advanced = this.getComposerDraft(folderPath) !== seen;
+      return advanced ? changes.map((change) => ({ ...change, keepAlternative: true as const })) : changes;
+    });
+    if (write) {
+      void write.catch((error: unknown) => fsLog.error('Could not persist composer draft', error));
+      return write;
+    }
+    if (draft) writeComposerDraft(this, folderPath, draft, origin);
+    else eraseComposerDraft(this, folderPath, origin);
+    return Promise.resolve();
   }
 
   /** What a deleted folder takes with it: its drafts, and those of its subfolders. */
@@ -699,12 +1095,40 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readFullscreenDraft(this, itemId);
   }
 
-  public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): void {
-    writeFullscreenDraft(this, itemId, draft, origin);
+  public saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin: 'local' | 'remote' = 'local'): Promise<void> {
+    this.attachments.persistDrafts(draft.attachments ?? []);
+    return this.writeFullscreenDraftIntent(itemId, draft, origin);
   }
 
-  public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): void {
-    eraseFullscreenDraft(this, itemId, origin);
+  public async keepFullscreenDraftAlternative(itemId: string, draft: FullscreenDraft): Promise<void> {
+    const vault = this.currentVault;
+    this.attachments.persistDrafts(draft.attachments ?? []);
+    for (const attachment of draft.attachments ?? []) await this.attachments.readForRegistry(attachment);
+    if (this.currentVault !== vault) throw new Error('Хранилище изменилось во время записи черновика');
+    await this.writeFullscreenDraftIntent(itemId, draft, 'local', true);
+  }
+
+  public clearFullscreenDraft(itemId: string, origin: 'local' | 'remote' = 'local'): Promise<void> {
+    return this.writeFullscreenDraftIntent(itemId, null, origin);
+  }
+
+  private writeFullscreenDraftIntent(itemId: string, draft: FullscreenDraft | null, origin: 'local' | 'remote', keepAlternative = false): Promise<void> {
+    const seen = this.getFullscreenDraft(itemId);
+    const write = this.captureSharedWrite(origin, () => {
+      const current = this.getFullscreenDraft(itemId);
+      if (keepAlternative || current !== seen) {
+        return [{ id: sharedRegistryId('fullscreen', itemId), previous: null, value: draft, keepAlternative: true }];
+      }
+      return draftSharedMutation('fullscreen', itemId, current, draft);
+    });
+    if (write) {
+      void write.catch((error: unknown) => fsLog.error('Could not persist fullscreen draft', error));
+      return write;
+    }
+    if (keepAlternative) return Promise.reject(new Error('Синхронизация черновиков не готова'));
+    if (draft) writeFullscreenDraft(this, itemId, draft, origin);
+    else eraseFullscreenDraft(this, itemId, origin);
+    return Promise.resolve();
   }
 
   public getFullscreenWidth(): boolean {
@@ -731,8 +1155,31 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readMemory(this);
   }
 
+  /** Compute against the current list inside the shared journal queue, not a stale caller snapshot. */
+  public async mutateMemory<T>(edit: (current: MemoryItem[]) => { items: MemoryItem[]; result: T } | undefined): Promise<T | undefined> {
+    let result: T | undefined;
+    const collect = () => {
+      const before = this.getMemory();
+      const change = edit(before);
+      if (!change) return [];
+      result = change.result;
+      return memorySharedMutations(before, change.items);
+    };
+    const write = this.captureSharedWrite('local', collect);
+    if (write) {
+      await write;
+    } else {
+      const change = edit(this.getMemory());
+      if (change && !this.saveMemory(change.items)) throw new Error('Не удалось сохранить память');
+      result = change?.result;
+    }
+    return result;
+  }
+
   /** Persists the list and wakes sync. Returns false when the quota refuses the write. */
   public saveMemory(items: MemoryItem[], origin: 'local' | 'remote' = 'local'): boolean {
+    const before = this.sharedListeners.has(this.currentVault.id) ? this.getMemory() : [];
+    if (this.captureShared(origin, () => memorySharedMutations(before, items))) return origin === 'local';
     const saved = writeMemory(this, items);
     if (saved && origin === 'local') {
       this.emitChange({ kind: 'memory', action: 'upsert', id: 'memory', origin });
@@ -744,8 +1191,53 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return readWorkspaceState(this);
   }
 
-  public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): void {
+  public saveWorkspaceState(partialState: Partial<WorkspaceState>, origin: 'local' | 'remote' = 'local'): Promise<void> {
+    const sharedKeys = ['profile', 'notifyRoutes', 'notifyPrefs', 'aiPrompt', 'aiPromptAt', 'aiPersona', 'aiPersonaAt', 'aiPersonaEnabled'];
+    if (origin === 'local' && !sharedKeys.some((key) => Object.hasOwn(partialState, key))) {
+      writeWorkspaceState(this, partialState);
+      return Promise.resolve();
+    }
+    const seen = this.getWorkspaceState();
+    let hasAlternative = false;
+    const queued = this.captureSharedWrite(origin, () => {
+      const current = selectSharedWorkspace(this.getWorkspaceState());
+      return workspaceSharedMutations(seen, partialState).flatMap((change): SharedMutation[] => {
+        const { key } = parseSharedRegistryId(change.id);
+        if (!isSharedWorkspaceField(key)) throw new Error('Invalid workspace mutation');
+        if (equal(current[key] ?? null, change.previous)) return [change];
+        if (equal(current[key] ?? null, change.value)) return [];
+        hasAlternative = true;
+        return [{ ...change, keepAlternative: true }];
+      });
+    }, () => this.applyDeviceWorkspacePatch(partialState));
+    if (queued) {
+      const write = queued.then(() => {
+        if (hasAlternative) throw new Error('Правка сохранена в конфликтах синхронизации');
+      });
+      void write.catch((error: unknown) => {
+        fsLog.error('Could not persist shared workspace edit', error);
+        window.dispatchEvent(new Event('slag-workspace-write-failed'));
+      });
+      return write;
+    }
     writeWorkspaceState(this, partialState, origin);
+    return Promise.resolve();
+  }
+
+  public setDeviceIntegrationsEnabled(integrationsEnabled: boolean): void {
+    const notifyPrefs = this.getWorkspaceState().notifyPrefs;
+    writeWorkspaceState(this, sharedWorkspacePatch('notifyPrefs', notifyPrefs ?? null, { notifyPrefs: { integrationsEnabled } }));
+  }
+
+  private applyDeviceWorkspacePatch(partialState: Partial<WorkspaceState>): void {
+    const { profile, notifyRoutes, notifyPrefs, aiPrompt, aiPromptAt, aiPersona, aiPersonaAt, aiPersonaEnabled, ...device } = partialState;
+    void [profile, notifyRoutes, aiPrompt, aiPromptAt, aiPersona, aiPersonaAt, aiPersonaEnabled];
+    if (notifyPrefs?.integrationsEnabled !== undefined) {
+      const current = this.getWorkspaceState().notifyPrefs;
+      writeWorkspaceState(this, { ...device, ...sharedWorkspacePatch('notifyPrefs', current ?? null, { notifyPrefs }) });
+      return;
+    }
+    if (Object.keys(device).length) writeWorkspaceState(this, device);
   }
 
   public saveFolderViewSettings(folderPath: string, settings: Partial<FolderViewSettings>): void {
@@ -771,6 +1263,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     folders?: FolderMeta[];
     removedIds?: string[];
     workspaceState?: WorkspaceState;
+    registryNotes?: boolean;
   }): Promise<void> {
     const vault = this.currentVault;
     const base = {
@@ -826,12 +1319,12 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         const nextFolderPaths = new Set(folders.map(f => f.path));
         for (const oldF of base.folders) {
           if (!nextFolderPaths.has(oldF.path) && oldF.path !== DEFAULT_INBOX_FOLDER) {
-            await this.files.removeFolderFromDisk(oldF.path);
+            await this.files.removeFolderFromDisk(oldF.path, vault);
           }
         }
       }
       // A synced folder lands the way one made here does: a directory, then its metadata.
-      this.persistFolders(folders, 'remote');
+      if (data.folders) this.persistFolders(folders, 'remote');
     }
     if (this.currentVault.id !== vault.id) throw new Error('Vault changed while persisting sync');
 
@@ -845,7 +1338,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         folders: this.getFolders(),
         workspace: this.getWorkspaceState(),
       },
-      incoming: { items: data.items ?? base.items, folders, workspace: data.workspaceState },
+      incoming: { items: data.items ?? base.items, removedIds: data.removedIds, folders, workspace: data.workspaceState },
     });
     if (isTauri() && reconciled.drifted) {
       const notePath = (item: SlagItem) => `${this.files.getVaultNotesPath(vault)}/${item.folder || DEFAULT_INBOX_FOLDER}/${item.filename || getSafeNoteFilename(item.title, item.id)}`;
@@ -865,7 +1358,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         dropped: reconciled.dropped.length,
       });
     }
-    if (!this.importVaultData({
+    if (!this.applyVaultImport({
       // Only what the bundle carried: a workspace-only bundle has no business rewriting the notes.
       items: data.items ? reconciled.items : undefined,
       folders: data.folders ? reconciled.folders : undefined,
@@ -890,7 +1383,22 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     };
   }
 
-  public importVaultData(data: VaultImportPayload): boolean {
+  public async assertBackupRestoreAllowed(vault = this.currentVault): Promise<void> {
+    // Re-read durable enrollment even offline. An unreadable marker is not proof of legacy mode.
+    if (this.currentVault.id !== vault.id) throw new Error('Хранилище изменилось во время импорта');
+    const stored = await this.readNoteRegistry();
+    if (this.currentVault.id !== vault.id) throw new Error('Хранилище изменилось во время импорта');
+    if (stored !== undefined || this.noteIntentListeners.size || this.registryFolderVaults.has(vault.id) || this.sharedListeners.has(vault.id)) {
+      throw new Error('Восстановите бэкап в отдельное несинхронизируемое хранилище');
+    }
+  }
+
+  public async importVaultData(data: VaultImportPayload, vault = this.currentVault): Promise<boolean> {
+    await this.assertBackupRestoreAllowed(vault);
+    return this.applyVaultImport(data);
+  }
+
+  private applyVaultImport(data: VaultImportPayload): boolean {
     try {
       for (const folder of data.folders ?? []) {
         safeVaultRelativePath(folder.path);
@@ -915,9 +1423,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return importVaultPayload(rest, this.transferIo());
   }
 
-  public importVaultFromJson(jsonString: string): boolean {
+  public async importVaultFromJson(jsonString: string, vault = this.currentVault): Promise<boolean> {
     const payload = parseVaultBackup(jsonString);
-    return payload ? this.importVaultData(payload) : false;
+    return payload ? this.importVaultData(payload, vault) : false;
   }
 }
 

@@ -42,8 +42,9 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       fullPage: false,
     });
 
-    // 3. Clicking sidebar-sync-btn directly opens Settings on "Синхронизация" tab
+    // 3. The status panel links to the sync tab.
     await sidebarSyncBtn.click();
+    await page.getByTestId('sidebar-sync-open-settings').click();
     const settingsModal = page.locator('.fixed.z-50', { hasText: 'Настройки' });
     await expect(settingsModal).toBeVisible({ timeout: 5000 });
 
@@ -72,6 +73,17 @@ test.describe('E2EE Synchronization & Non-Telemetry SAS Pairing Flow', () => {
       path: 'test-results/screenshots/sync_settings_unified_header_card.png',
       fullPage: false,
     });
+
+    const conflictSwitch = settingsModal.getByRole('switch', { name: 'В конфликте оставлять версию релея' });
+    await expect(conflictSwitch).not.toBeChecked();
+    await conflictSwitch.click();
+    await expect(page.getByText('Не сохранять отклонённые правки?', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Оставлять версию релея', exact: true }).click();
+    await expect(conflictSwitch).toBeChecked();
+    await conflictSwitch.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: 'test-results/screenshots/sync-note-conflicts.png' });
+    await conflictSwitch.click();
+    await expect(conflictSwitch).not.toBeChecked();
 
     // 6. Test Background Sync Interval (Battery Saver)
     const intervalSelect = settingsModal.locator('[data-testid="sync-interval-select"]');

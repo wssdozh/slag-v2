@@ -131,22 +131,17 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
                   variant={isActive ? 'filled' : 'outline'}
                   className="transition-colors duration-150"
                 />
-                {hasDot && (
-                  <span
-                    className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-blue-500 ring-2 ring-surface"
-                    title={`${unsortedCount} неразобранных записей`}
-                  />
-                )}
+
               </div>
             </button>
           );
         })}
       </nav>
 
-      {/* Floating Action Button (FAB) matching Linear circular pill */}
       <button
+        type="button"
         onClick={handleFabClick}
-        className="pointer-events-auto w-12 h-12 rounded-full bg-surface-elevated border border-tint-12 flex items-center justify-center text-white shadow-2xl shadow-scrim-80 hover:bg-tint-10 motion-press cursor-pointer shrink-0"
+        className="pointer-events-auto flex size-12 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-2xl shadow-scrim-80 outline-none ring-0 transition-colors hover:bg-accent-strong focus-visible:bg-accent-strong motion-press cursor-pointer"
         title="Новая запись"
         aria-label="Создать новую запись"
       >

@@ -70,8 +70,7 @@ export const ATTACHMENT_REQUEST_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The store the section lives in: the vault's `state.json`, through the one door that writes it.
- * `write` is expected to resolve once the patch is on its way; the door itself logs a failed
- * write instead of throwing, so the migration proves its own write by reading the file back.
+ * The native writer rejects failed writes. The queue keeps failed patches for retry.
  */
 export interface SyncSectionStore {
   read(): Promise<Record<string, unknown>>;
@@ -85,6 +84,7 @@ let sectionRaw: Record<string, unknown> = {};
 let sectionStore: SyncSectionStore | null = null;
 let pendingPatch: Record<string, unknown> | null = null;
 let flushChain: Promise<void> = Promise.resolve();
+let flushError: { cause: unknown } | null = null;
 
 /**
  * The app logger pulls the config barrel and the icon set behind it. `node --test` reads this file
@@ -161,18 +161,23 @@ async function flushQueue(): Promise<void> {
     if (!store) return;
     try {
       await store.write(patch);
+      flushError = null;
     } catch (error) {
+      pendingPatch = Object.assign({}, patch, pendingPatch);
+      flushError = { cause: error };
       warn('Could not save the sync ledgers to state.json:', error);
+      return;
     }
   }
 }
 
-/**
- * The one door to `state.json` logs a failed write and resolves — it is the app's settings file,
- * and a folder rename must not throw into a keystroke. So the only proof the file has a patch is
- * reading it back, and the migration pays for that one read: it deletes the old fallback key only
- * when the file demonstrably holds the new one.
- */
+/** A bundle must not leave or be ACKed before its journal writes succeed. */
+export async function requireSyncSectionFlushed(): Promise<void> {
+  await flushChain;
+  if (flushError) throw new Error('Не удалось сохранить журнал синхронизации', flushError);
+}
+
+/** Migration removes its fallback only after reading the patch back from disk. */
 export async function writeSyncSectionVerified(patch: Record<string, unknown>): Promise<boolean> {
   const store = sectionStore;
   if (!store) return false;
@@ -208,20 +213,29 @@ export interface SectionHydration {
   error: unknown | null;
 }
 
-export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionStore): Promise<SectionHydration> {
-  if (onDisk(scope.vaultId)) {
-    return { section: sectionRaw, persisted: sectionStore !== null, error: null };
-  }
-
+export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionStore, isCurrent = () => true): Promise<SectionHydration> {
   let raw: Record<string, unknown>;
   try {
+    await flushChain;
     raw = await store.read();
   } catch (error) {
-    // No readable disk means no new home: stay on the old one instead of pretending to move.
-    resetSection();
+    // Keep already-loaded same-vault state for local edits, but the caller must not start sync.
+    if (isCurrent() && !onDisk(scope.vaultId)) resetSection();
     return { section: {}, persisted: false, error };
   }
-
+  if (!isCurrent()) return { section: {}, persisted: false, error: 'Stale sync hydration' };
+  if (raw.tombstones !== undefined && (!raw.tombstones || typeof raw.tombstones !== 'object' ||
+      Array.isArray(raw.tombstones) || Object.keys(raw.tombstones).length !== Object.keys(sanitizeTombstones(raw.tombstones)).length)) {
+    if (!onDisk(scope.vaultId)) resetSection();
+    return { section: {}, persisted: false, error: 'Invalid deletion ledger' };
+  }
+  if (onDisk(scope.vaultId) && sectionStore && pendingPatch) {
+    const pending = pendingPatch;
+    if (!await writeSyncSectionVerified(pending)) return { section: {}, persisted: false, error: flushError };
+    if (!isCurrent()) return { section: {}, persisted: false, error: 'Stale sync hydration' };
+    raw = { ...raw, ...pending };
+  }
+  resetSection();
   const stored = sectionFromState(raw);
   const legacy = readLegacySection(scope.vaultId);
   const merged = mergeSectionState(stored, legacy.state);
@@ -233,7 +247,9 @@ export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionSto
   if (legacy.keys.length === 0) return { section: raw, persisted: true, error: null };
 
   const patch = sectionToPatch(merged);
-  if (!(await writeSyncSectionVerified(patch))) {
+  const written = await writeSyncSectionVerified(patch);
+  if (!isCurrent()) return { section: {}, persisted: false, error: 'Stale sync hydration' };
+  if (!written) {
     // The merged copy is in memory, but the file never demonstrably took it: the old keys stay
     // for the next run instead of being deleted against a write that did not land.
     sectionStore = null;
@@ -252,6 +268,7 @@ function resetSection(): void {
   sectionRaw = {};
   sectionStore = null;
   pendingPatch = null;
+  flushError = null;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
 } from '../../../lib/time/todoistTaskParser';
 import { parseSubtasksFromContent } from '../../../lib/tasks/taskUtils';
 import { getTodayIso } from '../../../lib/time/dateUtils';
+import { withoutSpoilers } from '../../../lib/text/noteDisclosure';
 
 /**
  * What the user waved away in the ghost chips. A dismissed value is still in the
@@ -121,7 +122,7 @@ export function resolveComposerFields({
 
   return {
     finalContent,
-    firstLine: (finalContent.split('\n')[0] ?? '').replace(/^#+\s*/, '').trim(),
+    firstLine: withoutSpoilers(finalContent.split('\n')[0] ?? '').replace(/^#+\s*/, '').trim(),
     cleanTitle: parsed.cleanTitle,
     tags: finalTags,
     folder,

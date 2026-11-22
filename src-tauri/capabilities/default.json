@@ -36,6 +36,8 @@
     "android-fs:allow-read-file-as-data-url",
     "android-fs:allow-show-open-dir-picker",
     "android-fs:allow-show-open-file-picker",
+    "android-fs:allow-show-save-file-picker",
+    "android-fs:allow-write-file",
     "android-fs:allow-persist-picker-uri-permission",
     "android-fs:allow-check-persisted-picker-uri-permission",
     "android-fs:allow-list-all-persisted-picker-uri-permissions"

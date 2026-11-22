@@ -1,12 +1,10 @@
 // Folder header: name, icon, path, counters and the inline edit controls.
 import React, { useEffect, useRef } from 'react';
-import { Icon } from '../UI/icons/Icon';
+import { Icon, type IconSize } from '../UI/icons/Icon';
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { folderIconName } from '../UI/icons/icons';
-import { MenuDropdown } from '../UI/MenuDropdown';
 import { IconButton } from '../UI/IconButton';
-import { FolderIconGrid } from './FolderIconGrid';
+import { FolderAppearancePicker } from './FolderAppearancePicker';
 import { FolderActionsMenu } from './FolderActionsMenu';
 import { recordCountLabel } from './folderStatsConfig';
 import type { FolderProfileEdit } from './useFolderProfileEdit';
@@ -19,6 +17,7 @@ export interface FolderProfileHeaderProps {
   itemCount: number;
   variant: FolderProfileVariant;
   edit: FolderProfileEdit;
+  onSaveFolder: (folder: FolderMeta) => void;
   onMove: () => void;
   onDelete: () => void;
   onClose?: () => void;
@@ -30,10 +29,10 @@ const iconButtonClass: Record<FolderProfileVariant, string> = {
   screen: 'w-11 h-11 rounded-xl',
 };
 
-const iconGlyphClass: Record<FolderProfileVariant, string> = {
-  dock: 'w-4 h-4',
-  modal: 'w-4 h-4',
-  screen: 'w-5 h-5',
+const iconGlyphSize: Record<FolderProfileVariant, IconSize> = {
+  dock: 'xl',
+  modal: 'md',
+  screen: 'lg',
 };
 
 const nameClass: Record<FolderProfileVariant, string> = {
@@ -59,6 +58,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
   itemCount,
   variant,
   edit,
+  onSaveFolder,
   onMove,
   onDelete,
   onClose,
@@ -74,29 +74,13 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
     if (isEditingDescription) descriptionRef.current?.focus({ preventScroll: true });
   }, [isEditingDescription]);
 
-  const folderIcon = folderIconName(folder?.icon);
   const TitleTag = variant === 'screen' ? 'h1' : 'div';
 
   return (
     <div className="flex flex-col gap-2 min-w-0">
       <div className="flex items-start gap-2.5 min-w-0">
-        <MenuDropdown
-          ariaLabel="Иконка папки"
-          minWidth={196}
-          align="start"
-          trigger={
-            <button
-              type="button"
-              title="Сменить иконку папки"
-              aria-label="Сменить иконку папки"
-              className={`${iconButtonClass[variant]} shrink-0 flex items-center justify-center text-fg-secondary hover:text-fg-primary hover:bg-tint-6 motion-surface outline-none ring-0 cursor-pointer`}
-            >
-              <Icon name={folderIcon} size="md" tone="inherit" className={iconGlyphClass[variant]} />
-            </button>
-          }
-        >
-          <FolderIconGrid value={folder?.icon} onSelect={edit.selectIcon} />
-        </MenuDropdown>
+        <FolderAppearancePicker folder={folder} onSave={onSaveFolder} size={iconGlyphSize[variant]}
+          className={`${iconButtonClass[variant]} text-fg-secondary hover:text-fg-primary motion-surface`} />
 
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
           {isEditingName ? (
@@ -143,8 +127,13 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0">
-          {!isSystem && (
-            <FolderActionsMenu onRename={edit.startRename} onMove={onMove} onDelete={onDelete} />
+          {(!isSystem || variant === 'dock') && (
+            <FolderActionsMenu
+              onRename={isSystem ? undefined : edit.startRename}
+              onMove={isSystem ? undefined : onMove}
+              onDelete={isSystem ? undefined : onDelete}
+              onDescription={variant === 'dock' ? edit.startDescription : undefined}
+            />
           )}
           {onClose && (
             <IconButton size="sm" title="Закрыть (Esc)" aria-label="Закрыть" onClick={onClose}>
@@ -157,6 +146,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
       {/* Description and its editor are one stacked block: the open row grows exactly as
           the closed one shrinks, so the profile changes height in a single motion instead
           of the textarea popping in. */}
+      {(variant !== 'dock' || folder?.description || isEditingDescription) && (
       <div className="flex flex-col min-w-0">
         <div className="motion-fold" data-expanded={!isEditingDescription} inert={isEditingDescription}>
           <button
@@ -198,6 +188,7 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

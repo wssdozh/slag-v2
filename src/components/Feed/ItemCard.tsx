@@ -7,26 +7,21 @@ import { Icon } from '../UI/icons/Icon';
 import { LinearSignalBars } from '../UI/PriorityBadge';
 import { canEnrichAttachments, enrichAttachment } from '../../lib/media/enrichment/dispatch';
 import { extractFocalContext } from '../../lib/media/enrichment/text';
+import { storage } from '../../lib/storage';
 import { PRIORITY_LABELS } from '../../lib/tasks/taskUtils';
 import { formatDueStamp } from '../../lib/time/dateUtils';
 import { MarkdownRenderer } from '../UI/MarkdownRenderer';
+import { FOLDED_QUOTE, withoutSpoilers } from '../../lib/text/noteDisclosure';
 import { resolveAttachmentEmbeds } from '../../lib/text/attachmentEmbed';
 import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { UI_DELAYS, DEFAULT_INBOX_FOLDER } from '../../config';
 import { TagChip } from '../UI/TagChip';
 import { ItemCardActions } from './item/ItemCardActions';
+import { ItemSyncDot } from './item/ItemSyncDot';
 import { ItemReplyBanner } from './item/ItemReplyBanner';
 import { ItemSubtasks } from './item/ItemSubtasks';
-import { ItemVideoNotes } from './item/ItemVideoNotes';
-import { ItemAudioNotes } from './item/ItemAudioNotes';
-import { ItemImages } from './item/ItemImages';
-import { ItemFiles } from './item/ItemFiles';
-import {
-  attachmentCounts,
-  buildItemLightboxImages,
-  groupItemAttachments,
-  itemCardShape,
-} from './item/itemAttachments';
+import { ItemAttachmentGrid } from './item/ItemAttachmentGrid';
+import { buildItemLightboxImages } from './item/itemAttachments';
 
 const CARD_TRANSITION =
   'transform var(--slag-motion-base) var(--ease-standard), ' +
@@ -100,40 +95,34 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   } = useApp();
 
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
-  const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [visibleTagCount, setVisibleTagCount] = useState(0);
   const [tagsRowWidth, setTagsRowWidth] = useState(0);
   const tagsRowRef = useRef<HTMLDivElement | null>(null);
 
-  const handleToggleOcr = useCallback((id: string) => {
-    setExpandedOcrIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const handleEnrichAttachment = useCallback(async (targetAtt: SlagAttachment) => {
+    if (processingId) return;
     if (!canEnrichAttachments(aiSettings)) {
       addToast('Подписка неактивна, а свой ключ Groq не указан — распознавание недоступно', 'info');
       return;
     }
-    const focalContext = extractFocalContext(item);
-    const inFlightAttachments = item.attachments.map(a =>
-      a.id === targetAtt.id ? { ...a, enrichmentStatus: 'processing' as const } : a
-    );
-    updateItem({ ...item, attachments: inFlightAttachments });
-
+    const vaultId = storage.getCurrentVault().id;
+    setProcessingId(targetAtt.id);
     try {
-      const enriched = await enrichAttachment(targetAtt, focalContext, aiSettings);
-      const updatedAttachments = item.attachments.map(a => a.id === targetAtt.id ? enriched : a);
-      updateItem({ ...item, attachments: updatedAttachments });
-    } catch {
-      // quiet fallback
+      const enriched = await enrichAttachment(targetAtt, extractFocalContext(item), aiSettings);
+      if (enriched.enrichmentStatus !== 'ready') {
+        addToast(enriched.enrichmentStatus === 'error' ? 'Не удалось распознать вложение' : 'Распознавание для этого вложения недоступно', 'error');
+        return;
+      }
+      if (storage.getCurrentVault().id !== vaultId) return;
+      const latest = storage.getItemById(item.id);
+      if (!latest?.attachments.some(a => a.id === targetAtt.id)) return;
+      updateItem({ ...latest, attachments: latest.attachments.map(a => a.id === targetAtt.id ? enriched : a) });
+    } finally {
+      setProcessingId(null);
     }
-  }, [aiSettings, item, updateItem, addToast]);
+  }, [aiSettings, item, processingId, updateItem, addToast]);
 
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -180,10 +169,16 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     }
   };
 
+  const hasTextSelection = (target: EventTarget | null) => {
+    const selection = window.getSelection();
+    return target instanceof Element && !selection?.isCollapsed &&
+      Boolean(selection?.containsNode(target, true));
+  };
+
   const handleCardClick = (e: React.MouseEvent) => {
-    if (!isMobile) return;
+    if (!isMobile || hasTextSelection(e.target)) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, a, input, textarea, [role="button"], .cursor-pointer')) return;
+    if (target?.closest('button, a, input, textarea, summary, [role="button"], .cursor-pointer')) return;
     if (suppressTapRef.current) {
       suppressTapRef.current = false;
       return;
@@ -292,23 +287,18 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const galleryAttachments = useMemo(
     () => (item.attachments ?? []).filter(
       (attachment) => !embeddedAttachmentIds.has(attachment.id)
-    ),
-    [item.attachments, embeddedAttachmentIds]
+    ).map(attachment => attachment.id === processingId ? { ...attachment, enrichmentStatus: 'processing' as const } : attachment),
+    [item.attachments, embeddedAttachmentIds, processingId]
   );
-  // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
-  const attachmentGroups = useMemo(() => groupItemAttachments(galleryAttachments), [galleryAttachments]);
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
   // `missing` tells pictures apart from bytes still on their way.
   const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(item.attachments);
 
-  const shape = itemCardShape(item, attachmentCounts(attachmentGroups));
-  const isVoiceBubble = shape === 'voice';
-  const isFileBubble = shape === 'file';
-
-  // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
-  // exception is the open OCR panel: prose needs a column, not a 200px strip.
-  const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
-  const hasFloatingActions = isVoiceBubble || isFileBubble || isPictureBubble || shape === 'video';
+  const timestamp = (
+    <span data-testid="item-time" className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-mono text-2xs leading-none text-fg-muted select-none">
+      {formattedTime}<ItemSyncDot item={item} />
+    </span>
+  );
 
   const handleImageClick = useCallback((img: SlagAttachment) => {
     if (onImageClick) {
@@ -451,7 +441,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const hasBottomMeta =
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
-  const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
+  const isCompactText = !isArticle && !hasBottomMeta && !item.replyToId &&
+    !item.attachments.length && !item.subtasks?.length && repliesCount === 0 && !item.content.includes(FOLDED_QUOTE);
 
   // The step before the card is a number, so its style object outlives the list's re-renders.
   const cardStyle = useMemo<React.CSSProperties | undefined>(
@@ -472,8 +463,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   );
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
+    if (hasTextSelection(e.target)) return;
+    e.preventDefault();
     openContextMenu({
       x: e.clientX,
       y: e.clientY,
@@ -483,12 +475,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   };
 
   const handleDragStart = (e: React.DragEvent) => {
-    // If dragging an interactive element (wiki-link, tag, button, input), prevent card drag
-    const target = e.target as HTMLElement | null;
-    if (target?.closest('a, button, [role="button"], input, textarea, .cursor-pointer')) {
-      e.preventDefault();
-      return;
-    }
     e.dataTransfer.setData('text/plain', item.id);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -528,8 +514,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         id={`item-${item.id}`}
         data-flip-id={item.id}
         onClick={handleCardClick}
-        draggable={!isMobile}
-        onDragStart={handleDragStart}
         onContextMenu={handleContextMenu}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -542,24 +526,19 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           transition: swipeOffset ? 'none' : CARD_TRANSITION,
           ...cardStyle,
         }}
-        className={`group relative flex flex-col ${
-          isVoiceBubble || isFileBubble
-            ? 'gap-0 max-w-sm sm:max-w-md'
-            : isPictureBubble || shape === 'video'
-              ? 'gap-0 w-fit max-w-full'
-              : 'gap-1.5 w-full'
-        } p-2.5 sm:p-3 rounded-xl cursor-default select-none ${
+        className={`group relative ${isCompactText && !isTask ? 'block' : `flex ${isCompactText ? 'flex-row items-end' : 'flex-col'}`} ${
+          `${isCompactText ? 'gap-3' : 'gap-1.5'} w-fit max-w-full`
+        } ${isCompactText ? 'px-2.5 sm:px-3 py-1.5' : 'p-2.5 sm:p-3'} rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
             : 'bg-surface hover:bg-surface-hover'
         }`}
       >
-        {/* Action Buttons: desktop inside card for full-width items; floating right for pure voice/file bubbles */}
         <ItemCardActions
-          isFloating={hasFloatingActions}
           isArticle={isArticle}
           onReply={handleReply}
           onOpenArticle={handleOpenArticle}
+          onDragStart={isMobile ? undefined : handleDragStart}
         />
 
       {/* Reply Parent Quote Banner */}
@@ -572,7 +551,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       {/* Main Content Area */}
       {isTask ? (
         /* Task Variant */
-        <div className="flex flex-col gap-2 pt-0.5">
+        <div className="flex min-w-0 flex-col gap-2 pt-0.5">
           <div className="flex items-start gap-2.5">
             <button
               onClick={() => toggleTaskComplete(item.id)}
@@ -583,7 +562,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
               <TaskStatusMark done={item.status === 'done'} className="w-4 h-4" />
             </button>
 
-            <div className="flex-1 min-w-0 pr-14 sm:pr-16">
+            <div className="min-w-0">
               <h3
                 className={`text-base font-medium leading-snug tracking-tight ${
                   item.status === 'done'
@@ -595,14 +574,14 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                   content={item.title}
                   inline
                   onWikiLinkClick={scrollToItem}
-                  className={item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}
+                  className={`select-text ${item.status === 'done' ? 'line-through text-fg-muted' : 'text-fg-primary'}`}
                   {...attachmentMarkdownProps}
                 />
               </h3>
 
               {taskBodyContent && (
                 <div className="mt-1 text-sm text-fg-tertiary leading-relaxed font-normal">
-                  <CardMarkdown content={taskBodyContent} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
+                  <CardMarkdown content={taskBodyContent} className="select-text" onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
                 </div>
               )}
             </div>
@@ -620,17 +599,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-14 sm:pr-20"
+            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
           >
             <Icon name="entity.article" size="md" className="shrink-0" />
             <span>{item.title}</span>
           </h3>
 
           <p
-            onClick={handleOpenArticle}
-            className="text-sm text-fg-tertiary line-clamp-3 leading-relaxed font-normal cursor-pointer hover:text-fg-primary transition-colors"
+            onClick={(event) => { if (!hasTextSelection(event.target)) handleOpenArticle(); }}
+            className="text-sm text-fg-tertiary line-clamp-3 leading-relaxed font-normal select-text cursor-text"
           >
-            {item.summary || item.content.slice(0, 200)}
+            {withoutSpoilers(item.summary || item.content).slice(0, 200)}
           </p>
         </div>
       ) : (
@@ -645,56 +624,31 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           if (!textToRender) return null;
 
           return (
-            <div className="flex flex-col gap-1.5 pr-14 sm:pr-16">
-              <div className="text-sm text-fg-soft leading-relaxed font-normal">
-                <CardMarkdown content={textToRender} onWikiLinkClick={scrollToItem} {...attachmentMarkdownProps} />
+            <div className="min-w-0">
+              <div className="flow-root text-xs text-fg-soft leading-relaxed font-normal">
+                <CardMarkdown
+                  content={textToRender}
+                  onWikiLinkClick={scrollToItem}
+                  className={`select-text ${isCompactText ? 'inline [&>p:last-child]:inline [&>p:last-child]:mb-0' : ''}`}
+                  {...attachmentMarkdownProps}
+                />
+                {isCompactText && (
+                  <span className="relative top-0.5 float-right ml-3">{timestamp}
+                  </span>
+                )}
               </div>
             </div>
           );
         })()
       )}
 
-      {/* Video Circle Notes (Telegram style) */}
-      <ItemVideoNotes
-        attachments={attachmentGroups.video}
-        srcs={attachmentSrcs}
-        onOpen={handleImageClick}
-      />
-
-      {/* Audio Notes Player */}
-      <ItemAudioNotes
-        attachments={attachmentGroups.audio}
-        srcs={attachmentSrcs}
-        isVoiceBubble={isVoiceBubble}
-        formattedTime={formattedTime}
-        onEnrich={handleEnrichAttachment}
-      />
-
-      {/* Pictures: one keeps its own shape, a pile fills one canvas */}
-      <ItemImages
-        images={attachmentGroups.image}
-        srcs={attachmentSrcs}
-        missing={missingAttachmentSrcs}
-        isPictureBubble={isPictureBubble}
-        expandedOcrIds={expandedOcrIds}
-        onToggleOcr={handleToggleOcr}
-        onImageClick={handleImageClick}
-        onEnrich={handleEnrichAttachment}
-      />
-
-      {/* File Attachments */}
-      <ItemFiles
-        attachments={attachmentGroups.file}
-        srcs={attachmentSrcs}
-        isFileBubble={isFileBubble}
-        formattedTime={formattedTime}
-      />
+      <ItemAttachmentGrid attachments={galleryAttachments} srcs={attachmentSrcs} missing={missingAttachmentSrcs} onOpen={handleImageClick} onEnrich={handleEnrichAttachment} />
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
-      {shouldRenderBottomBar && (
+      {!(isCompactText && !isTask) && (
         <div
           data-testid="item-meta-row"
-          className="flex items-center gap-2 pt-1 min-h-[16px] w-full select-none"
+          className={`flex items-center gap-2 select-none ${isCompactText ? 'shrink-0 pb-0.5' : 'pt-1 min-h-[16px] w-full'}`}
         >
           {hasBottomMeta ? (
             <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden flex-nowrap">
@@ -782,15 +736,9 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
                 );
               })()}
             </div>
-          ) : (
-            <div />
-          )}
+          ) : null}
 
-          {!isVoiceBubble && (
-            <span className="text-2xs font-mono text-fg-muted select-none ml-auto shrink-0 leading-none">
-              {formattedTime}
-            </span>
-          )}
+          <span className="ml-auto inline-flex shrink-0">{timestamp}</span>
         </div>
       )}
 

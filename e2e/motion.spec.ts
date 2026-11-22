@@ -155,6 +155,45 @@ test('a fresh note lands, and the list settles when one is deleted', async ({ pa
   expect(travelled).toBe(true);
 });
 
+test('loading older notes keeps a visible card still from the first frame', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.addInitScript(() => {
+    const day = new Date().setHours(12, 0, 0, 0);
+    localStorage.setItem('slag_items_default_vault', JSON.stringify(Array.from({ length: 45 }, (_, i) => ({
+      id: `prepend-${i}`, type: 'note', folder: 'Входящие', title: '', content: `Запись ${i}\n\nИстория ленты`,
+      createdAt: day + i * 60_000, updatedAt: day + i * 60_000, tags: [], attachments: [],
+    }))));
+  });
+  await page.goto('/');
+  await page.addStyleTag({ content: ':root { --slag-motion-slow: 1600ms; }' });
+  const feed = page.getByTestId('feed-list-container');
+  await expect(feed.locator('[data-flip-id]')).toHaveCount(15);
+
+  const firstFrame = await feed.locator('#item-prepend-30').evaluate(async (card) => {
+    const list = card.closest<HTMLElement>('[data-testid="feed-list-container"]')!;
+    const top = () => card.getBoundingClientRect().top - list.getBoundingClientRect().top;
+    list.scrollTop = 0;
+    const before = top();
+    const olderId = '#item-prepend-15';
+    const deadline = performance.now() + 5000;
+    while (!list.querySelector(olderId) && performance.now() < deadline) {
+      await new Promise(requestAnimationFrame);
+      // Initial bottom settling can run before the top sentinel's first notification.
+      if (!list.querySelector(olderId) && list.scrollTop > 0) list.scrollTop = 0;
+    }
+    return {
+      count: list.querySelectorAll('[data-flip-id]').length,
+      shift: Math.abs(top() - before),
+      animated: card.getAnimations().some(({ effect }) =>
+        effect instanceof KeyframeEffect && effect.getKeyframes().some(frame => 'transform' in frame)),
+    };
+  });
+  expect(firstFrame.count).toBe(30);
+  expect(firstFrame.shift).toBeLessThanOrEqual(2);
+  expect(firstFrame.animated).toBe(false);
+  await page.screenshot({ path: 'test-results/screenshots/feed_prepend_no_jump.png' });
+});
+
 test('a sent note rises from the composer, and the cards above it do not jump', async ({ page }) => {
   await page.goto('/');
   // Long enough to read the start keyframe before the animation ends.
@@ -283,7 +322,7 @@ test('a kanban card glides to its new column, and reduced motion skips it', asyn
   const card = page.locator('[data-testid="kanban-card"]', { hasText: title });
   await expect(card).toBeVisible();
   await card.locator('button[title="Сменить статус задачи"]').click();
-  await card.getByRole('button', { name: 'В работе', exact: true }).click();
+  await page.getByRole('button', { name: 'В работе', exact: true }).click();
 
   const glided = () => page.locator('[data-testid="kanban-card"]', { hasText: title }).evaluate(element =>
     element.getAnimations().some(animation =>
@@ -296,7 +335,7 @@ test('a kanban card glides to its new column, and reduced motion skips it', asyn
   // With reduced motion the card simply appears in the new column.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await card.locator('button[title="Сменить статус задачи"]').click();
-  await card.getByRole('button', { name: 'К выполнению', exact: true }).click();
+  await page.getByRole('button', { name: 'К выполнению', exact: true }).click();
   await expect(card).toBeVisible();
   const still = await card.evaluate(element => element.getAnimations().length);
   expect(still).toBe(0);
@@ -367,19 +406,15 @@ test('a browser without view transitions still switches vaults', async ({ page }
   await expect(page.locator('aside button', { hasText: 'второе' })).toHaveCount(1);
 });
 
-test('the inbox counter pops when its number changes', async ({ page }) => {
+test('the inbox in the sidebar has no counter even with records', async ({ page }) => {
   await page.goto('/');
-  await page.addStyleTag({ content: ':root { --slag-motion-slow: 2000ms; }' });
-  const badge = page.getByTestId('inbox-count');
-  await expect(badge).toBeVisible();
-  const before = (await badge.innerText()).trim();
-
-  await createTask(page, 'Счётчик ' + Date.now());
-  await expect(badge).not.toHaveText(before);
-  const running = await badge.evaluate(el => el.getAnimations().filter(animation => animation.playState === 'running').length);
-  expect(running).toBeGreaterThan(0);
-
-  await page.locator('aside').first().screenshot({ path: 'test-results/screenshots/motion_count.png' });
+  const inbox = page.locator('aside button').filter({ hasText: 'Входящие' });
+  await expect(inbox).toHaveText('Входящие', { timeout: 60_000 });
+  const composer = page.locator('main textarea');
+  await composer.fill('Заметка без счётчика');
+  await page.locator('button[title*="Отправить"]').click();
+  await expect(page.locator('[data-flip-id]').filter({ hasText: 'Заметка без счётчика' })).toBeVisible();
+  await expect(inbox).toHaveText('Входящие');
 });
 
 test('shared modal exits before unmount and becomes inert immediately', async ({ page }) => {

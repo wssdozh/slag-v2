@@ -209,7 +209,7 @@ test.describe('assistant memory', () => {
 
     const seeded = await page.evaluate(async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      const result = memoryService.remember({
+      const result = await memoryService.remember({
         text: 'работает по ночам',
         kind: 'fact',
         tag: 'работа',
@@ -270,7 +270,7 @@ test.describe('assistant memory', () => {
     // и forget по тексту убирает факт из живых
     const forgotten = await page.evaluate(async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      const removed = memoryService.forget('работает по ночам');
+      const removed = await memoryService.forget('работает по ночам');
       return { removed, live: memoryService.all().length };
     });
     expect(forgotten.removed).toBe(true);
@@ -284,11 +284,11 @@ test.describe('assistant memory', () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
       const { storage } = await import(/* @vite-ignore */ '/src/lib/storage/index.ts');
 
-      memoryService.remember({ text: 'живёт в Москве', kind: 'fact', tag: 'быт' });
+      await memoryService.remember({ text: 'живёт в Москве', kind: 'fact', tag: 'быт' });
       const exported = storage.exportVaultAsJson();
       localStorage.removeItem(key);
       const cleared = storage.getMemory().length;
-      const restored = storage.importVaultFromJson(exported);
+      const restored = await storage.importVaultFromJson(exported);
       return {
         exportedHasMemory: exported.includes('живёт в Москве'),
         cleared,
@@ -308,8 +308,8 @@ test.describe('assistant memory', () => {
 
     await page.evaluate(async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      memoryService.remember({ text: 'не любит созвон-митинги до полудня', kind: 'pref', tag: 'работа', importance: 4 });
-      memoryService.remember({ text: 'пиши коротко, без вступлений', kind: 'rule', importance: 5 });
+      await memoryService.remember({ text: 'не любит созвон-митинги до полудня', kind: 'pref', tag: 'работа', importance: 4 });
+      await memoryService.remember({ text: 'пиши коротко, без вступлений', kind: 'rule', importance: 5 });
     });
 
     await page.locator('button[title*="Настройки"]').first().click();
@@ -353,9 +353,9 @@ test.describe('assistant memory', () => {
 
     await page.evaluate(async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      memoryService.remember({ text: 'работает по ночам', kind: 'fact', tag: 'работа' });
-      memoryService.remember({ text: 'не любит созвоны до полудня', kind: 'pref', tag: 'работа' });
-      memoryService.remember({ text: 'бегает по утрам', kind: 'fact', tag: 'здоровье' });
+      await memoryService.remember({ text: 'работает по ночам', kind: 'fact', tag: 'работа' });
+      await memoryService.remember({ text: 'не любит созвоны до полудня', kind: 'pref', tag: 'работа' });
+      await memoryService.remember({ text: 'бегает по утрам', kind: 'fact', tag: 'здоровье' });
     });
 
     await page.evaluate(async (settings) => {
@@ -395,7 +395,7 @@ test.describe('assistant memory', () => {
       });
 
       // «Дизайн» с большой буквы должен прилипнуть к существующему тегу заметки
-      const result = memoryService.remember({ text: 'любит минимализм', kind: 'pref', tag: 'Дизайн' });
+      const result = await memoryService.remember({ text: 'любит минимализм', kind: 'pref', tag: 'Дизайн' });
       return result?.item.tag ?? null;
     });
 
@@ -532,7 +532,7 @@ test.describe('assistant memory', () => {
 
     const seededId = await page.evaluate(async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      return memoryService.remember({ text: 'завтра встреча', kind: 'event' })?.item.id ?? null;
+      return (await memoryService.remember({ text: 'завтра встреча', kind: 'event' }))?.item.id ?? null;
     });
     expect(seededId).toBeTruthy();
 

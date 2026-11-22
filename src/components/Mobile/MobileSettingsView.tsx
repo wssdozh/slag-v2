@@ -78,20 +78,18 @@ export const MobileSettingsView: React.FC = () => {
         style={{ paddingTop: 'calc(max(var(--sat), 0px) + 1rem)' }}
       >
         {/* Аккаунт первым: в настройки заходят проверить его, а не папки. */}
-        <SettingsGroup className="pt-5">
+        <SettingsGroup>
           <ProfileCard
             planLabel={isLocked ? 'Войти · синхронизация и облачный ИИ' : `Тариф ${planLabel} · кеш ${usedCacheMb} МБ из ${cacheLabel}`}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            label={isLocked ? 'SLAG ID' : 'Личный кабинет'}
-            testId={isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn'}
-            onClick={() => navigatePage('account')}
-            chevron
+            accountAction={{
+              label: isLocked ? 'SLAG ID' : 'Личный кабинет',
+              testId: isLocked ? 'mobile-settings-login-btn' : 'mobile-settings-account-btn',
+              onClick: () => navigatePage('account'),
+            }}
           />
         </SettingsGroup>
 
-        <SettingsGroup className="pt-5">
+        <SettingsGroup>
           <SettingsRow
             icon={<Icon name="entity.vault" size="md" tone="inherit" />}
             label={vault.name || 'SLAG Vault'}
@@ -104,7 +102,7 @@ export const MobileSettingsView: React.FC = () => {
         <VaultSwitcherMenu isOpen={isVaultSwitcherOpen} onClose={() => setIsVaultSwitcherOpen(false)} variant="sheet" />
 
         {accountState.invitations.length > 0 && (
-          <SettingsGroup className="pt-5">
+          <SettingsGroup>
             {accountState.invitations.map((inv, index) => (
               <React.Fragment key={inv.vaultId}>
                 {index > 0 && <SettingsDivider />}
@@ -119,7 +117,7 @@ export const MobileSettingsView: React.FC = () => {
           </SettingsGroup>
         )}
 
-        <SettingsGroup className="pt-5">
+        <SettingsGroup>
           {SETTINGS_TABS.filter((tab) => tab.id !== 'account').map((tab, index) => {
             const isUpdates = tab.id === 'updates';
             const updateValue = isUpdates

@@ -845,31 +845,31 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await expect(fullscreenEditorRoot).toBeVisible();
 
     // Verify paperclip attach button in toolbar
-    const attachBtn = page.locator('button[title*="Прикрепить файл"]').first();
+    const attachBtn = page.getByRole('button', { name: 'Прикрепить файл, фото или медиа' });
     await expect(attachBtn).toBeVisible();
+    await attachBtn.hover();
+    await expect(page.getByRole('tooltip').filter({ hasText: 'Прикрепить файл, фото или медиа' })).toBeVisible();
 
     // Simulate pasting an image file into the fullscreen editor
     await fullscreenEditorRoot.evaluate((node) => {
       const dt = new DataTransfer();
-      const file = new File(['mock_image_bytes'], 'mock_screenshot.png', { type: 'image/png' });
+      const file = new File(['<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="steelblue"/></svg>'], 'mock_screenshot.svg', { type: 'image/svg+xml' });
       dt.items.add(file);
       node.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     });
 
-    // Verify "Медиа и вложения" section appeared with the attached image
-    await expect(page.locator('text=Медиа и вложения').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=mock_screenshot.png').first()).toBeVisible();
+    const strip = page.getByTestId('attachment-strip');
+    await expect(strip.getByRole('button', { name: 'mock_screenshot.svg', exact: true })).toBeVisible({ timeout: 5000 });
 
     // Verify markdown link was inserted into content
     await page.waitForFunction(() => {
       const getMd = (window as any).__slagGetEditorMarkdown;
-      return typeof getMd === 'function' && getMd().includes('![[mock_screenshot.png]]');
+      return typeof getMd === 'function' && getMd().includes('![[mock_screenshot.svg]]');
     });
 
-    // Test "Вставить в текст" button click
-    const insertInTextBtn = page.locator('button', { hasText: 'Вставить в текст' }).first();
-    await expect(insertInTextBtn).toBeVisible();
-    await insertInTextBtn.click();
+    await strip.getByRole('button', { name: 'Действия: mock_screenshot.svg' }).click();
+    await page.getByRole('button', { name: 'Вставить в текст' }).click();
+    await expect(page.getByRole('button', { name: 'Вставить в текст' })).toHaveCount(0);
 
     // Capture visual screenshot of Fullscreen Editor with media
     await page.screenshot({

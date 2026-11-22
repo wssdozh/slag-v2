@@ -534,7 +534,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     });
 
     // Save changes
-    await page.locator('header button[title*="Сохранить изменения"]').click();
+    await page.locator('header button[data-hint*="Сохранить изменения"]').click();
     await page.waitForTimeout(200);
 
     // 6. Switch to Calendar view and verify inspecting task opens FullscreenEditor
@@ -1224,6 +1224,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const dockviewContainer = page.locator('.dockview-theme-slag');
     await expect(dockviewContainer).toBeVisible();
     await expect(page.locator('nav[aria-label="Мобильная навигация"]')).not.toBeVisible();
+    await expect.poll(async () => (await dockviewContainer.locator('.dv-groupview').boundingBox())?.width).toBe(550);
 
     // 2. Verify the detached panel is present as a tab
     const sidebarTab = page.locator('.dv-tab, .dockview-tab').filter({ hasText: 'Навигация' }).first();
@@ -1237,6 +1238,14 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const closeBtn = page.locator('button[title="Закрыть"]').first();
     await expect(closeBtn).toBeVisible();
     await expect(closeBtn).toBeEnabled();
+    const minimizeBtn = page.getByRole('button', { name: 'Свернуть' });
+    await expect.poll(async () => {
+      const [add, minimize] = await Promise.all([addPanelBtn.boundingBox(), minimizeBtn.boundingBox()]);
+      return Boolean(add && minimize && add.x + add.width <= minimize.x);
+    }).toBe(true);
+    await addPanelBtn.click();
+    await expect(page.getByRole('button', { name: 'Канбан' })).toBeVisible();
+    await page.keyboard.press('Escape');
 
     // 5. Capture screenshot of the detached window
     await page.screenshot({
@@ -1511,10 +1520,10 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // 2. Desktop: Verify sticky toolbar at top
     const desktopStickyToolbar = page.locator('[data-testid="fullscreen-editor-modal"] header.sticky.top-0');
     await expect(desktopStickyToolbar).toBeVisible();
-    const textStylesBtn = desktopStickyToolbar.locator('button[title*="Стили текста"]');
+    const textStylesBtn = desktopStickyToolbar.locator('button[aria-label*="Стили текста"]');
     await expect(textStylesBtn).toBeVisible();
     await textStylesBtn.click();
-    await expect(desktopStickyToolbar.locator('button', { hasText: 'Заголовок 1' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Заголовок 1', exact: true })).toBeVisible();
     await textStylesBtn.click();
 
     // Take screenshot of Desktop editor with sticky toolbar
@@ -1525,6 +1534,13 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: 'screenshots/editor-task-clean.png' });
+
+    const dateTrigger = page.getByRole('button', { name: 'Установить срок таски', exact: true });
+    await dateTrigger.click();
+    const datePicker = page.getByTestId('date-popover');
+    await expect(datePicker.getByRole('button', { name: 'Сегодня' })).toBeInViewport();
+    await datePicker.getByRole('button', { name: 'Готово' }).click();
+    await expect(datePicker).toBeHidden();
 
     // 3. Emulate mobile viewport to test Telegram-style bottom bar
     await page.setViewportSize({ width: 390, height: 844 });
@@ -1683,6 +1699,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // The card's own action button opens the note in the fullscreen editor.
     const card = page.locator('.group').filter({ hasText: 'fsafdadfsasf' }).first();
     await expect(card).toBeVisible();
+    await card.hover();
     await card.locator('button[aria-label="Открыть в фокус-редакторе"]').first().click();
 
     const editor = page.locator('[data-testid="fullscreen-editor-modal"]');

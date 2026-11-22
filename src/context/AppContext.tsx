@@ -256,6 +256,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [refreshData, openComposerModal]);
 
+  useEffect(() => {
+    const notify = () => addToast('Не удалось сохранить общие настройки', 'error');
+    window.addEventListener('slag-workspace-write-failed', notify);
+    return () => window.removeEventListener('slag-workspace-write-failed', notify);
+  }, [addToast]);
+
   // Network online/offline diagnostics
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -1,8 +1,9 @@
 // The editor's draft: every editable field, dirty tracking, autosave and the save call.
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect, useMemo } from 'react';
 import { storage } from '../../lib/storage';
-import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft } from '../../types';
+import type { SlagItem, SlagItemType, SlagItemStatus, SlagAttachment, RecurrenceRule, ComposerDraft, FullscreenDraft } from '../../types';
 import { parseSubtasksFromContent, migrateLegacySubtasksToContent } from '../../lib/tasks/taskUtils';
+import { equal } from '../../lib/sync/notes/merge';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { consumeComposerDraft, restoreComposerDraft } from './fullscreen/composerDraftOwner';
 
@@ -61,7 +62,7 @@ export function useFullscreenDraft({
   onSaved,
   addToast,
 }: UseFullscreenDraftOptions): UseFullscreenDraftReturn {
-  const initialDraft = storage.getFullscreenDraft(item.id);
+  const [initialDraft] = useState(() => storage.getFullscreenDraft(item.id));
   const initialFullWidth = storage.getFullscreenWidth();
 
   const [title, setTitle] = useState(() => initialDraft?.title ?? (item.title || ''));
@@ -78,10 +79,10 @@ export function useFullscreenDraft({
   const [status, setStatus] = useState<SlagItemStatus>(() => initialDraft?.status ?? (item.status || 'todo'));
   const [dueDate, setDueDate] = useState(() => initialDraft?.dueDate ?? (item.dueDate || ''));
   // The time of day lives in `reminder` — the same field the feed stamps under a task.
-  const [reminder, setReminder] = useState<string | undefined>(() => item.reminder);
+  const [reminder, setReminder] = useState<string | undefined>(() => initialDraft?.reminder ?? item.reminder);
   const [duration, setDuration] = useState<number | undefined>(() => initialDraft?.duration ?? item.duration);
   const [recurrence, setRecurrence] = useState<RecurrenceRule | undefined>(() => initialDraft?.recurrence ?? item.recurrence);
-  const [attachments, setAttachments] = useState<SlagAttachment[]>(item.attachments || []);
+  const [attachments, setAttachments] = useState<SlagAttachment[]>(() => initialDraft?.attachments ?? item.attachments ?? []);
   const [isFullWidth, setIsFullWidth] = useState(() => initialFullWidth);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
@@ -89,13 +90,39 @@ export function useFullscreenDraft({
 
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isFirstMountRef = useRef(true);
+  const draft = useMemo<Omit<FullscreenDraft, 'updatedAt'>>(() => ({
+    itemId: item.id, title, content, tags, folder, type, attachments,
+    priority: type === 'task' ? priority : undefined,
+    status: type === 'task' ? status : undefined,
+    dueDate: type === 'task' ? dueDate : undefined,
+    reminder: type === 'task' ? reminder : undefined,
+    duration: type === 'task' ? duration : undefined,
+    recurrence: type === 'task' ? recurrence : undefined,
+  }), [item.id, title, content, tags, folder, type, attachments, priority, status, dueDate, reminder, duration, recurrence]);
+  const latestDraft = useRef(draft);
+  const savedDraft = useRef(draft);
+  const adopting = useRef(false);
+  const retryAdoption = useRef<(() => Promise<void>) | null>(null);
+  const pendingNoteEdit = useRef(false);
+  const adoptedCanonical = useRef(false);
+  const lastObservedDraft = useRef(draft);
+  const resetBaseline = useRef(false);
+  const itemRef = useRef(item);
+  useLayoutEffect(() => {
+    itemRef.current = item;
+    latestDraft.current = draft;
+    if (resetBaseline.current) {
+      savedDraft.current = draft;
+      lastObservedDraft.current = draft;
+      resetBaseline.current = false;
+    }
+  }, [draft, item]);
   // A saved draft must not come back as a composer draft when the editor unmounts.
   const didSaveRef = useRef(false);
 
   // Function to persist changes for existing item to disk and sync
   const flushAutosave = useCallback(() => {
-    if (item.id.startsWith('draft_')) return;
+    if (adopting.current || !pendingNoteEdit.current || item.id.startsWith('draft_')) return;
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
@@ -119,6 +146,7 @@ export function useFullscreenDraft({
       readingTimeMinutes: type === 'article' ? readTime : undefined,
       updatedAt: Date.now(),
     };
+    pendingNoteEdit.current = false;
     storage.saveItem(updated);
     storage.clearFullscreenDraft(item.id);
     setSaveStatus('saved');
@@ -126,26 +154,17 @@ export function useFullscreenDraft({
 
   // Auto-save in-flight edits to crash-proof draft storage & live autosave for existing notes
   useEffect(() => {
-    // Always persist to local/remote draft cache
-    storage.saveFullscreenDraft(item.id, {
-      itemId: item.id,
-      title,
-      content,
-      tags,
-      folder,
-      type,
-      priority: type === 'task' ? priority : undefined,
-      status: type === 'task' ? status : undefined,
-      dueDate: type === 'task' ? dueDate : undefined,
-      duration: type === 'task' ? duration : undefined,
-      recurrence: type === 'task' ? recurrence : undefined,
-      updatedAt: Date.now(),
-    });
-
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      return;
+    if (adopting.current) return;
+    if (!equal(draft, lastObservedDraft.current)) {
+      lastObservedDraft.current = draft;
+      if (!equal(draft, savedDraft.current)) {
+        pendingNoteEdit.current = true;
+        void storage.saveFullscreenDraft(item.id, { ...draft, updatedAt: Date.now() }).then(() => {
+          if (!adopting.current) savedDraft.current = draft;
+        }, () => addToast?.('Не удалось сохранить черновик редактора', 'error'));
+      }
     }
+    if (!pendingNoteEdit.current) return;
 
     if (item.id.startsWith('draft_')) {
       return;
@@ -168,9 +187,85 @@ export function useFullscreenDraft({
       clearTimeout(noticeTimer);
       clearTimeout(timer);
     };
-  }, [item.id, title, content, tags, folder, type, priority, status, dueDate, duration, recurrence, flushAutosave]);
+  }, [item.id, draft, flushAutosave, addToast]);
+
+  useEffect(() => {
+    let active = true;
+    let savingAlternative = false;
+    let incoming: FullscreenDraft | null = null;
+    const vault = storage.getCurrentVault();
+    let inFlight: Omit<FullscreenDraft, 'updatedAt'> | null = null;
+    const preserve = (snapshot: Omit<FullscreenDraft, 'updatedAt'>) => {
+      if (storage.getCurrentVault() !== vault) return Promise.reject(new Error('Vault changed before draft preservation'));
+      inFlight = snapshot;
+      return storage.keepFullscreenDraftAlternative(item.id, { ...snapshot, updatedAt: Date.now() }).finally(() => {
+        if (inFlight === snapshot) inFlight = null;
+      });
+    };
+    const adopt = async () => {
+      if (savingAlternative) return;
+      savingAlternative = true;
+      adopting.current = true;
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+      try {
+        while (active && !equal(latestDraft.current, savedDraft.current)) {
+          const snapshot = latestDraft.current;
+          const { updatedAt, ...remote } = incoming ?? { updatedAt: 0 };
+          void updatedAt;
+          if (!equal(remote, snapshot)) {
+            await preserve(snapshot);
+            if (active) addToast?.('Локальная правка сохранена в конфликтах синхронизации', 'info');
+          }
+          if (!active) return;
+          savedDraft.current = snapshot;
+        }
+      } catch {
+        addToast?.(active ? 'Не удалось сохранить локальную правку; черновик оставлен в редакторе' : 'Не удалось сохранить локальную правку при закрытии редактора', 'error');
+        return;
+      } finally {
+        savingAlternative = false;
+      }
+      if (!active) return;
+      adopting.current = false;
+      pendingNoteEdit.current = false;
+      adoptedCanonical.current = true;
+      resetBaseline.current = true;
+      const base = itemRef.current;
+      const next = incoming ?? base;
+      setTitle(next.title || '');
+      setContent(!incoming && base.type === 'task' ? migrateLegacySubtasksToContent(base.content || '', base.subtasks) : next.content || '');
+      setType(next.type);
+      setFolder(next.folder || DEFAULT_INBOX_FOLDER);
+      setTags(next.tags || []);
+      setAttachments(incoming ? incoming.attachments ?? base.attachments ?? [] : base.attachments ?? []);
+      setPriority(next.priority || 'none');
+      setStatus(next.status || 'todo');
+      setDueDate(next.dueDate || '');
+      setReminder(next.reminder);
+      setDuration(next.duration);
+      setRecurrence(next.recurrence);
+      setSaveStatus('idle');
+    };
+    retryAdoption.current = adopt;
+    const unsubscribe = storage.subscribeChanges((event) => {
+      if (event.kind !== 'draft' || event.origin !== 'remote' || !event.registry || event.id !== `fullscreen:${item.id}`) return;
+      incoming = event.action === 'delete' ? null : event.payload as FullscreenDraft;
+      void adopt();
+    });
+    return () => {
+      active = false;
+      retryAdoption.current = null;
+      unsubscribe();
+      const snapshot = latestDraft.current;
+      if (adopting.current && !equal(snapshot, savedDraft.current) && !equal(snapshot, inFlight)) {
+        void preserve(snapshot).catch(() => addToast?.('Не удалось сохранить локальную правку при закрытии редактора', 'error'));
+      }
+    };
+  }, [item.id, addToast]);
 
   const syncDraftBackToComposer = useCallback(() => {
+    if (adopting.current || (adoptedCanonical.current && !pendingNoteEdit.current)) return;
     if (!item.id.startsWith('draft_')) return;
     const targetFolderVal = folder !== DEFAULT_INBOX_FOLDER ? folder : undefined;
     const draftData: ComposerDraft = {
@@ -226,6 +321,7 @@ export function useFullscreenDraft({
   }, [isFullWidth]);
 
   const handleSave = useCallback(() => {
+    if (adopting.current) return;
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
@@ -271,6 +367,13 @@ export function useFullscreenDraft({
   }, [item, title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime, saveItem, updateItem, onSaved, addToast, onClose]);
 
   const handleClose = useCallback(() => {
+    if (adopting.current) {
+      // Close only after the latest input is safely in the journal, including retries after disk failure.
+      void retryAdoption.current?.().then(() => {
+        if (!adopting.current) onClose();
+      });
+      return;
+    }
     if (!item.id.startsWith('draft_')) {
       flushAutosave();
     } else {

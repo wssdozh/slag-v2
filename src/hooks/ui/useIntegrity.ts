@@ -3,7 +3,7 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 import type { Finding, IntegrityStatus, RepairPlan } from '../../lib/vault/integrity/types';
 import type { ManifestStatus } from '../../lib/sync/types';
 import { syncEngine } from '../../lib/sync/syncEngine';
-import { readManifestAutoCheck, readManifestAutoResolve, writeManifestAutoCheck, writeManifestAutoResolve } from '../../lib/sync/manifest/prefs';
+import { readManifestAutoCheck, writeManifestAutoCheck } from '../../lib/sync/manifest/prefs';
 import { applyIntegrityRepair, runIntegrityCheck } from '../../lib/storage/integrityService';
 
 export interface UseIntegrity {
@@ -15,12 +15,10 @@ export interface UseIntegrity {
   message: string | null;
   /** The last comparison with the room. `null` until the engine has run one. */
   remote: ManifestStatus | null;
+  registryMode: 'inactive' | 'starting' | 'ready';
   /** Whether the engine compares on its own. Off means only the button asks. */
   autoCheck: boolean;
   setAutoCheck(next: boolean): void;
-  /** Whether a refused note goes to the trash by itself, or waits for the button. */
-  autoResolve: boolean;
-  setAutoResolve(next: boolean): void;
   /** «сверить с сервером сейчас»: one check, now, with the anti-loop latch aside. */
   checkServer(): void;
   verify(): Promise<void>;
@@ -42,18 +40,15 @@ export function useIntegrity(): UseIntegrity {
   // The engine keeps the same object between checks, so this reads the room's answer without
   // copying it per render and without the panel having to press «сверить» to see it.
   const remote = useSyncExternalStore(subscribeToEngine, () => syncEngine.getManifest(), () => null);
+  const registryMode = useSyncExternalStore(subscribeToEngine,
+    () => syncEngine.noteGeneration === undefined ? 'inactive' : syncEngine.activeRoomId ? 'ready' : 'starting',
+    () => 'inactive' as const);
   // Lazy initial state, not an effect: the switch has to show the stored answer on the first frame.
   const [autoCheck, setAutoCheckState] = useState(readManifestAutoCheck);
-  const [autoResolve, setAutoResolveState] = useState(readManifestAutoResolve);
 
   const setAutoCheck = useCallback((next: boolean) => {
     writeManifestAutoCheck(next);
     setAutoCheckState(next);
-  }, []);
-
-  const setAutoResolve = useCallback((next: boolean) => {
-    writeManifestAutoResolve(next);
-    setAutoResolveState(next);
   }, []);
 
   const checkServer = useCallback(() => {
@@ -116,10 +111,9 @@ export function useIntegrity(): UseIntegrity {
     lastScan,
     message,
     remote,
+    registryMode,
     autoCheck,
     setAutoCheck,
-    autoResolve,
-    setAutoResolve,
     checkServer,
     verify,
     repair,

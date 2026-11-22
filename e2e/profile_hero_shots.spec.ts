@@ -37,42 +37,41 @@ test('profile hero — desktop', async ({ page }) => {
   await seedProfile(page);
   await expect(page.getByLabel('Имя профиля')).toHaveValue('Мори');
   await page.waitForTimeout(400);
+  await expect(page.getByRole('dialog').locator('[data-settings-divider]').first()).toBeHidden();
   await page.screenshot({ path: 'test-results/screenshots/profile-hero-desktop.png' });
 });
 
 test('profile hero — mobile 375', async ({ page }) => {
   await openMobileSettings(page);
   await page.waitForTimeout(400);
-  await page.screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
+  const account = page.getByTestId('mobile-settings-account-btn');
+  await expect(account).toHaveText('');
+  await page.getByLabel('Имя профиля').locator('../..').screenshot({ path: 'test-results/screenshots/profile-hero-mobile.png' });
+  await expect(page.getByTestId('mobile-settings-root').locator('[data-settings-divider]').first()).toBeHidden();
+  const create = page.getByRole('button', { name: 'Создать новую запись' });
+  await expect(create).toHaveClass(/\bbg-accent\b/);
+  await page.screenshot({ path: 'test-results/screenshots/settings-mobile-accent.png' });
+  await account.click();
+  await expect(page).toHaveURL(/page=account/);
 });
 
-test('portrait is big, the badge misses the name, and the photo opens the picker', async ({ page }) => {
-  test.setTimeout(60_000);
+test('the avatar opens the photo menu without a separate pencil button', async ({ page }) => {
   await openMobileSettings(page);
 
-  const avatar = page.getByRole('button', { name: 'Сменить фото профиля' });
-  const pencil = page.getByRole('button', { name: 'Изменить фото' });
-  const avatarBox = await avatar.boundingBox();
-  const nameBox = await page.getByLabel('Имя профиля').boundingBox();
-  const pencilBox = await pencil.boundingBox();
-  expect(avatarBox?.width).toBeGreaterThanOrEqual(88);
-  expect(avatarBox?.width).toBeLessThanOrEqual(96);
-  expect(nameBox!.y).toBeGreaterThan(pencilBox!.y + pencilBox!.height - 8);
+  const avatar = page.getByRole('button', { name: 'Изменить фото профиля', exact: true });
+  const avatarBox = (await avatar.boundingBox())!;
+  const nameBox = (await page.getByLabel('Имя профиля').boundingBox())!;
+  expect(avatarBox.width).toBeGreaterThanOrEqual(44);
+  expect(nameBox.x).toBeGreaterThan(avatarBox.x + avatarBox.width);
+  expect(nameBox.y).toBeLessThan(avatarBox.y + avatarBox.height);
+  await expect(page.getByTestId('mobile-settings-account-btn')).toBeVisible();
 
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), avatar.click()]);
-  expect(chooser).toBeTruthy();
-  await chooser.setFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: AVATAR_PNG });
-});
-
-test('the pencil opens the menu and its item opens the same picker', async ({ page }) => {
-  test.setTimeout(90_000);
-  await openMobileSettings(page);
-
-  await page.getByRole('button', { name: 'Изменить фото' }).click();
+  await expect(page.getByRole('button', { name: 'Изменить фото', exact: true })).toHaveCount(0);
+  await avatar.click();
+  await expect(page.getByRole('button', { name: 'Убрать фото' })).toBeVisible();
   const menuItem = page.getByRole('button', { name: 'Сменить фото', exact: true });
-  await expect(menuItem).toBeVisible({ timeout: 5000 });
 
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), menuItem.click()]);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 5000 }), menuItem.click()]);
   expect(chooser).toBeTruthy();
   await chooser.setFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: AVATAR_PNG });
 });

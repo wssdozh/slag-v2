@@ -29,11 +29,15 @@ export const MemoryList: React.FC = () => {
   }, [reload]);
 
   const forget = useCallback(
-    (item: MemoryItem) => {
-      memoryService.forget(item.id);
-      reload();
+    async (item: MemoryItem) => {
+      try {
+        await memoryService.forget(item.id);
+        reload();
+      } catch {
+        addToast('Не удалось удалить факт', 'error');
+      }
     },
-    [reload]
+    [addToast, reload]
   );
 
   const clearAll = useCallback(async () => {
@@ -44,9 +48,13 @@ export const MemoryList: React.FC = () => {
       isDestructive: true,
     });
     if (!confirmed) return;
-    memoryService.clear();
-    reload();
-    addToast('Память очищена', 'success');
+    try {
+      await memoryService.clear();
+      reload();
+      addToast('Память очищена', 'success');
+    } catch {
+      addToast('Не удалось очистить память', 'error');
+    }
   }, [addToast, confirmAction, reload]);
 
   return (

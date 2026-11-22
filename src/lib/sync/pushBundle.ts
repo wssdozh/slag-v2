@@ -1,7 +1,7 @@
 import type { PendingPush, SyncEngine } from './syncEngine';
 import type { SyncBundle, SyncChangeItem } from './types';
 import { computeHash, computeStateRootHash, encodeBundleFrame, encryptBundle } from './crypto';
-import { loadSentHashes, loadStateHash, loadTombstones, saveSentHashes, saveStateHash } from './localBookkeeping';
+import { loadSentHashes, loadStateHash, requireSyncSectionFlushed, saveStateHash } from './localBookkeeping';
 import { deletionsFromOutbox } from './itemDeletions';
 import { accountClient } from './account';
 import { vault } from '../storage/port';
@@ -50,24 +50,19 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
     try {
       // `getItems` re-hydrates `dataUrl` from the session cache, so a photo pasted a minute ago
       // would ride inside the note's own payload. Metadata only; bytes travel as their own change.
-      const items = stripAttachmentData(vault().getItems());
-      const folders = vault().getFolders();
-      const workspaceState = vault().getWorkspaceState();
-      const pendingOps = engine.getOutbox().pending();
+      const registry = Boolean(engine.noteGeneration);
+      const items = !registry || engine.canPackAttachment() ? stripAttachmentData(vault().getItems()) : [];
+      const folders = engine.hasFolderTreeRegistry ? [] : vault().getFolders();
+      const pendingOps = engine.getBundleOutbox();
 
-      const stateHash = await computeStateRootHash(items, folders);
+      const stateHash = await computeStateRootHash(registry ? [] : items, folders);
       if (generation !== engine.initGeneration) return;
       const lastSyncedHash = loadStateHash(engine.bookkeeping);
 
       // An attachment pass has nothing to do with the note state hash: it must get past the
       // "nothing changed" gate, or unsent bytes on an otherwise untouched vault never leave.
       // A request for missing bytes changes no note either, so it opens the gate the same way.
-      // A forced full push is the same story and used to be the bug: the flag was read below this
-      // return, so a vault that agreed with its own checkpoint never resent anything — neither
-      // after a manifest divergence nor after the relay admitted its history no longer covers our
-      // cursor. The gate asked "did anything change locally", and the answer was no.
       if (
-        !engine.forceFullPush &&
         !engine.canPackAttachment() &&
         !engine.hasPendingAttachmentRequests() &&
         lastSyncedHash === stateHash &&
@@ -86,13 +81,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       const changes: SyncChangeItem[] = [];
       // Only entities whose hash differs from what this room already received go out;
       // sending the whole vault on every keystroke is what kept pushes at 60 changes.
-      let sentHashes = loadSentHashes(engine.bookkeeping);
-      if (engine.forceFullPush) {
-        engine.forceFullPush = false;
-        sentHashes = {};
-        engine.entityHashes.clear();
-        saveSentHashes(engine.bookkeeping, {});
-      }
+      const sentHashes = loadSentHashes(engine.bookkeeping);
       const packedHashes: Record<string, string> = {};
       const pack = (key: string, hash: string, change: SyncChangeItem) => {
         if (sentHashes[key] === hash) return;
@@ -103,7 +92,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // Stringify + SHA-256 of every note on every keystroke is the only O(vault) work in
       // the push path (11 ms at 50 notes, 182 ms at 5000). `updatedAt` is bumped by every
       // storage mutation, so it is a cheap change signature: hash only what moved.
-      for (const item of items) {
+      for (const item of registry ? [] : items) {
         const cacheKey = `item:${item.id}`;
         const sig = `${item.updatedAt ?? 0}:${item.title?.length ?? 0}:${item.content?.length ?? 0}`;
         const cached = engine.entityHashes.get(cacheKey);
@@ -144,52 +133,55 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         });
       }
 
-      // The prompt and the persona travel on their own channel, below: the workspace bundle is
-      // deduped per entity, and these are the one thing a device that joined late can never
-      // recover from a bundle that was already acked.
-      const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _personaOn,
-              aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...sharedWorkspace } = workspaceState;
-      const workspaceHash = await computeHash(JSON.stringify(sharedWorkspace));
-      pack('workspace:workspace_state', workspaceHash, {
-        id: 'workspace_state',
-        type: 'workspace',
-        action: 'upsert',
-        version: 1,
-        hash: workspaceHash,
-        payload: sharedWorkspace,
-      });
-
-      // Always packed, never deduped: a few hundred bytes are worth a channel that cannot be
-      // missed. The receiver resolves each field by its timestamp, so a stale copy is harmless.
-      const promptPayload = {
-        prompt: workspaceState.aiPrompt ?? '',
-        persona: workspaceState.aiPersona ?? '',
-        personaEnabled: workspaceState.aiPersonaEnabled === true,
-        promptAt: workspaceState.aiPromptAt ?? 0,
-        personaAt: workspaceState.aiPersonaAt ?? 0,
-      };
-      changes.push({
-        id: 'assistant_prompt',
-        type: 'assistant_prompt',
-        action: 'upsert',
-        version: 1,
-        hash: await computeHash(JSON.stringify(promptPayload)),
-        payload: promptPayload,
-      });
-
-      // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is
-      // not in the state root hash: the outbox op a memory write leaves behind opens the push
-      // gate, and the hash of each fact settles what actually left.
-      for (const fact of vault().getMemory()) {
-        const factHash = await computeHash(JSON.stringify(fact));
-        pack(`memory:${fact.id}`, factHash, {
-          id: fact.id,
-          type: 'memory',
-          action: fact.deletedAt ? 'delete' : 'upsert',
+      if (!engine.hasSharedRegistry) {
+        const workspaceState = vault().getWorkspaceState();
+        // The prompt and the persona travel on their own channel, below: the workspace bundle is
+        // deduped per entity, and these are the one thing a device that joined late can never
+        // recover from a bundle that was already acked.
+        const { aiPrompt: _prompt, aiPersona: _persona, aiPersonaEnabled: _personaOn,
+                aiPromptAt: _promptAt, aiPersonaAt: _personaAt, ...sharedWorkspace } = workspaceState;
+        const workspaceHash = await computeHash(JSON.stringify(sharedWorkspace));
+        pack('workspace:workspace_state', workspaceHash, {
+          id: 'workspace_state',
+          type: 'workspace',
+          action: 'upsert',
           version: 1,
-          hash: factHash,
-          payload: fact.deletedAt ? { deletedAt: fact.deletedAt } : fact,
+          hash: workspaceHash,
+          payload: sharedWorkspace,
         });
+
+        // Always packed, never deduped: a few hundred bytes are worth a channel that cannot be
+        // missed. The receiver resolves each field by its timestamp, so a stale copy is harmless.
+        const promptPayload = {
+          prompt: workspaceState.aiPrompt ?? '',
+          persona: workspaceState.aiPersona ?? '',
+          personaEnabled: workspaceState.aiPersonaEnabled === true,
+          promptAt: workspaceState.aiPromptAt ?? 0,
+          personaAt: workspaceState.aiPersonaAt ?? 0,
+        };
+        changes.push({
+          id: 'assistant_prompt',
+          type: 'assistant_prompt',
+          action: 'upsert',
+          version: 1,
+          hash: await computeHash(JSON.stringify(promptPayload)),
+          payload: promptPayload,
+        });
+
+        // The assistant's memory is a short list, so it packs whole and dedupes per fact. It is
+        // not in the state root hash: the outbox op a memory write leaves behind opens the push
+        // gate, and the hash of each fact settles what actually left.
+        for (const fact of vault().getMemory()) {
+          const factHash = await computeHash(JSON.stringify(fact));
+          pack(`memory:${fact.id}`, factHash, {
+            id: fact.id,
+            type: 'memory',
+            action: fact.deletedAt ? 'delete' : 'upsert',
+            version: 1,
+            hash: factHash,
+            payload: fact.deletedAt ? { deletedAt: fact.deletedAt } : fact,
+          });
+        }
       }
 
       // One attachment per bundle, and only when the previous bundle is confirmed. A slow uplink
@@ -227,9 +219,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
       // so — the trash moved it, the watcher saw the file vanish — never because the list this
       // moment is short: the index reads empty for the first second of every start, and
       // `syncedIds` minus that list once sent "eighty-four notes deleted" to every device.
-      const tombstones = loadTombstones(engine.bookkeeping);
       for (const { id, deletedAt } of deletionsFromOutbox(pendingOps)) {
-        if (deletedAt > (tombstones[id] ?? 0)) tombstones[id] = deletedAt;
         changes.push({
           id,
           type: 'item',
@@ -238,11 +228,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
           hash: String(deletedAt),
           payload: { deletedAt },
         });
-      }
-      // A note that exists is not deleted, whatever the ledger says: the tombstone only ever guards
-      // a stale copy from coming back.
-      for (const id of items.map((it) => it.id)) {
-        delete tombstones[id];
       }
 
       // Pack folder mutations, trash operations, and drafts from Outbox
@@ -276,7 +261,7 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
             hash: String(op.timestamp),
             payload: op.payload,
           });
-        } else if (op.kind === 'draft') {
+        } else if (!engine.hasSharedRegistry && op.kind === 'draft') {
           changes.push({
             id: op.id,
             type: 'draft',
@@ -316,7 +301,6 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         frame: encodeBundleFrame(encrypted),
         stateHash,
         packedHashes,
-        tombstones: { ...tombstones },
         opIds: pendingOps.map((o) => o.opId),
         changes: changes.length,
         settled: false,
@@ -327,6 +311,8 @@ if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUr
         `Queued bundle ${pending.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${engine.activeRoomId.slice(0, 10)}...`
       );
 
+      if (generation !== engine.initGeneration) return;
+      await requireSyncSectionFlushed();
       if (generation !== engine.initGeneration) return;
       engine.pendingPushes.set(pending.bundleId, pending);
       if (attachmentRequest) {

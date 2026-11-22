@@ -7,13 +7,10 @@ import { accountClient } from '../../lib/sync/account';
 import type { ProfileInfo } from '../../types';
 import { IconButton } from '../UI/IconButton';
 import { MenuDropdown } from '../UI/MenuDropdown';
-import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { ProfileAvatar } from './ProfileAvatar';
 
 /** The stored crop is square and a bit larger than the biggest on-screen circle. */
 const AVATAR_SIZE = 192;
-const AVATAR_DESKTOP = 132;
-const AVATAR_MOBILE = 92;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 const PHOTO_MENU_ITEM =
@@ -45,15 +42,15 @@ async function readAvatar(file: File): Promise<string> {
 interface ProfileCardProps {
   /** The line under the name: plan, cache, or the login hint. */
   planLabel: string;
+  accountAction?: { label: string; onClick: () => void; testId?: string };
 }
 
 /**
  * One profile header for the desktop settings tab and the phone settings root. It owns the
  * photo, the name and the vault write, because that is the whole job of the block.
  */
-export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
+export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel, accountAction }) => {
   const { addToast } = useApp();
-  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<ProfileInfo>(() => storage.getWorkspaceState().profile ?? { name: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -74,9 +71,13 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
     return () => window.removeEventListener('slag-sync-updated', applySyncedProfile);
   }, []);
 
-  const save = (next: ProfileInfo) => {
+  const save = async (next: ProfileInfo) => {
+    try {
+      await storage.saveWorkspaceState({ profile: next });
+    } catch {
+      return; // The workspace writer reports the failure; don't publish it to the account.
+    }
     setProfile(next);
-    storage.saveWorkspaceState({ profile: next });
     // The name lives in the vault; the copy on the account exists so the telegram bot can greet
     // a person in `/start`, where it has no way to decrypt anything.
     if (!accountClient.isAuthenticated()) return;
@@ -102,13 +103,20 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
 
   const menuItems = (
     <>
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          setIsMenuOpen(false);
+          void handleAvatarPick(event);
+        }}
+      />
       <button
         type="button"
         className={PHOTO_MENU_ITEM}
-        onClick={() => {
-          setIsMenuOpen(false);
-          avatarInputRef.current?.click();
-        }}
+        onClick={() => avatarInputRef.current?.click()}
       >
         <Icon name="media.camera" size="sm" tone="inherit" className="shrink-0" />
         <span>Сменить фото</span>
@@ -133,66 +141,54 @@ export const ProfileCard: React.FC<ProfileCardProps> = ({ planLabel }) => {
   );
 
   return (
-    <div className="flex flex-col items-center px-4 pt-6 pb-5">
-      <div className="relative mb-4">
-        <button
-          type="button"
-          aria-label="Сменить фото профиля"
-          title="Сменить фото профиля"
-          onClick={() => avatarInputRef.current?.click()}
-          style={{ width: isMobile ? AVATAR_MOBILE : AVATAR_DESKTOP, height: isMobile ? AVATAR_MOBILE : AVATAR_DESKTOP }}
-          className="block rounded-full overflow-hidden border border-subtle bg-tint-6 hover:border-hover transition-colors cursor-pointer outline-none ring-0 focus-visible:ring-2 focus-visible:ring-accent/40"
+    <div className="flex items-center gap-3 px-4 py-3 sm:py-4">
+      <div className="shrink-0">
+        <MenuDropdown
+          ariaLabel="Действия с фото профиля"
+          minWidth={168}
+          isOpen={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          trigger={
+            <button
+              type="button"
+              aria-label="Изменить фото профиля"
+              title="Изменить фото профиля"
+              className="block size-12 overflow-hidden rounded-full border border-subtle bg-tint-6 outline-none ring-0 transition-colors hover:border-hover focus-visible:border-hover sm:size-14"
+            >
+              <ProfileAvatar profile={profile} className="w-full h-full text-lg" />
+            </button>
+          }
         >
-          <ProfileAvatar
-            profile={profile}
-            className={`w-full h-full ${isMobile ? 'text-2xl' : 'text-3xl'}`}
-          />
-        </button>
-        <div className="absolute -bottom-1 -right-1">
-          <MenuDropdown
-            ariaLabel="Действия с фото профиля"
-            minWidth={168}
-            align="end"
-            isOpen={isMenuOpen}
-            onOpenChange={setIsMenuOpen}
-            trigger={
-              <IconButton
-                size="md"
-                title="Изменить фото"
-                aria-label="Изменить фото"
-                className="max-sm:w-9 max-sm:h-9 rounded-full border border-subtle bg-surface-elevated shadow-sm hover:border-hover hover:bg-surface-hover"
-              >
-                <Icon name="action.edit" size="sm" tone="inherit" />
-              </IconButton>
-            }
-          >
-            {menuItems}
-          </MenuDropdown>
-        </div>
+          {menuItems}
+        </MenuDropdown>
       </div>
-      <input
-        ref={nameInputRef}
-        aria-label="Имя профиля"
-        placeholder="Как тебя зовут"
-        value={profile.name}
-        onChange={(event) => setProfile({ ...profile, name: event.target.value })}
-        onBlur={() => save(profile)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-        }}
-        spellCheck={false}
-        className={`w-full max-w-[240px] bg-transparent text-center font-semibold text-fg-primary placeholder:text-fg-dim outline-none truncate border-b border-transparent focus:border-hover transition-colors ${isMobile ? 'text-base' : 'text-lg'}`}
-      />
-      <span className="mt-1 max-w-[320px] text-center text-sm leading-relaxed text-fg-muted text-pretty">
-        {planLabel}
-      </span>
-      <input
-        ref={avatarInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={(event) => void handleAvatarPick(event)}
-      />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <input
+          ref={nameInputRef}
+          aria-label="Имя профиля"
+          placeholder="Как тебя зовут"
+          value={profile.name}
+          onChange={(event) => setProfile({ ...profile, name: event.target.value })}
+          onBlur={() => save(profile)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur();
+          }}
+          spellCheck={false}
+          className="w-full truncate border-b border-transparent bg-transparent text-base font-semibold leading-5 text-fg-primary outline-none placeholder:text-fg-dim focus:border-hover"
+        />
+        <span className="truncate text-xs text-fg-secondary" title={planLabel}>{planLabel}</span>
+      </div>
+      {accountAction && (
+        <IconButton
+          size="lg"
+          data-testid={accountAction.testId}
+          onClick={accountAction.onClick}
+          aria-label={accountAction.label}
+          title={accountAction.label}
+          className="ml-auto hover:bg-tint-6 focus-visible:bg-tint-8"
+          icon={<Icon name="system.settings" size="lg" tone="inherit" />}
+        />
+      )}
     </div>
   );
 };

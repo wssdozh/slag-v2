@@ -12,6 +12,7 @@ export interface SlagAttachment {
   size: number;
   relativePath: string;
   dataUrl?: string; // Base64 or Object URL for rendering
+  registryBlobId?: string; // Address of the accepted encrypted bytes
   duration?: number; // Duration in seconds (e.g. 5.8)
   waveform?: number[]; // Normalized waveform peak array [0..1]
   extractedText?: string; // Whisper transcription (audio/video), OCR text (image), or file sample
@@ -80,11 +81,14 @@ export interface KanbanColumn {
   statusMapping?: 'backlog' | 'todo' | 'in_progress' | 'done';
 }
 
+export type FolderColor = 'blue' | 'green' | 'amber' | 'rose' | `hue:${number}`;
+
 export interface FolderMeta {
   path: string; // Relative path, e.g. "Входящие", "Проекты/SLAG"
   name: string; // Display name
   description: string; // Detailed description used by AI triage
   icon?: string;
+  color?: FolderColor;
   kanbanColumns?: KanbanColumn[];
   showReferenceColumn?: boolean;
   /** Manual position in the tree; absent while the folder was never dragged. */
@@ -354,6 +358,8 @@ export interface FullscreenDraft {
   title: string;
   content: string;
   tags: string[];
+  attachments?: SlagAttachment[];
+  reminder?: string;
   folder: string;
   type: SlagItemType;
   priority?: 'none' | 'low' | 'medium' | 'high';

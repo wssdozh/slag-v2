@@ -141,6 +141,7 @@ export const Composer: React.FC<ComposerProps> = ({
     isModal,
     isActive,
     isFullscreenEditorOpen,
+    addToast,
     onResetExtra: () => {
       clearQueries();
       setParsedTask(null);

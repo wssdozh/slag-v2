@@ -1,21 +1,18 @@
 // Left rail: vault switcher, folder tree, inbox, sync state and settings shortcuts.
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
-import { syncEngine } from '../../lib/sync/syncEngine';
 import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
-import type { SyncStatus } from '../../lib/sync/types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { Icon } from '../UI/icons/Icon';
-import { syncGlyph } from './syncGlyph';
+import { SyncStatusButton } from './SyncStatusButton';
 export const Sidebar: React.FC = () => {
   const {
     vault,
     vaults,
     currentFolder,
     setCurrentFolder,
-    items,
     setIsSettingsOpen,
     openSettingsModal,
     setIsLogViewerOpen,
@@ -23,39 +20,9 @@ export const Sidebar: React.FC = () => {
     appUpdate,
   } = useApp();
 
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
   const bottomBarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    return syncEngine.subscribe(setSyncStatus);
-  }, []);
-
-  useEffect(() => {
-    if (!isVaultDropdownOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      if (bottomBarRef.current && !bottomBarRef.current.contains(e.target as Node)) {
-        setIsVaultDropdownOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsVaultDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isVaultDropdownOpen]);
-
-  const inboxItemsCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
-  const glyph = syncGlyph(syncStatus);
+  const getVaultAnchor = useCallback(() => bottomBarRef.current, []);
 
   return (
     <aside
@@ -77,15 +44,6 @@ export const Sidebar: React.FC = () => {
               <Icon name="entity.inbox" size="md" tone="tertiary" />
               <span>{DEFAULT_INBOX_FOLDER}</span>
             </div>
-            {inboxItemsCount > 0 && (
-              <span
-                key={inboxItemsCount}
-                data-testid="inbox-count"
-                className="px-1.5 py-0.2 rounded-full text-2xs font-mono bg-tint-10 text-fg-soft motion-count"
-              >
-                {inboxItemsCount}
-              </span>
-            )}
           </button>
         </div>
 
@@ -145,25 +103,10 @@ export const Sidebar: React.FC = () => {
           isOpen={isVaultDropdownOpen}
           onClose={() => setIsVaultDropdownOpen(false)}
           variant="dropdown"
-          position="bottom"
+          getAnchor={getVaultAnchor}
         />
 
-        {/* Sync Status button: the glyph itself carries the state, no status dot on top of it */}
-        <button
-          onClick={() => openSettingsModal('sync')}
-          className="p-1.5 rounded hover:bg-tint-6 transition-colors shrink-0 cursor-pointer"
-          title={glyph.title}
-          aria-label={glyph.title}
-          data-testid="sidebar-sync-btn"
-          data-sync-state={syncStatus.state}
-        >
-          <Icon
-            name={glyph.name}
-            size="md"
-            tone="inherit"
-            className={`transition-colors ${glyph.className}`}
-          />
-        </button>
+        <SyncStatusButton onSettings={() => openSettingsModal('sync')} />
 
         {/* Logs HUD button */}
         <button

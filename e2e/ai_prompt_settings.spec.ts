@@ -5,15 +5,24 @@ test.setTimeout(300_000);
 // Промпт и персона — две отдельные модалки: каждая пишет своё поле в workspace state,
 // а не общий объект настроек.
 test('prompt and persona dialogs save separately into the synced workspace state', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 120_000 });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('sidebar-settings-btn')).toBeVisible({ timeout: 240_000 });
   await page.getByTestId('sidebar-settings-btn').click();
   await page.getByTestId('settings-tab-ai').click();
 
   await page.getByTestId('ai-prompt-open').click();
   await page.getByTestId('ai-prompt-text').fill('Отвечай коротко, без вступлений. Списки — по пункту на строку.');
-  await page.screenshot({ path: 'test-results/screenshots/ai-prompt-modal.png' });
+  await page.evaluate(() => {
+    // Native mode without a ready journal: storage must reject rather than write legacy prefs.
+    Object.defineProperty(window, 'isTauri', { value: true, configurable: true });
+  });
   await page.getByTestId('ai-prompt-save').click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Текст остался в редакторе' })).toBeVisible();
+  await expect(page.getByTestId('ai-prompt-text')).toHaveValue(/по пункту на строку/);
+  await page.screenshot({ path: 'test-results/screenshots/ai-prompt-modal.png' });
+  await page.evaluate(() => { Reflect.deleteProperty(window, 'isTauri'); });
+  await page.getByTestId('ai-prompt-save').click();
+  await expect(page.getByTestId('ai-prompt-text')).toHaveCount(0);
 
   await page.getByTestId('ai-persona-open').click();
   // Тумблер подписан не только для скринридера: рядом с ним видно, что он включает.

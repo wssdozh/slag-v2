@@ -1,5 +1,7 @@
 // Owns sync: config, push of local changes, apply of incoming bundles, status reporting.
 import { vault } from '../storage/port';
+import { openNoteSession } from './notes/session';
+import { isLegacySharedKind } from './notes/sharedBody';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
@@ -11,7 +13,7 @@ import {
   saveSentHashes,
   clearSyncLedgers,
   hydrateSyncSection,
-  saveTombstones,
+  requireSyncSectionFlushed,
   SYNC_SECTION,
   loadAttachmentRequests,
   markAttachmentRequestSent as stampAttachmentRequest,
@@ -93,7 +95,6 @@ export interface PendingPush {
   frame: Uint8Array<ArrayBuffer>;
   stateHash: string;
   packedHashes: Record<string, string>;
-  tombstones: Record<string, number>;
   opIds: string[];
   changes: number;
   settled: boolean;
@@ -115,11 +116,30 @@ export class SyncEngine {
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null;
   public activeVaultKey: CryptoKey | null = null;
   public activeRoomId: string | null = null;
+  private noteAbort?: AbortController;
+  private noteSession: Awaited<ReturnType<typeof openNoteSession>> = null;
+  private noteRoomStatus?: import('./notes/wire').NoteStatus;
+
+  getNoteRoomStatus() { return this.noteRoomStatus; }
+  private noteError: string | null = null;
+  get noteGeneration() { return this.noteSession?.generation; }
+  get hasFolderTreeRegistry() { return this.noteSession?.folderTree === true; }
+  get hasAtomicFolderGroups() { return this.noteSession?.atomicGroups === true; }
+  get hasSharedRegistry() { return this.noteSession?.sharedRecords === true; }
+  get hasRegistryMedia() { return this.noteSession?.registryMedia === true; }
+  public bundleQuery() {
+    const query = new URLSearchParams({ vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId });
+    if (this.noteGeneration) query.set('noteGeneration', String(this.noteGeneration));
+    if (this.hasFolderTreeRegistry) query.set('folderTree', '1');
+    if (this.hasAtomicFolderGroups) query.set('atomicGroups', '1');
+    if (this.hasSharedRegistry) query.set('sharedRecords', '1');
+    if (this.hasRegistryMedia) query.set('registryMedia', '1');
+    return query;
+  }
   public isProcessingSync = false;
   public sequence = 1;
   public appliedBundleIds = new Set<string>();
   public batchUpdating = false;
-  public forceFullPush = false;
   /** Set by the headless node: it holds a copy and never sends its own state back. */
   public forceReceiveOnly = false;
   /** A first pull over a tunnel can take minutes; the app on a LAN never needs more than 30s. */
@@ -190,16 +210,6 @@ export class SyncEngine {
   private pushDebounceTrailing = false;
   /** The root this device last put in the room, so an unchanged vault makes no request. */
   public manifestPostedRoot: string | null = null;
-  /**
-   * The room root this device already resent against. The anti-loop latch: a divergence that a
-   * full resend did not fix is reported, never resent again against the same peer state.
-   */
-  public manifestReconcileRoot: string | null = null;
-  /**
-   * When that resend went out, ms. A note edited after this moment was never in front of the
-   * neighbour, so it cannot be one it refused — `decideResolve` refuses to touch it.
-   */
-  public manifestResentAt: number | null = null;
   /** The slow background check: it starts with the room and dies with it. */
   private manifestHeartbeatInterval: ReturnType<typeof setInterval> | null = null;
   /** Bundle changes are collected here and written to disk once per burst, not once per bundle. */
@@ -233,7 +243,7 @@ export class SyncEngine {
   public attachmentPass = false;
 
   public canPackAttachment(): boolean {
-    return this.attachmentPass && this.pendingPull === null;
+    return !this.hasRegistryMedia && this.attachmentPass && this.pendingPull === null;
   }
   /** Set when the relay refuses a bundle for quota: attachments wait for a restart. */
   private attachmentSyncBlocked = false;
@@ -255,6 +265,7 @@ export class SyncEngine {
   constructor() {
     this.transport = new SyncTransport({
       onStatus: (state, error) => {
+        this.noteSession?.replica.requireCatchUp();
         this.status.state = state;
         if (error !== null) {
           this.status.error = error;
@@ -278,6 +289,8 @@ export class SyncEngine {
         const pending = this.pendingPushes.get(bundleId);
         if (pending) this.commitPush(pending);
       },
+      onNoteMessage: (message) => this.noteSession?.replica.handleMessage(message),
+      onRoomModeChanged: () => { void this.init(); },
       onBundle: async (bundle) => {
         await this.applyIncomingBundle(bundle);
       },
@@ -293,6 +306,7 @@ export class SyncEngine {
         return this.assistantActionHandler?.(requestId, action);
       },
       onCatchUpPull: () => {
+        void this.noteSession?.replica.catchUp().catch((error: unknown) => this.reportNoteError(error));
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
         // A dropped socket takes the debounce timer with it; asks that survived the reconnect
         // must leave again instead of waiting for the next unrelated edit.
@@ -346,11 +360,23 @@ export class SyncEngine {
       // Remote-origin writes are already applied state, and an external one came from the disk
       // under us (the MCP server, another editor): pushing it would echo back through the relay
       // and the two devices would ping-pong the same bundle forever.
-      if (event.origin === 'remote' || event.origin === 'external') return;
+      if (event.origin === 'remote') return;
+      if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
+      if (this.hasSharedRegistry && isLegacySharedKind(event.kind)) return;
+      if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
+        if (event.origin === 'external' && event.kind === 'item') {
+          void this.noteSession.replica.recordExternal(event).catch((error: unknown) => this.reportNoteError(error));
+        } else if (event.kind === 'item' && event.action === 'upsert' && (event.payload as SlagItem | undefined)?.attachments?.length) {
+          this.scheduleAttachmentPass();
+        }
+        return;
+      }
+      if (event.origin === 'external') return;
       const op = createSyncOpFromStorageEvent(event);
       if (op) {
         syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
         this.getOutbox().enqueue(op);
+        if (op.kind === 'item' || op.kind === 'trash') this.notify();
         // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
         const isDraft = op.kind === 'draft';
         this.scheduleDebouncedPush(
@@ -365,10 +391,63 @@ export class SyncEngine {
     return { ...this.config };
   }
 
+  private failedItemHashes = new Map<string, string>();
+  private itemDeliveryLedger?: { queued: Set<string>; sent: Record<string, string> };
+
+  public getItemDeliveryStatus(item: SlagItem, hash?: string) {
+    if (!this.config.enabled) return 'local';
+    if (this.noteSession) return this.noteSession.replica.deliveryStatus(item);
+    if (this.config.localSyncMode === 'receive-only') return 'local';
+    const key = `item:${item.id}`;
+    const ledger = this.itemDeliveryLedger ??= {
+      queued: new Set(this.getOutbox().pending().filter(({ kind }) => kind === 'item' || kind === 'trash').map(({ id }) => id)),
+      sent: loadSentHashes(this.bookkeeping),
+    };
+    const queued = ledger.queued.has(item.id);
+    if (this.activeRoomId && hash) {
+      if (ledger.sent[key] === hash && !queued) return 'accepted';
+      if ([...this.pendingPushes.values()].some((push) => push.packedHashes[key] === hash)) return 'sending';
+      if (this.failedItemHashes.get(key) === hash) return 'error';
+    }
+    return queued ? 'pending' : 'unconfirmed';
+  }
+
+  public getNoteConflicts() {
+    const replica = this.noteSession?.replica;
+    return replica?.conflicts.map((entry) => {
+      const current = replica.confirmedValue(entry.noteId);
+      return { ...entry, currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
+    }) ?? [];
+  }
+
+  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string) {
+    const replica = this.noteSession?.replica;
+    if (!replica) throw new Error('Реестр синхронизации недоступен');
+    await replica.resolveConflict(intentId, resolution, reviewedRevision, content);
+  }
+
+  public async resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>) {
+    const replica = this.noteSession?.replica;
+    if (!replica) throw new Error('Реестр синхронизации недоступен');
+    await replica.resolveFolderConflict(groupId, resolution, reviewed);
+  }
+
   public getStatus(): SyncStatus {
     const manifest = this.status.manifest;
+    const registry = this.noteSession?.replica;
+    const pendingCount = registry ? registry.pendingCount + this.getOutbox().pending().length : this.status.pendingCount;
+    const error = this.status.error ?? this.noteError;
+    const state = registry && this.status.state === 'connected'
+      ? registry.syncHealth === 'error' || error ? 'error'
+        : !this.activeRoomId || !this.transport.isOpenFor(this.activeRoomId) ? 'offline'
+        : registry.syncHealth !== 'current' || pendingCount || this.pendingPushes.size ? 'syncing' : 'connected'
+      : this.status.state;
     return {
       ...this.status,
+      state,
+      error,
+      pendingCount,
+      registry: this.noteSession?.progress,
       initialSync: { ...this.status.initialSync },
       subscription: computeSubscription(this),
       // Copied like the fields above: the panel holds this object, and a status the engine keeps
@@ -407,6 +486,7 @@ export class SyncEngine {
   }
 
   public notify(): void {
+    this.itemDeliveryLedger = undefined;
     const current = this.getStatus();
     this.listeners.forEach((fn) => fn(current));
   }
@@ -431,6 +511,13 @@ export class SyncEngine {
     }, delayMs);
   }
 
+  public getBundleOutbox() {
+    return this.getOutbox().pending().filter((op) =>
+      (!this.noteGeneration || (op.kind !== 'item' && op.kind !== 'trash'))
+      && (!this.hasFolderTreeRegistry || op.kind !== 'folder')
+       && (!this.hasSharedRegistry || !isLegacySharedKind(op.kind)));
+  }
+
   public getOutbox(): Outbox {
     return new Outbox(this.bookkeeping);
   }
@@ -440,23 +527,15 @@ export class SyncEngine {
     delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS,
     trigger: ManifestTrigger = 'push',
   ): void {
-    manifestSchedule.scheduleManifestCheck(this, delayMs, trigger);
+    if (!this.noteGeneration) manifestSchedule.scheduleManifestCheck(this, delayMs, trigger);
   }
 
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
-    manifestSchedule.requestManifestCheck(this);
-  }
-
-  /**
-   * Moves notes the neighbour refused to the trash, and says so in the log.
-   *
-   * `origin: 'local'` on purpose: the engine ignores remote-origin writes so two devices cannot
-   * echo each other, and this deletion has to travel — the person's own `deleteItem` goes the same
-   * way. The trash is reversible; a delete would not be.
-   */
-  public trashRejectedNotes(ids: string[]): void {
-    manifestSync.trashRejectedNotes(ids);
+    if (this.noteSession) {
+      // The offline capture session exists before disk edits are safe from inbound projection.
+      if (this.activeRoomId) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
+    } else manifestSchedule.requestManifestCheck(this);
   }
 
   /**
@@ -464,6 +543,7 @@ export class SyncEngine {
    * photo never rides inside a keystroke bundle. The pass is a one-shot flag the push consumes.
    */
   private scheduleAttachmentPass(): void {
+    if (this.hasRegistryMedia) return;
     // A queued ask for missing bytes drains one bundle at a time, on the same one-shot push.
     if (this.pendingRequests.size > 0) this.scheduleDebouncedPush(0);
     // A backlog pull owns the channel: one file per push here is slower than the pull and would
@@ -513,6 +593,7 @@ export class SyncEngine {
     sentHashes: Record<string, string>,
     packedHashes: Record<string, string>
   ): Promise<boolean> {
+    if (this.hasRegistryMedia) return false;
     const attachments = item.attachments ?? [];
     const attempted = new Set<string>();
     // A device asked for these bytes after a bundle it ACKed failed to write them: they leave
@@ -594,7 +675,7 @@ export class SyncEngine {
 
   /** A paired device lost these bytes: send them again despite the delivered mark. */
   public forceAttachmentSend(attachmentId: string): void {
-    if (this.forcedAttachmentIds.has(attachmentId)) return;
+    if (this.hasRegistryMedia || this.forcedAttachmentIds.has(attachmentId)) return;
     if (this.attachmentSyncBlocked) {
       syncLog.debug('Forced attachment skipped: relay refused the plan quota for this session');
       return;
@@ -609,7 +690,7 @@ export class SyncEngine {
    * with a dozen broken photos would otherwise ask on every reconnect.
    */
   public requestAttachmentBytes(att: SlagAttachment): void {
-    if (this.pendingRequests.has(att.id)) return;
+    if (this.hasRegistryMedia || this.pendingRequests.has(att.id)) return;
     const lastRequestedAt = loadAttachmentRequests(this.bookkeeping)[`att:${att.id}`] ?? 0;
     if (Date.now() - lastRequestedAt < ATTACHMENT_REQUEST_COOLDOWN_MS) return;
     this.pendingRequests.set(att.id, {
@@ -640,6 +721,7 @@ export class SyncEngine {
 
   /** At most one request per bundle: the answer is a whole file, not a diff. */
   public nextAttachmentRequest(): AttachmentRequestPayload | null {
+    if (this.hasRegistryMedia) return null;
     const next = this.pendingRequests.values().next();
     return next.done ? null : next.value;
   }
@@ -650,7 +732,7 @@ export class SyncEngine {
   }
 
   public hasPendingAttachmentRequests(): boolean {
-    return this.pendingRequests.size > 0;
+    return !this.hasRegistryMedia && this.pendingRequests.size > 0;
   }
 
   public markAttachmentRequestSent(attachmentId: string): void {
@@ -663,6 +745,7 @@ export class SyncEngine {
    * stats the disk, so this is not a per-bundle loop; the per-file cooldown does the rest.
    */
   public async requestMissingAttachments(): Promise<void> {
+    if (this.hasRegistryMedia) return;
     if (this.missingScanGeneration === this.initGeneration) return;
     this.missingScanGeneration = this.initGeneration;
     try {
@@ -738,11 +821,13 @@ export class SyncEngine {
       // workspace over under a name the storage read never looked at, so a profile (and every
       // other workspace field) from another device never landed.
       await vault().importSyncedVaultData({
-        items: buffered.items,
-        folders: buffered.folders,
-        removedIds: buffered.removedIds,
-        workspaceState: buffered.workspaceState,
+        items: !this.noteGeneration && buffered.detail.items ? buffered.items : undefined,
+        folders: !this.hasFolderTreeRegistry && buffered.detail.folders ? buffered.folders : undefined,
+        removedIds: !this.noteGeneration && buffered.detail.items ? buffered.removedIds : undefined,
+        registryNotes: Boolean(this.noteGeneration),
+        workspaceState: this.hasSharedRegistry ? undefined : buffered.workspaceState,
       });
+      await requireSyncSectionFlushed();
     } catch (error) {
       // Nothing reached the disk, so the relay must not be told this burst is done: dropping
       // the ids makes a re-delivery apply again instead of being skipped as "already applied".
@@ -757,6 +842,15 @@ export class SyncEngine {
         this.notify();
       }
       throw error;
+    }
+    if (generation === this.initGeneration && !this.noteGeneration && buffered.removedIds.length > 0) {
+      const activeIds = new Set(vault().getItems().map((item) => item.id));
+      syncLog.debug('Legacy import: explicit note deletes after persistence', {
+        bundles: buffered.bundles.slice(0, 8),
+        bundleCount: buffered.bundles.length,
+        requested: buffered.removedIds.length,
+        stillActive: buffered.removedIds.filter((id) => activeIds.has(id)).length,
+      });
     }
     // One render per burst, after the final state is on disk.
     window.dispatchEvent(
@@ -777,7 +871,8 @@ export class SyncEngine {
       try {
         await this.sendAck(bundleId);
       } catch (error) {
-        // An unconfirmed ACK only means another delivery; the state is already on disk.
+        // Allow another delivery to retry; the state is already on disk.
+        this.appliedBundleIds.delete(bundleId);
         syncLog.warn(`Failed to ACK applied bundle ${bundleId}:`, error);
       }
     }
@@ -797,11 +892,11 @@ export class SyncEngine {
    * of the vault that replaced it.
    */
   private syncSectionStore(vaultId: string): SyncSectionStore {
+    const meta = storage.getCurrentVault();
+    if (meta.id !== vaultId) throw new Error('Хранилище сменилось до чтения журнала');
     return {
-      read: () => storage.files.readStateSection(SYNC_SECTION),
-      write: (patch) => (this.currentVaultId === vaultId
-        ? storage.files.writeStateSection(SYNC_SECTION, patch)
-        : Promise.resolve()),
+      read: () => storage.files.readStateSection(SYNC_SECTION, meta, true),
+      write: (patch) => storage.files.writeStateSection(SYNC_SECTION, patch, meta, true),
     };
   }
 
@@ -813,30 +908,33 @@ export class SyncEngine {
    * The web build and the headless node have no disk: `hydrateSyncSection` is not even asked, and
    * every ledger keeps answering from the storage it answered from before.
    */
-  private async hydrateSyncState(): Promise<void> {
+  private async hydrateSyncState(generation: number): Promise<boolean> {
     const vaultId = this.currentVaultId;
+    const isCurrent = () => generation === this.initGeneration && vaultId === this.currentVaultId;
     try {
       const seed = await getSecret(SECRET_KEYS.vaultSeed(vaultId));
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
 
       let section: Record<string, unknown> | null = null;
       if (isTauri()) {
-        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId));
-        if (outcome.error) {
-          syncLog.warn('The sync ledgers stay in the fallback keys, state.json did not take them:', outcome.error);
-        }
+        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId), isCurrent);
+        if (!outcome.persisted) throw new Error('Не удалось загрузить журнал синхронизации', { cause: outcome.error });
         section = outcome.section;
       }
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
 
       const config = await hydrateConfig(this, vaultId, seed, section);
-      if (vaultId !== this.currentVaultId) return;
+      if (!isCurrent()) return false;
       this.config = config;
       this.status.subscription = computeSubscription(this);
+      return true;
     } catch (error) {
-      // A secret store that will not answer is not a crash: the seed check below reports it, and
-      // an empty config falls back to the keys this build used before the file existed.
+      if (!isCurrent()) return false;
       syncLog.error(`Could not read the sync state of vault ${vaultId}:`, error);
+      this.status.state = 'error';
+      this.status.error = 'Синхронизация остановлена: журнал хранилища не удалось прочитать или сохранить.';
+      this.notify();
+      return false;
     }
   }
 
@@ -895,6 +993,10 @@ export class SyncEngine {
    */
   public async retrySync(): Promise<void> {
     this.clearRetryTimer();
+    if (!this.activeRoomId) {
+      await this.init();
+      return;
+    }
     // Unconditional: an error left over from a connection that is back is the whole reason the
     // panel kept saying "Ошибка" after the server answered a health check.
     this.status.error = null;
@@ -905,20 +1007,25 @@ export class SyncEngine {
       this.scheduleRetry();
       return;
     }
-    if (this.status.initialSync.state === 'error' || !this.activeRoomId) {
+    if (this.status.initialSync.state === 'error') {
       await this.init();
       return;
     }
     try {
       this.status.state = 'syncing';
       this.notify();
-      await this.fetchPendingBundlesHttp();
+      await Promise.all([this.fetchPendingBundlesHttp(), this.noteSession?.replica.catchUp()]);
       // The pull answered, so the red dot is a lie even before the push below decides anything.
       this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
       this.notify();
       await pushLocalChanges(this);
-    } catch {
-      // The pull reported itself to the status and already asked for the next attempt.
+    } catch (error) {
+      if (error instanceof Error && error.message === 'note_upgrade_required') {
+        await this.init();
+        return;
+      }
+      if (this.noteSession) this.reportNoteError(error);
+      // The legacy pull reported itself to the status and already asked for the next attempt.
     }
   }
 
@@ -935,15 +1042,8 @@ export class SyncEngine {
     }
     syncLog.info(`SyncEngine switching to vault: ${vaultId}`);
     this.disconnect();
-    const generation = this.initGeneration;
     this.currentVaultId = vaultId;
-    // The new vault's own config and ledgers before anything is told about it: a save that lands
-    // between a switch and its hydration would otherwise write this vault's keys into that file.
-    await this.hydrateSyncState();
-    if (generation !== this.initGeneration) return;
-    this.status.subscription = computeSubscription(this);
     this.status.currentRoomId = null;
-    this.notify();
     await this.init();
   }
 
@@ -954,8 +1054,7 @@ export class SyncEngine {
     const startedAt = performance.now();
     // The vault's own sync state — config, seed, ledgers — before anything decides whether sync
     // can run at all: `enabled` and the seed phrase are fields of that config.
-    await this.hydrateSyncState();
-    if (generation !== this.initGeneration) return;
+    if (!await this.hydrateSyncState(generation) || generation !== this.initGeneration) return;
     const seedPhrase = this.config.seedPhrase;
     const initial = isInitialSyncPending(this.currentVaultId);
     if (initial) syncLog.info('Initial sync started', { vaultId: this.currentVaultId });
@@ -978,6 +1077,49 @@ export class SyncEngine {
       this.status.state = 'syncing';
       this.notify();
 
+      const port = vault();
+      const serverUrl = apiBase(this.config.serverUrl);
+      const vaultId = port.getCurrentVault().syncId;
+      const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
+      if (generation !== this.initGeneration) return;
+      const accountRoom = async (id: string) =>
+        `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', id, legacyRoomId]))).slice(0, 32)}`;
+      const controller = this.noteAbort = new AbortController();
+      const noteOptions = (roomId: string, syncVaultId: string): Parameters<typeof openNoteSession>[0] => ({
+        serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
+        signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
+        readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
+        onDeliveryChange: () => this.notify(),
+        onStatus: (status) => { if (generation === this.initGeneration) { this.noteRoomStatus = status; this.notify(); } },
+        log: (event, data, warning) => warning ? syncLog.warn(event, data) : syncLog.debug(event, data),
+        onError: (error: unknown) => this.reportNoteError(error), onProgress: () => {
+          if (controller.signal.aborted) return;
+          if (this.noteSession?.replica.syncHealth === 'current') this.noteError = null;
+          this.status.lastSyncTime = new Date().toLocaleTimeString();
+          this.notify();
+        },
+        onApplied: ({ item }: { item: SlagItem | null }) => {
+          window.dispatchEvent(new CustomEvent('slag-sync-updated', { detail: { hasItemsChanged: true } }));
+          // Registry media is verified and written before onApplied; only legacy needs a peer lookup.
+          if (this.hasRegistryMedia) return;
+          for (const attachment of item?.attachments ?? []) {
+            void port.hasAttachmentBytes(attachment.id, attachment.relativePath).then((present) => {
+              if (!controller.signal.aborted && !present) this.requestAttachmentBytes(attachment);
+            }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
+          }
+        },
+        hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => this.getOutbox().pending().some(({ kind }) =>
+           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')
+           || (sharedRecords === true && isLegacySharedKind(kind))),
+      });
+      if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
+        const roomId = await accountRoom(vaultId);
+        if (generation !== this.initGeneration) return;
+        const capture = await openNoteSession(noteOptions(roomId, vaultId), true);
+        if (generation !== this.initGeneration) return;
+        this.noteSession = capture;
+        if (capture) this.notify();
+      }
       const canSync = await refreshServerAuth(this);
       if (generation !== this.initGeneration) return;
       if (!canSync) {
@@ -1013,19 +1155,23 @@ export class SyncEngine {
         }
       }
 
-      const [vaultKey, legacyRoomId] = await Promise.all([
-        deriveVaultKey(seedPhrase),
-        deriveRoomId(seedPhrase),
-      ]);
+      const syncVaultId = this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId;
+      const roomId = this.usesAccountSync() ? await accountRoom(syncVaultId) : legacyRoomId;
       if (generation !== this.initGeneration) return;
-      // Never claim an anonymous legacy room: it has no authenticated owner metadata.
-      const roomId = this.usesAccountSync()
-        ? `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', this.getSyncVaultId(), legacyRoomId]))).slice(0, 32)}`
-        : legacyRoomId;
+      const noteSession = this.noteSession ?? (this.usesAccountSync() ? await openNoteSession(noteOptions(roomId, syncVaultId)) : null);
+      if (this.noteSession) {
+        if (!this.usesAccountSync() || syncVaultId !== vaultId) throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
+        await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
+      }
       if (generation !== this.initGeneration) return;
+      // Journal edits found on disk before the incoming feed can replace their files.
+      await noteSession?.captureColdNoteEdits();
+      if (generation !== this.initGeneration) return;
+      this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
+      if (noteSession) this.notify();
 
       // The tombstone ledger is in memory by now, from the hydrate at the top of init: a pull that
       // started without it would accept a stale copy of a note this device deleted. Nothing is
@@ -1043,7 +1189,7 @@ export class SyncEngine {
       this.startIntervals();
 
       this.batchUpdating = initial;
-      await this.fetchPendingBundlesHttp();
+      await Promise.all([this.fetchPendingBundlesHttp(), noteSession?.replica.catchUp()]);
       if (generation !== this.initGeneration) return;
       this.batchUpdating = false;
       await this.flushStagedImport();
@@ -1150,7 +1296,7 @@ export class SyncEngine {
   }
 
   
-  /** Commits a confirmed push: hashes, tombstones and the outbox advance only once the relay has it. */
+  /** Commits delivery by op ID, never by replacing the deletion ledger with a snapshot. */
   private commitPush(pending: PendingPush): void {
     if (pending.settled) return;
     pending.settled = true;
@@ -1160,9 +1306,11 @@ export class SyncEngine {
     }
     this.pendingPushes.delete(pending.bundleId);
 
+    for (const [key, hash] of Object.entries(pending.packedHashes)) {
+      if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
+    }
     saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
-    saveTombstones(this.bookkeeping, pending.tombstones);
     this.getOutbox().markSynced(pending.opIds);
     this.status.lastSyncTime = new Date().toLocaleTimeString();
     this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
@@ -1184,6 +1332,10 @@ export class SyncEngine {
     // A refusal from the relay is an answer, not a failure to repeat: only a lost connection or a
     // timeout is worth another pass, and those schedule one below.
     let retryable = true;
+    for (const [key, hash] of Object.entries(pending.packedHashes)) {
+      if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
+    }
+    const generation = this.initGeneration;
     // The deadline is bytes-shaped, not flat. A 7 MB attachment over a home uplink is a legitimate
     // push that needs more than thirty seconds: the fixed deadline cut it off mid-transfer, the pull
     // put that file back in the queue, and the machine sat in a push → timeout → retry loop where
@@ -1193,7 +1345,7 @@ export class SyncEngine {
     try {
       if (!this.activeRoomId) throw new Error('Sync room is not ready');
       const cleanUrl = apiBase(this.config.serverUrl);
-      const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?vault=${encodeURIComponent(this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId)}`, {
+      const response = await fetch(`${cleanUrl}/api/rooms/${this.activeRoomId}/bundle?${this.bundleQuery()}`, {
         method: 'POST',
         headers: authHeaders(this, true),
         body,
@@ -1203,7 +1355,11 @@ export class SyncEngine {
       });
       if (!response.ok) {
         if (response.status === 409) {
-          // ponytail: relay dedups by bundle_id; replay means it is already delivered.
+          const receipt: unknown = await response.json().catch(() => null);
+          // Only an explicit replay receipt acknowledges delivery. Freeze and upgrade are refusals.
+          if (!receipt || typeof receipt !== 'object' || !('error' in receipt) || receipt.error !== 'bundle_replay') {
+            throw new Error('Sync push failed: HTTP 409');
+          }
         } else if (response.status === 401 || response.status === 403) {
           retryable = false;
           this.disconnect();
@@ -1222,6 +1378,11 @@ export class SyncEngine {
     } catch (err: unknown) {
       if (pending.settled) return;
       this.pendingPushes.delete(pending.bundleId);
+      if (generation === this.initGeneration) {
+        for (const [key, hash] of Object.entries(pending.packedHashes)) {
+          if (key.startsWith('item:')) this.failedItemHashes.set(key, hash);
+        }
+      }
       const msg = syncErrorText(err, timeoutMs);
       syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
       this.status.state = 'error';
@@ -1247,7 +1408,7 @@ export class SyncEngine {
     // A device that edits nothing still has to notice a peer that fell behind. One look at the
     // room's rows on a slow clock; `scheduleManifestCheck` coalesces it with the push-driven asks,
     // and a dark connection has nobody to ask through.
-    this.manifestHeartbeatInterval = setInterval(() => {
+    this.manifestHeartbeatInterval = this.noteGeneration ? null : setInterval(() => {
       if (!this.config.enabled || !this.activeRoomId) return;
       if (this.status.state === 'offline' || this.status.state === 'error') return;
       this.scheduleManifestCheck(0, 'push');
@@ -1266,7 +1427,7 @@ export class SyncEngine {
         if (!wsOpen) {
           void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Background pull failed:', error));
         }
-        if (!wsOpen || this.getOutbox().pending().length > 0) {
+        if (!wsOpen || this.getBundleOutbox().length > 0) {
           void pushLocalChanges(this);
         }
       }, intervalMs);
@@ -1291,12 +1452,10 @@ export class SyncEngine {
   /** One page of the room's feed, sized by weight and by the byte budget of this device. */
   private async fetchPullPage(generation: number, cursor: number): Promise<PullPage | null> {
     const cleanUrl = apiBase(this.config.serverUrl);
-    const params = new URLSearchParams({
-      device: this.config.deviceId,
-      vault: this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId,
-      limit: String(this.pullPageSize),
-      maxBytes: String(this.pullPageBytes),
-    });
+    const params = this.bundleQuery();
+    params.set('device', this.config.deviceId);
+    params.set('limit', String(this.pullPageSize));
+    params.set('maxBytes', String(this.pullPageBytes));
     if (cursor > 0) params.set('since', String(cursor));
     const controller = new AbortController();
     const abort = () => controller.abort(new DOMException('Sync pull timed out', 'TimeoutError'));
@@ -1306,9 +1465,15 @@ export class SyncEngine {
         headers: authHeaders(this),
         signal: controller.signal,
       });
-      if (generation !== this.initGeneration || !res.ok) {
-        controller.abort();
-        if (generation !== this.initGeneration) return null;
+      if (generation !== this.initGeneration) return null;
+      if (!res.ok) {
+        if (res.status === 409 && this.usesAccountSync()) {
+          const body: unknown = await res.json().catch(() => null);
+          if (generation !== this.initGeneration) return null;
+          if (body && typeof body === 'object' && 'error' in body && body.error === 'note_upgrade_required') {
+            throw new Error('note_upgrade_required');
+          }
+        }
         throw new Error(`Sync pull failed: HTTP ${res.status}`);
       }
       // The first bundle can exceed the page budget. Use the actual response size when known.
@@ -1352,10 +1517,8 @@ export class SyncEngine {
         }
         if (!page) return;
         if (cursor > 0 && page.oldest > 0 && cursor + 1 < page.oldest) {
-          // The cursor points before the oldest bundle the relay still keeps: everything in
-          // between expired, so a delta can never close the gap — resend the full state once.
-          syncLog.warn(`Sync cursor ${cursor} is older than relay history (${page.oldest}): scheduling a full resend`);
-          this.forceFullPush = true;
+          // Missing transport history cannot make this client's local snapshot authoritative.
+          syncLog.warn(`Sync cursor ${cursor} is older than relay history (${page.oldest}): pulling retained bundles only`);
         }
         for (const item of page.bundles) {
           if (generation !== this.initGeneration) return;
@@ -1393,8 +1556,20 @@ export class SyncEngine {
     this.startIntervals();
   }
 
+  private reportNoteError(error: unknown): void {
+    if (!this.noteSession) return;
+    this.noteError = syncErrorText(error, this.pullTimeoutMs);
+    this.notify();
+  }
+
   public disconnect(): void {
     ++this.initGeneration;
+    this.failedItemHashes.clear();
+    this.noteAbort?.abort();
+    this.noteAbort = undefined;
+    this.noteSession = null;
+    this.noteRoomStatus = undefined;
+    this.noteError = null;
     // A retry belongs to the session it was armed in; a vault switch must not inherit it.
     this.clearRetryTimer();
     if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
@@ -1406,8 +1581,6 @@ export class SyncEngine {
     manifestSchedule.clearManifestCheck();
     // A new room is a new row: the root this device published belongs to the room it left.
     this.manifestPostedRoot = null;
-    this.manifestReconcileRoot = null;
-    this.manifestResentAt = null;
     if (this.importTimer) clearTimeout(this.importTimer);
     this.importTimer = null;
     this.importBuffer = null;
@@ -1430,6 +1603,8 @@ export class SyncEngine {
     this.activeVaultKey = null;
     this.activeRoomId = null;
     this.status.currentRoomId = null;
+    this.status.manifest = undefined;
+    this.status.lastSyncTime = null;
     this.status.state = 'idle';
     this.notify();
   }

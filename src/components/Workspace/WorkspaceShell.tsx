@@ -6,6 +6,7 @@ import {
   DockviewReact,
   type IDockviewPanelProps,
   type DockviewApi,
+  type DockviewReadyEvent,
 } from 'dockview-react';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { FeedHeader } from '../Feed/FeedHeader';
@@ -56,7 +57,7 @@ const WorkspaceContentPanel: React.FC<{
   );
 
   return (
-    <main className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-[320px]">
+    <main className="w-full h-full bg-canvas flex flex-col overflow-hidden min-w-0">
       <FeedHeader viewMode={activeMode} onViewModeChange={handleModeChange} />
       {activeMode === 'kanban' ? (
         <KanbanBoard />
@@ -169,6 +170,31 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
     onWillDragPanel: handleWillDragPanel,
   });
 
+  const captionRef = useRef<HTMLDivElement>(null);
+  const handleReady = useCallback((event: DockviewReadyEvent) => {
+    onReady(event);
+    const caption = captionRef.current;
+    if (!caption) return;
+
+    // Reserve only the portion of each grid header actually covered by the caption buttons.
+    const alignCaption = () => {
+      const controls = caption.getBoundingClientRect();
+      const insets = event.api.groups.map(group => {
+        const rect = group.element.getBoundingClientRect();
+        const inset = group.api.location.type === 'grid' && rect.top < controls.bottom && rect.bottom > controls.top
+          ? Math.max(0, Math.min(rect.right, controls.right) - Math.max(rect.left, controls.left))
+          : 0;
+        return { element: group.element, inset };
+      });
+      for (const { element, inset } of insets) {
+        if (inset > 0) element.style.setProperty('--caption-inset', `${inset}px`);
+        else element.style.removeProperty('--caption-inset');
+      }
+    };
+    event.api.onDidLayoutChange(alignCaption);
+    alignCaption();
+  }, [onReady]);
+
   // Minimum widths are defined for a comfortable window; after a resize they are rescaled to what
   // actually fits, otherwise the grid ends up wider than the frame and the right pane gets clipped.
   useEffect(() => {
@@ -259,7 +285,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-canvas text-fg-primary select-none relative z-0 isolate">
-      <WindowControls />
+      <WindowControls ref={captionRef} />
 
       {dropPreview && (
         <div
@@ -279,7 +305,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
         components={components}
         rightHeaderActionsComponent={GroupHeaderActions}
         getTabContextMenuItems={getTabContextMenuItems}
-        onReady={onReady}
+        onReady={handleReady}
         className="dockview-theme-slag w-full h-full"
         popoutUrl="/popout.html"
       />

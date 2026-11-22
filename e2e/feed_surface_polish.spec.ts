@@ -66,6 +66,7 @@ test.describe('Feed surfaces: tone instead of borders, one motion per action', (
         lastBottom: Math.round(cards[cards.length - 1].getBoundingClientRect().bottom),
         composerTop: Math.round(composer.getBoundingClientRect().top),
         pillBottom: Math.round(pill.getBoundingClientRect().bottom),
+        pillRightInset: Math.round(list.getBoundingClientRect().right - pill.getBoundingClientRect().right),
       };
     });
 
@@ -77,9 +78,12 @@ test.describe('Feed surfaces: tone instead of borders, one motion per action', (
 
     const floating = await geometry();
     expect(floating.pillBottom).toBeLessThanOrEqual(floating.composerTop);
+    expect(floating.pillRightInset).toBe(16);
+    const pill = page.getByRole('button', { name: 'Прокрутить к последним заметкам' });
+    await expect(pill).toHaveCSS('border-top-width', '0px');
     await page.screenshot({ path: 'test-results/screenshots/feed-scroll-pill-over-composer.png' });
 
-    await page.locator('button[aria-label="Прокрутить к последним заметкам"]').click();
+    await pill.click();
     await page.waitForTimeout(1200);
 
     const anchored = await geometry();

@@ -1,6 +1,6 @@
 // Anchored popover menu that flips and clamps itself inside the viewport, portal-rendered.
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { AnchoredPopover } from './AnchoredPopover';
 import { usePresence } from '../../hooks/ui/usePresence';
 
 export interface MenuDropdownProps {
@@ -14,10 +14,6 @@ export interface MenuDropdownProps {
   align?: 'start' | 'end';
   /** Min width of the dropdown popover in px */
   minWidth?: number;
-  /** Width used for viewport collision calculations (defaults to minWidth). */
-  positioningWidth?: number;
-  /** Keep the left edge inside the viewport. */
-  clampLeft?: boolean;
   ariaLabel?: string;
   /** Controlled open state */
   isOpen?: boolean;
@@ -35,8 +31,6 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
   direction = 'auto',
   align = 'start',
   minWidth = 150,
-  positioningWidth = minWidth,
-  clampLeft = true,
   ariaLabel,
   isOpen: controlledIsOpen,
   onOpenChange,
@@ -57,73 +51,11 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
     [controlledIsOpen, onOpenChange]
   );
 
-  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
-  const [lastCoords, setLastCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
-  if (coords && coords !== lastCoords) {
-    setLastCoords(coords);
-  }
-  const effectiveCoords = coords || lastCoords;
-
   const triggerContainerRef = useRef<HTMLDivElement | null>(null);
-
-  const updatePosition = useCallback(() => {
-    if (!triggerContainerRef.current) return;
-    const rect = triggerContainerRef.current.getBoundingClientRect();
-    const dropdownW = positioningWidth;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-
-    let dir: 'down' | 'up' = 'down';
-    if (direction === 'up') {
-      dir = 'up';
-    } else if (direction === 'down') {
-      dir = 'down';
-    } else {
-      dir = spaceBelow < 180 && spaceAbove > spaceBelow ? 'up' : 'down';
-    }
-
-    let left = align === 'end' ? rect.right - dropdownW : rect.left;
-    if (left + dropdownW > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - dropdownW - 8);
-    }
-    if (clampLeft && left < 8) {
-      left = 8;
-    }
-
-    if (dir === 'up') {
-      setCoords({
-        bottom: window.innerHeight - rect.top + 6,
-        left,
-      });
-    } else {
-      setCoords({
-        top: rect.bottom + 6,
-        left,
-      });
-    }
-  }, [direction, align, positioningWidth, clampLeft]);
-
-  useLayoutEffect(() => {
-    if (isOpen) {
-      updatePosition();
-    }
-  }, [isOpen, updatePosition]);
-
-  const toggle = useCallback(() => {
-    if (!isOpen) {
-      updatePosition();
-      setOpen(true);
-    } else {
-      setOpen(false);
-    }
-  }, [isOpen, updatePosition, setOpen]);
+  const getAnchor = useCallback(() => triggerContainerRef.current, []);
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleScrollOrResize = () => {
-      updatePosition();
-    };
 
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -150,47 +82,35 @@ export const MenuDropdown: React.FC<MenuDropdownProps> = ({
       }
     };
 
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
     window.addEventListener('click', handleClickOutside, true);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('click', handleClickOutside, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, updatePosition, setOpen, dropdownRef]);
-
-  const portalContent =
-    isPresent && effectiveCoords && typeof document !== 'undefined'
-      ? createPortal(
-          <div
-            ref={dropdownRef}
-            data-motion-state={phase}
-            onTransitionEnd={onTransitionEnd}
-            style={{
-              position: 'fixed',
-              ...(effectiveCoords.top !== undefined ? { top: `${effectiveCoords.top}px` } : {}),
-              ...(effectiveCoords.bottom !== undefined ? { bottom: `${effectiveCoords.bottom}px` } : {}),
-              left: `${effectiveCoords.left}px`,
-              minWidth: `${minWidth}px`,
-            }}
-            className={`z-[9999] rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover ${dropdownClassName}`}
-          >
-            {children}
-          </div>,
-          document.body
-        )
-      : null;
+  }, [isOpen, setOpen, dropdownRef]);
 
   return (
     <div ref={triggerContainerRef} aria-label={ariaLabel} className={`relative inline-flex items-center shrink-0 ${className}`}>
-      <div onClick={toggle} className="inline-flex items-center">
+      <div onClick={() => setOpen(!isOpen)} className="inline-flex items-center">
         {trigger}
       </div>
-      {portalContent}
+      {isPresent && (
+        <AnchoredPopover
+          surfaceRef={dropdownRef}
+          getAnchor={getAnchor}
+          isOpen={isOpen}
+          direction={direction}
+          align={align}
+          minWidth={minWidth}
+          data-motion-state={phase}
+          onTransitionEnd={onTransitionEnd}
+          className={`z-[9999] rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover ${dropdownClassName}`}
+        >
+          {children}
+        </AnchoredPopover>
+      )}
     </div>
   );
 };

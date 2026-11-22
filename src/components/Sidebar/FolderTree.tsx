@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Icon } from '../UI/icons/Icon';
-import { folderIconName } from '../UI/icons/icons';
+import { FolderAppearancePicker } from '../FolderProfile/FolderAppearancePicker';
 import { logger } from '../../lib/logger/logger';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { buildFolderTree, type FolderDropMode, type FolderNode } from '../../lib/vault/folderTree';
@@ -40,6 +40,7 @@ export const FolderTree: React.FC = () => {
     items,
     moveItem,
     moveFolder,
+    saveFolder,
     openContextMenu,
   } = useApp();
 
@@ -202,7 +203,6 @@ export const FolderTree: React.FC = () => {
       i => i.folder === node.path || i.folder.startsWith(node.path + '/')
     ).length;
 
-    const iconName = folderIconName(node.meta?.icon);
 
     const handleContextMenu = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -282,15 +282,16 @@ export const FolderTree: React.FC = () => {
               <span className="w-3.5 shrink-0" />
             )}
 
-            <Icon name={iconName} size="sm" tone="inherit" className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-fg-soft' : 'text-fg-muted group-hover:text-fg-secondary'}`} />
+            <FolderAppearancePicker folder={node.meta} onSave={saveFolder} size="sm"
+              className={`size-5 rounded ${isSelected ? 'text-fg-soft' : 'text-fg-muted group-hover:text-fg-secondary'}`} />
             <span className="truncate">{node.name}</span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="relative flex min-w-5 items-center justify-end shrink-0">
             {itemCount > 0 && (
               <span
                 key={itemCount}
-                className="text-2xs font-mono text-fg-muted group-hover:text-fg-secondary px-1 motion-count"
+                className="text-2xs font-mono text-fg-muted pr-0.5 motion-count group-hover:invisible group-focus-within:invisible"
               >
                 {itemCount}
               </span>
@@ -308,7 +309,7 @@ export const FolderTree: React.FC = () => {
                 });
               }}
               title="Действия с папкой"
-              className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-fg-muted hover:text-fg-soft hover:bg-tint-10 transition-opacity"
+              className="absolute right-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto p-0.5 rounded text-fg-muted hover:text-fg-soft hover:bg-tint-10 focus-visible:bg-tint-10 transition-opacity"
             >
               <Icon name="action.more" size="sm" tone="inherit" />
             </button>

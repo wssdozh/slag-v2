@@ -257,10 +257,10 @@ test.describe('adversarial memory & time', () => {
         const memory = await import(/* @vite-ignore */ '/src/lib/memory.ts');
         const now = Date.now();
 
-        memory.memoryService.remember({ text: 'завтра у меня встреча', kind: 'event' });
-        memory.memoryService.remember({ text: 'купить молоко', kind: 'note' });
-        memory.memoryService.remember({ text: 'пиши коротко', kind: 'rule' });
-        memory.memoryService.remember({ text: 'любит тёмную тему', kind: 'pref' });
+        await memory.memoryService.remember({ text: 'завтра у меня встреча', kind: 'event' });
+        await memory.memoryService.remember({ text: 'купить молоко', kind: 'note' });
+        await memory.memoryService.remember({ text: 'пиши коротко', kind: 'rule' });
+        await memory.memoryService.remember({ text: 'любит тёмную тему', kind: 'pref' });
 
         const raw = JSON.parse(localStorage.getItem(key) || '[]');
         const shifted = raw.map((item: any) => ({
@@ -331,8 +331,8 @@ test.describe('adversarial memory & time', () => {
         const memory = await import(/* @vite-ignore */ '/src/lib/memory.ts');
         const now = Date.now();
 
-        memory.memoryService.remember({ text: 'встреча с врачом', kind: 'event' });
-        memory.memoryService.remember({ text: 'созвон с командой', kind: 'event' });
+        await memory.memoryService.remember({ text: 'встреча с врачом', kind: 'event' });
+        await memory.memoryService.remember({ text: 'созвон с командой', kind: 'event' });
 
         const raw = JSON.parse(localStorage.getItem(key) || '[]');
         const shifted = raw.map((item: any) => ({

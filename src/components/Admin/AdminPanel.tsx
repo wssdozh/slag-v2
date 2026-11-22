@@ -1,3 +1,4 @@
+import type { RoomMigrationAction } from './useAdminData';
 // Admin console shell: server/token login and five tabs over the relay's API.
 import React, { useEffect, useState } from 'react';
 import { Icon } from '../UI/icons/Icon';
@@ -86,6 +87,28 @@ export const AdminPanel: React.FC = () => {
     setStatusMessage,
     setCustomError,
   });
+
+  const migrateRoom = async (roomId: string, action: RoomMigrationAction, body: object) => {
+    const response = await fetch(`${serverUrl}/api/admin/rooms/${encodeURIComponent(roomId)}/${action}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(120_000),
+    }).catch(() => null);
+    await loadData(token, serverUrl, period);
+    if (!response) throw new Error('Ответ релея не получен. Проверьте показанный режим комнаты, прежде чем повторить действие.');
+    if (!response.ok) {
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      const reasons: Record<string, string> = {
+        note_prepare_changed: 'Подготовка или поколение изменились. Перечитайте статус комнаты.',
+        note_prepare_writers_changed: 'Список писателей изменился или подготовка начата старым инструментом. Отмените и подготовьте переход заново.',
+        note_backup_failed: 'Не удалось сохранить резервную копию. Реестр не включён.',
+        note_no_writers: 'Нет устройств с правом записи.',
+        invalid_note_seed: 'Пакет не соответствует выбранной комнате или поколению.',
+        cache_limit_exceeded: 'Пакет не помещается в квоту хранилища.',
+        payload_too_large: 'Пакет превышает лимит загрузки; используйте операторский инструмент.',
+      };
+      throw new Error(reasons[result?.error ?? ''] ?? `Релей отклонил действие (HTTP ${response.status}).`);
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
@@ -390,6 +413,7 @@ export const AdminPanel: React.FC = () => {
             onPurgeRoom={purgeRoom}
             onCleanup={cleanup}
             onVacuum={vacuum}
+            onMigrateRoom={migrateRoom}
           />
         ) : (
           <SecurityTab

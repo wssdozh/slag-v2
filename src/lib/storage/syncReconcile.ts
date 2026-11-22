@@ -17,6 +17,7 @@ export interface SyncedVaultSnapshot {
 
 export interface StagedSyncImport {
   items: SlagItem[];
+  removedIds?: readonly string[];
   folders: FolderMeta[];
   /** Absent when the bundle carried no workspace change. */
   workspace?: WorkspaceState;
@@ -100,13 +101,17 @@ export function reconcileSyncedVault(input: {
     !sameJson(base.folders, current.folders) ||
     !sameJson(base.workspace, current.workspace);
   if (!drifted) {
-    // The common case: nothing moved, so the staged result is already the answer.
-    return { items: incoming.items, folders: incoming.folders, workspace, localWins: [], dropped: [], drifted };
+    // The staged snapshot can predate `base`: a local note may have arrived before disk import
+    // even began. Keep unmentioned notes in the index just as the disk write keeps their files.
+    const mentioned = new Set([...incoming.items.map(({ id }) => id), ...incoming.removedIds ?? []]);
+    const items = [...incoming.items, ...current.items.filter(({ id }) => !mentioned.has(id))];
+    return { items, folders: incoming.folders, workspace, localWins: [], dropped: [], drifted };
   }
 
   const baseById = new Map(base.items.map((item) => [item.id, item]));
   const currentIds = new Set(current.items.map((item) => item.id));
   const incomingById = new Map(incoming.items.map((item) => [item.id, item]));
+  const removedIds = new Set(incoming.removedIds);
   const dropped = incoming.items.filter((item) => baseById.has(item.id) && !currentIds.has(item.id));
   const droppedIds = new Set(dropped.map((item) => item.id));
 
@@ -117,8 +122,8 @@ export function reconcileSyncedVault(input: {
     placed.add(local.id);
     const staged = incomingById.get(local.id);
     if (!staged) {
-      // Created locally while the bundle was being written: the bundle never heard of it.
-      items.push(local);
+      // Absence alone is not a delete. Honor only explicit deletions that weren't restored.
+      if (!removedIds.has(local.id)) items.push(local);
       continue;
     }
     const baseItem = baseById.get(local.id);

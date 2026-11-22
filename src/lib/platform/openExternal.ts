@@ -1,6 +1,9 @@
 // Opens a link in the system browser. Telegram deep links are the reason this exists: an
 // <a target="_blank"> does nothing inside the app's webview.
+import { isTauri } from '@tauri-apps/api/core';
 import { logger } from '../logger/logger';
+
+export const isNativeWebview = isTauri;
 
 const uiLog = logger.scope('UI');
 

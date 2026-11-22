@@ -46,9 +46,9 @@ test.describe('adversarial memory edges', () => {
 
     const result = await memoryEval(page, async (key) => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      const blank = memoryService.remember({ text: '   ' });
+      const blank = await memoryService.remember({ text: '   ' });
       // «не» больше не стоп-слово в памяти, но одна негация без объекта фактом не становится
-      const stops = memoryService.remember({ text: 'не и в на' });
+      const stops = await memoryService.remember({ text: 'не и в на' });
       const raw = JSON.parse(localStorage.getItem(key) ?? '[]');
       return {
         blankIsNull: blank === null,
@@ -149,10 +149,10 @@ test.describe('adversarial memory edges', () => {
 
     const result = await memoryEval(page, async (key) => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      memoryService.remember({ text: 'первый факт про работу', tag: 'Работа' });
-      memoryService.remember({ text: 'второй факт про работу', tag: '#работа' });
-      memoryService.remember({ text: 'третий факт про работу', tag: 'РАБОТА' });
-      memoryService.remember({ text: 'четвёртый факт без темы', tag: 'заметка' });
+      await memoryService.remember({ text: 'первый факт про работу', tag: 'Работа' });
+      await memoryService.remember({ text: 'второй факт про работу', tag: '#работа' });
+      await memoryService.remember({ text: 'третий факт про работу', tag: 'РАБОТА' });
+      await memoryService.remember({ text: 'четвёртый факт без темы', tag: 'заметка' });
       // The facts live in memory first; the backend write is coalesced, so the stored copy is a
       // tick behind. Waiting for it here keeps the assertion about the shape, not about timing.
       let raw: Array<{ tag: string | null }> = [];
@@ -176,7 +176,7 @@ test.describe('adversarial memory edges', () => {
     const result = await memoryEval(page, async (key) => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
       for (let index = 0; index < 100; index += 1) {
-        memoryService.remember({ text: 'пиши коротко, без вступлений', kind: 'rule' });
+        await memoryService.remember({ text: 'пиши коротко, без вступлений', kind: 'rule' });
       }
       const live = memoryService.all();
       return {
@@ -217,7 +217,7 @@ test.describe('adversarial memory edges', () => {
       // «1q», «2q», … уникальны по нормализованному тексту: числа короче двух символов
       // нормализатор выбрасывает, и без суффикса индексы 1..9 слились бы в одну запись.
       for (let index = 1; index <= 600; index += 1) {
-        memoryService.remember({ text: `факт ${index}q из проверки лимита`, kind: 'fact' });
+        await memoryService.remember({ text: `факт ${index}q из проверки лимита`, kind: 'fact' });
       }
 
       const live = memoryService.all();
@@ -248,7 +248,7 @@ test.describe('adversarial memory edges', () => {
 
     await memoryEval(page, async (text) => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      memoryService.remember({ text, kind: 'note' });
+      await memoryService.remember({ text, kind: 'note' });
     }, payload);
 
     const stored = await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '[]')[0]?.text ?? null, MEMORY_KEY);
@@ -278,9 +278,9 @@ test.describe('adversarial memory edges', () => {
 
     const written = await memoryEval(page, async () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
-      memoryService.remember({ text: 'первый факт переживает перезагрузку' });
-      memoryService.remember({ text: 'второй факт переживает перезагрузку' });
-      memoryService.remember({ text: 'третий факт переживает перезагрузку' });
+      await memoryService.remember({ text: 'первый факт переживает перезагрузку' });
+      await memoryService.remember({ text: 'второй факт переживает перезагрузку' });
+      await memoryService.remember({ text: 'третий факт переживает перезагрузку' });
       return memoryService.all().length;
     }, undefined);
     expect(written).toBe(3);
@@ -304,14 +304,14 @@ test.describe('adversarial memory edges', () => {
       const { memoryService } = await import(/* @vite-ignore */ '/src/lib/memory.ts');
 
       // один факт уходит по id, другой — по тексту в другом падеже
-      const byIdFact = memoryService.remember({ text: 'работает по ночам', kind: 'fact' });
+      const byIdFact = await memoryService.remember({ text: 'работает по ночам', kind: 'fact' });
       const id = byIdFact?.item.id ?? '';
-      const firstForget = memoryService.forget(id);
-      const secondForget = memoryService.forget(id);
+      const firstForget = await memoryService.forget(id);
+      const secondForget = await memoryService.forget(id);
 
-      memoryService.remember({ text: 'не любит созвон-митинги до полудня', kind: 'pref' });
+      await memoryService.remember({ text: 'не любит созвон-митинги до полудня', kind: 'pref' });
       // другой падеж и другой регистр: «созвон митинга» вместо «созвон-митинги»
-      const byTextForget = memoryService.forget('НЕ ЛЮБИТ СОЗВОН МИТИНГА ДО ПОЛУДНЯ');
+      const byTextForget = await memoryService.forget('НЕ ЛЮБИТ СОЗВОН МИТИНГА ДО ПОЛУДНЯ');
 
       return {
         id,

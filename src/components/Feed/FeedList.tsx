@@ -37,7 +37,6 @@ import {
 // Within this distance of the bottom the note is arriving in front of the reader:
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
-const COMPOSER_SETTLE_PX = 200;
 
 export const FeedList: React.FC = () => {
   const {
@@ -51,6 +50,11 @@ export const FeedList: React.FC = () => {
     currentFolder,
     activeTypeFilter,
     activeTagFilter,
+    inboxMode,
+    hideCompletedTasks,
+    aiItemFilter,
+    sortBy,
+    sortOrder,
     addToast,
     highlightedItemId,
     openLightbox,
@@ -147,10 +151,9 @@ export const FeedList: React.FC = () => {
     }
   }
 
-  const prevScrollHeightRef = useRef<number>(0);
-  const prevScrollTopRef = useRef<number>(0);
-  const isPrependRef = useRef<boolean>(false);
-  const prevItemsLengthRef = useRef<number>(filteredItems.length);
+  const prependAnchorRef = useRef<{ id: string; top: number; viewKey: string; aiFilter: typeof aiItemFilter } | null>(null);
+  const skipPrependMotionRef = useRef(false);
+  const viewKey = JSON.stringify([highlightKey, inboxMode, isPinnedOnlyFilter, hideCompletedTasks, sortBy, sortOrder]);
 
   const hasMoreOlder = hasOlderItems(history.length, windowSize);
 
@@ -159,14 +162,18 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container || !hasMoreOlder) return;
     // Предыдущая догрузка ещё держит анкор: вторая подряд даёт скачок.
-    if (isPrependRef.current) return;
+    if (prependAnchorRef.current) return;
 
-    prevScrollHeightRef.current = container.scrollHeight;
-    prevScrollTopRef.current = container.scrollTop;
-    isPrependRef.current = true;
+    const viewport = container.getBoundingClientRect();
+    for (const card of container.querySelectorAll<HTMLElement>('[data-flip-id]')) {
+      const rect = card.getBoundingClientRect();
+      if (rect.bottom <= viewport.top || rect.top >= viewport.bottom) continue;
+      prependAnchorRef.current = { id: card.dataset.flipId!, top: rect.top - viewport.top, viewKey, aiFilter: aiItemFilter };
+      break;
+    }
 
     setWindowSize(prev => nextWindowSize(prev, history.length));
-  }, [hasMoreOlder, history.length]);
+  }, [hasMoreOlder, history.length, viewKey, aiItemFilter]);
 
   const isStuckToBottomRef = useRef(true);
 
@@ -178,22 +185,22 @@ export const FeedList: React.FC = () => {
     const container = containerRef.current;
     if (!container) return;
 
-    const added = filteredItems.length > prevItemsLengthRef.current;
-    prevItemsLengthRef.current = filteredItems.length;
-
-    if (isPrependRef.current) {
-      const delta = container.scrollHeight - prevScrollHeightRef.current;
-      if (delta > 0) {
-        container.scrollTop = prevScrollTopRef.current + delta;
+    const anchor = prependAnchorRef.current;
+    prependAnchorRef.current = null;
+    skipPrependMotionRef.current = false;
+    if (anchor && anchor.viewKey === viewKey && anchor.aiFilter === aiItemFilter) {
+      skipPrependMotionRef.current = true;
+      const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(anchor.id)}"]`);
+      if (card) {
+        // Correct only the movement that remains after any browser anchoring.
+        const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        container.scrollTop += offset - anchor.top;
+        return;
       }
-      isPrependRef.current = false;
-      return;
     }
 
     if (highlightedItemId) return;
-    const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    if (isStuckToBottomRef.current || (added && distFromBottom <= COMPOSER_SETTLE_PX)) {
-      isStuckToBottomRef.current = true;
+    if (isStuckToBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
   });
@@ -203,6 +210,7 @@ export const FeedList: React.FC = () => {
   // boxes are the final ones and the delta carries the scroll the list just took.
   useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'), {
     enterFromBelow: true,
+    skipMotionRef: skipPrependMotionRef,
   });
 
   // The keyboard and a growing composer resize the scrollport without rendering this list.

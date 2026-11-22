@@ -2,6 +2,7 @@
 import * as chronoRu from 'chrono-node/ru';
 import * as chronoEn from 'chrono-node/en';
 import type { RecurrenceRule } from '../../types';
+import { protectSpoilers, withoutSpoilers } from '../text/noteDisclosure';
 
 export interface ParsedTodoistTask {
   /** The first line with the date, time, priority, repeat, duration and tags cut out. */
@@ -54,6 +55,8 @@ const WEEKDAY_MAP: Record<string, number> = {
 };
 
 export function parseTodoistInput(text: string, referenceDate: Date = new Date()): ParsedTodoistTask {
+  const { markdown, restore } = protectSpoilers(text);
+  text = markdown;
   const lines = text.split('\n');
   let workingText = (lines[0] ?? '').replace(/^#+\s+/, '');
   let priority: 'none' | 'low' | 'medium' | 'high' | undefined = undefined;
@@ -342,7 +345,8 @@ export function parseTodoistInput(text: string, referenceDate: Date = new Date()
   cleanText = cleanText.replace(/^[\s,;:.!?—–-]+/, '').replace(/[\s,;:]+$/, '');
   cleanText = cleanText.replace(/\s+/g, ' ').trim();
 
-  let cleanTitle = cleanText;
+  cleanText = restore(cleanText);
+  let cleanTitle = withoutSpoilers(cleanText).trim();
   if (cleanTitle) {
     cleanTitle = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
   } else {
@@ -546,11 +550,12 @@ export function extractFolderToken<T extends { name: string; path: string }>(
   folders: T[]
 ): { cleanContent: string; folder: T | null } {
   if (!text) return { cleanContent: '', folder: null };
+  const { markdown, restore } = protectSpoilers(text);
   for (const mention of folderMentions(folders)) {
     // One space goes with the mention, so cutting it out does not leave a gap behind.
     const token = new RegExp(`(^|[ \\t])@${mention.token}(?=[ \\t]|\\n|$)[ \\t]?`, 'gi');
-    if (!token.test(text)) continue;
-    return { cleanContent: text.replace(token, '$1').trim(), folder: mention.folder };
+    if (!token.test(markdown)) continue;
+    return { cleanContent: restore(markdown.replace(token, '$1').trim()), folder: mention.folder };
   }
   return { cleanContent: text, folder: null };
 }
@@ -565,6 +570,7 @@ export function parseComposerMentions<T extends { name: string; path: string }>(
   folders: T[]
 ): { cleanContent: string; folder: T | null; tags: string[] } {
   const { cleanContent: withoutMentions, folder } = extractFolderToken(text, folders);
-  const { cleanContent, tags } = extractAndStripTags(withoutMentions);
-  return { cleanContent, folder, tags };
+  const { markdown, restore } = protectSpoilers(withoutMentions);
+  const { cleanContent, tags } = extractAndStripTags(markdown);
+  return { cleanContent: restore(cleanContent), folder, tags };
 }

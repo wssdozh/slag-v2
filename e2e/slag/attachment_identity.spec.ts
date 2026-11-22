@@ -15,8 +15,8 @@ test('same-named attachment embeds retain distinct bytes in feed and editor', as
     }));
     const { idbSaveAttachment } = await import('/src/lib/storage/indexedDb.ts');
     await Promise.all(attachments.map(attachment => idbSaveAttachment(attachment)));
-    storage.saveItem({ id: 'attachment_identity', type: 'note', title: 'attachment identity',
-      content: 'intro\n\n![[image.webp]]\n![[image.webp]]\n\nend', folder: 'Входящие', tags: [],
+    storage.saveItem({ id: 'attachment_identity', type: 'note', title: 'Референсы интерфейса',
+      content: 'Два скриншота для сравнения:\n\n![[image.webp]]\n![[image.webp]]\n\nКонец заметки.', folder: 'Входящие', tags: ['интерфейс', 'референсы'],
       attachments, createdAt: Date.now(), updatedAt: Date.now() });
     const { resolveAttachmentByName, resolveAttachmentEmbeds } = await import('/src/lib/text/attachmentEmbed.ts');
     const { serializeItemToMarkdown, parseMarkdownToItem } = await import('/src/lib/vault/markdownSerializer.ts');
@@ -54,7 +54,27 @@ test('same-named attachment embeds retain distinct bytes in feed and editor', as
   const widgets = editor.getByTestId('attachment-embed-widget').locator('img');
   await expect(widgets).toHaveCount(2);
   await expect.poll(async () => (await imageColors('#fullscreen-editor-root [data-testid="attachment-embed-widget"] img')).map((svg, index) => svg.includes(expectedColors[index]))).toEqual([true, true]);
-  await expect(page.getByTestId('attachment-strip')).toContainText('Медиа и вложения (2)');
+  const strip = page.getByTestId('attachment-strip');
+  await expect(strip.getByRole('button', { name: 'image.webp', exact: true })).toHaveCount(2);
+  await expect.poll(async () => (await imageColors('[data-testid="attachment-strip"] img')).map((svg, index) => svg.includes(expectedColors[index]))).toEqual([true, true]);
   await expect.poll(async () => widgets.evaluateAll(images => images.every(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+  await page.getByRole('button', { name: 'Развернуть на всё окно' }).click();
+  await expect.poll(async () => (await page.getByTestId('fullscreen-editor-modal').boundingBox())?.width).toBe(1280);
+  await page.locator('[data-editor-body]').evaluate(node => { node.scrollTop = 0; });
+  const paperclip = page.getByRole('button', { name: 'Прикрепить файл, фото или медиа' });
+  await paperclip.hover();
+  await expect(page.getByRole('tooltip').filter({ hasText: 'Прикрепить файл, фото или медиа' })).toBeVisible();
   await page.getByTestId('fullscreen-editor-modal').screenshot({ path: 'test-results/screenshots/attachment-identity-editor.png', animations: 'disabled' });
+
+  await strip.getByRole('button', { name: 'Действия: image.webp' }).last().click();
+  await expect(page.getByRole('button', { name: 'Сдвинуть вправо' })).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Вставить в текст' })).toBeHidden();
+  await expect(editor).toBeVisible();
+
+  await paperclip.click();
+  await expect(page.getByTestId('attach-sheet')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('attach-sheet')).toBeHidden();
+  await expect(editor).toBeVisible();
 });

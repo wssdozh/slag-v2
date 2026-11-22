@@ -84,7 +84,9 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
 
     // Press feedback: a folder row tints the moment the finger lands, then fades back.
-    const folderRow = page.locator('.divide-y > button').first();
+    const folderRow = page.getByText('Папки', { exact: true }).locator('..').getByRole('button').first();
+    await expect(folderRow).toBeVisible();
+    await expect(folderRow).toHaveCSS('border-bottom-width', '0px');
     const rowBox = await folderRow.boundingBox();
     if (rowBox) {
       await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
@@ -106,12 +108,27 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     }
   });
 
+  test('Inbox header has an icon-only back button and no subtitle', async ({ page }) => {
+    await page.getByRole('button', { name: /^Входящие/ }).first().tap();
+
+    const header = page.locator('header').first();
+    const back = header.getByRole('button', { name: 'Папки', exact: true });
+    await expect(header.getByText('Входящие', { exact: true })).toBeVisible();
+    await expect(header.getByText('Лента входящих', { exact: true })).toHaveCount(0);
+    await expect(back).toBeVisible();
+    await expect(back).toHaveText('');
+    await header.screenshot({ path: 'test-results/screenshots/mobile_inbox_header.png' });
+
+    await back.tap();
+    await expect(page.getByRole('heading', { name: /^Заметки/ })).toBeVisible();
+  });
+
   test('2. Hierarchical folder navigation & Telegram-style Composer', async ({ page }) => {
     // Tap on "Входящие" folder
     const inboxFolderBtn = page.locator('button', { hasText: 'Входящие' }).first();
     await inboxFolderBtn.click();
 
-    // Verify folder header with "< Папки" and title "Входящие"
+    // Verify folder header with a back button and title "Входящие"
     await expect(page.locator('header span', { hasText: 'Входящие' })).toBeVisible();
     await expect(page.locator('button[title*="Назад к списку папок"]')).toBeVisible();
 

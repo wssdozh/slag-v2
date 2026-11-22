@@ -15,7 +15,7 @@ interface AudioPlayerProps {
   duration?: number;
   waveform?: number[];
   compact?: boolean;
-  timeContext?: string;
+  timeContext?: React.ReactNode;
   transcript?: string;
   extractedText?: string;
   summary?: string;
@@ -266,12 +266,6 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
     </span>
   );
 
-  const timeContextText = timeContext ? (
-    <span className="shrink-0 font-mono text-3xs leading-none text-fg-muted select-none">
-      {timeContext}
-    </span>
-  ) : null;
-
   const enrichControl = (onEnrich || transcript || enrichmentStatus === 'processing') ? (
     <button
       type="button"
@@ -327,7 +321,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
               )}
               <span className="ml-auto flex shrink-0 items-center gap-1.5">
                 {durationText}
-                {timeContextText}
+                {timeContext}
                 {enrichControl}
               </span>
             </div>
@@ -339,7 +333,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
           {playButton}
           {scrubTrack}
           {durationText}
-          {timeContextText}
+          {timeContext}
           {enrichControl}
         </div>
       )}

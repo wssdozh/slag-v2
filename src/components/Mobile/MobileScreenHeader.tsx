@@ -8,7 +8,9 @@ export interface MobileScreenHeaderProps {
   onBack?: () => void;
   backLabel?: string;
   backTitle?: string;
+  iconOnlyBack?: boolean;
   leftSlot?: React.ReactNode;
+  leadingAction?: React.ReactNode;
   centerSlot?: React.ReactNode;
   rightSlot?: React.ReactNode;
   className?: string;
@@ -21,7 +23,9 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
   onBack,
   backLabel = 'Назад',
   backTitle,
+  iconOnlyBack = false,
   leftSlot,
+  leadingAction,
   centerSlot,
   rightSlot,
   className = '',
@@ -43,13 +47,16 @@ export const MobileScreenHeader: React.FC<MobileScreenHeaderProps> = ({
             onClick={onBack}
             aria-label={backLabel}
             title={backTitle || backLabel}
-            className="h-10 px-2 rounded-lg text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer flex items-center gap-1.5"
+            className={`flex items-center rounded-lg text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer ${
+              iconOnlyBack ? 'size-12 justify-center' : 'h-10 gap-1.5 px-2'
+            }`}
           >
             <Icon name="nav.back" size="md" tone="inherit" />
-            <span className="text-xs font-medium">{backLabel}</span>
+            {!iconOnlyBack && <span className="text-xs font-medium">{backLabel}</span>}
           </button>
         ) : (
           <>
+            {leadingAction}
             {icon && (
               <div className="w-6 h-6 rounded-md bg-tint-10 flex items-center justify-center font-mono font-bold text-xs text-white shrink-0">
                 {icon}

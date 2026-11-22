@@ -10,9 +10,11 @@ import { Icon } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
+import { folderColorCss } from '../../lib/vault/folderColor';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { useComposerInset } from '../../hooks/layout/useComposerInset';
+import { SyncStatusButton } from '../Sidebar/SyncStatusButton';
 
 function unsortedLabel(count: number): string {
   const mod10 = count % 10;
@@ -38,12 +40,7 @@ export const MobileFoldersView: React.FC = () => {
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
-    activeTypeFilter,
-    sortBy,
-    sortOrder,
-    hideCompletedTasks,
-    isPinnedOnlyFilter,
-    inboxMode,
+    openSettingsModal,
   } = useApp();
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
@@ -65,23 +62,12 @@ export const MobileFoldersView: React.FC = () => {
 
   const isInbox = mobileActiveFolder === DEFAULT_INBOX_FOLDER;
 
-  const isCustomized =
-    feedViewMode !== 'feed' ||
-    activeTypeFilter !== 'all' ||
-    sortBy !== 'createdAt' ||
-    sortOrder !== 'asc' ||
-    hideCompletedTasks ||
-    isPinnedOnlyFilter ||
-    (isInbox && inboxMode !== 'all');
-
   const folderMaterialsCount = useMemo(
     () => materialsInFolder(items, currentFolder).length,
     [items, currentFolder],
   );
 
-  const inboxUnsortedCount = useMemo(() => {
-    return isInbox ? items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length : 0;
-  }, [items, isInbox]);
+  const canTriageInbox = isInbox && items.some(i => i.folder === DEFAULT_INBOX_FOLDER);
 
   // Root folders vs Direct subfolders of mobileActiveFolder
   const directSubfolders = useMemo(() => {
@@ -117,6 +103,7 @@ export const MobileFoldersView: React.FC = () => {
       <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none">
         {/* Top Header */}
         <MobileScreenHeader
+          className="border-none"
           title={
             <button
               type="button"
@@ -132,7 +119,7 @@ export const MobileFoldersView: React.FC = () => {
               <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-150 ${isVaultMenuOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
             </button>
           }
-          icon="S"
+          leadingAction={<SyncStatusButton mobile onSettings={() => openSettingsModal('sync')} />}
           rightSlot={
             <>
               <button
@@ -160,7 +147,7 @@ export const MobileFoldersView: React.FC = () => {
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
           {/* Pinned Inbox Card */}
-          <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden">
+          <div className="rounded-2xl bg-surface/80 overflow-hidden">
             <button
               onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
               onPointerDown={flashTap}
@@ -189,7 +176,7 @@ export const MobileFoldersView: React.FC = () => {
               Папки
             </div>
 
-            <div className="rounded-2xl bg-surface/80 border border-tint-6 overflow-hidden divide-y divide-tint-4">
+            <div className="rounded-2xl bg-surface/80 overflow-hidden">
               {directSubfolders
                 .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
                 .map(folder => {
@@ -203,7 +190,7 @@ export const MobileFoldersView: React.FC = () => {
                       className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
+                        <div data-folder-color={folder.color} style={{ color: folderColorCss(folder.color) }} className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
                           <Icon name={iconName} size="lg" tone="inherit" />
                         </div>
                         <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
@@ -230,6 +217,7 @@ export const MobileFoldersView: React.FC = () => {
       {/* Top Header */}
       <MobileScreenHeader
         onBack={handleBack}
+        iconOnlyBack
         backLabel={
           mobileActiveFolder.includes('/')
             ? mobileActiveFolder.split('/')[mobileActiveFolder.split('/').length - 2]
@@ -248,9 +236,11 @@ export const MobileFoldersView: React.FC = () => {
             <span className="text-sm font-bold text-white truncate max-w-full">
               {activeMeta?.name || mobileActiveFolder}
             </span>
-            <span className="text-3xs font-mono text-fg-muted truncate max-w-full">
-              {isInbox ? 'Лента входящих' : mobileActiveFolder}
-            </span>
+            {!isInbox && (
+              <span className="text-3xs font-mono text-fg-muted truncate max-w-full">
+                {mobileActiveFolder}
+              </span>
+            )}
           </button>
         }
         rightSlot={
@@ -277,17 +267,15 @@ export const MobileFoldersView: React.FC = () => {
             )}
 
             {/* AI Triage button in Inbox */}
-            {isInbox && inboxUnsortedCount > 0 && (
+            {canTriageInbox && (
               <button
                 type="button"
                 onClick={() => setIsTriageModalOpen(true)}
-                title={`ИИ-Сортировка (${inboxUnsortedCount} неразобранных)`}
+                title="ИИ-Сортировка"
                 aria-label="Запустить ИИ-Сортировку"
-                className="h-8 px-2 rounded-lg flex items-center gap-1 text-fg-secondary hover:text-fg-soft hover:bg-tint-6 motion-press cursor-pointer"
+                className="flex items-center justify-center size-12 rounded-lg text-fg-secondary hover:text-fg-soft hover:bg-tint-6 motion-press cursor-pointer"
               >
-                <Icon name="action.sort" size="sm" tone="inherit" className="shrink-0" />
-                <span key={inboxUnsortedCount} className="font-mono text-2xs motion-count">{inboxUnsortedCount}</span>
-                <span className="sr-only">Запустить ИИ-Сортировку</span>
+                <Icon name="action.sort" size="sm" tone="inherit" />
               </button>
             )}
 
@@ -300,9 +288,6 @@ export const MobileFoldersView: React.FC = () => {
               aria-label="Вид и фильтры папки"
             >
               <Icon name="action.more" size="lg" tone="inherit" />
-              {isCustomized && (
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-white ring-2 ring-panel" />
-              )}
             </button>
           </div>
         }
@@ -313,14 +298,14 @@ export const MobileFoldersView: React.FC = () => {
 
       {/* Subfolders Quick Ribbon (If folder has subfolders) */}
       {directSubfolders.length > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-tint-4 bg-panel/60 overflow-x-auto scrollbar-none shrink-0 z-10">
+        <div className="z-10 flex shrink-0 items-center gap-2 overflow-x-auto border-b border-tint-6 bg-panel px-3 scrollbar-none">
           {directSubfolders.map(sub => {
             const subItemsCount = items.filter(i => i.folder === sub.path).length;
             return (
               <button
                 key={sub.path}
                 onClick={() => setMobileActiveFolder(sub.path)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-tint-4 hover:bg-tint-8 border border-tint-6 text-xs font-medium text-fg-tertiary shrink-0 motion-press cursor-pointer whitespace-nowrap"
+                className="flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 text-xs font-medium text-fg-secondary active:bg-tint-8 focus-visible:bg-tint-8 cursor-pointer"
               >
                 <Icon name="entity.folder" size="sm" />
                 <span>{sub.name}</span>
@@ -330,7 +315,7 @@ export const MobileFoldersView: React.FC = () => {
           })}
           <button
             onClick={() => openCreateFolderModal(mobileActiveFolder)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-tint-2 hover:bg-tint-6 border border-dashed border-tint-10 text-xs text-fg-secondary shrink-0 cursor-pointer whitespace-nowrap"
+            className="flex h-12 shrink-0 items-center gap-1.5 whitespace-nowrap px-2 text-xs text-fg-secondary active:bg-tint-8 focus-visible:bg-tint-8 cursor-pointer"
             title="Создать подпапку"
           >
             <Icon name="action.add" size="sm" tone="inherit" />

@@ -46,6 +46,7 @@ src/
     tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока)
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
+      notes/        wire, channel, session, replica, journal, merge, persistence, conflicts, bootstrap
     vault/          модель записи: schema, updates, markdown serializer, filename, vaultDisplay, demo
     time/           даты, recurrence, Todoist-парсер, раскладка календаря
     media/          attachments enrichment, audio, bytecode, file drop, blobToDataUrl

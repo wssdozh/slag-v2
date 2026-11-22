@@ -14,10 +14,14 @@ export const NotificationsSettingsTab: React.FC = () => {
   const { addToast } = useApp();
   const [prefs, setPrefs] = useState<NotifyPrefs>(() => getNotifyPrefs());
 
-  const patchPrefs = (next: Partial<NotifyPrefs>) => {
-    const merged = { ...prefs, ...next };
-    setPrefs(merged);
-    saveNotifyPrefs(merged);
+  const patchPrefs = async (next: Partial<NotifyPrefs>) => {
+    try {
+      await saveNotifyPrefs(next);
+    } catch {
+      return; // Storage already reports the failure.
+    } finally {
+      setPrefs(getNotifyPrefs());
+    }
   };
 
   const handleTest = async () => {

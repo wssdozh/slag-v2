@@ -32,7 +32,8 @@ test.describe('Telegram-style Pinned Messages Banner & Feed Retention', () => {
     // 3. Verify Telegram-style Pinned Banner appeared at top of feed
     const banner = page.locator('[data-testid="pinned-banner"]');
     await expect(banner).toBeVisible();
-    await expect(banner.locator('text=Закреплённое сообщение')).toBeVisible();
+    await expect(banner.getByText('Закреплено', { exact: true })).toBeVisible();
+    await expect(banner.locator('[data-icon="action.pin"]').first()).toBeVisible();
 
     // Capture screenshot of Telegram-style pinned banner
     await page.screenshot({

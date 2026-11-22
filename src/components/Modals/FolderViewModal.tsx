@@ -1,10 +1,13 @@
 // The per-folder view settings sheet: layout, sort, filters, and resetting them.
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { FeedViewMode, SlagItemType, SortField, InboxMode } from '../../types';
 import { Icon } from '../UI/icons/Icon';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
+import { AnchoredPopover } from '../UI/AnchoredPopover';
+
+const getTrigger = () => document.querySelector<HTMLElement>('button[aria-label="Вид и фильтры папки"]');
 
 export const FolderViewModal: React.FC = () => {
   const {
@@ -25,39 +28,7 @@ export const FolderViewModal: React.FC = () => {
   } = useApp();
 
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
-  const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
-  const [cachedCoords, setCachedCoords] = useState<{ top: number; right: number } | null>(null);
-  if (coords && coords !== cachedCoords) {
-    setCachedCoords(coords);
-  }
-  const effectiveCoords = coords || cachedCoords;
-
   const { ref, phase, isPresent, onTransitionEnd } = usePresence(isFolderViewModalOpen);
-
-  // Position popover directly under the 3-dots button in the active header
-  useEffect(() => {
-    if (!isFolderViewModalOpen) return;
-
-    const updatePosition = () => {
-      const trigger = document.querySelector('button[aria-label="Вид и фильтры папки"]');
-      if (trigger) {
-        const rect = trigger.getBoundingClientRect();
-        const top = rect.bottom + 6;
-        const right = Math.max(8, window.innerWidth - rect.right);
-        setCoords({ top, right });
-      } else {
-        setCoords({ top: 56, right: 16 });
-      }
-    };
-
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
-    };
-  }, [isFolderViewModalOpen]);
 
   // Close on Escape key
   useEffect(() => {
@@ -118,20 +89,17 @@ export const FolderViewModal: React.FC = () => {
       />
 
       {/* Lightweight Linear Dark dropdown popover */}
-      <div
-        ref={ref}
+      <AnchoredPopover
+        surfaceRef={ref}
+        getAnchor={getTrigger}
+        isOpen={isFolderViewModalOpen}
+        align="end"
         role="dialog"
         aria-label="Вид и фильтры"
         aria-modal="true"
         data-motion-state={phase}
         onTransitionEnd={onTransitionEnd}
-        inert={!isFolderViewModalOpen}
-        style={{
-          position: 'fixed',
-          top: effectiveCoords ? `${effectiveCoords.top}px` : '56px',
-          right: effectiveCoords ? `${effectiveCoords.right}px` : '16px',
-        }}
-        className="pointer-events-auto w-[310px] max-w-[calc(100vw-16px)] rounded-2xl bg-surface-elevated/98 border border-tint-8 shadow-2xl shadow-scrim-90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-fg-soft"
+        className="pointer-events-auto z-50 select-none w-[310px] rounded-2xl bg-surface-elevated/98 border border-tint-8 shadow-2xl shadow-scrim-90 backdrop-blur-xl p-3 space-y-3 motion-popover text-xs text-fg-soft"
       >
         {/* Section 1: View Modes with Reset Icon in top-right */}
         <div>
@@ -306,7 +274,7 @@ export const FolderViewModal: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </AnchoredPopover>
     </div>
   );
 };

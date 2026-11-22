@@ -5,7 +5,7 @@
 // ledger, and the section writes are coalesced — a keystroke that enqueues one draft op is not a
 // file write of its own, it joins whatever write is already on its way.
 import type { SyncOperation } from '../entities/types';
-import { loadOutbox, saveOutbox } from '../localBookkeeping';
+import { loadOutbox, loadTombstones, saveOutbox, saveTombstones } from '../localBookkeeping';
 import type { SyncScope } from '../localBookkeeping';
 
 export class Outbox {
@@ -16,7 +16,23 @@ export class Outbox {
   }
 
   public enqueue(op: SyncOperation): void {
-    const ops = loadOutbox(this.scope.vaultId);
+    // A local delete guards against stale incoming copies immediately, not when a packet is ACKed.
+    if ((op.kind === 'item' && op.action === 'delete') || (op.kind === 'trash' && op.action === 'restore')) {
+      const tombstones = loadTombstones(this.scope);
+      const previous = tombstones[op.id];
+      if (op.kind === 'item' && op.timestamp > (previous ?? 0)) {
+        tombstones[op.id] = op.timestamp;
+        saveTombstones(this.scope, tombstones);
+      } else if (op.kind === 'trash' && previous !== undefined) {
+        delete tombstones[op.id];
+        saveTombstones(this.scope, tombstones);
+      }
+    }
+    const ops = loadOutbox(this.scope.vaultId).filter((previous) =>
+      previous.id !== op.id || !(
+        (op.kind === 'trash' && op.action === 'restore' && previous.kind === 'item' && previous.action === 'delete') ||
+        (op.kind === 'item' && op.action === 'delete' && previous.kind === 'trash' && previous.action === 'restore')
+      ));
     // Compaction: if operation exists for same entity, replace or update
     const idx = ops.findIndex((o) => o.kind === op.kind && o.id === op.id);
     if (idx >= 0) {
@@ -37,6 +53,17 @@ export class Outbox {
     const pending = loadOutbox(this.scope.vaultId);
     const remaining = pending.filter((op) => !syncedSet.has(op.opId));
     if (remaining.length === pending.length) return;
+    // Upgrade path: a delete queued by an older client may not have a local tombstone yet.
+    // Apply only acknowledged deletes still in the queue, never ones superseded by a restore.
+    const tombstones = loadTombstones(this.scope);
+    let changed = false;
+    for (const op of pending) {
+      if (syncedSet.has(op.opId) && op.kind === 'item' && op.action === 'delete' && op.timestamp > (tombstones[op.id] ?? 0)) {
+        tombstones[op.id] = op.timestamp;
+        changed = true;
+      }
+    }
+    if (changed) saveTombstones(this.scope, tombstones);
     saveOutbox(this.scope.vaultId, remaining);
   }
 

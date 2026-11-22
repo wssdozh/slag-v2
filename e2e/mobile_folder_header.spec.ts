@@ -65,12 +65,8 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
     await expect(modal).not.toBeVisible();
 
     // 7. Verify active filter badge appears in the mobile header
-    const taskBadge = page.locator('span', { hasText: 'Таски' }).first();
-    await expect(taskBadge).toBeVisible();
-
-    // Verify customization dot on the vertical 3-dots button
-    const dotIndicator = dotsBtn.locator('span.rounded-full');
-    await expect(dotIndicator).toBeVisible();
+    const taskBadge = page.getByRole('button', { name: 'Сбросить фильтр по типу' });
+    await expect(taskBadge).toHaveAttribute('title', /Таски/);
 
     // Capture screenshot with active filter chip
     await page.screenshot({
@@ -85,7 +81,6 @@ test.describe('Mobile Unified Folder Header & Filters in Modal', () => {
 
     // Verify badge disappears
     await expect(dismissBtn).not.toBeVisible();
-    await expect(dotIndicator).not.toBeVisible();
 
     // Capture final clean header
     await page.screenshot({

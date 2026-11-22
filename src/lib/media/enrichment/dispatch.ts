@@ -3,7 +3,6 @@ import type { AiSettings, SlagAttachment, SlagItem } from '../../../types';
 import { AI_LIMITS } from '../../../config';
 import { logger } from '../../logger/logger';
 import { storage } from '../../storage';
-import { blobToDataUrl } from '../blobToDataUrl';
 import { downscaleImageDataUrl } from '../imageCodec';
 import {
   chatTargetForConnection,
@@ -28,12 +27,8 @@ const enrichLog = logger.scope('AI');
 /** The note keeps attachment metadata; the bytes live in IndexedDB or `.attachments/`. */
 async function withBytes(attachment: SlagAttachment): Promise<SlagAttachment> {
   if (attachment.dataUrl) return attachment;
-  const url = await storage.getAttachmentUrl(attachment.id, attachment.relativePath, attachment.mimeType);
-  if (!url) return attachment;
-  if (url.startsWith('data:')) return { ...attachment, dataUrl: url };
-
-  const blob = await (await fetch(url)).blob();
-  const dataUrl = await blobToDataUrl(blob);
+  const dataUrl = await storage.getAttachmentDataUrl(attachment);
+  if (!dataUrl) throw new Error('Файл вложения недоступен на этом устройстве');
   return { ...attachment, dataUrl };
 }
 
@@ -163,26 +158,26 @@ export async function enrichAttachment(
   // Settings reach this boundary from storage and from tests; normalizing here means a
   // half-migrated or partial object cannot crash the transports below.
   const settings = normalizeAiSettings(rawSettings);
-  const attachment = await withBytes(attachmentInput);
-  const isMedia = attachment.type === 'image' || attachment.type === 'audio' || attachment.type === 'video';
+  const isMedia = attachmentInput.type === 'image' || attachmentInput.type === 'audio' || attachmentInput.type === 'video';
 
   const mediaTargets = isMedia
-    ? mediaChain(settings, attachment.type === 'image' ? 'vision' : 'stt')
+    ? mediaChain(settings, attachmentInput.type === 'image' ? 'vision' : 'stt')
     : [];
   const chatTargets = isMedia ? [] : chatChain(settings);
 
   if (mediaTargets.length === 0 && chatTargets.length === 0) {
-    return { ...attachment, enrichmentStatus: 'idle' };
+    return { ...attachmentInput, enrichmentStatus: 'idle' };
   }
 
   const startMs = performance.now();
   const route = isMedia ? mediaTargets[0]?.label : chatTargets[0]?.providerName;
-  enrichLog.info(`Enriching attachment "${attachment.name}" (${attachment.type})`, {
+  enrichLog.info(`Enriching attachment "${attachmentInput.name}" (${attachmentInput.type})`, {
     context: focalContext.slice(0, 60),
     route: route || 'none',
   });
 
   try {
+    const attachment = await withBytes(attachmentInput);
     let result: EnrichmentResult | null = null;
     let lastError: unknown = null;
 
@@ -232,13 +227,10 @@ export async function enrichAttachment(
     // waiting for the write here closes the window where a reload loses the cached copy.
     await storage.saveAttachment(enriched);
     return enriched;
-  } catch (err: any) {
-    enrichLog.warn(`Enrichment failed for "${attachment.name}":`, err?.message || err);
-    return {
-      ...attachment,
-      enrichmentStatus: 'error',
-      enrichmentError: err?.message || 'Ошибка обработки',
-    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Ошибка обработки';
+    enrichLog.warn(`Enrichment failed for "${attachmentInput.name}":`, message);
+    return { ...attachmentInput, enrichmentStatus: 'error', enrichmentError: message };
   }
 }
 

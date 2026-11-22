@@ -1,9 +1,55 @@
 import { test, expect } from '@playwright/test';
 
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`Active filters share compact styling and clear independently at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    if (viewport.width < 768) {
+      await page.getByRole('button', { name: /^Входящие/ }).first().click();
+    }
+    const dots = page.getByRole('button', { name: 'Вид и фильтры папки' });
+    const header = dots.locator('xpath=ancestor::header');
+    await expect(header.getByRole('button', { name: 'Информация о папке' })).toHaveText('Входящие');
+    await expect(header.getByRole('button', { name: 'Запустить ИИ-Сортировку' })).toHaveText('');
+    await dots.click();
+    const modal = page.getByRole('dialog', { name: 'Вид и фильтры', exact: true });
+    await modal.getByRole('button', { name: 'Таски', exact: true }).click();
+    await modal.getByText('Скрыть выполненные', { exact: true }).click();
+    await modal.getByText('Только закрепленные', { exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+    await expect(dots.locator(':scope > *')).toHaveCount(1);
+    await header.screenshot({ path: `test-results/screenshots/inbox-header-filtered-${viewport.width}.png` });
+
+    const type = page.getByRole('button', { name: 'Сбросить фильтр по типу', exact: true });
+    const pinned = page.getByRole('button', { name: 'Сбросить фильтр закрепленных', exact: true });
+    const completed = page.getByRole('button', { name: 'Показать выполненные таски', exact: true });
+    for (const badge of [type, pinned, completed]) {
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveCSS('border-top-width', '0px');
+      await expect(badge).toHaveCSS('height', '24px');
+      await expect(badge).toHaveAttribute('class', await type.getAttribute('class') ?? '');
+      await expect(badge.locator('[data-icon="action.close"]')).toHaveAttribute('width', '12');
+      await expect(badge.locator('button')).toHaveCount(0);
+      await expect(badge).toHaveText('');
+    }
+    await page.screenshot({ path: `test-results/screenshots/unified-filter-chips-${viewport.width}.png` });
+    await completed.focus();
+    await page.keyboard.press('Enter');
+    await expect(completed).not.toBeVisible();
+    await expect(type).toBeVisible();
+    await expect(pinned).toBeVisible();
+    await pinned.click();
+    await expect(pinned).not.toBeVisible();
+    await type.click();
+    await expect(type).not.toBeVisible();
+  });
+}
+
 test.describe('Folder View Settings & Todoist-style Modal', () => {
   test('Clean header, Todoist-style view modal, sorting, filtering, and per-folder persistence', async ({ page }) => {
     // Open app
-    await page.goto('http://localhost:5173');
+    await page.goto('/');
     await page.waitForSelector('header');
 
     // 1. Verify clean header: no segmented mode switcher, only folder title and 3-dots button
@@ -57,12 +103,10 @@ test.describe('Folder View Settings & Todoist-style Modal', () => {
     await expect(modal).not.toBeVisible();
 
     // Verify active filter chip appears in the header with 1-click dismiss button
-    const taskChip = page.locator('header span', { hasText: 'Таски' }).first();
-    await expect(taskChip).toBeVisible();
-
-    // Click dismiss button on the chip
     const dismissChipBtn = page.locator('header button[aria-label="Сбросить фильтр по типу"]');
-    await expect(dismissChipBtn).toBeVisible();
+    await expect(dismissChipBtn).toHaveAttribute('title', /Таски/);
+    await expect(dismissChipBtn).toHaveCSS('border-top-width', '0px');
+    await dismissChipBtn.locator('xpath=ancestor::header').screenshot({ path: 'test-results/screenshots/compact-feed-filter.png' });
     await dismissChipBtn.click();
 
     // Verify chip disappeared

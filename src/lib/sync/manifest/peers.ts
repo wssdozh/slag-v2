@@ -1,4 +1,4 @@
-// Who else in this room published a root, and what to ask them for.
+// Who else in this room published a root.
 //
 // The relay keeps one manifest per device now, so a check reads the other devices' rows and gets
 // the per-note leaves with them. An older relay keeps one row for the whole room and reports it in
@@ -83,19 +83,20 @@ export function parsePeerManifests(raw: unknown): PeerManifest[] {
 /**
  * The other devices' manifests, or an empty list when there is nothing to compare against.
  *
- * `204` is "you already have the latest syncId", `404` is "nobody published yet": both mean the
- * room answered nothing, and neither is worth an error in the panel.
+ * `null` means no new observation (not modified or a failed read). A 404 for a missing
+ * manifest is an empty room, not a transport failure.
  */
-export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifest[]> {
+export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifest[] | null> {
   try {
     const response = await fetch(manifestRoomUrl(engine, engine.config.deviceId), {
       headers: authHeaders(engine),
       signal: AbortSignal.timeout(SYNC_INTERVALS.MANIFEST_TIMEOUT_MS),
     });
-    if (response.status === 204 || response.status === 404) return [];
+    if (response.status === 204) return null;
+    if (response.status === 404) return [];
     if (!response.ok) {
       syncLog.debug(`Манифесты соседей не прочитаны: HTTP ${response.status}`);
-      return [];
+      return null;
     }
     // A row naming this device is this device: comparing it with ourselves is the "in sync" lie
     // that shipped in dev.37, so it never counts as a peer.
@@ -104,38 +105,6 @@ export async function readPeerManifests(engine: SyncEngine): Promise<PeerManifes
     );
   } catch (error) {
     syncLog.debug('Манифесты соседей не прочитаны: сервер не ответил', { error: String(error) });
-    return [];
-  }
-}
-
-/**
- * Asks one peer for the notes only it has, by id.
- *
- * The answer is an ordinary bundle and `applyBundle` is its only receiver: this is a request for
- * state that already travels the room's normal path, not a second sync channel. An old client has
- * no device id to address, so there is nobody to ask — that divergence stays a report.
- */
-export async function requestMissingNotes(
-  engine: SyncEngine,
-  peer: PeerManifest,
-  ids: string[],
-): Promise<void> {
-  if (peer.deviceId === null || ids.length === 0 || peer.leaves === undefined) return;
-  const url = `${apiBase(engine.config.serverUrl)}/api/rooms/${engine.activeRoomId}/sync-request`;
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: authHeaders(engine, true),
-      body: JSON.stringify({ type: 'note_request', to: peer.deviceId, ids }),
-      signal: AbortSignal.timeout(SYNC_INTERVALS.MANIFEST_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      // A relay older than this app answers 404: a fact about the deployment, not about the vault.
-      syncLog.debug(`Запрос недостающих заметок не принят: HTTP ${response.status}`);
-      return;
-    }
-    syncLog.info(`Попросил у устройства ${peer.deviceId} ${ids.length} заметок, которых у меня нет`);
-  } catch (error) {
-    syncLog.debug('Запрос недостающих заметок не отправлен: сервер не ответил', { error: String(error) });
+    return null;
   }
 }

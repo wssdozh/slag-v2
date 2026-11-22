@@ -108,7 +108,7 @@
 .dockview-theme-slag .dockview-tabs-and-actions-container .dv-void-container {
   order: 3 !important;
   flex: 1 1 auto !important;
-  min-width: 80px !important;
+  min-width: 0 !important;
   height: 100% !important;
   align-self: stretch !important;
   pointer-events: auto !important;
@@ -118,7 +118,7 @@
 .dockview-theme-slag .dv-tabs-and-actions-container,
 .dockview-theme-slag .dockview-tabs-and-actions-container {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 0 6px;
+  padding: 0 calc(6px + var(--caption-inset, 0px)) 0 6px;
   display: flex !important;
   align-items: center !important;
   background-color: var(--color-panel, #16171c);

@@ -16,7 +16,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       <button
         onClick={onClose}
         className="p-1.5 rounded-lg text-fg-secondary hover:text-white hover:bg-tint-6 motion-press cursor-pointer"
-        title="Назад к ленте (Escape)"
+        data-hint="Назад к ленте (Escape)"
         aria-label="Назад к ленте"
       >
         <Icon name="nav.back" size="md" tone="inherit" />

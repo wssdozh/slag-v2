@@ -26,6 +26,52 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     expect(cardText).toContain(noteText);
   });
 
+  test('note text is selectable, links open, and disclosure stays out of the way', async ({ page }) => {
+    const composer = page.locator('main textarea');
+    await composer.fill('Выделяемый фрагмент. [Ссылка проверки](https://example.com/slag-note) ||Текст спойлера||\n\n> [!quote]-\n> Текст цитаты');
+    await page.locator('button[title*="Отправить"]').click();
+    const card = page.locator('[data-flip-id]').filter({ hasText: 'Выделяемый фрагмент.' });
+    const paragraph = card.locator('p').first();
+    await paragraph.hover({ position: { x: 4, y: 6 } });
+    const points = await paragraph.evaluate((element) => {
+      const range = document.createRange();
+      range.setStart(element.firstChild!, 0);
+      range.setEnd(element.firstChild!, 18);
+      const rect = range.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, y: (rect.top + rect.bottom) / 2 };
+    });
+    await page.mouse.move(points.left + 1, points.y);
+    await page.mouse.down();
+    await page.mouse.move(points.right - 1, points.y, { steps: 10 });
+    await page.mouse.up();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toContain('Выделяемый');
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.keyboard.press('ControlOrMeta+C');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Выделяемый');
+    const handle = card.getByTestId('item-drag-handle');
+    await expect(handle).toHaveAttribute('draggable', 'true');
+    const dragData = await page.evaluateHandle(() => new DataTransfer());
+    await handle.dispatchEvent('dragstart', { dataTransfer: dragData });
+    expect(await dragData.evaluate((data) => data.getData('text/plain'))).toBe(await card.getAttribute('data-flip-id'));
+    await page.evaluate(() => window.getSelection()?.removeAllRanges());
+
+    await page.context().route('https://example.com/slag-note', (route) => route.fulfill({ body: 'Link test' }));
+    const popup = page.waitForEvent('popup');
+    await card.getByRole('link', { name: 'Ссылка проверки' }).click();
+    await expect(await popup).toHaveURL('https://example.com/slag-note');
+    await (await popup).close();
+
+    await expect(card.getByText('Текст спойлера')).toHaveCount(0);
+    const spoiler = card.getByRole('button', { name: 'Раскрыть спойлер' });
+    await spoiler.focus();
+    await page.keyboard.press('Enter');
+    await expect(card.getByText('Текст спойлера')).toBeVisible();
+    await expect(card.getByText('Текст цитаты')).not.toBeVisible();
+    await card.locator('summary').click();
+    await expect(card.getByText('Текст цитаты')).toBeVisible();
+    await card.screenshot({ path: 'test-results/screenshots/note-disclosure.png' });
+  });
+
   test('2. Task creation & direct in-feed completion toggle', async ({ page }) => {
     // Select task type in composer
     const typeDropdownButton = page.locator('button', { hasText: /Заметка|Таска|Статья/ }).first();
@@ -165,7 +211,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
     // Verify fullscreen editor opened with article content
     await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
-    await expect(page.locator('.cm-content')).toContainText('Три ключевых принципа SLAG');
+    await expect(page.locator('.cm-content')).toContainText('Один файл вместо десяти приложений');
 
     await page.screenshot({
       path: 'test-results/screenshots/fullscreen-editor-live-preview.png',
@@ -481,6 +527,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     // 4. Capture Fullscreen Editor layout for visual audit
     const focusEditorBtn = page.locator('button[aria-label="Открыть в фокус-редакторе"]').first();
     if (await focusEditorBtn.isVisible()) {
+      await focusEditorBtn.locator('xpath=ancestor::*[@data-flip-id]').hover();
       await focusEditorBtn.click();
       await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
 

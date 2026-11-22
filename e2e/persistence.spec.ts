@@ -133,23 +133,28 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     }
   });
 
-  test('ItemCard floating action buttons on hover outside the card and clean header', async ({ page }) => {
+  test('ItemCard reveals actions in its top-right corner without resizing', async ({ page }) => {
     const card = page.locator('main [id^="item-"]').first();
-    await expect(card).toBeVisible();
+    await card.scrollIntoViewIfNeeded();
+    const reply = card.getByRole('button', { name: 'Ответить (R)' });
+    const actions = reply.locator('..');
+    await expect(actions).toHaveCSS('opacity', '0');
+    await expect(actions).toHaveCSS('pointer-events', 'none');
+    const before = (await card.boundingBox())!;
 
-    // Take screenshot without hover
-    await page.screenshot({ path: 'test-results/screenshots/card-no-hover.png' });
-
-    // Hover over the card
     await card.hover();
-    await page.waitForTimeout(200);
+    await expect(actions).toHaveCSS('opacity', '1');
+    const overlay = (await actions.boundingBox())!;
+    expect(await card.boundingBox()).toEqual(before);
+    expect(overlay.x).toBeGreaterThanOrEqual(before.x);
+    expect(overlay.x + overlay.width).toBeCloseTo(before.x + before.width - 4);
+    expect(overlay.y).toBeCloseTo(before.y + 4);
+    await card.screenshot({ path: 'test-results/screenshots/card-hover-corner.png' });
 
-    // Verify action buttons appear
-    const replyBtn = card.locator('button[title*="Ответить"]').first();
-    await expect(replyBtn).toBeVisible();
-
-    // Take screenshot with hover
-    await page.screenshot({ path: 'test-results/screenshots/card-hover-outside.png' });
+    await page.mouse.move(0, 0);
+    await expect(actions).toHaveCSS('opacity', '0');
+    await reply.focus();
+    await expect(actions).toHaveCSS('opacity', '1');
   });
 
   // Skipped, and not on a selector: the editor stops being a modal at some point in this flow,
@@ -178,7 +183,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
 
     // 3. Switch width to Wide mode. The control is the sheet-width toggle; the old label
     // "Широкая" went away when the editor was redesigned around a sheet.
-    const widthBtn = page.locator('header button[title*="Развернуть лист"]').first();
+    const widthBtn = page.locator('header button[aria-label*="Развернуть лист"]').first();
     await widthBtn.click();
     await page.waitForTimeout(400);
 
@@ -204,7 +209,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await page.screenshot({ path: 'test-results/screenshots/fullscreen_restored_after_reload.png' });
 
     // 8. Save and close
-    await page.locator('header button[title*="Сохранить изменения"]').click();
+    await page.locator('header button[data-hint*="Сохранить изменения"]').click();
     await expect(editorModal).not.toBeVisible();
 
     // 9. Reload again - editor should stay closed

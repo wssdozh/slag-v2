@@ -44,15 +44,21 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
   const [enabledInitial] = useState(enabled);
   const [wide, setWide] = useState(() => getPref(SIZE_KEY) === '1');
 
-  const save = () => {
-    // The timestamp is what lets another device lose an old copy instead of overwriting this one.
-    const at = Date.now();
-    if (field === 'prompt') {
-      storage.saveWorkspaceState({ aiPrompt: value.trim(), aiPromptAt: at });
-    } else {
-      storage.saveWorkspaceState({ aiPersona: value.trim(), aiPersonaEnabled: enabled, aiPersonaAt: at });
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    setSaveFailed(false);
+    try {
+      const at = Date.now(); // Legacy rooms still carry the timestamp; registry rooms use revisions.
+      await storage.saveWorkspaceState(field === 'prompt' ? { aiPrompt: value.trim(), aiPromptAt: at }
+        : { aiPersona: value.trim(), aiPersonaEnabled: enabled, aiPersonaAt: at });
+      onClose();
+    } catch {
+      setSaveFailed(true);
+    } finally {
+      setSaving(false);
     }
-    onClose();
   };
 
   const toggleWide = () => {
@@ -75,7 +81,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
           {enabled ? 'ассистент говорит от её лица' : 'выключено — только правила промпта'}
         </span>
       </span>
-      <SettingsSwitch checked={enabled} onChange={setEnabled} label="Персона включена" />
+      <SettingsSwitch checked={enabled} onChange={(next) => { if (!saving) setEnabled(next); }} label="Персона включена" />
     </div>
   );
 
@@ -87,14 +93,15 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
       placeholder={PLACEHOLDERS[field]}
       aria-label={TITLES[field]}
       data-testid={`ai-${field}-text`}
-      disabled={personaOff}
+      disabled={personaOff || saving}
       className="w-full flex-1 min-h-24 rounded-md bg-surface-elevated border border-subtle px-3 py-2 text-xs leading-relaxed text-fg-primary placeholder:text-fg-dim outline-none ring-0 resize-none disabled:opacity-50"
     />
   );
 
   const actions = (
     <div className="flex items-center justify-end gap-2">
-      <span className="mr-auto text-2xs font-mono text-fg-dim">{value.length}</span>
+      {saveFailed ? <span role="alert" className="mr-auto text-xs text-fg-secondary">Не удалось сохранить. Текст остался в редакторе.</span>
+        : <span className="mr-auto text-2xs font-mono text-fg-dim">{value.length}</span>}
       <button
         type="button"
         onClick={onClose}
@@ -106,7 +113,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
         type="button"
         onClick={save}
         data-testid={`ai-${field}-save`}
-        disabled={!dirty}
+        disabled={!dirty || saving}
         className="px-3 py-1.5 rounded-md text-xs font-medium bg-accent text-white hover:bg-accent-strong disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
       >
         Сохранить
