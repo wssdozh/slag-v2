@@ -204,6 +204,9 @@ export async function openNoteSession(options: {
       const copies = await options.port.readRegistryNoteCopies?.(ids) ?? [];
       requireVerified();
       return copies;
+    }, (note, disk) => {
+      assertScope();
+      options.port.rememberNoteProjection?.(note, disk);
     }),
     get progress() {
       const progress = replica.progress;

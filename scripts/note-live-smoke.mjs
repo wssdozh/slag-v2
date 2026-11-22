@@ -93,6 +93,7 @@ try {
     let posts = 0;
     let pushes = 0;
     let ignoreReply = false;
+    let interceptPush;
     const attempts = [];
     let saved;
     const errors = [];
@@ -108,7 +109,11 @@ try {
       if (ws.readyState !== WebSocket.OPEN) return false;
       pushes++;
       attempts.push(JSON.parse(text).ops);
-      ws.send(text);
+      if (interceptPush) {
+        const intercept = interceptPush;
+        interceptPush = undefined;
+        intercept(() => ws.send(text));
+      } else ws.send(text);
       return true;
     },
     apply: async ({ id, item }) => local.set(id, item),
@@ -127,6 +132,7 @@ try {
     await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
     await replica.catchUp();
     return { replica, local, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
+      holdNextPush: () => new Promise((resolve) => { interceptPush = resolve; }),
       folders: () => folders, groups, stats: () => ({ reads, posts, pushes }), saved: () => saved,
       close: () => { controller.abort(); ws.close(); } };
   }
@@ -206,23 +212,55 @@ try {
   await until(() => author.local.has('small-99') && reader.replica.pendingCount === 0);
   assert.equal(reader.stats().pushes - pushesBefore, 1);
   assert.equal(reader.stats().reads + author.stats().reads, readsBefore);
-  // Concurrent writers converge on one accepted revision. The stale copy remains local.
+  // Both peers capture the same actual base before the first remote event arrives.
   const shared = reader.local.get(id);
+  const revision = reader.saved().confirmed[id].revision;
+  const beforeMerge = (await phoneChannel.status()).head;
   const parallelTitle = { ...shared, title: 'title from first writer' };
   const parallelContent = { ...shared, content: 'body from second writer' };
-  await Promise.all([
-    author.replica.record([{ id, kind: 'update', item: parallelTitle, previous: shared }]),
-    reader.replica.record([{ id, kind: 'update', item: parallelContent, previous: shared }]),
+  const update = (peer, item, previous, baseRevision) => peer.replica.record([
+    { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
   ]);
-  await until(() => [author, reader].every((device) => device.replica.pendingCount === 0));
+  await Promise.all([update(author, parallelTitle, shared, revision), update(reader, parallelContent, shared, revision)]);
+  const combined = { ...parallelTitle, content: parallelContent.content };
+  await until(() => [author, reader].every((peer) => peer.replica.pendingCount === 0 && peer.saved().cursor === beforeMerge + 2));
+  assert.equal(author.local.get(id).title, combined.title);
+  assert.equal(author.local.get(id).content, combined.content);
   assert.deepEqual(reader.local.get(id), author.local.get(id));
-  const loser = [author, reader].find((device) => device.replica.conflicts.length);
-  assert.ok(loser);
-  const [conflict] = loser.replica.conflicts;
-  assert.deepEqual(conflict.item, loser === reader ? parallelContent : parallelTitle);
-  await loser.replica.resolveConflict(conflict.intentId, 'keep', conflict.revision);
-  assert.deepEqual(loser.saved().conflicts, []);
+  assert.deepEqual([...author.replica.conflicts, ...reader.replica.conflicts], []);
   assert.deepEqual([...author.errors, ...reader.errors], []);
+
+  const third = await device(2);
+  const beforeRace = reader.saved().cursor;
+  const raceBase = reader.local.get(id);
+  const raceRevision = reader.saved().confirmed[id].revision;
+  const restartState = reader.saved();
+  reader.close();
+  await update(author, { ...raceBase, tags: ['other device'] }, raceBase, raceRevision);
+  await until(() => third.saved().cursor === beforeRace + 1 && author.replica.pendingCount === 0);
+  reader = await device(1, restartState, reader.local);
+  const held = reader.holdNextPush();
+  await update(reader, { ...raceBase, content: 'offline edit in the reopened editor' }, raceBase, raceRevision);
+  const send = await held;
+  const thirdBase = third.local.get(id);
+  await update(third, { ...thirdBase, isPinned: true }, thirdBase, third.saved().confirmed[id].revision);
+  await until(() => reader.saved().cursor === beforeRace + 2 && third.replica.pendingCount === 0);
+  send();
+  await until(() => reader.saved().cursor === beforeRace + 3 && reader.replica.pendingCount === 0);
+  const [obsolete, retried] = reader.attempts.slice(-2).map(([op]) => op);
+  assert.notEqual(retried.opId, obsolete.opId);
+  assert.equal(retried.baseRevision, beforeRace + 2);
+  const raceResult = reader.local.get(id);
+  assert.deepEqual(raceResult.tags, ['other device']);
+  assert.equal(raceResult.content, 'offline edit in the reopened editor');
+  assert.equal(raceResult.isPinned, true);
+  assert.deepEqual(reader.replica.conflicts, []);
+  const requestsBeforeNoop = reader.stats();
+  await update(reader, { ...raceResult, updatedAt: Date.now() }, raceResult, beforeRace + 3);
+  assert.equal(reader.replica.pendingCount, 0);
+  assert.deepEqual(reader.stats(), requestsBeforeNoop);
+  third.close();
+
   const beforeGroup = (await phoneChannel.status()).head;
   const folderTree = [...tree, { path: 'Projects', name: 'Projects', description: '' }];
   const original = author.local.get(id);
@@ -231,7 +269,7 @@ try {
   await author.replica.recordFolderGroup([{ id, kind: 'update', item: moved, previous: original }], folderTree, tree);
   await until(() => author.replica.pendingCount === 0 && reader.saved().cursor === beforeGroup + 2);
   assert.deepEqual(author.attempts.at(-1), author.attempts.at(-2));
-  assert.deepEqual(reader.groups, [{ notes: [{ id, item: moved }], tree: folderTree }]);
+  assert.deepEqual(reader.groups, [{ notes: [{ id, item: moved, revision: beforeGroup + 1 }], tree: folderTree }]);
   assert.deepEqual(author.local.get(id), moved);
   assert.deepEqual(author.folders(), folderTree);
   const accepted = await phoneChannel.events(generation, beforeGroup);

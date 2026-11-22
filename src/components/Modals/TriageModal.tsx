@@ -164,7 +164,7 @@ const TriageModalDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> 
             folder: s.targetFolder,
             tags: mergedTags,
             updatedAt: Date.now(),
-          });
+          }, originalItem);
           count++;
         }
       }

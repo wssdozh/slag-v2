@@ -1,12 +1,14 @@
 // Serializes local intents and canonical application, not the network. I/O is owned by the host.
 import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
-import type { AcceptedNote, NoteMutation } from '../../storage/noteRegistry';
+import type { AcceptedNote, NoteMutation, NoteOrigin } from '../../storage/noteRegistry';
 import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
 import { NoteChannel } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
 import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteIntentSource, NoteJournal, RegistryValue } from './journal.ts';
 import { noteDifferences, relayNote } from './merge.ts';
+import { candidate, confirmedBase } from './reconcile.ts';
+import type { Candidate } from './reconcile.ts';
 import { isSharedRegistryId } from './sharedBody.ts';
 import type { SharedBody, SharedMutation } from './sharedBody.ts';
 import { checkedSharedBody, isNoteItem } from './wire.ts';
@@ -53,28 +55,12 @@ function headRejected(result: NoteResult): boolean {
   return result.status === 'rejected' && (result.code === 'note_head_changed' || result.code === 'note_head_required');
 }
 
-type Candidate = { item: RegistryValue; kind: NoteOp['kind']; conflicts: string[]; skip?: true };
-
-function candidate(intent: NoteIntent, head: NoteBase | undefined): Candidate {
-  const { base, kind, item } = intent;
-  const current = head?.item ?? null;
-  if (intent.predecessorConflict) return { item: current, kind, conflicts: ['predecessor'], skip: true };
-  if (!base && !intent.attempt) throw new Error('Неизвестна исходная версия заметки; правка осталась в очереди');
-  if (!head && kind !== 'create') throw new Error('Эталон заметки не найден; правка осталась в очереди');
-  if (base?.revision === (head?.revision ?? 0) && sameRegistryValue(base.item, current)) {
-    if (kind === 'update' && sameRegistryValue(item, current)) return { item: current, kind, conflicts: [], skip: true };
-    if ((kind === 'create' && !head) || (kind === 'restore' && head && current === null)
-        || ((kind === 'update' || kind === 'delete') && current !== null)) return { item, kind, conflicts: [] };
-  }
-  // Equal content at a newer revision does not prove it is the same lifetime of this record.
-  return { item: current, kind, conflicts: [intent.id === FOLDER_TREE_ID ? 'folders' : kind], skip: true };
-}
-
 export class NoteReplica {
   private state: NoteJournal;
   private chain = Promise.resolve();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private sending = false;
+  private readonly rebaseCounts = new Map<string, number>();
   private pulling: Promise<void> | undefined;
   private pullRetry: ReturnType<typeof setTimeout> | undefined;
   private observedRevision = 0;
@@ -350,7 +336,7 @@ export class NoteReplica {
     if (this.host.readOnly) return Promise.resolve();
     const run = this.enqueue(async () => {
       const before = this.state.pending;
-      const state = changes.reduce((journal, change) => recordNote(journal, { ...change, source, intentId: crypto.randomUUID() }), this.state);
+      const state = changes.reduce((journal, change) => recordNote(journal, { ...change, source, intentId: change.intentId ?? crypto.randomUUID() }), this.state);
       await this.persist(state);
       for (const intent of state.pending) if (!before.includes(intent)) this.logIntent('Note intent recorded', intent);
       this.schedule();
@@ -363,7 +349,8 @@ export class NoteReplica {
       .then((digest) => `${revision}:${digest}`);
   }
 
-  captureColdNoteEdits(readCopies: (ids: Set<string>) => Promise<{ item: SlagItem; marker?: string }[]>): Promise<void> {
+  captureColdNoteEdits(readCopies: (ids: Set<string>) => Promise<{ item: SlagItem; marker?: string }[]>,
+    remember?: (note: AcceptedNote, disk: SlagItem) => void): Promise<void> {
     if (this.host.readOnly) return Promise.resolve();
     return this.enqueue(async () => {
       const state = this.state;
@@ -379,7 +366,14 @@ export class NoteReplica {
       for (const { item: copy, marker } of copies) {
         const previous = live.get(copy.id);
         if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder
-            || previous.title !== copy.title || previous.type !== copy.type || normalizeDiskBody(previous.content) === normalizeDiskBody(copy.content)) continue;
+            || previous.title !== copy.title || previous.type !== copy.type) continue;
+        const revision = state.confirmed[copy.id].revision;
+        if (normalizeDiskBody(previous.content) === normalizeDiskBody(copy.content)) {
+          if (remember && marker && marker === await this.registryBodyMarker(copy.id, revision, previous.content)) {
+            remember({ id: copy.id, revision, item: previous, registryBodyMarker: marker }, copy);
+          }
+          continue;
+        }
         // The Markdown and its provenance were replaced together. A replayable projection
         // ahead of this journal is not a local edit, even if the relay has since advanced again.
         const projected = marker ? Number(marker.split(':', 1)[0]) : 0;
@@ -394,14 +388,16 @@ export class NoteReplica {
     });
   }
 
-  recordExternal(event: { id: string; action: string; payload?: SlagItem; previous?: SlagItem }): Promise<void> {
+  recordExternal(event: { id: string; action: string; payload?: SlagItem; previous?: SlagItem;
+    noteOrigin?: NoteOrigin | null; intentId?: string }): Promise<void> {
     // A watcher reports a missing path, not an explicit delete. An atomic rename,
     // unreadable file, or a folder move must never mint a registry tombstone.
     if ((event.action !== 'upsert' && event.action !== 'conflict') || !event.payload) return Promise.resolve();
     const item = relayNote(event.payload);
     if (!isNoteItem(item) || item.id !== event.id) return Promise.reject(new Error('Invalid note from disk watcher'));
     const head = confirmedNote(this.state, event.id);
-    return this.record([{ id: event.id, kind: head ? 'update' : 'create', item, previous: event.previous }], 'disk-watch');
+    return this.record([{ id: event.id, kind: head || event.previous ? 'update' : 'create', item, previous: event.previous,
+      origin: event.noteOrigin, intentId: event.intentId }], 'disk-watch');
   }
 
   private error(error: unknown) {
@@ -440,8 +436,8 @@ export class NoteReplica {
   }
 
   private async projectedNote(id: string, item: SlagItem | null, revision: number): Promise<AcceptedNote> {
-    if (!this.host.trackDiskProjection || !item || !revision) return { id, item };
-    return { id, item, registryBodyMarker: await this.registryBodyMarker(id, revision, item.content) };
+    if (!this.host.trackDiskProjection || !item || !revision) return { id, item, revision };
+    return { id, item, revision, registryBodyMarker: await this.registryBodyMarker(id, revision, item.content) };
   }
 
   private async applyValue(id: string, item: RegistryValue, revision: number, discardLiveCopy = false) {
@@ -458,7 +454,7 @@ export class NoteReplica {
   }
 
   private async settle(intent: NoteIntent, head: NoteBase, fields: string[]) {
-    let next = settleNote(setConfirmed(this.state, intent.id, head), intent, head.revision, fields.length > 0);
+    let next = settleNote(setConfirmed(this.state, intent.id, head), intent, head.revision, fields.length > 0, head.item);
     if (fields.length) next = { ...next, conflicts: [...this.conflicts, { intentId: intent.intentId, noteId: intent.id,
       kind: intent.kind, revision: head.revision, item: intent.item, fields, at: Date.now() }] };
     if (!next.pending.some((entry) => entry.id === intent.id)) {
@@ -478,7 +474,7 @@ export class NoteReplica {
       const changed = fields.length && isNoteItem(intent.item) && isNoteItem(head.item) ? noteDifferences(intent.item, head.item) : undefined;
       const known = ['title', 'type', 'folder', 'tags', 'attachments', 'status', 'priority', 'dueDate', 'reminder', 'duration', 'recurrence',
         'subtasks', 'kanbanColumn', 'isPinned', 'isArchived', 'replyToId', 'linkedItemIds', 'streak', 'history', 'lastCompletedDate', 'summary', 'readingTimeMinutes'];
-      const reason = ['predecessor', 'folder', 'folders'].includes(fields[0]) ? fields[0]
+      const reason = ['base', 'lifecycle', 'predecessor', 'folder', 'folders'].includes(fields[0]) ? fields[0]
         : fields.length ? intent.base?.revision === head.revision ? 'different_base_or_transition' : 'revision_changed' : undefined;
       this.logIntent(fields.length ? 'Note conflict saved' : intent.attempt ? 'Note accepted' : 'Equivalent note update skipped', intent,
         { revision: head.revision, stage: intent.attempt ? 'receipt-or-feed' : 'prepare', reason,
@@ -488,7 +484,7 @@ export class NoteReplica {
     else log();
   }
 
-  private async accept(head: NoteHead, applyKnown = false) {
+  private async accept(head: NoteHead, applyKnown = false, recovered = false) {
     // Recovery can see surviving heads of an expired group, not the original event batch.
     if (head.group && !this.host.applyFolderGroup) throw new Error('Atomic folder groups are not supported by this session');
     const body = await openAnyRegistryBody(this.host.keys, this.host.room, this.host.generation, head);
@@ -496,8 +492,8 @@ export class NoteReplica {
     if ('shared' in body && !this.host.applyShared) throw new Error('Shared registry support is not enabled');
     const { id } = body;
     const item = 'folders' in body ? body.folders : 'shared' in body ? (body.shared === null ? null : { shared: body.shared }) : body.item;
-    const base = { revision: head.revision, item };
     const own = this.state.pending.find((intent) => intent.attempt?.op.opId === head.opId);
+    const base = confirmedBase(recovered ? undefined : confirmedNote(this.state, id), head, item, own?.intentId);
     // A heads scan can recover a surviving member, but only a complete receipt settles the group.
     if (own && !own.folderGroup) {
       await this.settle(own, base, own.attempt?.conflicts ?? []);
@@ -529,7 +525,7 @@ export class NoteReplica {
     for (const [index, body] of bodies.entries()) {
       const { revision } = heads[index];
       const value = 'folders' in body ? body.folders : body.item;
-      next = setConfirmed(next, body.id, { revision, item: value });
+      next = setConfirmed(next, body.id, confirmedBase(confirmedNote(next, body.id), heads[index], value));
       // Keep the optimistic copy when a local proposal is pending; its base will be
       // checked separately. Never project an older head over a newer confirmation.
       if (confirmedNote(next, body.id)?.revision !== revision || next.pending.some(({ id }) => id === body.id)) continue;
@@ -602,7 +598,7 @@ export class NoteReplica {
         let previous = after;
         for (const head of page.heads) {
           if (head.noteId <= previous || head.revision <= since || head.revision > through) throw new Error('Invalid registry scan order');
-          await this.accept(head, since === 0);
+          await this.accept(head, since === 0, true);
           previous = head.noteId;
         }
         if (page.next !== null && (page.next <= after || page.next !== previous)) throw new Error('Registry scan did not advance');
@@ -716,6 +712,7 @@ export class NoteReplica {
       const first = firstPerNote(this.state);
       const ready = new Set(first);
       for (const intent of first) {
+        if ((this.rebaseCounts.get(intent.intentId) ?? 0) >= 3) continue;
         if (intent.folderGroup) {
           if (!this.host.atomicGroups || intent.folderGroup.index !== 0) continue;
           const groupId = intent.folderGroup.id;
@@ -743,6 +740,7 @@ export class NoteReplica {
           if (isSharedRegistryId(intent.id) && !this.host.applyShared) throw new Error('Shared registry support is not enabled');
           let attempt = intent.attempt;
           if (!attempt) {
+            if (this.needsFeed && intent.kind === 'update' && intent.provenBase && isNoteItem(intent.item)) continue;
             const head = confirmedNote(this.state, intent.id);
             const next = candidate(intent, head);
             const tree = confirmedNote(this.state, FOLDER_TREE_ID)?.item;
@@ -888,10 +886,15 @@ export class NoteReplica {
     }, Boolean(conflict));
   }
 
+  private countRebase(intentId: string) {
+    this.rebaseCounts.set(intentId, (this.rebaseCounts.get(intentId) ?? 0) + 1);
+  }
+
   private async clearRejectedAttempts(results: NoteResult[]) {
     // Only an explicit rejection proves these opIds did not commit. Network failures keep them intact.
     const rejected = new Set(results.filter(headRejected).map(({ opId }) => opId));
     for (const intent of this.state.pending) if (intent.attempt && rejected.has(intent.attempt.op.opId)) {
+      if (!intent.folderGroup) this.countRebase(intent.intentId);
       this.logIntent('Note requires catch-up', intent, { reason: 'head_changed' });
     }
     await this.persist({ ...this.state, pending: this.state.pending.map((intent) =>
@@ -918,9 +921,19 @@ export class NoteReplica {
     if (result.status === 'accepted') {
       if (result.revision <= attempt.op.baseRevision) throw new Error('Invalid accepted note revision');
       this.observe(result.revision);
-      await this.settle(intent, { revision: result.revision, item: attempt.item }, attempt.conflicts);
+      await this.settle(intent, confirmedBase(confirmedNote(this.state, intent.id), { ...attempt.op, revision: result.revision },
+        attempt.item, intent.intentId), attempt.conflicts);
     } else if (result.status === 'stale') {
       if (!result.current || result.current.noteId !== attempt.op.noteId) throw new Error('Wrong stale note');
+      if (intent.kind === 'update' && intent.provenBase && intent.source !== 'retry' && intent.source !== 'cold-recovery' && isNoteItem(intent.item)) {
+        // A stale reply can jump over delete/restore or intermediate updates. Let the feed
+        // establish continuity before attempting to merge; a heads scan cannot guess it.
+        this.observe(result.current.revision);
+        await this.persist({ ...this.state, pending: this.state.pending.map((entry) =>
+          entry === intent ? { ...entry, attempt: undefined } : entry) });
+        this.countRebase(intent.intentId);
+        return;
+      }
       // Keep the sent attempt durable until the rejection and the canonical revision are both
       // accounted for. If a write fails here, retry the same opId on the next pass.
       if (result.current.group) {
@@ -973,8 +986,10 @@ export class NoteReplica {
           if (failure) throw failure;
         });
         if (results.some(headRejected)) await this.catchUp();
-        else if (this.needsFeed) void this.catchUp().catch(() => undefined); // catchUp reports and schedules retry.
+        else if (this.needsFeed) await this.catchUp();
         this.host.onProgress();
+      } else if (this.needsFeed) {
+        await this.catchUp();
       } else if (this.pendingCount < pendingBefore) {
         this.host.onProgress();
       } else if (this.pendingCount) {
@@ -994,6 +1009,9 @@ export class NoteReplica {
         this.host.onDeliveryChange?.();
       }
       this.sending = false;
+      const pending = new Set(this.state.pending.map(({ intentId }) => intentId));
+      for (const id of this.rebaseCounts.keys()) if (!pending.has(id)) this.rebaseCounts.delete(id);
+      if (delay === RETRY_MS) this.rebaseCounts.clear();
       this.schedule(delay);
     }
   }

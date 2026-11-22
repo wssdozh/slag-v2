@@ -1,8 +1,9 @@
 // The log: levels, scopes, listeners, the buffer, retention and persistence. What must never be
 // written is decided in `logRedaction`.
 import type { LogEntry, LogLevel, LogScope } from '../../types';
-import { STORAGE_KEYS, UI_DELAYS } from '../../config';
-import { maskSensitiveString, sanitizeForLog } from './logRedaction';
+import { STORAGE_KEYS } from '../../config/storage.ts';
+import { UI_DELAYS } from '../../config/ui.ts';
+import { maskSensitiveString, sanitizeForLog } from './logRedaction.ts';
 
 export type LogListener = (entry: LogEntry) => void;
 

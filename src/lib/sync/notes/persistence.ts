@@ -28,7 +28,9 @@ function validItem(value: unknown, id: string): boolean {
 
 function validateBase(value: unknown, id: string) {
   const base = object(value);
-  if (!integer(base.revision) || (!(id === FOLDER_TREE_ID && base.revision === 0 && base.item === null) && !validItem(base.item, id))) {
+  if (!integer(base.revision) || (!(id === FOLDER_TREE_ID && base.revision === 0 && base.item === null) && !validItem(base.item, id))
+      || (base.since !== undefined && (!integer(base.since) || !base.since || base.since > base.revision || !isNoteItem(base.item)))
+      || (base.intentId !== undefined && (typeof base.intentId !== 'string' || !base.intentId))) {
     throw new Error('Invalid persisted note base');
   }
 }
@@ -106,6 +108,9 @@ export function loadNoteJournal(value: unknown, room: string, generation: number
         || !validItem(item, id) || (kind === 'delete') !== (item === null)
         || (entry.source !== undefined && (typeof entry.source !== 'string' || !['app', 'disk-watch', 'cold-recovery', 'retry'].includes(entry.source)))
         || (predecessorConflict !== undefined && (predecessorConflict !== true || predecessor !== undefined || entry.attempt !== undefined))
+        || [entry.provenBase, entry.provenPredecessor, entry.unverifiedBase].some((flag) => flag !== undefined && flag !== true)
+        || (entry.provenBase !== undefined && entry.base === undefined)
+        || (entry.optimisticBase !== undefined && (entry.provenBase !== true || !isNoteItem(entry.optimisticBase) || entry.optimisticBase.id !== id))
         || predecessor !== chain.get(id)) throw new Error('Invalid persisted note intent');
     seen.add(intentId);
     chain.set(id, intentId);

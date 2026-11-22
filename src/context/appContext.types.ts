@@ -176,7 +176,7 @@ export interface AppContextType {
   
   // Storage operations
   saveItem: (item: Partial<SlagItem> & { title: string; content: string; type: SlagItemType }) => SlagItem;
-  updateItem: (item: SlagItem) => void;
+  updateItem: (item: SlagItem, editedFrom?: SlagItem | null) => { item: SlagItem; durable?: Promise<void> };
   openNewNote: (folder: string) => void;
   deleteItem: (id: string) => void;
   restoreFromTrash: (id: string) => void;

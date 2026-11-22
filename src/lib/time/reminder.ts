@@ -8,7 +8,7 @@
  * День считается по календарю (UTC-полуночи), часы — по локальным: перенос даты не должен
  * превращать 09:30 в 10:30 из-за перехода на летнее время.
  */
-import { logger } from '../logger/logger';
+import { logger } from '../logger/logger.ts';
 
 const BARE_CLOCK = /^([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 const LOCAL_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -165,9 +165,6 @@ export function normalizeReminder(raw: unknown, dueDate?: string): string | unde
     // Голое время живёт на дне задачи: без дня его некуда поставить.
     return reminderToIso(dueDate, clock) ?? text;
   }
-  timeLog.warn('Reminder left as written: no zone and no day to anchor it', {
-    reminder: text,
-    dueDate,
-  });
+  timeLog.warn('Reminder left as written: no zone and no day to anchor it');
   return text;
 }

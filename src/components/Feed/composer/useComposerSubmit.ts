@@ -147,7 +147,7 @@ export function useComposerSubmit({
     if (aiSettings.autoTagging && fields.tags.length === 0 && content.trim().length >= 15) {
       categorizeDraft(content.trim(), destinationFolder, folders, aiSettings).then(res => {
         if (res.tags && res.tags.length > 0) {
-          updateItem({ ...saved, tags: res.tags, updatedAt: Date.now() });
+          updateItem({ ...saved, tags: res.tags, updatedAt: Date.now() }, saved);
         }
       }).catch(() => {
         // quiet fallback

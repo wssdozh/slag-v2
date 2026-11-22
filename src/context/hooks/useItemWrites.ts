@@ -74,14 +74,13 @@ export function useItemWrites(deps: ItemWritesDeps) {
     setIsFullscreenEditorOpen(true);
   }, [setIsFullscreenEditorOpen, setSelectedItem]);
 
-  const updateItem = useCallback((item: SlagItem) => {
-    const previous = storage.getItems().find(existing => existing.id === item.id);
+  const updateItem = useCallback((item: SlagItem, editedFrom?: SlagItem | null) => {
+    const previous = editedFrom === undefined ? storage.getItems().find(existing => existing.id === item.id) : editedFrom;
     const updated = previous ? applyTaskCompletion(previous, item) : item;
-    const saved = storage.saveItem(updated);
-    if (selectedItem?.id === item.id) {
-      setSelectedItem(saved);
-    }
+    const saved = storage.saveNoteEdit(updated, { editedFrom });
+    if (selectedItem?.id === item.id) setSelectedItem(saved.item);
     refreshData();
+    return saved;
   }, [selectedItem, refreshData, setSelectedItem]);
 
   const deleteItem = useCallback((id: string) => {
