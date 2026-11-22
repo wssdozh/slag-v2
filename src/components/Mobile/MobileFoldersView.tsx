@@ -10,6 +10,7 @@ import { Icon } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
+import { folderColorCss } from '../../lib/vault/folderColor';
 import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { useComposerInset } from '../../hooks/layout/useComposerInset';
@@ -189,7 +190,7 @@ export const MobileFoldersView: React.FC = () => {
                       className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div data-folder-color={folder.color} className="folder-icon-color w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
+                        <div data-folder-color={folder.color} style={{ color: folderColorCss(folder.color) }} className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
                           <Icon name={iconName} size="lg" tone="inherit" />
                         </div>
                         <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>

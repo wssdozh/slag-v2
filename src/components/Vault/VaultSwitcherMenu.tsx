@@ -1,5 +1,7 @@
 // Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete.
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { AnchoredPopover } from '../UI/AnchoredPopover';
 import { useApp } from '../../context/AppContext';
 import { isDesktopApp } from '../../lib/platform/windowControls';
 import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
@@ -9,15 +11,17 @@ export interface VaultSwitcherMenuProps {
   isOpen: boolean;
   onClose: () => void;
   variant?: 'dropdown' | 'sheet';
-  position?: 'top' | 'bottom';
+  getAnchor?: () => HTMLElement | null;
   className?: string;
 }
+
+const noAnchor = () => null;
 
 export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
   isOpen,
   onClose,
   variant = 'dropdown',
-  position = 'top',
+  getAnchor = noAnchor,
   className = '',
 }) => {
   const {
@@ -193,29 +197,30 @@ export const VaultSwitcherMenu: React.FC<VaultSwitcherMenuProps> = ({
   }
 
   return (
-    <div
-      ref={ref}
-      data-motion-state={phase}
-      onTransitionEnd={onTransitionEnd}
-      inert={!isOpen}
-      className="motion-presence-hold"
-    >
-      <div
-        className="fixed inset-0 z-40 bg-scrim-40 motion-fade"
-        data-motion-state={phase}
-        onClick={onClose}
-      />
-      <div
+    <>
+      {createPortal(
+        <div
+          className="fixed inset-0 z-40 bg-scrim-40 motion-fade"
+          data-motion-state={phase}
+          inert={!isOpen}
+          onClick={onClose}
+        />,
+        document.body,
+      )}
+      <AnchoredPopover
+        surfaceRef={ref}
+        getAnchor={getAnchor}
+        isOpen={isOpen}
+        direction="up"
+        matchAnchorWidth
+        data-testid="vault-switcher-dropdown"
         onClick={(e) => e.stopPropagation()}
+        onTransitionEnd={onTransitionEnd}
         data-motion-state={phase}
-        className={`absolute z-50 rounded-xl bg-surface-elevated border border-tint-8 shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs motion-popover ${
-          position === 'bottom'
-            ? 'bottom-full left-2 right-2 mb-1.5'
-            : 'top-full left-0 mt-2 w-72 sm:w-80'
-        } ${className}`}
+        className={`z-50 rounded-xl bg-surface-elevated border border-tint-8 shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs motion-popover [&>*]:shrink-0 ${className}`}
       >
         {menuContent}
-      </div>
-    </div>
+      </AnchoredPopover>
+    </>
   );
 };

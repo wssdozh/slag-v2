@@ -1,6 +1,6 @@
 // The app's own select: grouped options, icons, colours, a portal list and placement.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import { AnchoredPopover } from './AnchoredPopover';
 import { Icon } from './icons/Icon';
 import { usePresence } from '../../hooks/ui/usePresence';
 
@@ -59,15 +59,8 @@ export const Select: React.FC<SelectProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState<number>(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [calculatedDirection, setCalculatedDirection] = useState<'down' | 'up'>('down');
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [lastCoords, setLastCoords] = useState<{ top: number; left: number; width: number } | null>(null);
-  if (coords && coords !== lastCoords) {
-    setLastCoords(coords);
-  }
-  const effectiveCoords = coords || lastCoords;
-
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const getAnchor = useCallback(() => containerRef.current, []);
 
   const selectedOption = options.find((opt) => opt.value === value);
 
@@ -85,46 +78,12 @@ export const Select: React.FC<SelectProps> = ({
     listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'center' });
   }, [isOpen, isPresent, listRef]);
 
-  // Calculate fixed viewport coordinates for portal
-  const updatePosition = useCallback(() => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const dropdownHeight = 220;
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const spaceAbove = rect.top;
-
-    let dir: 'down' | 'up' = 'down';
-    if (direction === 'up') {
-      dir = 'up';
-    } else if (direction === 'down') {
-      dir = 'down';
-    } else {
-      dir = spaceBelow < dropdownHeight && spaceAbove > spaceBelow ? 'up' : 'down';
-    }
-
-    setCalculatedDirection(dir);
-
-    // Keep dropdown within viewport horizontal bounds
-    const width = Math.max(rect.width, 160);
-    let left = rect.left;
-    if (left + width > window.innerWidth - 8) {
-      left = Math.max(8, window.innerWidth - width - 8);
-    }
-
-    setCoords({
-      top: dir === 'up' ? rect.top - 6 : rect.bottom + 6,
-      left,
-      width,
-    });
-  }, [direction]);
-
   const handleToggle = () => {
     if (disabled) return;
     if (!isOpen) {
       setSearchQuery('');
       const idx = options.findIndex((opt) => opt.value === value);
       setHighlightedIndex(idx >= 0 ? idx : 0);
-      updatePosition();
     }
     setIsOpen(!isOpen);
   };
@@ -145,23 +104,6 @@ export const Select: React.FC<SelectProps> = ({
       items[safeHighlightedIndex].scrollIntoView({ block: 'nearest' });
     }
   }, [isOpen, safeHighlightedIndex, listRef]);
-
-  // Re-align on scroll or resize while open
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleScrollOrResize = () => {
-      updatePosition();
-    };
-
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
-
-    return () => {
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
-    };
-  }, [isOpen, updatePosition]);
 
   // Keyboard navigation, typeahead search, and click outside
   useEffect(() => {
@@ -230,21 +172,20 @@ export const Select: React.FC<SelectProps> = ({
 
   const isSmall = size === 'sm';
 
-  const portalContent = isPresent && effectiveCoords && typeof document !== 'undefined'
-    ? createPortal(
-        <div
-          ref={listRef}
+  const portalContent = isPresent && (
+        <AnchoredPopover
+          surfaceRef={listRef}
+          getAnchor={getAnchor}
+          isOpen={isOpen}
+          direction={direction}
+          minWidth={160}
+          maxWidth={340}
+          maxHeight={240}
+          matchAnchorWidth
           role="listbox"
           data-motion-state={phase}
           onTransitionEnd={onTransitionEnd}
-          style={{
-            position: 'fixed',
-            left: `${effectiveCoords.left}px`,
-            top: calculatedDirection === 'up' ? undefined : `${effectiveCoords.top}px`,
-            bottom: calculatedDirection === 'up' ? `${window.innerHeight - effectiveCoords.top}px` : undefined,
-            minWidth: `${effectiveCoords.width}px`,
-          }}
-          className={`z-[9999] max-w-[340px] max-h-60 overflow-y-auto rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
+          className={`z-[9999] rounded-xl bg-surface-elevated border border-tint-10 shadow-2xl shadow-scrim-90 p-1 backdrop-blur-xl motion-popover flex flex-col gap-0.5 ${dropdownClassName}`}
         >
           {/* Subtle Search Query Badge when user types */}
           {searchQuery && (
@@ -277,7 +218,7 @@ export const Select: React.FC<SelectProps> = ({
                     disabled={opt.disabled}
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     onClick={() => handleSelect(opt.value, opt.disabled)}
-                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
+                    className={`w-full flex shrink-0 items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
                       opt.disabled
                         ? 'opacity-40 cursor-not-allowed text-fg-dim'
                         : isSelected
@@ -301,10 +242,8 @@ export const Select: React.FC<SelectProps> = ({
               );
             })
           )}
-        </div>,
-        document.body
-      )
-    : null;
+        </AnchoredPopover>
+  );
 
   return (
     <div

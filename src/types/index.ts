@@ -81,7 +81,7 @@ export interface KanbanColumn {
   statusMapping?: 'backlog' | 'todo' | 'in_progress' | 'done';
 }
 
-export type FolderColor = 'blue' | 'green' | 'amber' | 'rose';
+export type FolderColor = 'blue' | 'green' | 'amber' | 'rose' | `hue:${number}`;
 
 export interface FolderMeta {
   path: string; // Relative path, e.g. "Входящие", "Проекты/SLAG"

@@ -1523,7 +1523,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     const textStylesBtn = desktopStickyToolbar.locator('button[aria-label*="Стили текста"]');
     await expect(textStylesBtn).toBeVisible();
     await textStylesBtn.click();
-    await expect(desktopStickyToolbar.locator('button', { hasText: 'Заголовок 1' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Заголовок 1', exact: true })).toBeVisible();
     await textStylesBtn.click();
 
     // Take screenshot of Desktop editor with sticky toolbar
@@ -1534,6 +1534,13 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
     await page.waitForTimeout(100);
     await page.screenshot({ path: 'screenshots/editor-task-clean.png' });
+
+    const dateTrigger = page.getByRole('button', { name: 'Установить срок таски', exact: true });
+    await dateTrigger.click();
+    const datePicker = page.getByTestId('date-popover');
+    await expect(datePicker.getByRole('button', { name: 'Сегодня' })).toBeInViewport();
+    await datePicker.getByRole('button', { name: 'Готово' }).click();
+    await expect(datePicker).toBeHidden();
 
     // 3. Emulate mobile viewport to test Telegram-style bottom bar
     await page.setViewportSize({ width: 390, height: 844 });

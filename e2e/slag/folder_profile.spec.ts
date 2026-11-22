@@ -64,16 +64,63 @@ test.describe('Folder profile', () => {
     const row = folderRow(page, 'Проекты');
     const icon = row.getByRole('button', { name: 'Сменить иконку папки' });
     await icon.click();
-    await page.getByRole('button', { name: 'Цвет: Синий' }).click();
-    const choice = page.getByRole('button', { name: /^Иконка:/ }).and(page.locator('[aria-pressed="false"]')).first();
+    const slider = page.getByRole('slider', { name: 'Цвет иконки' });
+    await expect(slider).toHaveAttribute('aria-valuetext', 'Стандартный');
+    const track = (await slider.boundingBox())!;
+    const y = track.y + track.height / 2;
+    await page.mouse.move(track.x + 8, y);
+    await page.mouse.down();
+    await page.mouse.move(track.x + track.width / 2, y, { steps: 8 });
+    const hue = Number(await slider.inputValue());
+    expect(hue).toBeGreaterThan(170);
+    expect(hue).toBeLessThan(190);
+    await expect(icon).not.toHaveAttribute('data-folder-color', `hue:${hue}`);
+    await expect(page.getByRole('button', { name: /^Иконка:/ }).first().locator(':scope > span')).toHaveCSS('color', `oklch(0.72 0.075 ${hue})`);
+    await page.mouse.up();
+    await expect(icon).toHaveAttribute('data-folder-color', `hue:${hue}`);
+    await slider.press('ArrowLeft');
+    const color = `hue:${hue - 1}`;
+    await expect(slider).toHaveValue(String(hue - 1));
+    await expect(icon).toHaveAttribute('data-folder-color', color);
+    const choice = page.getByRole('button', { name: 'Иконка: Покупки', exact: true });
     const chosenName = await choice.getAttribute('aria-label');
     await choice.click();
-    await expect(icon).toHaveAttribute('data-folder-color', 'blue');
+    await expect(icon).toHaveAttribute('data-folder-color', color);
     await expect(page.getByRole('button', { name: chosenName! })).toHaveAttribute('aria-pressed', 'true');
-    await page.screenshot({ path: 'test-results/screenshots/folder-appearance.png' });
+    const spectrum = slider.locator('..').locator('.folder-color-spectrum');
+    await expect(spectrum).toHaveCSS('background-image', /linear-gradient/);
+    await slider.locator('xpath=../..').screenshot({ path: 'test-results/screenshots/folder-icons-scroll.png', animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await icon.click();
+    await expect(slider).toHaveValue(String(hue - 1));
     await page.keyboard.press('Escape');
     await row.getByText('Проекты', { exact: true }).click();
-    await expect(dockProfile(page).getByRole('button', { name: 'Сменить иконку папки' })).toHaveAttribute('data-folder-color', 'blue');
+    await expect(dockProfile(page).getByRole('button', { name: 'Сменить иконку папки' })).toHaveAttribute('data-folder-color', color);
+  });
+
+  test('folder icon picker stays accessible near the bottom edge and after resizing', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 460 });
+    const icon = page.getByTestId('folder-tree-row').last().getByRole('button', { name: 'Сменить иконку папки' });
+    await icon.click();
+
+    const slider = page.getByRole('slider', { name: 'Цвет иконки' });
+    const popover = slider.locator('xpath=../../..');
+    await expect(popover).toHaveAttribute('data-motion-state', 'open');
+    const bounds = () => popover.evaluate(el => {
+      const { top, right, bottom, left } = el.getBoundingClientRect();
+      return { top, right: innerWidth - right, bottom: innerHeight - bottom, left };
+    });
+    await expect.poll(async () => Math.min(...Object.values(await bounds()))).toBeGreaterThanOrEqual(7);
+    expect((await popover.boundingBox())!.y).toBeLessThan((await icon.boundingBox())!.y);
+    await page.screenshot({ path: 'test-results/screenshots/folder-picker-at-window-edge.png' });
+
+    await page.setViewportSize({ width: 1100, height: 265 });
+    await expect.poll(async () => Math.min(...Object.values(await bounds()))).toBeGreaterThanOrEqual(7);
+    const lastChoice = popover.getByRole('button', { name: 'Иконка: Безопасность', exact: true });
+    await expect(lastChoice).not.toBeInViewport();
+    await lastChoice.click();
+    await expect(lastChoice).toHaveAttribute('aria-pressed', 'true');
+    await expect(slider).toBeInViewport();
   });
 
   test('inline rename moves the folder and keeps its records', async ({ page }) => {

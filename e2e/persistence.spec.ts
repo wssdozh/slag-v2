@@ -133,7 +133,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     }
   });
 
-  test('ItemCard reveals actions in its bottom-right corner without resizing', async ({ page }) => {
+  test('ItemCard reveals actions in its top-right corner without resizing', async ({ page }) => {
     const card = page.locator('main [id^="item-"]').first();
     await card.scrollIntoViewIfNeeded();
     const reply = card.getByRole('button', { name: 'Ответить (R)' });
@@ -148,7 +148,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     expect(await card.boundingBox()).toEqual(before);
     expect(overlay.x).toBeGreaterThanOrEqual(before.x);
     expect(overlay.x + overlay.width).toBeCloseTo(before.x + before.width - 4);
-    expect(overlay.y + overlay.height).toBeCloseTo(before.y + before.height - 4);
+    expect(overlay.y).toBeCloseTo(before.y + 4);
     await card.screenshot({ path: 'test-results/screenshots/card-hover-corner.png' });
 
     await page.mouse.move(0, 0);

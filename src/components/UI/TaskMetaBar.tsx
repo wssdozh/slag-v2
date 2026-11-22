@@ -2,7 +2,7 @@
 // composer and the fullscreen editor. The shells differ only in `size`: the composer's toolbar is
 // `md`, the editor's line under the title is `sm`. Everything else, including the right-click reset
 // and the popover direction, lives here, so a new control cannot look different in the second shell.
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Icon } from './icons/Icon';
 import type { RecurrenceRule, SlagItemPriority, SlagItemStatus } from '../../types';
 import { ToolbarButton } from './ToolbarButton';
@@ -68,6 +68,8 @@ export const TaskMetaBar: React.FC<TaskMetaBarProps> = ({
   onRecurrenceChange,
 }) => {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const dateAnchor = useRef<HTMLDivElement>(null);
+  const getDateAnchor = useCallback(() => dateAnchor.current, []);
   const [isDurationOpen, setIsDurationOpen] = useState(false);
   const [isRecurrenceOpen, setIsRecurrenceOpen] = useState(false);
 
@@ -158,7 +160,7 @@ export const TaskMetaBar: React.FC<TaskMetaBarProps> = ({
         />
       </div>
 
-      <div className="relative shrink-0">
+      <div ref={dateAnchor} className="relative shrink-0">
         <ToolbarButton
           size={size}
           active={hasDue}
@@ -180,6 +182,7 @@ export const TaskMetaBar: React.FC<TaskMetaBarProps> = ({
         />
 
         <DatePickerPopover
+          getAnchor={getDateAnchor}
           isOpen={isDatePickerOpen}
           value={dueDate}
           time={dueTime}

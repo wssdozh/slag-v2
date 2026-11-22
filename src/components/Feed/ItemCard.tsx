@@ -599,7 +599,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         <div className="flex flex-col gap-1.5 pt-0.5">
           <h3
             onClick={handleOpenArticle}
-            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors pr-9 sm:pr-0"
+            className="text-base font-medium text-fg-primary tracking-tight flex items-center gap-1.5 cursor-pointer hover:text-white transition-colors"
           >
             <Icon name="entity.article" size="md" className="shrink-0" />
             <span>{item.title}</span>

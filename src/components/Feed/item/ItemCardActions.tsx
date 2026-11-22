@@ -19,7 +19,7 @@ const ItemCardActionsComponent: React.FC<ItemCardActionsProps> = ({
   onDragStart,
 }) => (
   <div
-    className="pointer-events-auto absolute top-1.5 right-1.5 z-20 flex items-center gap-1 rounded-md bg-surface-hover sm:pointer-events-none sm:top-auto sm:bottom-1 sm:right-1 sm:opacity-0 sm:transition-opacity sm:duration-150 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100"
+    className="pointer-events-auto absolute top-1 right-1 z-20 flex items-center gap-1 rounded-md bg-surface-hover sm:pointer-events-none sm:opacity-0 sm:transition-opacity sm:duration-150 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100"
   >
     <button
       type="button"

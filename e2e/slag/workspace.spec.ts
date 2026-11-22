@@ -214,7 +214,7 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
 
     // 4. Open Vault dropdown
     await vaultTrigger.click();
-    const dropdown = page.locator('.absolute.bottom-full');
+    const dropdown = page.getByTestId('vault-switcher-dropdown');
     await expect(dropdown).toBeVisible();
     await expect(dropdown.locator('text=Хранилища (Vaults)')).toBeVisible();
     await page.screenshot({
@@ -228,7 +228,7 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     await createVaultBtn.click();
 
     // 6. Verify VaultModal opens
-    const vaultModal = page.locator('.fixed.z-50', { hasText: 'Новое хранилище' });
+    const vaultModal = page.getByRole('dialog', { name: 'Новое хранилище' });
     await expect(vaultModal).toBeVisible();
     await expect(vaultModal.locator('text=Локальное')).toBeVisible();
     await expect(vaultModal.locator('text=Папка на диске')).toBeVisible();
@@ -264,13 +264,13 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     // 10. Verify active vault is now "secondary".
     // The switcher outlives its close by one exit transition; counting `aside button` too early
     // finds both the trigger and the fading row.
-    await expect(page.locator('.absolute.bottom-full')).toBeHidden();
+    await expect(page.getByTestId('vault-switcher-dropdown')).toBeHidden();
     const secondaryTrigger = page.locator('aside button', { hasText: 'secondary' });
     await expect(secondaryTrigger).toBeVisible();
 
     // 11. Switch back to "main"
     await secondaryTrigger.click();
-    const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
+    const mainOption = page.getByTestId('vault-switcher-dropdown').locator('button', { hasText: 'main' });
     await mainOption.click();
     // The menu stays mounted through its exit transition, so wait it out before counting triggers.
     await expect(mainOption).toBeHidden();
@@ -506,13 +506,13 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
 
     // 2. Open VaultModal and create new vault "demo_check"
     await vaultTrigger.click();
-    const dropdown = page.locator('.absolute.bottom-full');
+    const dropdown = page.getByTestId('vault-switcher-dropdown');
     await expect(dropdown).toBeVisible();
 
     const createVaultBtn = dropdown.locator('button', { hasText: 'Создать новое хранилище...' });
     await createVaultBtn.click();
 
-    const vaultModal = page.locator('.fixed.z-50', { hasText: 'Новое хранилище' });
+    const vaultModal = page.getByRole('dialog', { name: 'Новое хранилище' });
     await expect(vaultModal).toBeVisible();
 
     const nameInput = vaultModal.locator('input[placeholder*="work"]');
@@ -575,7 +575,7 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     // 10. Switch back to "main" and delete "demo_check"
     const currentTrigger = page.locator('aside button', { hasText: 'demo_check' });
     await currentTrigger.click();
-    const mainOption = page.locator('.absolute.bottom-full button', { hasText: 'main' });
+    const mainOption = page.getByTestId('vault-switcher-dropdown').locator('button', { hasText: 'main' });
     await mainOption.click();
     // The menu stays mounted through its exit transition, so wait it out before counting triggers.
     await expect(mainOption).toBeHidden();

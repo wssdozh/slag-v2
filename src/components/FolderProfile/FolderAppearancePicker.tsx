@@ -1,3 +1,4 @@
+import { folderColorCss } from '../../lib/vault/folderColor';
 import type { FolderMeta } from '../../types';
 import { Icon, type IconSize } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
@@ -11,7 +12,7 @@ export function FolderAppearancePicker({ folder, onSave, size, className }: {
   className: string;
 }) {
   const icon = <Icon name={folderIconName(folder?.icon)} size={size} tone="inherit" />;
-  const style = `folder-icon-color shrink-0 inline-flex items-center justify-center ${className}`;
+  const style = `shrink-0 inline-flex items-center justify-center ${className}`;
   if (!folder) return <span className={style}>{icon}</span>;
 
   return (
@@ -19,6 +20,7 @@ export function FolderAppearancePicker({ folder, onSave, size, className }: {
       <MenuDropdown ariaLabel="Иконка папки" minWidth={196} trigger={
         <button type="button" title="Сменить иконку папки" aria-label="Сменить иконку папки"
           data-folder-color={folder.color}
+          style={{ color: folderColorCss(folder.color) }}
           className={`${style} cursor-pointer hover:bg-tint-6 focus-visible:bg-tint-12`}
         >
           {icon}

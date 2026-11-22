@@ -10,8 +10,10 @@ import {
 } from '../../lib/time/dateUtils';
 import { Icon } from './icons/Icon';
 import { usePresence } from '../../hooks/ui/usePresence';
+import { AnchoredPopover } from './AnchoredPopover';
 
 export interface DatePickerPopoverProps {
+  getAnchor: () => HTMLElement | null;
   isOpen?: boolean;
   value?: string;
   onChange: (dateIso: string) => void;
@@ -85,6 +87,7 @@ const TimeField: React.FC<{ value?: string; onChange: (time: string | null) => v
 };
 
 export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
+  getAnchor,
   isOpen = true,
   value,
   onChange,
@@ -119,7 +122,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) && !getAnchor()?.contains(e.target as Node)) {
         onClose();
       }
     };
@@ -136,7 +139,7 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
       window.removeEventListener('mousedown', handleClickOutside);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, containerRef]);
+  }, [isOpen, onClose, containerRef, getAnchor]);
 
   const handlePrevMonth = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -162,21 +165,19 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
     return getMonthCalendarDays(currentYear, currentMonth);
   }, [currentYear, currentMonth]);
 
-  const positionClasses = direction === 'up'
-    ? 'bottom-full mb-1.5'
-    : 'top-full mt-1.5';
-
   if (!isPresent) return null;
 
   return (
-    <div
-      ref={containerRef}
+    <AnchoredPopover
+      surfaceRef={containerRef}
+      getAnchor={getAnchor}
+      isOpen={isOpen}
+      direction={direction}
       data-motion-state={phase}
       data-testid="date-popover"
       onTransitionEnd={onTransitionEnd}
-      inert={!isOpen}
       onClick={(e) => e.stopPropagation()}
-      className={`absolute left-0 ${positionClasses} w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-tint-10 shadow-2xl shadow-scrim-90 p-2.5 z-50 flex flex-col gap-2 select-none motion-popover ${className}`}
+      className={`w-64 rounded-2xl bg-surface-elevated/98 backdrop-blur-xl border border-tint-10 shadow-2xl shadow-scrim-90 p-2.5 z-[9999] flex flex-col gap-2 [&>*]:shrink-0 select-none motion-popover ${className}`}
     >
       {/* Quick Presets. Picking a day no longer closes the popover: the time sits right below it,
           and reopening the calendar to type four digits was the whole reason people skipped it. */}
@@ -299,6 +300,6 @@ export const DatePickerPopover: React.FC<DatePickerPopoverProps> = ({
       >
         Готово
       </button>
-    </div>
+    </AnchoredPopover>
   );
 };

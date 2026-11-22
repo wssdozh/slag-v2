@@ -322,7 +322,7 @@ test('a kanban card glides to its new column, and reduced motion skips it', asyn
   const card = page.locator('[data-testid="kanban-card"]', { hasText: title });
   await expect(card).toBeVisible();
   await card.locator('button[title="Сменить статус задачи"]').click();
-  await card.getByRole('button', { name: 'В работе', exact: true }).click();
+  await page.getByRole('button', { name: 'В работе', exact: true }).click();
 
   const glided = () => page.locator('[data-testid="kanban-card"]', { hasText: title }).evaluate(element =>
     element.getAnimations().some(animation =>
@@ -335,7 +335,7 @@ test('a kanban card glides to its new column, and reduced motion skips it', asyn
   // With reduced motion the card simply appears in the new column.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await card.locator('button[title="Сменить статус задачи"]').click();
-  await card.getByRole('button', { name: 'К выполнению', exact: true }).click();
+  await page.getByRole('button', { name: 'К выполнению', exact: true }).click();
   await expect(card).toBeVisible();
   const still = await card.evaluate(element => element.getAnimations().length);
   expect(still).toBe(0);

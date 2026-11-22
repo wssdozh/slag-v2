@@ -1,5 +1,5 @@
 // Left rail: vault switcher, folder tree, inbox, sync state and settings shortcuts.
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { FolderTree } from './FolderTree';
 import { getVaultDisplayName } from '../../lib/vault/vaultDisplay';
@@ -22,29 +22,7 @@ export const Sidebar: React.FC = () => {
 
   const [isVaultDropdownOpen, setIsVaultDropdownOpen] = useState(false);
   const bottomBarRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isVaultDropdownOpen) return;
-
-    const handlePointerDown = (e: MouseEvent) => {
-      if (bottomBarRef.current && !bottomBarRef.current.contains(e.target as Node)) {
-        setIsVaultDropdownOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsVaultDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isVaultDropdownOpen]);
+  const getVaultAnchor = useCallback(() => bottomBarRef.current, []);
 
   return (
     <aside
@@ -125,7 +103,7 @@ export const Sidebar: React.FC = () => {
           isOpen={isVaultDropdownOpen}
           onClose={() => setIsVaultDropdownOpen(false)}
           variant="dropdown"
-          position="bottom"
+          getAnchor={getVaultAnchor}
         />
 
         <SyncStatusButton onSettings={() => openSettingsModal('sync')} />
