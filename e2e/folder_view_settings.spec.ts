@@ -1,5 +1,45 @@
 import { test, expect } from '@playwright/test';
 
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`Active filters share compact styling and clear independently at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    if (viewport.width < 768) {
+      await page.getByRole('button', { name: /^Входящие/ }).first().click();
+    }
+    await page.getByRole('button', { name: 'Вид и фильтры папки' }).click();
+    const modal = page.getByRole('dialog', { name: 'Вид и фильтры', exact: true });
+    await modal.getByRole('button', { name: 'Таски', exact: true }).click();
+    await modal.getByText('Скрыть выполненные', { exact: true }).click();
+    await modal.getByText('Только закрепленные', { exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
+
+    const type = page.getByRole('button', { name: 'Сбросить фильтр по типу', exact: true });
+    const pinned = page.getByRole('button', { name: 'Сбросить фильтр закрепленных', exact: true });
+    const completed = page.getByRole('button', { name: 'Показать выполненные таски', exact: true });
+    for (const badge of [type, pinned, completed]) {
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveCSS('border-top-width', '0px');
+      await expect(badge).toHaveCSS('height', '24px');
+      await expect(badge).toHaveAttribute('class', await type.getAttribute('class') ?? '');
+      await expect(badge.locator('[data-icon="action.close"]')).toHaveAttribute('width', '12');
+      await expect(badge.locator('button')).toHaveCount(0);
+      await expect(badge).toHaveText('');
+    }
+    await page.screenshot({ path: `test-results/screenshots/unified-filter-chips-${viewport.width}.png` });
+    await completed.focus();
+    await page.keyboard.press('Enter');
+    await expect(completed).not.toBeVisible();
+    await expect(type).toBeVisible();
+    await expect(pinned).toBeVisible();
+    await pinned.click();
+    await expect(pinned).not.toBeVisible();
+    await type.click();
+    await expect(type).not.toBeVisible();
+  });
+}
+
 test.describe('Folder View Settings & Todoist-style Modal', () => {
   test('Clean header, Todoist-style view modal, sorting, filtering, and per-folder persistence', async ({ page }) => {
     // Open app
