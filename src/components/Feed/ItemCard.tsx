@@ -18,16 +18,8 @@ import { ItemCardActions } from './item/ItemCardActions';
 import { ItemSyncDot } from './item/ItemSyncDot';
 import { ItemReplyBanner } from './item/ItemReplyBanner';
 import { ItemSubtasks } from './item/ItemSubtasks';
-import { ItemVideoNotes } from './item/ItemVideoNotes';
-import { ItemAudioNotes } from './item/ItemAudioNotes';
-import { ItemImages } from './item/ItemImages';
-import { ItemFiles } from './item/ItemFiles';
-import {
-  attachmentCounts,
-  buildItemLightboxImages,
-  groupItemAttachments,
-  itemCardShape,
-} from './item/itemAttachments';
+import { ItemAttachmentGrid } from './item/ItemAttachmentGrid';
+import { buildItemLightboxImages } from './item/itemAttachments';
 
 const CARD_TRANSITION =
   'transform var(--slag-motion-base) var(--ease-standard), ' +
@@ -101,20 +93,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   } = useApp();
 
   const [isTagsExpanded, setIsTagsExpanded] = useState(false);
-  const [expandedOcrIds, setExpandedOcrIds] = useState<Set<string>>(new Set());
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [visibleTagCount, setVisibleTagCount] = useState(0);
   const [tagsRowWidth, setTagsRowWidth] = useState(0);
   const tagsRowRef = useRef<HTMLDivElement | null>(null);
-
-  const handleToggleOcr = useCallback((id: string) => {
-    setExpandedOcrIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
 
   const handleEnrichAttachment = useCallback(async (targetAtt: SlagAttachment) => {
     if (!canEnrichAttachments(aiSettings)) {
@@ -296,24 +278,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     ),
     [item.attachments, embeddedAttachmentIds]
   );
-  // One bucket per kind, so each slot of the card gets its own list and the shape counts once.
-  const attachmentGroups = useMemo(() => groupItemAttachments(galleryAttachments), [galleryAttachments]);
   // Bytes are not in the note any more: they are resolved from IndexedDB or `.attachments/`.
   // `missing` tells pictures apart from bytes still on their way.
   const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(item.attachments);
 
-  const shape = itemCardShape(item, attachmentCounts(attachmentGroups));
   const timestamp = (
     <span data-testid="item-time" className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-mono text-2xs leading-none text-fg-muted select-none">
       {formattedTime}<ItemSyncDot item={item} />
     </span>
   );
-  const isVoiceBubble = shape === 'voice';
-  const isFileBubble = shape === 'file';
-
-  // A picture hugs its own width instead of pulling a column-wide slab behind it. The one
-  // exception is the open OCR panel: prose needs a column, not a 200px strip.
-  const isPictureBubble = shape === 'image' && expandedOcrIds.size === 0;
   const hasFloatingActions = !isArticle;
 
   const handleImageClick = useCallback((img: SlagAttachment) => {
@@ -457,7 +430,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   const hasBottomMeta =
     metaElements.length > 0 || Boolean(item.tags && item.tags.length > 0);
 
-  const shouldRenderBottomBar = (shape !== 'voice' && shape !== 'file') || hasBottomMeta;
   const isCompactText = !isArticle && !hasBottomMeta && !item.replyToId &&
     !item.attachments.length && !item.subtasks?.length && repliesCount === 0;
 
@@ -551,11 +523,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
           ...cardStyle,
         }}
         className={`group relative ${isCompactText && !isTask ? 'block' : `flex ${isCompactText ? 'flex-row items-end' : 'flex-col'}`} ${
-          isVoiceBubble || isFileBubble
-            ? 'gap-0 max-w-sm sm:max-w-md'
-            : isPictureBubble || shape === 'video'
-              ? 'gap-0 w-fit max-w-full'
-              : `${isCompactText ? 'gap-3' : 'gap-1.5'} w-fit max-w-full`
+          `${isCompactText ? 'gap-3' : 'gap-1.5'} w-fit max-w-full`
         } ${isCompactText ? 'px-2.5 sm:px-3 py-1.5' : 'p-2.5 sm:p-3'} rounded-xl cursor-default select-none ${
           isHighlighted
             ? 'bg-accent/10 border border-accent/40 item-highlight-pulse'
@@ -671,44 +639,10 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
         })()
       )}
 
-      {/* Video Circle Notes (Telegram style) */}
-      <ItemVideoNotes
-        attachments={attachmentGroups.video}
-        srcs={attachmentSrcs}
-        onOpen={handleImageClick}
-      />
-
-      {/* Audio Notes Player */}
-      <ItemAudioNotes
-        attachments={attachmentGroups.audio}
-        srcs={attachmentSrcs}
-        isVoiceBubble={isVoiceBubble}
-        timestamp={timestamp}
-        onEnrich={handleEnrichAttachment}
-      />
-
-      {/* Pictures: one keeps its own shape, a pile fills one canvas */}
-      <ItemImages
-        images={attachmentGroups.image}
-        srcs={attachmentSrcs}
-        missing={missingAttachmentSrcs}
-        isPictureBubble={isPictureBubble}
-        expandedOcrIds={expandedOcrIds}
-        onToggleOcr={handleToggleOcr}
-        onImageClick={handleImageClick}
-        onEnrich={handleEnrichAttachment}
-      />
-
-      {/* File Attachments */}
-      <ItemFiles
-        attachments={attachmentGroups.file}
-        srcs={attachmentSrcs}
-        isFileBubble={isFileBubble}
-        timestamp={timestamp}
-      />
+      <ItemAttachmentGrid attachments={galleryAttachments} srcs={attachmentSrcs} missing={missingAttachmentSrcs} onOpen={handleImageClick} onEnrich={handleEnrichAttachment} />
 
       {/* Bottom Bar: Metadata & Tags on left + Timestamp on right */}
-      {shouldRenderBottomBar && !(isCompactText && !isTask) && (
+      {!(isCompactText && !isTask) && (
         <div
           data-testid="item-meta-row"
           className={`flex items-center gap-2 select-none ${isCompactText ? 'shrink-0 pb-0.5' : 'pt-1 min-h-[16px] w-full'}`}
@@ -801,7 +735,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
             </div>
           ) : null}
 
-          {!isVoiceBubble && !isFileBubble && <span className="ml-auto inline-flex shrink-0">{timestamp}</span>}
+          <span className="ml-auto inline-flex shrink-0">{timestamp}</span>
         </div>
       )}
 
