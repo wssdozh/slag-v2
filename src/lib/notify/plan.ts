@@ -7,7 +7,8 @@ import { computeHash } from '../sync/crypto';
 import { formatDueDateLabel, getISODateString } from '../time/dateUtils';
 import { reminderClock, reminderDay, reminderToIso } from '../time/reminder';
 import { describeError, getNotifyPrefs, getNotifyRoutes, integrationsLive, saveNotifyRoutes } from './prefs';
-import { DAY_MS, shiftOutOfQuiet } from './quiet';
+import { shiftOutOfQuiet } from './quiet';
+import { classifyTaskSchedule } from '../tasks/taskSchedule';
 
 const notifyLog = logger.scope('NOTIFY');
 
@@ -94,23 +95,12 @@ export function resolveReminder(item: Pick<SlagItem, 'reminder' | 'dueDate'>): n
   return Number.isFinite(at) ? at : null;
 }
 
-function isOverdueTask(item: SlagItem, todayKey: string): boolean {
-  return item.type === 'task' && item.status !== 'done' && !!item.dueDate && item.dueDate < todayKey;
-}
-
-/** The next 10:00 that is still ahead: one ping a day per overdue task, not a backlog. */
-function overdueMoment(item: SlagItem, now: number): number | null {
-  if (!item.dueDate) return null;
-  const [year, month, day] = item.dueDate.split('-').map(Number);
-  if (![year, month, day].every(Number.isFinite)) return null;
-  const due = new Date(year, month - 1, day, OVERDUE_HOUR, 0, 0, 0);
-  let at = due.getTime() + DAY_MS;
-  if (at <= now) {
-    const today = new Date(now);
-    today.setHours(OVERDUE_HOUR, 0, 0, 0);
-    at = today.getTime() > now ? today.getTime() : today.getTime() + DAY_MS;
-  }
-  return at;
+/** The next local 10:00: one ping a day per overdue task, not a backlog. */
+function overdueMoment(now: number): number {
+  const next = new Date(now);
+  next.setHours(OVERDUE_HOUR, 0, 0, 0);
+  if (next.getTime() <= now) next.setDate(next.getDate() + 1);
+  return next.getTime();
 }
 
 /** One planned delivery: which item, which event, when. */
@@ -139,17 +129,14 @@ async function planFor(item: SlagItem, prefs: NotifyPrefs, now: number): Promise
       };
     }
   }
-  if (prefs.overdue && isOverdueTask(item, localDateKey(now))) {
-    const moment = overdueMoment(item, now);
-    if (moment !== null) {
-      const fireAt = shiftOutOfQuiet(moment, prefs);
-      return {
-        itemKey: item.id,
-        eventKey: await eventKeyFor(`${item.id}|overdue|${item.dueDate}|${localDateKey(fireAt)}`),
-        fireAt,
-        kind: 'overdue',
-      };
-    }
+  if (prefs.overdue && classifyTaskSchedule(item, localDateKey(now)) === 'overdue') {
+    const fireAt = shiftOutOfQuiet(overdueMoment(now), prefs);
+    return {
+      itemKey: item.id,
+      eventKey: await eventKeyFor(`${item.id}|overdue|${item.dueDate}|${localDateKey(fireAt)}`),
+      fireAt,
+      kind: 'overdue',
+    };
   }
   return null;
 }

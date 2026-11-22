@@ -1,7 +1,7 @@
 // Splits tasks into overdue, unscheduled and per-day buckets, expanding recurrences.
 import { useMemo } from 'react';
 import type { SlagItem } from '../types';
-import { getTodayString } from '../lib/time/dateUtils';
+import { classifyDueDate } from '../lib/tasks/taskSchedule';
 import { getRecurringOccurrencesInRange } from '../lib/time/recurrenceHelper';
 import { reminderClock, reminderToIso } from '../lib/time/reminder';
 import { DEFAULT_INBOX_FOLDER } from '../config';
@@ -12,6 +12,7 @@ export interface CalendarTask extends SlagItem {
 
 export interface UseCalendarScheduleParams {
   items: SlagItem[];
+  todayStr: string;
   currentFolder?: string;
   filterByFolder?: boolean;
   rangeStart?: string;
@@ -28,13 +29,12 @@ export interface CalendarScheduleResult {
 
 export function useCalendarSchedule({
   items,
+  todayStr,
   currentFolder,
   filterByFolder = false,
   rangeStart,
   rangeEnd,
 }: UseCalendarScheduleParams): CalendarScheduleResult {
-  const todayStr = useMemo(() => getTodayString(), []);
-
   const scopedTasks = useMemo(() => {
     return items.filter((item) => {
       const isTaskLike =
@@ -50,7 +50,7 @@ export function useCalendarSchedule({
 
   const overdueTasks = useMemo(() => {
     return scopedTasks
-      .filter((t) => t.status !== 'done' && t.dueDate && t.dueDate < todayStr)
+      .filter((t) => t.status !== 'done' && classifyDueDate(t.dueDate, todayStr) === 'overdue')
       .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
   }, [scopedTasks, todayStr]);
 

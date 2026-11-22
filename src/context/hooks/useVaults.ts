@@ -103,16 +103,18 @@ export function useVaults(deps: {
       setChatMessages(storage.getAssistantHistory());
       setSelectedItem(null);
       refreshData();
+      void syncEngine.switchVault(storage.getCurrentVault().id);
+      addToast('Хранилище переключено', 'info');
     });
-    void syncEngine.switchVault(vaultId);
-    addToast('Хранилище переключено', 'info');
   };
 
   const createVault = (name: string, mode?: 'indexeddb' | 'fsa' | 'tauri', path?: string, id?: string) => {
     const newMeta = storage.createVault(name, mode, path, id);
     if (!id && accountClient.isAuthenticated()) {
       void accountClient.registerVault(storage.ensureVaultSyncId(newMeta.id), newMeta.name)
-        .then(() => syncEngine.switchVault(newMeta.id))
+        .then(() => {
+          if (storage.getCurrentVault().id === newMeta.id) return syncEngine.switchVault(newMeta.id);
+        })
         .catch((error) => addToast(`Хранилище создано локально, но не зарегистрировано: ${error.message}`, 'error'));
     } else if (!id) {
       void syncEngine.switchVault(newMeta.id);

@@ -94,9 +94,7 @@ export function switchVault(store: VaultRegistryHost, vaultId: string): VaultMet
     store.currentVault = { ...target, isCurrent: true };
     setPref(CURRENT_VAULT_KEY, JSON.stringify(store.currentVault));
     fsLog.info(`Switched vault to "${store.currentVault.name}" (${store.currentVault.id})`);
-    if (isTauri()) {
-      void store.syncCurrentVaultFs();
-    }
+    void store.syncCurrentVaultFs();
     return store.currentVault;
   }
   return store.currentVault;

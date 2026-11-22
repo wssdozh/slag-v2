@@ -153,6 +153,7 @@ export class StorageService {
 
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
+  private currentVaultRead: Promise<boolean> = Promise.resolve(true);
   public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   public attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
@@ -536,8 +537,16 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public syncCurrentVaultFs(): Promise<boolean> {
-    void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
-    return this.files.syncCurrentVaultFs();
+    if (isTauri()) {
+      void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
+    }
+    this.currentVaultRead = isTauri() ? this.files.syncCurrentVaultFs() : Promise.resolve(true);
+    return this.currentVaultRead;
+  }
+
+  /** The existing read for this vault selection; promise identity distinguishes A → B → A. */
+  public getCurrentVaultRead(): Promise<boolean> {
+    return this.currentVaultRead;
   }
 
   public initTauriFs(): Promise<boolean> {
@@ -564,9 +573,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
-      void this.files.initTauriFs().finally(() => {
-        this.hydrated = true;
-      });
+      this.currentVaultRead = this.initTauriFs();
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
       const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
@@ -881,12 +888,12 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     const items = this.getItems();
     const oldItemsMap = new Map(items.map(i => [i.id, i]));
     const saveMap = new Map(itemsToSave.map(i => {
-      const filename = getSafeNoteFilename(i.title, i.id);
+      const filename = oldItemsMap.get(i.id)?.filename || getSafeNoteFilename(i.title, i.id);
       return [i.id, { ...i, filename, updatedAt: Date.now() }];
     }));
     const updated = items.map(i => saveMap.get(i.id) || i);
     for (const [id, item] of saveMap) {
-      if (!items.some(i => i.id === id)) {
+      if (!oldItemsMap.has(id)) {
         updated.unshift(item);
       }
     }

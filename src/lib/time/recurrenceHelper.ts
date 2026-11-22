@@ -1,6 +1,6 @@
 // Recurrence rules: parse, describe and advance a repeating task to its next occurrence.
 import type { RecurrenceRule, SlagItem } from '../../types';
-import { getISODateString } from './dateUtils';
+import { getISODateString, parseISODateString } from './dateUtils';
 import { shiftReminderToDay } from './reminder';
 import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../tasks/taskUtils';
 
@@ -10,17 +10,6 @@ export const RECURRENCE_PRESETS: Array<{ label: string; rule: RecurrenceRule }> 
   { label: 'Каждую неделю', rule: { freq: 'weekly', interval: 1, resetSubtasks: true } },
   { label: 'Каждый месяц', rule: { freq: 'monthly', interval: 1, resetSubtasks: true } },
 ];
-
-export function parseISODateString(dateStr: string): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return new Date(NaN);
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(0);
-  date.setHours(12, 0, 0, 0);
-  date.setFullYear(y, m - 1, d);
-  return y >= 1 && date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d
-    ? date
-    : new Date(NaN);
-}
 
 /**
  * ISO weekday: 1 = Monday, 2 = Tuesday, ..., 7 = Sunday
@@ -202,22 +191,20 @@ export function getRecurringOccurrencesInRange(
  * Evaluates recurring tasks upon app startup, date changes, or at midnight.
  * Automatically handles:
  * 1. Advancing completed recurring tasks to their next cycle once nextDueDate arrives,
- *    resetting status to 'todo', resetting subtasks (if resetSubtasks is true),
- *    bumping createdAt to now so it drops as a fresh message into today's feed,
- *    and maintaining streak.
+ *    reopening them, resetting subtasks if configured, and maintaining streak.
  * 2. Rolling over overdue uncompleted tasks to the first scheduled date on or after today,
- *    bumping createdAt to now, and resetting streak to 0 with red-tint indicator.
+ *    and resetting streak to 0. Creation and completion history never change here.
  *
  * ponytail: in-memory scan across items array on date change, upgrade to indexed cursor if vault items exceed 10,000
  */
 export function evaluateRecurringTasks(
   items: SlagItem[],
   referenceDate: Date = new Date()
-): { updatedItems: SlagItem[]; changedCount: number } {
+): { updatedItems: SlagItem[]; changedCount: number; changedItems: SlagItem[] } {
   const todayStr = getISODateString(referenceDate);
   const nowTs = referenceDate.getTime();
   let changedCount = 0;
-  if (!Number.isFinite(nowTs)) return { updatedItems: items, changedCount };
+  if (!Number.isFinite(nowTs)) return { updatedItems: items, changedCount, changedItems: [] };
 
   const updatedItems = items.map(item => {
     if (item.type !== 'task' || !item.recurrence || !item.dueDate
@@ -264,7 +251,6 @@ export function evaluateRecurringTasks(
         streak: newStreak,
         content: updatedContent,
         subtasks: updatedSubtasks,
-        createdAt: nowTs,
         updatedAt: nowTs,
       };
     }
@@ -280,7 +266,6 @@ export function evaluateRecurringTasks(
         dueDate: targetDueDate,
         reminder: shiftReminderToDay(item.reminder, item.dueDate, targetDueDate),
         streak: 0,
-        createdAt: nowTs,
         updatedAt: nowTs,
       };
     }
@@ -288,5 +273,6 @@ export function evaluateRecurringTasks(
     return item;
   });
 
-  return { updatedItems, changedCount };
+  const changedItems = changedCount ? updatedItems.filter((item, index) => item !== items[index]) : [];
+  return { updatedItems, changedCount, changedItems };
 }
