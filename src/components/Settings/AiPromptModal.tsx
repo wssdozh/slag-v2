@@ -1,7 +1,7 @@
 // One dialog per prompt field: instructions and persona are edited apart, and saved apart.
 // The dialog outlives its answer by one exit, so it leaves like the rest of the overlays; a new
 // field opened inside that window reuses the surface but starts from the stored text again.
-import React, { useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../UI/icons/Icon';
 import { BaseModal } from '../Modals/BaseModal';
@@ -55,10 +55,11 @@ interface PromptDialogProps {
   session: number;
   isOpen: boolean;
   onClose: () => void;
+  onSaved: (attempt: number) => void;
   presence: ReturnType<typeof usePresence>;
 }
 
-const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onClose, presence }) => {
+const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onClose, onSaved, presence }) => {
   const isMobile = useIsMobile();
   const [draft, setDraft] = useState(() => createDraft(field, session));
   // Every opening starts from the stored text, even when the surface is still fading the previous
@@ -66,20 +67,32 @@ const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onC
   if (draft.session !== session || draft.field !== field) setDraft(createDraft(field, session));
 
   const [wide, setWide] = useState(() => getPref(SIZE_KEY) === '1');
-  const [saving, setSaving] = useState(false);
+  // A write belongs to the session that started it. Session identity is separate from the
+  // rendered surface: the surface stays for the exit and may already show the next field.
+  const [savingSession, setSavingSession] = useState<number | null>(null);
+  const saving = savingSession === session;
+  /** A write from a session that is no longer open must not report into the current draft. */
+  const sessionRef = useRef(session);
+  useLayoutEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   const save = async () => {
-    setSaving(true);
-    setDraft((previous) => ({ ...previous, saveFailed: false }));
+    const attempt = draft.session;
+    setSavingSession(attempt);
+    setDraft((previous) => previous.session === attempt ? { ...previous, saveFailed: false } : previous);
     try {
       const at = Date.now(); // Legacy rooms still carry the timestamp; registry rooms use revisions.
       await storage.saveWorkspaceState(field === 'prompt' ? { aiPrompt: draft.value.trim(), aiPromptAt: at }
         : { aiPersona: draft.value.trim(), aiPersonaEnabled: draft.enabled, aiPersonaAt: at });
-      onClose();
+      // The write is fulfilled either way; the owner closes only if this attempt is still current.
+      onSaved(attempt);
     } catch {
-      setDraft((previous) => ({ ...previous, saveFailed: true }));
+      if (sessionRef.current === attempt) {
+        setDraft((previous) => previous.session === attempt ? { ...previous, saveFailed: true } : previous);
+      }
     } finally {
-      setSaving(false);
+      setSavingSession((current) => current === attempt ? null : current);
     }
   };
 
@@ -231,6 +244,15 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
   const presence = usePresence(isOpen);
   const [snapshot, setSnapshot] = useState<{ open: boolean; field: PromptField | null }>({ open: isOpen, field });
   const [session, setSession] = useState(0);
+  const sessionRef = useRef(session);
+  useLayoutEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+  // A write that outlived its field may close only the field it was started from. The owner stays
+  // mounted across exits, so this guard still exists when the dialog that started the write does not.
+  const closeIfCurrent = useCallback((attempt: number) => {
+    if (sessionRef.current === attempt) onClose();
+  }, [onClose]);
   // The close keeps the field it is fading; the next open starts a session and reads the vault.
   // Compare against the shown field, not the prop: a closed modal has no field of its own.
   const shownField = field ?? snapshot.field;
@@ -248,6 +270,7 @@ export const AiPromptModal: React.FC<AiPromptModalProps> = ({ field, isOpen, onC
       session={session}
       isOpen={isOpen}
       onClose={onClose}
+      onSaved={closeIfCurrent}
       presence={presence}
     />
   );

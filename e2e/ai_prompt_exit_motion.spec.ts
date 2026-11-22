@@ -87,6 +87,74 @@ async function openMobileSettings(page: Page) {
   await page.getByTestId('mobile-settings-ai').click();
 }
 
+/** Holds the next workspace write inside the page, so a save can outlive the dialog that asked it. */
+async function deferWorkspaceSave(page: Page) {
+  await page.evaluate(async () => {
+    const module = await import(/* @vite-ignore */ '/src/lib/storage/index.ts');
+    const storage = module.storage;
+    const host = window as unknown as {
+      __deferredSaves: {
+        succeed: () => Promise<void>;
+        fail: (reason: string) => void;
+      }[];
+    };
+    host.__deferredSaves = [];
+    const original = storage.saveWorkspaceState.bind(storage);
+    storage.saveWorkspaceState = (patch: unknown) => new Promise<void>((resolve, reject) => {
+      host.__deferredSaves.push({
+        succeed: async () => {
+          await original(patch);
+          resolve();
+        },
+        fail: (reason: string) => reject(new Error(reason)),
+      });
+    });
+  });
+}
+
+/** Starts a save, answers the prompt, and opens persona inside the exit: same surface, new session. */
+async function deferPromptSaveAndOpenPersona(page: Page, draft: string) {
+  await page.getByTestId('ai-prompt-open').click();
+  await page.getByTestId('ai-prompt-text').fill(draft);
+  await deferWorkspaceSave(page);
+  await page.getByTestId('ai-prompt-save').click();
+  await expect(page.getByTestId('ai-prompt-save')).toBeDisabled();
+
+  await page.evaluate(() => {
+    const dialog = document.querySelector('[role="dialog"][aria-label="Промпт"]');
+    const cancel = [...(dialog?.querySelectorAll('button') ?? [])]
+      .find(button => button.textContent?.trim() === 'Отмена');
+    cancel?.click();
+    window.setTimeout(() => {
+      (document.querySelector('[data-testid="ai-persona-open"]') as HTMLElement | null)?.click();
+    }, 20);
+  });
+
+  const persona = page.getByTestId('ai-persona-text');
+  await expect(persona).toBeVisible();
+  return persona;
+}
+
+async function resolveDeferredSave(page: Page, outcome: 'succeed' | 'fail') {
+  await page.evaluate((mode) => {
+    const saves = (window as unknown as {
+      __deferredSaves: { succeed: () => Promise<void>; fail: (reason: string) => void }[];
+    }).__deferredSaves;
+    if (mode === 'succeed') return saves[0].succeed();
+    saves[0].fail('offline');
+  }, outcome);
+}
+
+async function startDeferredSaveAndClose(page: Page, draft: string) {
+  const persona = await deferPromptSaveAndOpenPersona(page, draft);
+  // The new session is not "saving": the switch answers and the editor is editable at once.
+  await page.getByLabel('Персона включена').click();
+  await expect(page.getByTestId('ai-persona-switch-row')).toContainText('ассистент говорит от её лица');
+  await expect(persona).toBeEnabled();
+  await expect(page.getByTestId('ai-persona-save')).toBeEnabled();
+  return persona;
+}
+
 test('desktop: a closed prompt fades with its draft, then opens clean and returns focus', async ({ page }) => {
   await openDesktopSettings(page);
   const opener = page.getByTestId('ai-prompt-open');
@@ -155,6 +223,59 @@ test('desktop: a different field opened inside the exit window is not the previo
 
   await dialog.getByRole('button', { name: 'Отмена' }).click();
   await expect(persona).toHaveCount(0);
+});
+
+test('desktop: a save deferred past its close cannot close, disable or error the next field', async ({ page }) => {
+  await openDesktopSettings(page);
+  const persona = await startDeferredSaveAndClose(page, 'DEFERRED-PROMPT-SAVE');
+
+  await resolveDeferredSave(page, 'succeed');
+
+  // The write is fulfilled, but it no longer owns the surface it started from.
+  await expect(persona).toBeVisible();
+  await expect(persona).toBeEnabled();
+  await expect(page.getByText('Не удалось сохранить. Текст остался в редакторе.')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Персона' })).toHaveAttribute('data-motion-state', 'open');
+  await expect.poll(() => page.evaluate(async () => {
+    const module = await import(/* @vite-ignore */ '/src/lib/storage/index.ts');
+    return module.storage.getWorkspaceState().aiPrompt ?? '';
+  })).toContain('DEFERRED-PROMPT-SAVE');
+});
+
+test('desktop: a save finishing after its field was replaced does not close the replacement', async ({ page }) => {
+  await openDesktopSettings(page);
+  const persona = await deferPromptSaveAndOpenPersona(page, 'DEFERRED-PROMPT-SAVE');
+
+  await resolveDeferredSave(page, 'succeed');
+
+  await expect(persona).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Персона' })).toHaveAttribute('data-motion-state', 'open');
+  await expect(page.getByText('Не удалось сохранить. Текст остался в редакторе.')).toHaveCount(0);
+});
+
+test('desktop: a save failing after its field was replaced does not mark the replacement', async ({ page }) => {
+  await openDesktopSettings(page);
+  const persona = await deferPromptSaveAndOpenPersona(page, 'FAILING-PROMPT-SAVE');
+
+  await resolveDeferredSave(page, 'fail');
+
+  await expect(page.getByText('Не удалось сохранить. Текст остался в редакторе.')).toHaveCount(0);
+  await expect(persona).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Персона' })).toHaveAttribute('data-motion-state', 'open');
+});
+
+test('desktop: a save failing after its close cannot mark the next field', async ({ page }) => {
+  await openDesktopSettings(page);
+  const persona = await startDeferredSaveAndClose(page, 'FAILING-PROMPT-SAVE');
+
+  await resolveDeferredSave(page, 'fail');
+
+  await expect(persona).toBeVisible();
+  await expect(persona).toBeEnabled();
+  await expect(page.getByTestId('ai-persona-save')).toBeEnabled();
+  await expect(page.getByTestId('ai-persona-switch-row')).toContainText('ассистент говорит от её лица');
+  await expect(page.getByText('Не удалось сохранить. Текст остался в редакторе.')).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Персона' })).toHaveAttribute('data-motion-state', 'open');
 });
 
 test('desktop: reduced motion shortens the exit instead of forcing the usual duration', async ({ page }) => {
