@@ -47,7 +47,7 @@ test('Capture Fullscreen Editor Teletype Top Utilities and Object Context', asyn
 
   // 2. Open "Aa" Text Styles Dropdown in Top Bar
   console.log('Step 2: Clicking Aa dropdown');
-  const aaBtn = page.locator('header button[title*="Стили текста"]').first();
+  const aaBtn = page.locator('header button[aria-label*="Стили текста"]').first();
   await expect(aaBtn).toBeVisible({ timeout: 5000 });
   await aaBtn.click();
   await page.waitForTimeout(200);

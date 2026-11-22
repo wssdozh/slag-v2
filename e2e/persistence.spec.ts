@@ -183,7 +183,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
 
     // 3. Switch width to Wide mode. The control is the sheet-width toggle; the old label
     // "Широкая" went away when the editor was redesigned around a sheet.
-    const widthBtn = page.locator('header button[title*="Развернуть лист"]').first();
+    const widthBtn = page.locator('header button[aria-label*="Развернуть лист"]').first();
     await widthBtn.click();
     await page.waitForTimeout(400);
 
@@ -209,7 +209,7 @@ test.describe('SLAG v2 Persistence & Drafts Verification', () => {
     await page.screenshot({ path: 'test-results/screenshots/fullscreen_restored_after_reload.png' });
 
     // 8. Save and close
-    await page.locator('header button[title*="Сохранить изменения"]').click();
+    await page.locator('header button[data-hint*="Сохранить изменения"]').click();
     await expect(editorModal).not.toBeVisible();
 
     // 9. Reload again - editor should stay closed

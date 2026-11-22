@@ -109,26 +109,22 @@ test.describe('SLAG v2 — attachment embeds (![[file]])', () => {
     const editorRoot = page.locator('#fullscreen-editor-root');
     await expect(editorRoot).toBeVisible();
 
-    const strip = page.locator('[data-testid="attachment-strip"]');
-    await expect(strip).toBeAttached();
+    const strip = page.getByTestId('attachment-strip');
+    const thumb = strip.getByRole('button', { name: IMAGE_NAME, exact: true });
+    await expect(thumb).toBeVisible();
+    await expect(strip.getByRole('link', { name: FILE_NAME })).toHaveAttribute('download', FILE_NAME);
+    const divider = await page.getByTestId('editor-content-divider').boundingBox();
+    const rail = await strip.boundingBox();
+    const editor = await editorRoot.boundingBox();
+    expect(rail!.y).toBeGreaterThan(divider!.y + divider!.height);
+    expect(editor!.y).toBeGreaterThan(rail!.y + rail!.height);
+    await thumb.click();
+    await expect(page.getByTestId('image-lightbox')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('image-lightbox')).toBeHidden();
+    await expect(editorRoot).toBeVisible();
 
-    // (a) the rail lives after the editor in the document, not above the text.
-    const railPosition = await page.evaluate(() => {
-      const editor = document.querySelector('#fullscreen-editor-root');
-      const rail = document.querySelector('[data-testid="attachment-strip"]');
-      if (!editor || !rail) return 'missing';
-      return editor.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING
-        ? 'after'
-        : 'before';
-    });
-    expect(railPosition).toBe('after');
-
-    // (b) it is folded by default, so only the compact summary row is there.
-    await expect(strip).toHaveAttribute('data-collapsed', 'true');
-    await expect(strip.getByText('Медиа и вложения (2)')).toBeVisible();
-    await expect(strip.getByText('Вставить в текст')).toHaveCount(0);
-
-    // (c) the tokens paint as widgets: the raw `![[` never reaches the editor DOM.
+    // The tokens paint as widgets: the raw `![[` never reaches the editor DOM.
     const cmContent = page.locator('.cm-content');
     await expect(cmContent).toBeVisible();
     const fileWidget = page.locator(
@@ -140,10 +136,7 @@ test.describe('SLAG v2 — attachment embeds (![[file]])', () => {
     ).toBeVisible();
     await expect(cmContent).not.toContainText('[[');
 
-    // Bring the rail into the frame: the screenshot is evidence of the placement itself.
-    await page.locator('[data-editor-body]').evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
-    });
+    await strip.scrollIntoViewIfNeeded();
     await page.screenshot({ path: 'test-results/screenshots/file-rendering-editor.png' });
 
     // Clicking the widget puts the caret on the token: the token turns back into markdown so it
@@ -155,5 +148,20 @@ test.describe('SLAG v2 — attachment embeds (![[file]])', () => {
     const markdownAfter = await page.evaluate(() => window.__slagGetEditorMarkdown?.() ?? '');
     expect(markdownAfter).toBe(markdownBefore);
     expect(markdownAfter).toContain(`![[${FILE_NAME}]]`);
+
+    // More files than fit in a phone-width row: the rest are one tap away.
+    await page.setViewportSize({ width: 375, height: 800 });
+    await editorRoot.evaluate(node => {
+      const dataTransfer = new DataTransfer();
+      for (let index = 0; index < 5; index++) {
+        dataTransfer.items.add(new File(['example'], `example-${index}.txt`, { type: 'text/plain' }));
+      }
+      node.dispatchEvent(new DragEvent('drop', { dataTransfer, bubbles: true, cancelable: true }));
+    });
+    await page.getByRole('button', { name: /^Показать ещё/ }).click();
+    await expect(strip.getByRole('link', { name: 'example-4.txt' })).toBeVisible();
+    await strip.getByRole('button', { name: 'Действия: example-4.txt' }).click();
+    await page.getByRole('button', { name: 'Удалить', exact: true }).click();
+    await expect(strip.getByRole('link', { name: 'example-4.txt' })).toHaveCount(0);
   });
 });

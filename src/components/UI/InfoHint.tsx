@@ -7,6 +7,11 @@ import React, { useEffect, useId, useState } from 'react';
 import { BaseModal } from '../Modals/BaseModal';
 import { Icon } from './icons/Icon';
 
+export function HintBubble({ className = '', ...props }: React.ComponentPropsWithoutRef<'span'>) {
+  return <span role="tooltip" {...props}
+    className={`block rounded-lg border border-border-subtle bg-surface-elevated px-2.5 py-2 text-[11px] leading-snug text-fg-secondary shadow-xl backdrop-blur-xl ${className}`} />;
+}
+
 export interface InfoHintProps {
   /** The one sentence on hover. Keep it a sentence, not a paragraph. */
   hint: string;
@@ -60,14 +65,13 @@ export const InfoHint: React.FC<InfoHintProps> = ({ hint, title, children, testI
         </button>
 
         {/* Hover and keyboard focus, both. No listeners: a CSS-only bubble cannot leak one. */}
-        <span
+        <HintBubble
           id={hintId}
-          role="tooltip"
           data-testid={testId ? `${testId}-hint` : undefined}
-          className="pointer-events-none absolute right-0 top-full z-20 mt-1.5 w-60 rounded-lg border border-border-subtle bg-surface-elevated px-2.5 py-2 text-[11px] leading-snug text-fg-secondary opacity-0 shadow-xl backdrop-blur-xl transition-opacity duration-100 peer-hover:opacity-100 peer-focus-visible:opacity-100"
+          className="pointer-events-none absolute right-0 top-full z-20 mt-1.5 w-60 opacity-0 transition-opacity duration-100 peer-hover:opacity-100 peer-focus-visible:opacity-100"
         >
           {hint}
-        </span>
+        </HintBubble>
       </span>
 
       <BaseModal

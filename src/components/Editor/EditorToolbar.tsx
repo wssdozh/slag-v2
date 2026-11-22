@@ -1,6 +1,8 @@
 // Editor toolbar assembly: top row, markdown palette, save/zen actions.
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '../UI/icons/Icon';
+import { HintBubble } from '../UI/InfoHint';
 import { startDraggingWindow, toggleMaximizeWindow } from '../../lib/platform/windowControls';
 import { EditorTopBar } from './EditorTopBar';
 import { MarkdownPalette } from './MarkdownPalette';
@@ -13,11 +15,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   folder,
   onFolderChange,
   folderOptions,
-  selectedAttachment,
-  onSelectAttachment,
-  onRemoveAttachment,
-  onInsertAttachmentMarkdown,
-  onOpenLightbox,
   onUndo,
   onRedo,
   onInsertMarkdown,
@@ -35,10 +32,26 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onToggleExpanded,
 }) => {
   const [activeTopDropdown, setActiveTopDropdown] = React.useState<MarkdownDropdown | null>(null);
+  const [hint, setHint] = React.useState<{ label: string; top: number; center: number } | null>(null);
+  const showHint = (target: EventTarget | null) => {
+    const trigger = target instanceof Element ? target.closest<HTMLElement>('button[data-hint]') : null;
+    if (!trigger?.dataset.hint) {
+      setHint(null);
+      return;
+    }
+    const { bottom, left, width } = trigger.getBoundingClientRect();
+    setHint({ label: trigger.dataset.hint, top: bottom + 6, center: left + width / 2 });
+  };
 
   return (
     <header
+      onPointerOver={event => { if (event.pointerType === 'mouse') showHint(event.target); }}
+      onPointerLeave={() => setHint(null)}
+      onScrollCapture={() => setHint(null)}
+      onFocus={event => { if (event.target.matches(':focus-visible')) showHint(event.target); }}
+      onBlur={() => setHint(null)}
       onMouseDown={(e) => {
+        setHint(null);
         if (e.button === 0 && !(e.target as HTMLElement).closest('button, input, [role="button"], [role="listbox"], a')) {
           startDraggingWindow();
         }
@@ -53,14 +66,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
       } ${isZenMode ? 'opacity-0 hover:opacity-100' : 'opacity-100'}`}
       style={{ paddingTop: isCompact ? 0 : 'max(var(--sat), 0px)' }}
     >
-      {/* Invisible Backdrop to dismiss active top dropdown */}
-      {activeTopDropdown && (
-        <div
-          className="fixed inset-0 z-40 bg-transparent"
-          onClick={() => setActiveTopDropdown(null)}
-        />
-      )}
-
       <div
         className={`relative w-full h-full flex items-center justify-between px-4 md:px-6 gap-2 md:gap-3 ${
           isCompact ? 'py-1.5' : 'py-2.5'
@@ -74,12 +79,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
         />
 
         <MarkdownPalette
-          itemId={item.id}
-          selectedAttachment={selectedAttachment}
-          onSelectAttachment={onSelectAttachment}
-          onRemoveAttachment={onRemoveAttachment}
-          onInsertAttachmentMarkdown={onInsertAttachmentMarkdown}
-          onOpenLightbox={onOpenLightbox}
           onUndo={onUndo}
           onRedo={onRedo}
           onInsertMarkdown={onInsertMarkdown}
@@ -113,7 +112,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   ? 'text-white bg-tint-10 border border-tint-10'
                   : 'text-fg-secondary hover:text-white hover:bg-tint-6'
               }`}
-              title={isExpanded ? 'Вернуть в панель (Esc)' : 'Развернуть на всё окно'}
+              data-hint={isExpanded ? 'Вернуть в панель (Esc)' : 'Развернуть на всё окно'}
+              aria-label={isExpanded ? 'Вернуть в панель (Esc)' : 'Развернуть на всё окно'}
             >
               {isExpanded ? <Icon name="action.collapsePane" size="md" tone="inherit" /> : <Icon name="action.expandPane" size="md" tone="inherit" />}
             </button>
@@ -129,7 +129,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                   ? 'text-white bg-tint-10 border border-tint-10'
                   : 'text-fg-secondary hover:text-white hover:bg-tint-6'
               }`}
-              title={isFullWidth ? 'Свернуть лист' : 'Развернуть лист'}
+              data-hint={isFullWidth ? 'Свернуть лист' : 'Развернуть лист'}
+              aria-label={isFullWidth ? 'Свернуть лист' : 'Развернуть лист'}
             >
               {isFullWidth ? <Icon name="action.collapse" size="md" tone="inherit" /> : <Icon name="action.expand" size="md" tone="inherit" />}
             </button>
@@ -144,7 +145,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
                 ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20'
                 : 'text-fg-secondary hover:text-white hover:bg-tint-6'
             }`}
-            title={isZenMode ? 'Выйти из режима фокуса (Zen)' : 'Режим полного фокуса (Zen)'}
+            data-hint={isZenMode ? 'Выйти из режима фокуса (Zen)' : 'Режим полного фокуса (Zen)'}
+            aria-label={isZenMode ? 'Выйти из режима фокуса (Zen)' : 'Режим полного фокуса (Zen)'}
           >
             <Icon name="action.preview" size="md" tone="inherit" />
           </button>
@@ -153,7 +155,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           <button
             onClick={onSave}
             className="hidden md:flex w-ctrl-sm h-ctrl-sm items-center justify-center rounded-full bg-accent-strong text-white hover:bg-accent-strong/90 shadow-sm cursor-pointer motion-press"
-            title="Сохранить изменения (Ctrl+S / ⌘S)"
+            data-hint="Сохранить изменения (Ctrl+S / ⌘S)"
             aria-label={item.id.startsWith('draft_') ? 'Создать' : 'Готово'}
           >
             {/* weight is decided by Icon, not by the call site */}
@@ -161,6 +163,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           </button>
         </div>
       </div>
+      {hint && !activeTopDropdown && createPortal(
+        <div className="pointer-events-none fixed z-[110] flex w-52 max-w-[calc(100vw-1rem)] -translate-x-1/2 justify-center"
+          style={{ top: hint.top, left: `clamp(min(7rem, 50vw), ${hint.center}px, max(calc(100vw - 7rem), 50vw))` }}>
+          <HintBubble>{hint.label}</HintBubble>
+        </div>, document.body,
+      )}
     </header>
   );
 };

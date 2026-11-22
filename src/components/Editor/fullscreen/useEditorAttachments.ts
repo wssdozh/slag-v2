@@ -13,7 +13,6 @@ export interface EditorAttachmentsOptions {
   attachments: SlagAttachment[];
   setAttachments: React.Dispatch<React.SetStateAction<SlagAttachment[]>>;
   setContent: React.Dispatch<React.SetStateAction<string>>;
-  setIsAttachmentsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   addToast: Toast;
   openAttachSheet: (onAdd: (attachments: SlagAttachment[]) => void) => void;
 }
@@ -28,7 +27,6 @@ export function useEditorAttachments({
   attachments,
   setAttachments,
   setContent,
-  setIsAttachmentsCollapsed,
   addToast,
   openAttachSheet,
 }: EditorAttachmentsOptions) {
@@ -53,7 +51,6 @@ export function useEditorAttachments({
 
   const handleAttachmentsAdded = useCallback((newAtts: SlagAttachment[]) => {
     setAttachments(prev => [...prev, ...newAtts]);
-    setIsAttachmentsCollapsed(false);
     const links = newAtts.map(a => `![[${a.name}]]`).join('\n') + '\n';
     const view = getEditorView();
     if (view) {
@@ -67,7 +64,7 @@ export function useEditorAttachments({
       setContent(prev => (prev.trim() ? prev + '\n\n' + links : links));
     }
     addToast(`Добавлено медиа: ${newAtts.length} ${newAtts.length === 1 ? 'файл' : 'файла'}`, 'success');
-  }, [getEditorView, addToast, setAttachments, setContent, setIsAttachmentsCollapsed]);
+  }, [getEditorView, addToast, setAttachments, setContent]);
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const files: File[] = [];

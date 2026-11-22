@@ -26,7 +26,7 @@ test('desktop editor docks into its pane, then expands to the window', async ({ 
   await page.getByRole('button', { name: 'Таска', exact: true }).last().click();
   await expect(typeTrigger).toHaveAttribute('title', 'Таска');
 
-  await page.locator('header button[title="Развернуть на всё окно"]').first().click();
+  await page.locator('header button[aria-label="Развернуть на всё окно"]').first().click();
   // The detent interpolates its box; measure after it settles.
   await page.waitForTimeout(400);
   const expanded = await editor.boundingBox();

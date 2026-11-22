@@ -59,6 +59,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     folders,
     addToast,
     openLightbox,
+    activeLightboxIndex,
+    attachSheet,
     aiSettings,
     isSearchOpen,
     isMobile,
@@ -181,11 +183,8 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
   // Zen mode & layout controls (persisting user's width preference)
   const [isZenMode, setIsZenMode] = useState(false);
-  // The rail starts folded: it belongs under the text, not between the tags and the note.
-  const [isAttachmentsCollapsed, setIsAttachmentsCollapsed] = useState(true);
-  const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
-
-  const selectedAttachment = attachments.find(a => a.id === selectedAttachmentId);
+  const [attachmentMenuId, setAttachmentMenuId] = useState<string | null>(null);
+  const isAttachmentMenuOpen = attachments.some(att => att.id === attachmentMenuId);
 
   const folderOptions = React.useMemo(() => buildFolderOptions(folders), [folders]);
 
@@ -195,7 +194,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
   // `![[file]]` paints as a widget in the note body. CM6 captures extensions at mount, so the
   // plugin reads a deps object that outlives renders and is repainted when `version` moves.
-  const { srcs: attachmentSrcs } = useAttachmentSrcs(attachments);
+  const { srcs: attachmentSrcs, missing: missingAttachmentSrcs } = useAttachmentSrcs(attachments);
   const [embedDeps] = useState<AttachmentEmbedDeps>(() => ({ attachments, srcs: {}, version: 0 }));
   const [extensionsForEditor] = useState<readonly Extension[]>(() => [
     ...editorExtensions,
@@ -230,6 +229,14 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Those surfaces own Escape; let their handlers run before the editor's.
+        if (activeLightboxIndex !== null || attachSheet) return;
+        if (isAttachmentMenuOpen) {
+          e.preventDefault();
+          e.stopPropagation();
+          setAttachmentMenuId(null);
+          return;
+        }
         e.preventDefault();
         // LIFO: сначала закрывается верхний слой (меню форматирования), редактор — следующим.
         if (activeMobilePopover) {
@@ -261,7 +268,7 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     };
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [handleClose, handleSave, activeMobilePopover, setIsFullWidth, isMobile, isEditorExpanded, paneRect]);
+  }, [handleClose, handleSave, activeMobilePopover, activeLightboxIndex, attachSheet, isAttachmentMenuOpen, setIsFullWidth, isMobile, isEditorExpanded, paneRect]);
 
   const insertMarkdown = useCallback((prefix: string, suffix: string = '') => {
     const view = getEditorView();
@@ -315,7 +322,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
     attachments,
     setAttachments,
     setContent,
-    setIsAttachmentsCollapsed,
     addToast,
     openAttachSheet,
   });
@@ -389,11 +395,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
           folder={folder}
           onFolderChange={setFolder}
           folderOptions={folderOptions}
-          selectedAttachment={selectedAttachment}
-          onSelectAttachment={setSelectedAttachmentId}
-          onRemoveAttachment={removeAttachment}
-          onInsertAttachmentMarkdown={insertAttachmentMarkdown}
-          onOpenLightbox={openLightbox}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onInsertMarkdown={insertMarkdown}
@@ -509,30 +510,26 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
 
               {/* Tags Ribbon Row: chips are stepped into and renamed, not just appended to. */}
               <EditorTagsRow tags={tags} onChange={setTags} />
-
-              {/* Subtle Divider between Properties/Tags and Content */}
-              <div className="h-px bg-tint-6 w-full mt-1" />
+              <div className="h-px bg-tint-6 w-full mt-1" data-testid="editor-content-divider" />
+              {attachments.length > 0 && (
+                <AttachmentStrip
+                  itemId={item.id}
+                  attachments={attachments}
+                  srcs={attachmentSrcs}
+                  missing={missingAttachmentSrcs}
+                  menuId={attachmentMenuId}
+                  onMenuChange={setAttachmentMenuId}
+                  onInsertMarkdown={insertAttachmentMarkdown}
+                  onMoveAttachment={moveAttachment}
+                  onRemoveAttachment={removeAttachment}
+                  onOpenLightbox={openLightbox}
+                />
+              )}
             </div>
 
             {/* Main Markdown Editor with Obsidian-style Live Preview */}
             <div
               id="fullscreen-editor-root"
-              onClick={(e) => {
-                const target = e.target as HTMLElement;
-                const img = target.closest('img');
-                if (img) {
-                  const src = img.getAttribute('src');
-                  const alt = img.getAttribute('alt');
-                  const found = attachments.find(a => a.name === alt || a.dataUrl === src);
-                  if (found) {
-                    setSelectedAttachmentId(found.id);
-                    return;
-                  }
-                }
-                if (selectedAttachmentId) {
-                  setSelectedAttachmentId(null);
-                }
-              }}
               onPaste={handlePaste}
               className="w-full relative min-h-[420px]"
             >
@@ -544,22 +541,6 @@ const FullscreenEditorContent: React.FC<FullscreenEditorContentProps> = ({ item,
                 extensions={extensionsForEditor}
               />
             </div>
-
-            {/* The rail lives under the note: attachments are a footnote to the text, not a
-                block glued over it. Folded until a file arrives or the reader opens it. */}
-            <AttachmentStrip
-              itemId={item.id}
-              attachments={attachments}
-              isCollapsed={isAttachmentsCollapsed}
-              onToggleCollapse={() => setIsAttachmentsCollapsed(prev => !prev)}
-              selectedAttachmentId={selectedAttachmentId}
-              onSelectAttachment={setSelectedAttachmentId}
-              onInsertMarkdown={insertAttachmentMarkdown}
-              onMoveAttachment={moveAttachment}
-              onRemoveAttachment={removeAttachment}
-              onAddClick={handleAttachClick}
-              onOpenLightbox={openLightbox}
-            />
 
             {/* Bottom spacer on mobile so last lines clear the floating bottom bar */}
             <div className="h-16 md:hidden shrink-0" aria-hidden="true" />

@@ -534,7 +534,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     });
 
     // Save changes
-    await page.locator('header button[title*="Сохранить изменения"]').click();
+    await page.locator('header button[data-hint*="Сохранить изменения"]').click();
     await page.waitForTimeout(200);
 
     // 6. Switch to Calendar view and verify inspecting task opens FullscreenEditor
@@ -1520,7 +1520,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     // 2. Desktop: Verify sticky toolbar at top
     const desktopStickyToolbar = page.locator('[data-testid="fullscreen-editor-modal"] header.sticky.top-0');
     await expect(desktopStickyToolbar).toBeVisible();
-    const textStylesBtn = desktopStickyToolbar.locator('button[title*="Стили текста"]');
+    const textStylesBtn = desktopStickyToolbar.locator('button[aria-label*="Стили текста"]');
     await expect(textStylesBtn).toBeVisible();
     await textStylesBtn.click();
     await expect(desktopStickyToolbar.locator('button', { hasText: 'Заголовок 1' })).toBeVisible();

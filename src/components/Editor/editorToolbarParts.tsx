@@ -1,5 +1,5 @@
 // Shared props, options and dropdown state for the editor toolbar halves.
-import type { SlagAttachment, SlagItem, SlagItemType } from '../../types';
+import type { SlagItem, SlagItemType } from '../../types';
 import type { SegmentedOption } from '../UI/ResponsiveSegmented';
 import { Icon } from '../UI/icons/Icon';
 export const ITEM_TYPE_OPTIONS: SegmentedOption<SlagItemType>[] = [
@@ -15,16 +15,6 @@ export interface EditorToolbarProps {
   folder: string;
   onFolderChange: (folder: string) => void;
   folderOptions: Array<{ value: string; label: string; dividerBefore?: boolean }>;
-  selectedAttachment: SlagAttachment | undefined;
-  onSelectAttachment: (id: string | null) => void;
-  onRemoveAttachment: (id: string) => void;
-  onInsertAttachmentMarkdown: (name: string) => void;
-  onOpenLightbox: (attachments: Array<{
-    id: string;
-    name: string;
-    url: string;
-    itemId?: string;
-  }>, index: number) => void;
   onUndo: () => void;
   onRedo: () => void;
   onInsertMarkdown: (prefix: string, suffix?: string) => void;
@@ -52,18 +42,12 @@ export type EditorTopBarProps = Pick<
 
 export type MarkdownPaletteProps = Pick<
   EditorToolbarProps,
-  | 'selectedAttachment'
-  | 'onSelectAttachment'
-  | 'onRemoveAttachment'
-  | 'onInsertAttachmentMarkdown'
-  | 'onOpenLightbox'
   | 'onUndo'
   | 'onRedo'
   | 'onInsertMarkdown'
   | 'onInsertTable'
   | 'onAttachClick'
 > & {
-  itemId: string;
   activeDropdown: MarkdownDropdown | null;
   onActiveDropdownChange: (next: MarkdownDropdown | null) => void;
 };
