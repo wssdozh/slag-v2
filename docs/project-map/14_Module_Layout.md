@@ -37,7 +37,7 @@ src/
   hooks/
     gestures/       drag, pointer dnd, sheet drag, swipe
     layout/         container width, flip layout, is mobile, visual viewport
-    media/          useAttachmentSrc, useAudioAnalyser, useComposerMedia
+    media/          useAttachmentSrc для карточек; useAttachmentSrcOnDemand для видимых плиток и кадров просмотрщика; аудио и медиа композера
     ui/             useLayerStack, usePresence, useGlobalHotkeys
   lib/
     ai/             оркестратор, tools, prompt, action parser, адаптеры, aiService; fallback/ — по файлу на группу интентов

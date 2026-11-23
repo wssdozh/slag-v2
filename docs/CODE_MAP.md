@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **664**, строк: **115327**, зон: **48**.
+Модулей: **671**, строк: **116742**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,10 +12,10 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1753 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1646 | 28 |
-| `src/lib/storage/index.ts` | 1539 | 50 |
+| `src/lib/sync/syncEngine.ts` | 1647 | 28 |
+| `src/lib/storage/index.ts` | 1539 | 51 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/sync/notes/replica.ts` | 1019 | 1 |
+| `src/lib/sync/notes/replica.ts` | 1042 | 1 |
 | `src/lib/storage/settingsStore.ts` | 959 | 5 |
 | `src/lib/storage/vaultFiles.ts` | 938 | 2 |
 | `e2e/slag/feed.spec.ts` | 919 | 0 |
@@ -26,7 +26,7 @@
 | `src/components/Feed/ItemCard.tsx` | 763 | 1 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 
-## e2e (playwright) — 144 файлов, 26543 строк
+## e2e (playwright) — 150 файлов, 27530 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -41,11 +41,11 @@
 - `e2e/admin_panel.spec.ts` — 493
 - `e2e/adversarial_memory_contradictions.spec.ts` — 429
 
-## src — 2 файлов, 553 строк
+## src — 2 файлов, 590 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `App.tsx` | 473 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
+| `App.tsx` | 510 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
 | `main.tsx` | 80 | 0 |  | Boots the React root into #root, in StrictMode, after the settings store, the… |
 
 ## src/components — 1 файлов, 56 строк
@@ -113,7 +113,7 @@
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 55 файлов, 8121 строк
+## src/components/Feed — 55 файлов, 8115 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -149,7 +149,7 @@
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
 | `FeedHeader.tsx` | 127 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder name and icon, filter badges, sort, materials toggl… |
-| `FeedList.tsx` | 557 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
+| `FeedList.tsx` | 551 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 179 | 1 | FolderSuggestionMenu | The `@folder` autocomplete: the folder tree as branch rows, the selected one,… |
 | `FolderViewButton.tsx` | 23 | 2 | FolderViewButton |  |
 | `item/ItemAttachmentGrid.tsx` | 106 | 2 | AttachmentTile, ItemAttachmentGrid |  |
@@ -236,13 +236,13 @@
 | `MobileShell.tsx` | 117 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
 | `MobileTasksView.tsx` | 271 | 1 | MobileTasksView | The phone tasks tab: status tabs you swipe between, plus the calendar mode. |
 
-## src/components/Modals — 12 файлов, 2473 строк
+## src/components/Modals — 12 файлов, 2511 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `BaseModal.tsx` | 169 | 15 | BaseModalProps, BaseModal | The dialog frame every modal wears: presence, backdrop, header, footer, Escap… |
 | `ComposerModal.tsx` | 61 | 1 | ComposerModal | The composer in a dialog: keeps its last options and folder through the exit. |
-| `ConfirmDialog.tsx` | 56 | 1 | ConfirmDialog | The app's own yes/no for destructive actions, instead of the platform's confi… |
+| `ConfirmDialog.tsx` | 94 | 1 | ConfirmDialog | The app's own yes/no for destructive actions, instead of the platform's confi… |
 | `ConflictTextPane.tsx` | 55 | 1 | ConflictTextPane |  |
 | `DiffModal.tsx` | 574 | 2 | DiffModalItemEntry, DiffModalProps, DiffModal | What an AI edit would change, before it is applied: the line diff and the acc… |
 | `FolderInfoModal.tsx` | 94 | 1 | FolderInfoModal | The folder dialog: its profile, plus triage, a new note, and its tags as filt… |
@@ -253,13 +253,13 @@
 | `TriageModal.tsx` | 478 | 1 | TriageModal | AI triage of the inbox: one batch of notes, folders and tags confirmed in a s… |
 | `VaultModal.tsx` | 284 | 1 | VaultModal | The vault switcher: choose a store, create one on a backend, or delete one. |
 
-## src/components/RightPanel — 3 файлов, 447 строк
+## src/components/RightPanel — 3 файлов, 507 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `FolderInfoPanel.tsx` | 19 | 1 | FolderInfoPanel | Dock-width container for the folder profile, bound to the current folder. |
-| `FolderMediaTabs.tsx` | 310 | 1 | FolderMediaTabsProps, FolderMediaTabs | Folder media browser: images, audio, files, links and tags in one tab strip. |
-| `useFolderMedia.ts` | 118 | 4 | FolderMediaData, useFolderMedia | Collects a folder's attachments, links and tags and resolves their bytes once. |
+| `FolderMediaTabs.tsx` | 353 | 1 | FolderMediaTabsProps, FolderMediaTabs | Folder media browser: images, audio, files, links and tags in one tab strip. |
+| `useFolderMedia.ts` | 135 | 4 | FolderMediaImage, FolderMediaAudio, FolderMediaFile, FolderMediaData, useFolderMedia | Collects a folder's attachments, links and tags; the bytes stay with the tile… |
 
 ## src/components/Search — 1 файлов, 434 строк
 
@@ -267,7 +267,7 @@
 |---|---:|---:|---|---|
 | `SearchModal.tsx` | 434 | 2 | SearchModal | The ⌘K palette: one query, hits grouped by kind, and keyboard navigation thro… |
 
-## src/components/Settings — 48 файлов, 5519 строк
+## src/components/Settings — 48 файлов, 5643 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -277,8 +277,8 @@
 | `ai/ConnectionsSection.tsx` | 93 | 1 | ConnectionsSection | The list of connections: a row per provider, expanding into its editor. |
 | `ai/RolesSection.tsx` | 55 | 1 | RolesSection | Who does what: answer, vision and speech, each picking one connection. |
 | `ai/useAiSettingsForm.ts` | 129 | 1 | AiSettingsForm, useAiSettingsForm | The AI settings form's one state: connections, roles and the flags, with thei… |
-| `AiPromptModal.tsx` | 193 | 1 | PromptField, AiPromptModal | One dialog per prompt field: instructions and persona are edited apart, and s… |
-| `AiSettingsTab.tsx` | 229 | 1 | AiSettingsTab | Where the model comes from — subscription or your own connections — and what … |
+| `AiPromptModal.tsx` | 318 | 1 | PromptField, AiPromptModal | One dialog per prompt field: instructions and persona are edited apart, and s… |
+| `AiSettingsTab.tsx` | 228 | 1 | AiSettingsTab | Where the model comes from — subscription or your own connections — and what … |
 | `devices/DeviceActions.tsx` | 150 | 2 | DeviceName, DeviceRevokeButton, LocalSyncModeGroup, PairDeviceButton, PairDeviceModal | Device row widgets: inline rename, revoke, and the local sync mode picker. |
 | `devices/DeviceCard.tsx` | 25 | 1 | DeviceCard | The modal shell that shows one device and the vaults it can reach. |
 | `devices/DeviceIcon.tsx` | 26 | 1 | DeviceIcon | The glyph a device row wears: one distinct mark per form factor, never the sa… |
@@ -329,7 +329,7 @@
 | `syncGlyph.ts` | 29 | 1 | syncGlyph | Keep the rail quiet during background traffic; comparison details belong in t… |
 | `SyncStatusButton.tsx` | 112 | 2 | SyncStatusButton |  |
 
-## src/components/UI — 38 файлов, 6765 строк
+## src/components/UI — 38 файлов, 6803 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -344,7 +344,7 @@
 | `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
 | `icons/Icon.tsx` | 109 | 151 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
 | `icons/icons.ts` | 569 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
-| `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
+| `ImageLightbox.tsx` | 398 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 91 | 2 | HintBubble, InfoHintProps, InfoHint | One question mark for every explanation in the app. |
 | `LightboxTextPanel.tsx` | 151 | 1 | LightboxTextPanelProps, LightboxTextPanel | OCR results beside a photo in the lightbox, with copy and retry when the pass… |
 | `MarkdownRenderer.tsx` | 389 | 4 | MarkdownAttachmentSrcs, MarkdownRenderer | Renders markdown with GFM, Obsidian [[wiki links]] as in-app jumps and ![[fil… |
@@ -484,11 +484,12 @@
 | `useIsMobile.ts` | 31 | 4 | useIsMobile | Tracks whether the viewport sits below the mobile breakpoint, on load and res… |
 | `useVisualViewportHeight.ts` | 56 | 1 | useVisualViewportHeight | Writes the visual viewport height to --vvh, so the shell shrinks with the key… |
 
-## src/hooks/media — 2 файлов, 267 строк
+## src/hooks/media — 3 файлов, 378 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useAttachmentSrc.ts` | 63 | 13 | AttachmentSrcs, AttachmentSources, useAttachmentSrcs, useAttachmentSrc | Resolves attachment ids to object URLs on demand, keeping media bytes out of … |
+| `useAttachmentSrc.ts` | 63 | 11 | AttachmentSrcs, AttachmentSources, useAttachmentSrcs, useAttachmentSrc | Resolves attachment ids to object URLs on demand, keeping media bytes out of … |
+| `useAttachmentSrcOnDemand.ts` | 111 | 2 | AttachmentSource, useAttachmentSrcOnDemand, useSeenTiles | One narrow resolver for attachment bytes, shared by the viewer's slides and t… |
 | `useComposerMedia.ts` | 204 | 1 | UseComposerMediaOptions, useComposerMedia | Composer's record controls: hold or lock, audio/video switch, finish and send. |
 
 ## src/hooks/ui — 6 файлов, 524 строк
@@ -500,7 +501,7 @@
 | `useGlobalHotkeys.ts` | 55 | 1 | useGlobalHotkeys | Routes keydown through the APP_COMMANDS catalogue and the top-layer Escape. |
 | `useIntegrity.ts` | 122 | 1 | UseIntegrity, useIntegrity | The storage panel's state: run a check, hand the plan to the repair, keep the… |
 | `useLayerStack.ts` | 123 | 1 | AppLayer, useLayerStack | LIFO dismiss stack shared by Escape and Android/browser back, synced to histo… |
-| `usePresence.ts` | 96 | 29 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
+| `usePresence.ts` | 96 | 31 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
 
 ## src/lib — 7 файлов, 1917 строк
 
@@ -553,7 +554,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `logger.ts` | 556 | 75 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
+| `logger.ts` | 556 | 77 | LogListener, logger | The log: levels, scopes, listeners, the buffer, retention and persistence. Wh… |
 | `logRedaction.ts` | 65 | 1 | maskSensitiveString, sanitizeForLog | Masking secrets in log messages and payloads; the one place that knows what a… |
 
 ## src/lib/media — 17 файлов, 2001 строк
@@ -615,7 +616,7 @@
 | `attachments.ts` | 364 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
 | `folderStore.ts` | 275 | 2 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 1539 | 50 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `index.ts` | 1539 | 51 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 160 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 163 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
@@ -644,7 +645,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 50 файлов, 11612 строк
+## src/lib/sync — 50 файлов, 11638 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -680,8 +681,8 @@
 | `notes/migrationExport.ts` | 84 | 1 | exportMigrationSnapshot, canExportMigrationSnapshot | Local-only evidence: preserve physical copies, including duplicate IDs and tr… |
 | `notes/persistence.ts` | 156 | 3 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
 | `notes/reconcile.ts` | 46 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
-| `notes/replica.ts` | 1019 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
-| `notes/session.ts` | 231 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/replica.ts` | 1042 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/session.ts` | 233 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/sharedBody.ts` | 60 | 18 | SharedKind, SharedValue, isLegacySharedKind, SharedBody, SharedMutation, +4 |  |
 | `notes/sharedWorkspace.ts` | 109 | 5 | SharedWorkspaceField, SharedWorkspace, SharedWorkspaceValue, isSharedWorkspaceField, selectSharedWorkspace, +3 |  |
 | `notes/wire.ts` | 319 | 20 | FOLDER_TREE_ID, RegistryBody, NoteKind, NoteMode, NoteStatus, +32 | The authenticated relay sees routing metadata, never the note's identity or b… |
@@ -691,7 +692,7 @@
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
 | `pushBundle.ts` | 361 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
 | `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1646 | 28 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncEngine.ts` | 1647 | 28 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
 | `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 54 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
@@ -793,5 +794,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 692 | 240 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 692 | 241 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

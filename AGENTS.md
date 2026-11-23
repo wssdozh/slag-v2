@@ -90,7 +90,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
 | корзина | `src/lib/storage/trashStore.ts` |
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
-| полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
+| первое открытие редактора и черновики | `src/App.tsx` загружает модуль по запросу; `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts`; замер `scripts/bench/startup-input.mjs` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
 | быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/context/hooks/useLocalDay.ts` — локальная дата |
 | мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
