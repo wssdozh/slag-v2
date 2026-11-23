@@ -25,7 +25,7 @@ export function FolderOverlay({ folders, currentFolder, inputRef, onSelect, onCl
           isFiltering={isFiltering} onSelect={onSelect} />
       </div>
       <div className="relative shrink-0" style={{
-        paddingBottom: 'calc(var(--folder-composer-safe-bottom, var(--sab)) + 8px)',
+        paddingBottom: 'calc(var(--sab) + 8px)',
         paddingLeft: 'calc(var(--sal) + 12px)',
         paddingRight: 'calc(var(--sar) + 12px)',
       }}>

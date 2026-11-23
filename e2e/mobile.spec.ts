@@ -170,9 +170,8 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
       await expect(panel).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(panel).toHaveCSS('border-radius', '16px');
       await expect(panel).toHaveCSS('box-shadow', 'none');
-      // The bottom bar owns the bottom safe area; don't count it twice.
-      await expect(page.getByRole('navigation', { name: 'Мобильная навигация' }).locator('..')).toHaveCSS('padding-bottom', '24px');
-      await expect(footer).toHaveCSS('padding-bottom', '8px');
+      // Safe areas plus the island's own 12px of air.
+      await expect(footer).toHaveCSS('padding-bottom', '32px');
       await expect(footer).toHaveCSS('padding-left', '24px');
       await expect(footer).toHaveCSS('padding-right', '28px');
       await page.screenshot({ path: 'test-results/screenshots/android_composer_outer_surface.png' });

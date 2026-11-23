@@ -1,7 +1,7 @@
 // Editor top row: back and folder. The record type lives with the metadata, under the title.
 import React from 'react';
 import { Icon } from '../UI/icons/Icon';
-import { FolderSelect } from '../UI/FolderSelect';
+import { Select } from '../UI/Select';
 import type { EditorTopBarProps } from './editorToolbarParts';
 
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
@@ -26,7 +26,15 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       {/* Vertical Divider */}
       <div className="h-4 w-px bg-tint-8 shrink-0" />
 
-      <FolderSelect value={folder} onChange={onFolderChange} options={folderOptions} />
+      {/* Folder Selector: ghost droplist without podlozhka, showing full hierarchical path */}
+      <Select
+        size="sm"
+        variant="ghost"
+        value={folder}
+        onChange={onFolderChange}
+        options={folderOptions}
+        className="max-w-[220px] md:max-w-[280px] h-7 text-xs font-mono"
+      />
     </div>
   );
 };

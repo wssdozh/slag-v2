@@ -6,10 +6,19 @@ import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { segmentText, type ComposerHighlight } from './composer/composerHighlights';
 import { ComposerEditorField, type ComposerEditorKeyEvent } from './composer/ComposerEditorField';
 
-export interface BaseComposerProps {
+type ComposerFieldProps = {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
+  fieldOnlySlot?: never;
+} | {
+  fieldOnlySlot: React.ReactElement;
+  value?: never;
+  onChange?: never;
+  onSubmit?: never;
+};
+
+export type BaseComposerProps = ComposerFieldProps & {
   /** Плейсхолдер инпута */
   placeholder?: string;
   /** Внешний ref на textarea */
@@ -103,6 +112,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   topRightSlot,
   overlaySlot,
   customControls,
+  fieldOnlySlot,
   minHeight = 24,
   maxHeight = 220,
   variant = 'card',
@@ -202,7 +212,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         )}
 
         {/* Зона ввода */}
-        {!hideTextarea && (
+        {fieldOnlySlot ?? (!hideTextarea && (
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="relative flex min-w-0 flex-1">
             {mode === 'markdown' && editorContainerRef ? (
@@ -275,10 +285,10 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               </div>
             )}
           </div>
-        )}
+        ))}
 
         {/* Нижняя панель действий (Toolbar) — без внутренней линии-разделителя */}
-        {customControls ? (
+        {!fieldOnlySlot && (customControls ? (
           customControls
         ) : (
           <div className="composer-toolbar relative flex min-w-0 items-end justify-between gap-2 max-[430px]:[&_.composer-record-type_span.truncate]:hidden">
@@ -314,7 +324,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               )}
             </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );
