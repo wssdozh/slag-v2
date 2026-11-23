@@ -16,6 +16,8 @@ import { MobileScreenHeader } from './MobileScreenHeader';
 import { VaultSwitcherMenu } from '../Vault/VaultSwitcherMenu';
 import { useComposerInset } from '../../hooks/layout/useComposerInset';
 import { SyncStatusButton } from '../Sidebar/SyncStatusButton';
+import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
+import { PullSearchHint } from '../UI/PullSearchHint';
 
 function unsortedLabel(count: number): string {
   const mod10 = count % 10;
@@ -46,6 +48,13 @@ export const MobileFoldersView: React.FC = () => {
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
   // Лента уезжает под островок композера: панель публикует его высоту, список её читает.
   const [attachComposerDock, composerInset] = useComposerInset();
+
+  // Только корень папок: тянуть вниз на верхней кромке списка, дальше открывается тот же поиск,
+  // что и по кнопке в шапке. Внутри папки жест не вешается — там живёт жест ленты.
+  const { pull, side, offset, handlers: pullHandlers } = usePullToSearch({
+    onTrigger: () => setIsSearchOpen(true),
+    topOnly: true,
+  });
 
   // A quick tap can end before `:active` ever paints a frame, so the acknowledgement
   // outlives the finger: the row stays lit for 200ms after it was touched.
@@ -145,61 +154,85 @@ export const MobileFoldersView: React.FC = () => {
         />
 
         {/* Scrollable Root Folders List (Telegram Grouped Style) */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
-          {/* Pinned Inbox Card */}
-          <div className="rounded-2xl bg-surface/80 overflow-hidden">
-            <button
-              onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
-              onPointerDown={flashTap}
-              className="w-full flex items-center justify-between p-3.5 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-6 h-6 flex items-center justify-center text-fg-soft shrink-0">
-                  <Icon name="entity.inbox" size="lg" tone="inherit" />
+        {/* Шапка стоит на месте: едет только полотно строк, а в освободившемся зазоре
+            проступает подсказка поиска. Скроллер не трансформируется — его rect верен. */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          <div
+            {...pullHandlers}
+            data-testid="mobile-folders-scroll"
+            className="flex-1 overflow-y-auto"
+          >
+            {/* Статичный клип: сдвинутое полотно не расширяет scrollHeight, длинный список
+                по-прежнему прокручивается на высоту раскладки. */}
+            <div className="min-h-full overflow-clip">
+              <div
+                data-testid="mobile-folders-pull-surface"
+                className="flex flex-col gap-3 px-4 py-4 pb-24"
+                style={{ transform: offset ? `translate3d(0, ${offset}px, 0)` : undefined }}
+              >
+              {/* Pinned Inbox Card */}
+              <div className="rounded-2xl bg-surface/80 overflow-hidden">
+                <button
+                  onClick={() => setMobileActiveFolder(DEFAULT_INBOX_FOLDER)}
+                  onPointerDown={flashTap}
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-6 h-6 flex items-center justify-center text-fg-soft shrink-0">
+                      <Icon name="entity.inbox" size="lg" tone="inherit" />
+                    </div>
+                    <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {unsortedCount > 0 && (
+                      <span className="text-xs font-mono text-fg-muted">
+                        {unsortedCount} {unsortedLabel(unsortedCount)}
+                      </span>
+                    )}
+                  </div>
+                </button>
+              </div>
+
+              {/* User Folders Group */}
+              <div className="flex flex-col gap-1.5 mt-1">
+                <div className="px-1 text-2xs font-mono text-fg-muted uppercase tracking-wider">
+                  Папки
                 </div>
-                <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
+
+                <div className="rounded-2xl bg-surface/80 overflow-hidden">
+                  {directSubfolders
+                    .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
+                    .map(folder => {
+                      const iconName = folderIconName(folder.icon);
+
+                      return (
+                        <button
+                          key={folder.path}
+                          onClick={() => setMobileActiveFolder(folder.path)}
+                          onPointerDown={flashTap}
+                          className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div data-folder-color={folder.color} style={{ color: folderColorCss(folder.color) }} className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
+                              <Icon name={iconName} size="lg" tone="inherit" />
+                            </div>
+                            <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
               </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {unsortedCount > 0 && (
-                  <span className="text-xs font-mono text-fg-muted">
-                    {unsortedCount} {unsortedLabel(unsortedCount)}
-                  </span>
-                )}
               </div>
-            </button>
-          </div>
-
-          {/* User Folders Group */}
-          <div className="flex flex-col gap-1.5 mt-1">
-            <div className="px-1 text-2xs font-mono text-fg-muted uppercase tracking-wider">
-              Папки
-            </div>
-
-            <div className="rounded-2xl bg-surface/80 overflow-hidden">
-              {directSubfolders
-                .filter(f => f.path !== DEFAULT_INBOX_FOLDER)
-                .map(folder => {
-                  const iconName = folderIconName(folder.icon);
-
-                  return (
-                    <button
-                      key={folder.path}
-                      onClick={() => setMobileActiveFolder(folder.path)}
-                      onPointerDown={flashTap}
-                      className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 active:duration-0 data-[tapped=true]:bg-tint-10 data-[tapped=true]:duration-0 transition-colors text-left cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div data-folder-color={folder.color} style={{ color: folderColorCss(folder.color) }} className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0">
-                          <Icon name={iconName} size="lg" tone="inherit" />
-                        </div>
-                        <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
-                      </div>
-                    </button>
-                  );
-                })}
             </div>
           </div>
+
+          {/* Подсказка монтируется только на жест: в покое узла нет. Один слой позиционирования:
+              testid и data-атрибуты живут на корне самого PullSearchHint. */}
+          {side === 'top' && (
+            <PullSearchHint pull={pull} side={side} testId="mobile-folders-pull-search" />
+          )}
         </div>
 
         <VaultSwitcherMenu

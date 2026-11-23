@@ -1089,6 +1089,7 @@ export class SyncEngine {
         serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
         signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
         readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
+        isLiveOpen: () => this.transport.isOpenFor(roomId),
         onDeliveryChange: () => this.notify(),
         onStatus: (status) => { if (generation === this.initGeneration) { this.noteRoomStatus = status; this.notify(); } },
         log: (event, data, warning) => warning ? syncLog.warn(event, data) : syncLog.debug(event, data),

@@ -151,6 +151,22 @@ export function collapseToRect(target: HTMLElement, dest: HTMLElement): Animatio
 export type ScreenSwap = 'tab' | 'tab-next' | 'tab-prev' | 'push' | 'pop';
 
 /**
+ * The update of the transition in flight, until it has painted once. A browser
+ * may hold the callback until after the next tap, so a newer request drains
+ * this one first: a tab tap during a vault switch then keeps both the switch
+ * and the tab, in the order they were asked for.
+ */
+let pendingUpdate: (() => void) | null = null;
+
+function drainPendingUpdate(): void {
+  const pending = pendingUpdate;
+  if (!pending) return;
+  // Cleared before the call: the update itself may start the next swap.
+  pendingUpdate = null;
+  pending();
+}
+
+/**
  * Swaps one full screen for another behind the browser's own snapshot layer.
  * The outgoing screen is never kept mounted: no duplicate nodes for tests or
  * screen readers, and a second tap cannot cut the exit short — it just starts
@@ -164,27 +180,49 @@ export function swapScreen(kind: ScreenSwap, update: () => void): void {
     typeof document.startViewTransition !== 'function' ||
     root.dataset.motionSwap
   ) {
+    drainPendingUpdate();
     update();
     return;
   }
 
+  let applied = false;
+  const apply = () => {
+    // The callback already ran (normally, drained, or before a browser refusal).
+    if (applied) return;
+    applied = true;
+    if (pendingUpdate === apply) pendingUpdate = null;
+    flushSync(update);
+  };
+
   const release = () => {
+    if (pendingUpdate === apply) pendingUpdate = null;
     delete root.dataset.motionSwap;
   };
+
+  pendingUpdate = apply;
   root.dataset.motionSwap = kind;
 
   let transition: ReturnType<typeof document.startViewTransition>;
   try {
-    transition = document.startViewTransition(() => {
-      flushSync(update);
-    });
-  } catch {
+    transition = document.startViewTransition(apply);
+  } catch (error) {
     release();
-    update();
+    // The browser refused before running the callback: apply this request once
+    // by hand. If the callback did run and threw, the update is not retried —
+    // that would paint twice and hide the real failure.
+    if (applied) throw error;
+    apply();
     return;
   }
 
+  // `ready` reports the visual plane: a skipped swap (hidden tab, another
+  // start) and an aborted one (duplicate transition names) are expected, and a
+  // failed update also settles it. All of it is secondary here: the update
+  // error keeps its one channel in `updateCallbackDone`, so rethrowing `ready`
+  // would report the same failure twice.
+  void transition.ready.catch(() => undefined);
   // The attribute picks the keyframes, so it must outlive the animation itself.
-  // `finished` settles even when the swap is skipped or the tab is hidden.
+  // `finished` settles even when the swap is skipped or the tab is hidden, and
+  // a callback error reaches the caller through `updateCallbackDone`.
   transition.finished.then(release, release);
 }

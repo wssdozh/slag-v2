@@ -6,6 +6,7 @@ import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { usePhotoPager } from '../../hooks/gestures/usePhotoPager';
 import { useItemActions } from '../../hooks/useItemActions';
+import { useAttachmentSrcOnDemand, type AttachmentSource } from '../../hooks/media/useAttachmentSrcOnDemand';
 import { ViewerVideo } from '../Media/ViewerVideo';
 import { LightboxTextPanel } from './LightboxTextPanel';
 
@@ -13,6 +14,44 @@ export type { LightboxImage };
 
 /** Idle before the chrome leaves on a phone, the way every media viewer behaves there. */
 const CHROME_IDLE_MS = 2500;
+
+/** A slide's bytes live where its note says; a deck built by hand may carry them inline only. */
+function sourceOf(image: LightboxImage): AttachmentSource | undefined {
+  if (!image.id) return undefined;
+  const attachment = image.sourceItem?.attachments?.find((candidate) => candidate.id === image.id);
+  if (!attachment) return image.url ? { id: image.id, dataUrl: image.url } : undefined;
+  return { id: attachment.id, relativePath: attachment.relativePath, mimeType: attachment.mimeType, dataUrl: image.url || undefined };
+}
+
+/**
+ * One mounted slide. The deck is built before the bytes may be here, so the slide asks for its
+ * own file — and only the neighbours the pager keeps mounted are built at all.
+ */
+const LightboxSlide: React.FC<{
+  image: LightboxImage;
+  isActive: boolean;
+  chromeVisible: boolean;
+  onDoubleClick: (event: React.MouseEvent) => void;
+}> = ({ image, isActive, chromeVisible, onDoubleClick }) => {
+  const src = useAttachmentSrcOnDemand(sourceOf(image), true);
+
+  if (image.kind === 'video') {
+    if (!isActive || !src) return <div className="h-full w-full bg-black" />;
+    return <ViewerVideo src={src} isActive chromeVisible={chromeVisible} />;
+  }
+  // No `src=""`: an empty source asks the page for itself and paints a broken frame. Bytes that
+  // are still on their way are a black frame, the same way a clip that is not playing is.
+  if (!src) return <div className="h-full w-full bg-black" aria-hidden />;
+  return (
+    <img
+      src={src}
+      alt={image.name}
+      draggable={false}
+      onDoubleClick={onDoubleClick}
+      className="max-h-full max-w-full select-none object-contain"
+    />
+  );
+};
 
 export interface ImageLightboxProps {
   images: LightboxImage[];
@@ -269,40 +308,39 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
       >
         <div ref={stageRef} className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center overflow-hidden will-change-transform">
           <div ref={trackRef} className="flex h-full w-full will-change-transform">
-            {activeImages.map((image, slideIndex) => (
-              <div
-                key={image.id ?? image.url}
-                className="relative flex h-full w-full shrink-0 items-center justify-center overflow-hidden"
-                aria-hidden={slideIndex !== activeIndex}
-              >
-                {Math.abs(slideIndex - activeIndex) <= 1 && (
-                  <div
-                    ref={slideIndex === activeIndex && !isVideo ? imageRef : undefined}
-                    className="flex h-full w-full items-center justify-center transition-transform duration-150"
-                    style={slideIndex === activeIndex && !isVideo
-                      ? { transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` }
-                      : undefined}
-                  >
-                    {isVideo && slideIndex === activeIndex ? (
-                      <ViewerVideo src={image.url} isActive chromeVisible={isChromeVisible} />
-                    ) : image.kind === 'video' ? (
-                      <div className="h-full w-full bg-black" />
-                    ) : (
-                      <img
-                        src={image.url}
-                        alt={image.name}
-                        draggable={false}
+            {activeImages.map((image, slideIndex) => {
+              const isActiveSlide = slideIndex === activeIndex;
+              // The zoom target is the frame, not the picture: it is mounted whether or not the
+              // bytes have arrived, so a deferred slide still pans and zooms once it paints.
+              const isZoomTarget = isActiveSlide && image.kind !== 'video';
+              return (
+                <div
+                  key={image.id ?? image.url}
+                  className="relative flex h-full w-full shrink-0 items-center justify-center overflow-hidden"
+                  aria-hidden={slideIndex !== activeIndex}
+                >
+                  {Math.abs(slideIndex - activeIndex) <= 1 && (
+                    <div
+                      ref={isZoomTarget ? imageRef : undefined}
+                      className="flex h-full w-full items-center justify-center transition-transform duration-150"
+                      style={isZoomTarget
+                        ? { transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)` }
+                        : undefined}
+                    >
+                      <LightboxSlide
+                        image={image}
+                        isActive={isActiveSlide}
+                        chromeVisible={isChromeVisible}
                         onDoubleClick={(event) => {
                           event.stopPropagation();
                           commitZoom(zoom === 1 ? 2 : 1);
                         }}
-                        className="max-h-full max-w-full select-none object-contain"
                       />
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {hasNeighbours && (

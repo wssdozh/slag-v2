@@ -1,5 +1,5 @@
 // One note in the feed: reply swipe, width, OCR/expansion state, and the slots it composes.
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useLayoutEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import type { SlagItem, SlagAttachment } from '../../types';
 import { TaskStatusMark } from '../UI/TaskStatusMark';
@@ -126,8 +126,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
 
   const longPressTimerRef = useRef<number | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const tapTimerRef = useRef<number | null>(null);
-  const lastTapAtRef = useRef(0);
   const suppressTapRef = useRef(false);
 
   // ponytail: замер ряда даёт лишний reflow на карточку; IntersectionObserver на чип, если карточки потяжелеют
@@ -156,19 +154,6 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     return () => observer.disconnect();
   }, [item.tags, tagsRowWidth]);
 
-  const copyItemText = () => {
-    const text = (item.content || '').trim() || item.title;
-    navigator.clipboard
-      .writeText(text)
-      .then(() => addToast('Текст скопирован', 'success'))
-      .catch(() => addToast('Не удалось скопировать', 'error'));
-    try {
-      navigator.vibrate?.(10);
-    } catch {
-      // Ignore: вибрация не критична
-    }
-  };
-
   const hasTextSelection = (target: EventTarget | null) => {
     const selection = window.getSelection();
     return target instanceof Element && !selection?.isCollapsed &&
@@ -183,36 +168,15 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       suppressTapRef.current = false;
       return;
     }
-    const now = performance.now();
-    if (now - lastTapAtRef.current < UI_DELAYS.DOUBLE_TAP_MS) {
-      lastTapAtRef.current = 0;
-      if (tapTimerRef.current) {
-        clearTimeout(tapTimerRef.current);
-        tapTimerRef.current = null;
-      }
-      copyItemText();
-      return;
-    }
-    lastTapAtRef.current = now;
-    tapTimerRef.current = window.setTimeout(() => {
-      tapTimerRef.current = null;
-      setSelectedItem(item);
-      setIsFullscreenEditorOpen(true);
-    }, UI_DELAYS.DOUBLE_TAP_MS);
+    setSelectedItem(item);
+    setIsFullscreenEditorOpen(true);
   };
-
-  useEffect(() => () => {
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-  }, []);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     const touch = e.touches[0];
     touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-    if (tapTimerRef.current) {
-      clearTimeout(tapTimerRef.current);
-      tapTimerRef.current = null;
-    }
+    suppressTapRef.current = false;
 
     longPressTimerRef.current = window.setTimeout(() => {
       try {
@@ -232,22 +196,17 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
     const dx = touch.clientX - touchStartPosRef.current.x;
     const dy = touch.clientY - touchStartPosRef.current.y;
 
-    // Cancel long press on movement
-    if (Math.hypot(dx, dy) > 10 && longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-      if (tapTimerRef.current) {
-        clearTimeout(tapTimerRef.current);
-        tapTimerRef.current = null;
+    // A drag or swipe is not a tap, even if the WebView synthesizes a click.
+    if (Math.hypot(dx, dy) > 10) {
+      suppressTapRef.current = true;
+      if (longPressTimerRef.current !== null) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
       }
     }
 
     // Horizontal swipe left for reply (Telegram style)
     if (dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      if (tapTimerRef.current) {
-        clearTimeout(tapTimerRef.current);
-        tapTimerRef.current = null;
-      }
       setSwipeOffset(Math.max(-70, dx));
     }
   };
