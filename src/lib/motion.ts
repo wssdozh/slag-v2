@@ -173,10 +173,10 @@ function drainPendingUpdate(): void {
  * the next swap. React has to flush inside the callback, otherwise the new
  * snapshot is still the old DOM.
  */
-export function swapScreen(kind: ScreenSwap, update: () => void): void {
+export function swapScreen(kind: ScreenSwap, update: () => void, animate = true): void {
   const root = document.documentElement;
   if (
-    prefersReducedMotion() ||
+    !animate || prefersReducedMotion() ||
     typeof document.startViewTransition !== 'function' ||
     root.dataset.motionSwap
   ) {

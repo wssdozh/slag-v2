@@ -129,6 +129,63 @@ test.describe('Phone folder switcher', () => {
     await expect(page.getByTestId('composer-dock').getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
   });
 
+  test('feed back swipe follows the finger, reverses, then steps out one folder at a time', async ({ page }) => {
+    const trigger = mobileFolderTrigger(page);
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x = 0, y = 300) =>
+      cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
+    await trigger.tap();
+    const search = page.getByRole('combobox', { name: 'Найти папку' });
+    await search.fill('Проекты/Идеи');
+    await search.press('Enter');
+    await expect(trigger).toContainText('Проекты/Идеи');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+
+    const screen = page.locator('main.mobile-screen-view');
+    const preview = page.getByTestId('folder-back-preview');
+    const x = () => screen.evaluate(node => node.getBoundingClientRect().x);
+    const card = page.locator('#item-picker-1');
+    const cardBox = (await card.boundingBox())!;
+    const cardX = Math.round(cardBox.x + cardBox.width * 0.7);
+    const cardY = Math.round(cardBox.y + 14);
+    await touch('touchStart', cardX, cardY);
+    await touch('touchMove', cardX + 90, cardY);
+    await expect.poll(x).toBeCloseTo(90, 0);
+    await expect(preview.getByText('Проекты', { exact: true })).toBeAttached();
+    await expect(preview).toHaveAttribute('inert', '');
+    await page.screenshot({ path: 'test-results/screenshots/mobile-feed-swipe-in-progress.png' });
+    await touch('touchMove', cardX - 60, cardY);
+    await expect.poll(x).toBeCloseTo(0, 0);
+    await touch('touchEnd');
+    await expect(preview).toHaveCount(0);
+    await expect(trigger).toContainText('Проекты/Идеи');
+    await expect(page.getByRole('button', { name: 'Отменить ответ' })).toHaveCount(0);
+
+    for (const next of ['Переключить папку: Проекты', null]) {
+      await touch('touchStart', 185);
+      await touch('touchMove', 235);
+      await touch('touchMove', 325);
+      await expect.poll(x).toBeCloseTo(140, 0);
+      await touch('touchEnd');
+      if (next) await expect(trigger).toHaveAccessibleName(next);
+      else await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+      await expect(preview).toHaveCount(0);
+    }
+    await expect(page.getByRole('navigation', { name: 'Мобильная навигация' })).toBeVisible();
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: 'Проекты', exact: true }).tap();
+    await expect(trigger).toHaveAccessibleName('Переключить папку: Проекты');
+    const replyBox = (await card.boundingBox())!;
+    const replyX = Math.round(replyBox.x + replyBox.width * 0.7);
+    const replyY = Math.round(replyBox.y + 14);
+    await touch('touchStart', replyX, replyY);
+    await touch('touchMove', replyX - 60, replyY);
+    await touch('touchEnd');
+    await expect(page.getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
+    await expect(trigger).toHaveAccessibleName('Переключить папку: Проекты');
+    await cdp.detach();
+  });
+
   test('Inbox Back opens the folder root with sync and dock; a root folder has neither', async ({ page }) => {
     const back = page.getByRole('button', { name: 'Назад к папкам' });
     await back.tap();

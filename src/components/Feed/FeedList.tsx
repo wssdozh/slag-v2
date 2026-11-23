@@ -56,7 +56,7 @@ function readPullOffset(container: HTMLElement) {
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
 
-export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilter }) => {
+export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter; preview?: boolean }> = ({ taskFilter, preview = false }) => {
   const {
     today,
     items,
@@ -529,6 +529,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     <ItemCard
       key={item.id}
       item={item}
+      preview={preview}
       gap={gap}
       isHighlighted={highlightedItemId === item.id}
       repliesCount={replyMetaMap.countMap.get(item.id) || 0}
@@ -536,7 +537,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       replyParent={item.replyToId ? itemMap.get(item.replyToId) || null : null}
       onImageClick={handleImageClick}
     />
-  ), [handleImageClick, highlightedItemId, itemMap, replyMetaMap]);
+  ), [handleImageClick, highlightedItemId, itemMap, preview, replyMetaMap]);
 
   return (
     <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -544,7 +545,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       <PinnedBanner />
       <div
         ref={containerRef}
-        data-testid="feed-list-container"
+        data-testid={preview ? undefined : 'feed-list-container'}
         data-pull-offset={pullOffset}
         onScroll={handleScroll}
         onContextMenu={handleFeedContextMenu}

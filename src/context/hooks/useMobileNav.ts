@@ -84,7 +84,7 @@ export function useMobileNav(
     });
   }, [mobileDockTabs]);
 
-  const navigateMobileFolder = useCallback((folder: string) => {
+  const navigateMobileFolder = useCallback((folder: string, animate = true) => {
     if (folder === currentFolder && isMobileFolderOpen && activeTabRef.current === 'folders') {
       setIsMobileFolderPickerOpen(false);
       return;
@@ -97,15 +97,15 @@ export function useMobileNav(
       setIsMobileFolderPickerOpen(false);
       setIsMobileFolderOpen(true);
       onSelectFolder(folder);
-    });
+    }, animate);
   }, [currentFolder, isMobileFolderOpen, onSelectFolder]);
 
-  const goBackFromMobileFolder = useCallback(() => {
+  const goBackFromMobileFolder = useCallback((animate = true) => {
     const parentEnd = currentFolder.lastIndexOf('/');
     if (parentEnd >= 0) {
-      navigateMobileFolder(currentFolder.slice(0, parentEnd));
+      navigateMobileFolder(currentFolder.slice(0, parentEnd), animate);
     } else {
-      swapScreen('pop', () => setIsMobileFolderOpen(false));
+      swapScreen('pop', () => setIsMobileFolderOpen(false), animate);
     }
   }, [currentFolder, navigateMobileFolder]);
 

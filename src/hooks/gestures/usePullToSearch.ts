@@ -127,7 +127,8 @@ export function usePullToSearch({ onTrigger, topOnly = false }: Options) {
     const start = touchRef.current;
     const touch = event.touches[0];
     if (!start || !touch) return;
-    if (event.touches.length > 1) {
+    if (event.defaultPrevented || event.touches.length > 1) {
+      // A second finger or a claimed back swipe cancels the pull.
       settle();
       return;
     }

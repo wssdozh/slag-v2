@@ -7,6 +7,7 @@ import { useComposerInset } from '../../hooks/layout/useComposerInset';
 import { materialsInFolder } from '../../lib/vault/folderItems';
 import { folderName as nameFromPath } from '../../lib/vault/folderTree';
 import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
+import { BaseComposer } from '../Feed/BaseComposer';
 import { Composer } from '../Feed/Composer';
 import { FeedList } from '../Feed/FeedList';
 import { FolderViewButton } from '../Feed/FolderViewButton';
@@ -17,7 +18,7 @@ import { MobileSubfolders } from './folders/MobileSubfolders';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileScreenHeader } from './MobileScreenHeader';
 
-export function MobileFoldersView() {
+export function MobileFoldersView({ preview = false }: { preview?: boolean }) {
   const {
     vault, folders, items, currentFolder, navigateToFolder, goBackFromMobileFolder,
     openCreateFolderModal, feedViewMode, isKanbanMaterialsOpen,
@@ -60,7 +61,7 @@ export function MobileFoldersView() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-canvas text-fg-primary select-none">
       <MobileScreenHeader
-        onBack={isMobileFolderPickerOpen ? closePicker : goBackFromMobileFolder}
+        onBack={isMobileFolderPickerOpen ? closePicker : () => goBackFromMobileFolder()}
         iconOnlyBack
         backLabel={parent ? `Назад: ${nameFromPath(parent)}` : 'Назад к папкам'}
         centerSlot={(
@@ -102,8 +103,8 @@ export function MobileFoldersView() {
           <MobileSubfolders folders={folders} items={items} currentFolder={currentFolder} onSelect={navigateToFolder} onCreate={openCreateFolderModal} />
           {feedViewMode === 'kanban' ? <KanbanBoard /> : feedViewMode === 'calendar' ? <MobileCalendarView embedded /> : (
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-              <FeedList />
-              <div ref={attachComposerDock} data-testid="composer-dock"
+              <FeedList preview={preview} />
+              <div ref={attachComposerDock} data-testid={preview ? undefined : 'composer-dock'}
                 className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center ${isMobileFolderPickerOpen ? 'invisible' : ''}`}
                 style={{
                   paddingBottom: 'calc(var(--sab) + 8px)',
@@ -112,7 +113,9 @@ export function MobileFoldersView() {
                 }}>
                 <div className="h-6 w-full bg-gradient-to-t from-canvas to-transparent" aria-hidden="true" />
                 <div className="pointer-events-auto w-full">
-                  <Composer key={JSON.stringify([vault.id, currentFolder])} />
+                  {preview ? (
+                    <BaseComposer fieldOnlySlot={<span className="block min-h-13 text-base text-fg-muted">Мысль, заметка или таска…</span>} />
+                  ) : <Composer key={JSON.stringify([vault.id, currentFolder])} />}
                 </div>
               </div>
             </div>

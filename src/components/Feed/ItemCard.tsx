@@ -48,6 +48,7 @@ export interface ItemCardProps {
    * alone was enough to defeat the memo on every card.
    */
   gap?: number;
+  preview?: boolean;
 }
 
 const isGenericTitle = (title?: string): boolean => {
@@ -75,6 +76,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
   replyParent = null,
   onImageClick,
   gap,
+  preview = false,
 }) => {
   const {
     toggleTaskComplete,
@@ -205,10 +207,8 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       }
     }
 
-    // Horizontal swipe left for reply (Telegram style)
-    if (dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-      setSwipeOffset(Math.max(-70, dx));
-    }
+    // A right swipe already owned by the feed must not turn into a reply on reversal.
+    setSwipeOffset(!e.defaultPrevented && dx < 0 && Math.abs(dx) > Math.abs(dy) * 1.5 ? Math.max(-70, dx) : 0);
   };
 
   const handleTouchEnd = () => {
@@ -470,7 +470,7 @@ const ItemCardComponent: React.FC<ItemCardProps> = ({
       )}
 
       <div
-        id={`item-${item.id}`}
+        id={preview ? undefined : `item-${item.id}`}
         data-flip-id={item.id}
         onClick={handleCardClick}
         onContextMenu={handleContextMenu}
