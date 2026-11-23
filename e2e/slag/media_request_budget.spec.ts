@@ -198,6 +198,11 @@ test('default shell: feed, folder pane, audio/file tabs and paging stay inside t
   await expect(slide).toHaveAttribute('src', /^data:image\/webp;base64,/);
   await expect.poll(async () => slide.evaluate((image) => (image as HTMLImageElement).naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0);
   expect(idsOf(await readAttachmentProbe(page), 'on-demand')).toContain(photoId(targetNote, targetIndex % PER_NOTE));
+  // Evidence: the deck on a slide of a note outside the feed window, resolved on demand.
+  await page.screenshot({
+    path: 'test-results/screenshots/media-request-budget-offwindow-slide.png',
+    animations: 'disabled',
+  });
 
   // Replace every tile with another folder of the same size: the new grid resolves its own photos,
   // which only happens if the observer survived the swap and the seen ids followed the new list.
