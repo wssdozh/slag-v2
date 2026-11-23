@@ -1,11 +1,76 @@
 // Folder media browser: images, audio, files, links and tags in one tab strip.
-import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useLayoutEffect, useEffect, useCallback, useMemo } from 'react';
 import { Icon } from '../UI/icons/Icon';
 import type { IconName } from '../UI/icons/icons';
 import { AudioPlayer } from '../UI/AudioPlayer';
-import type { FolderMediaData } from './useFolderMedia';
+import type { FolderMediaAudio, FolderMediaData, FolderMediaFile, FolderMediaImage } from './useFolderMedia';
 import type { FolderMediaTabId, LightboxImage } from '../../types';
 import { storage } from '../../lib/storage';
+import { useAttachmentSrcOnDemand, useSeenTiles } from '../../hooks/media/useAttachmentSrcOnDemand';
+
+/**
+ * One photo of the grid. The tile is in the layout from the first paint; its bytes are asked for
+ * only when it comes near the column, so a folder of a hundred photos costs what the column shows.
+ */
+const MediaTile: React.FC<{
+  image: FolderMediaImage;
+  isMobile: boolean;
+  isSeen: boolean;
+  registerTile: (node: HTMLElement | null) => void;
+  onOpen: () => void;
+}> = ({ image, isMobile, isSeen, registerTile, onOpen }) => {
+  const src = useAttachmentSrcOnDemand(image.attachment, isSeen);
+  return (
+    <div
+      ref={registerTile}
+      data-media-tile={image.id ?? image.name}
+      onClick={onOpen}
+      className={`aspect-square overflow-hidden bg-scrim-40 border border-tint-6 cursor-pointer hover:opacity-90 transition-opacity ${
+        isMobile ? 'rounded-xl' : 'rounded'
+      }`}
+    >
+      {src
+        ? <img src={src} alt={image.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        : <div className="w-full h-full" aria-hidden />}
+    </div>
+  );
+};
+
+/** An audio row exists only while its tab is open, so that is the whole of its "seen". */
+const AudioRow: React.FC<{ audio: FolderMediaAudio; isMobile: boolean }> = ({ audio, isMobile }) => {
+  const src = useAttachmentSrcOnDemand(audio.attachment, true);
+  return (
+    <div className={isMobile ? 'p-3 rounded-xl bg-surface border border-tint-6' : 'p-1'}>
+      {isMobile && <div className="text-xs text-fg-tertiary font-medium mb-1.5">{audio.name}</div>}
+      {src
+        ? <AudioPlayer src={src} extractedText={audio.extractedText} enrichmentStatus={audio.enrichmentStatus} />
+        : <div className="h-10 rounded bg-tint-4 motion-safe:animate-pulse" aria-hidden />}
+    </div>
+  );
+};
+
+/** A file row downloads from its own bytes, so it fetches them when its tab shows it. */
+const FileRow: React.FC<{ file: FolderMediaFile; isMobile: boolean }> = ({ file, isMobile }) => {
+  const src = useAttachmentSrcOnDemand(file.attachment, true);
+  return (
+    <a
+      href={src}
+      download={file.name}
+      aria-disabled={!src || undefined}
+      className={`flex items-center justify-between p-2 rounded bg-tint-2 hover:bg-tint-5 border border-tint-4 text-xs transition-colors ${
+        isMobile ? 'p-3 rounded-xl bg-surface border-tint-6' : ''
+      }`}
+    >
+      <div className="flex items-center gap-2 truncate">
+        <Icon name="entity.file" size="sm" className="shrink-0" />
+        <span className="truncate text-fg-tertiary">{file.name}</span>
+      </div>
+      <span className="text-3xs font-mono text-fg-muted shrink-0 ml-2">
+        {Math.round(file.size / 1024)} KB
+      </span>
+    </a>
+  );
+};
 
 export interface FolderMediaTabsProps {
   mediaData: FolderMediaData;
@@ -34,6 +99,10 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
   };
 
   const { allImages, allAudio, allFiles, allLinks, folderTags } = mediaData;
+
+  // One observer for the grid; a tile asks for its bytes once the observer says it came near.
+  const imageIds = useMemo(() => allImages.map((image) => image.id ?? image.name), [allImages]);
+  const { seen: seenTiles, registerTile } = useSeenTiles(imageIds);
 
   const isMobile = variant === 'mobile';
 
@@ -180,17 +249,16 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
               {isMobile ? 'В этой папке нет изображений' : 'Нет фото в этой папке'}
             </p>
           ) : (
-            <div className={`grid grid-cols-3 ${isMobile ? 'gap-2' : 'gap-1.5'}`}>
+            <div className={`grid grid-cols-3 ${isMobile ? 'gap-2' : 'gap-1.5'}`} data-testid="folder-media-grid">
               {allImages.map((img, idx) => (
-                <div
+                <MediaTile
                   key={(img.id || img.url) + idx}
-                  onClick={() => onOpenLightbox(allImages, idx)}
-                  className={`aspect-square overflow-hidden bg-scrim-40 border border-tint-6 cursor-pointer hover:opacity-90 transition-opacity ${
-                    isMobile ? 'rounded-xl' : 'rounded'
-                  }`}
-                >
-                  <img src={img.url} alt={img.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                </div>
+                  image={img}
+                  isMobile={isMobile}
+                  isSeen={seenTiles.has(img.id ?? img.name)}
+                  registerTile={registerTile}
+                  onOpen={() => onOpenLightbox(allImages, idx)}
+                />
               ))}
             </div>
           )
@@ -205,17 +273,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
           ) : (
             <div className="flex flex-col gap-2">
               {allAudio.map(aud => (
-                <div
-                  key={aud.id}
-                  className={isMobile ? 'p-3 rounded-xl bg-surface border border-tint-6' : 'p-1'}
-                >
-                  {isMobile && <div className="text-xs text-fg-tertiary font-medium mb-1.5">{aud.name}</div>}
-                  <AudioPlayer
-                    src={aud.url}
-                    extractedText={aud.extractedText}
-                    enrichmentStatus={aud.enrichmentStatus}
-                  />
-                </div>
+                <AudioRow key={aud.id} audio={aud} isMobile={isMobile} />
               ))}
             </div>
           )
@@ -230,22 +288,7 @@ export const FolderMediaTabs: React.FC<FolderMediaTabsProps> = ({
           ) : (
             <div className="flex flex-col gap-1.5">
               {allFiles.map(file => (
-                <a
-                  key={file.id}
-                  href={file.url}
-                  download={file.name}
-                  className={`flex items-center justify-between p-2 rounded bg-tint-2 hover:bg-tint-5 border border-tint-4 text-xs transition-colors ${
-                    isMobile ? 'p-3 rounded-xl bg-surface border-tint-6' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Icon name="entity.file" size="sm" className="shrink-0" />
-                    <span className="truncate text-fg-tertiary">{file.name}</span>
-                  </div>
-                  <span className="text-3xs font-mono text-fg-muted shrink-0 ml-2">
-                    {Math.round(file.size / 1024)} KB
-                  </span>
-                </a>
+                <FileRow key={file.id} file={file} isMobile={isMobile} />
               ))}
             </div>
           )

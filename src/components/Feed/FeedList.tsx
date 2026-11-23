@@ -19,7 +19,6 @@ import { Button } from '../UI/Button';
 import { processFileListToAttachments } from '../../lib/media/fileDropHelper';
 import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/enrichment/dispatch';
 import { PinnedBanner } from './PinnedBanner';
-import { useAttachmentSrcs } from '../../hooks/media/useAttachmentSrc';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
 import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
@@ -106,15 +105,9 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const { history, scheduledToday, overdue } = useMemo(() => partitionFeedBySchedule(filteredItems, today), [filteredItems, today]);
   const windowedItems = useMemo(() => takeWindow(history, windowSize), [history, windowSize]);
 
-  // The note keeps attachment metadata; the bytes are resolved once for the feed.
-  // ponytail: this preloads the whole folder even though the window renders 15 cards, because the
-  // lightbox pages through the folder deck and expects ready urls. Window it only together with a
-  // lazy resolve inside the lightbox, not before.
-  const feedAttachments = useMemo(
-    () => filteredItems.flatMap(it => it.attachments || []),
-    [filteredItems],
-  );
-  const { srcs: attachmentSrcs } = useAttachmentSrcs(feedAttachments);
+  // The note keeps attachment metadata and nothing else: every card resolves the bytes it shows
+  // (`ItemCard`), and the viewer resolves a slide when it becomes one of the mounted neighbours.
+  // The folder used to be preloaded here for the deck, which cost a folder of bytes for fifteen cards.
 
   // Stable handler for image lightbox in feed
   const handleImageClick = useCallback((img: SlagAttachment) => {
@@ -125,7 +118,8 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
         .map(att => ({
           id: att.id,
           name: att.name,
-          url: attachmentSrcs[att.id] ?? att.dataUrl ?? '',
+          // Only bytes that arrived inline are carried; the rest are resolved by the slide itself.
+          url: att.dataUrl ?? '',
           kind: att.type === 'video' ? ('video' as const) : ('image' as const),
           extractedText: att.extractedText,
           summary: att.summary,
@@ -136,7 +130,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     );
     const clickedIdx = folderImages.findIndex(i => i.id === img.id);
     openLightbox(folderImages, clickedIdx >= 0 ? clickedIdx : 0);
-  }, [attachmentSrcs, filteredItems, openLightbox]);
+  }, [filteredItems, openLightbox]);
 
   // Sync state during render on folder or filter change (React pure pattern)
   const filterKey = JSON.stringify([currentFolder, activeTypeFilter, activeTagFilter, taskFilter?.id, taskFilter?.today]);
