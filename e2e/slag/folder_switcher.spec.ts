@@ -14,19 +14,19 @@ const fixtureNotes = [inbox, 'Проекты/Идеи'].map((folder, i) => ({
 
 test.describe('Phone folder switcher', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
-  test.beforeEach(async ({ page }) => {
-    await page.addInitScript(({ folders, notes }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    await page.addInitScript(({ folders, notes, withReply }) => {
       localStorage.setItem('slag_registry_folders_default_vault', JSON.stringify(folders));
       localStorage.setItem('slag_items_default_vault', JSON.stringify(notes));
       localStorage.setItem('slag_drafts_default_vault', JSON.stringify({
         Входящие: { content: '', itemType: 'note', priority: 'none', attachments: [], tags: [],
-          replyTarget: notes[0], updatedAt: Date.now() },
+          replyTarget: withReply ? notes[0] : null, updatedAt: Date.now() },
         'Проекты/Идеи': { content: 'Черновик проекта', itemType: 'note', priority: 'none', attachments: [], tags: [], updatedAt: Date.now() },
       }));
       localStorage.setItem('slag_workspace_state_default_vault', JSON.stringify({
         currentFolder: 'Личное', activeMobileTab: 'settings', feedViewMode: 'kanban',
       }));
-    }, { folders: fixtureFolders, notes: fixtureNotes });
+    }, { folders: fixtureFolders, notes: fixtureNotes, withReply: !testInfo.title.startsWith('textarea:') });
     await page.goto('/', { waitUntil: 'commit' });
     await expect(mobileFolderTrigger(page)).toHaveAccessibleName(`Переключить папку: ${inbox}`, { timeout: 120_000 });
   });
@@ -45,10 +45,11 @@ test.describe('Phone folder switcher', () => {
       await expect(tabs).toBeVisible();
       await expect(field).toBeVisible();
       expect((await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeLessThanOrEqual((await tabs.boundingBox())!.y + 1);
-      await expect(dock.getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
       if (engine === 'textarea') {
-        await dock.getByRole('button', { name: 'Отменить ответ' }).click();
-        await page.screenshot({ path: 'test-results/screenshots/folder-switcher-mobile-inbox.png' });
+        await expect(dock.getByRole('button', { name: 'Отменить ответ' })).toHaveCount(0);
+        await page.screenshot({ path: 'test-results/screenshots/folder-switcher-mobile-inbox.png', animations: 'disabled' });
+      } else {
+        await expect(dock.getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
       }
       await field.fill('Черновик не из поиска');
       const attachment = dock.getByText('план.txt', { exact: true });
@@ -66,6 +67,8 @@ test.describe('Phone folder switcher', () => {
       await trigger.tap();
       const search = page.getByRole('combobox', { name: 'Найти папку' });
       await expect(search).toBeFocused();
+      expect(await search.locator('..').evaluate(node => parseFloat(getComputedStyle(node).borderTopLeftRadius))).toBeGreaterThanOrEqual(24);
+      expect((await search.boundingBox())!.height).toBe(48);
       expect(await feed.boundingBox()).toEqual(feedBefore);
       await expect(field).toBeHidden();
       await expect(folderPickerList(page).getByRole('option').first()).toHaveAttribute('aria-current', 'page');

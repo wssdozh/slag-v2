@@ -1,6 +1,4 @@
-// The floating tab dock at the bottom of the phone shell.
-// NOTE: FAB removed from here — it is rendered separately in MobileShell
-// as <InboxFAB> so it does not overlap the Composer dock.
+// The phone's bottom navigation and its optional capture button.
 import React, { useRef, useState, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
@@ -71,19 +69,18 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
       inert={!isVisible}
-      className="motion-dock pointer-events-none absolute inset-x-0 bottom-[max(var(--sab),0.75rem)] z-40 flex items-center justify-center gap-2.5 px-4"
+      className="motion-dock pointer-events-none absolute inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-subtle bg-canvas pb-[var(--sab)] pl-[calc(var(--sal)+0.5rem)] pr-[calc(var(--sar)+0.5rem)]"
     >
-      {/* Main Linear-style Floating Capsule Dock */}
       <nav
         ref={navRef}
         aria-label="Мобильная навигация"
-        className="relative pointer-events-auto h-[var(--mobile-tab-dock-height)] bg-surface border border-tint-8 rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-scrim-80"
+        className="pointer-events-auto relative flex h-[var(--mobile-tab-dock-height)] min-w-0 flex-1 items-stretch"
       >
-        {/* Animated sliding capsule indicator */}
+        {/* A single moving marker, not a second capsule inside the bar. */}
         {indicatorStyle.ready && (
           <div
             data-testid="dock-active-pill"
-            className="absolute top-1 bottom-1 left-0 rounded-full bg-tint-10 shadow-sm pointer-events-none transition-[transform,width] duration-200"
+            className="pointer-events-none absolute bottom-1.5 left-0 grid justify-items-center transition-[transform,width] duration-200 before:h-0.5 before:w-3 before:rounded-full before:bg-fg-secondary"
             style={{
               transform: `translateX(${indicatorStyle.left}px)`,
               width: `${indicatorStyle.width}px`,
@@ -100,25 +97,17 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
           return (
             <button
               key={tabId}
+              type="button"
               data-tab-id={tabId}
+              aria-current={isActive ? 'page' : undefined}
               onClick={() => setActiveMobileTab(tabId)}
-              className={`relative z-10 h-10 min-w-11 px-3 rounded-full flex items-center justify-center motion-press cursor-pointer ${
-                isActive
-                  ? `${indicatorStyle.ready ? '' : 'bg-tint-10'} text-white font-medium`
-                  : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
+              className={`motion-press grid min-w-0 flex-1 place-items-center rounded-lg focus-visible:bg-tint-8 active:bg-tint-6 ${
+                isActive ? 'text-fg-primary' : 'text-fg-secondary hover:text-fg-primary'
               }`}
               title={tab.label}
               aria-label={tab.label}
             >
-              <div className="relative flex items-center justify-center">
-                <Icon
-                  name={tab.icon}
-                  size="lg"
-                  tone={isActive ? 'primary' : 'secondary'}
-                  variant={isActive ? 'filled' : 'outline'}
-                  className="transition-colors duration-150"
-                />
-              </div>
+              <Icon name={tab.icon} size="lg" tone="inherit" className="transition-colors duration-150" />
             </button>
           );
         })}

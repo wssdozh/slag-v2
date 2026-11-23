@@ -108,7 +108,7 @@ export function MobileFoldersView() {
               <div ref={attachComposerDock} data-testid="composer-dock"
                 className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center ${isMobileFolderPickerOpen ? 'invisible' : ''}`}
                 style={{
-                  paddingBottom: 'calc(var(--sab) + 8px)',
+                  paddingBottom: 'calc(var(--folder-composer-safe-bottom, var(--sab)) + 8px)',
                   paddingLeft: 'calc(var(--sal) + 12px)',
                   paddingRight: 'calc(var(--sar) + 12px)',
                 }}>

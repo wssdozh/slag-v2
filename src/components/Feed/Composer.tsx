@@ -704,7 +704,7 @@ export const Composer: React.FC<ComposerProps> = ({
             ? 'Таска…'
             : itemType === 'article'
             ? 'Черновик статьи…'
-            : 'Мысль, заметка или таска…'
+            : 'Написать заметку…'
           : itemType === 'task'
           ? 'Таска... (@ папка, # тег, - [ ] подзадачи, [[ ссылки)'
           : itemType === 'article'
@@ -752,7 +752,7 @@ export const Composer: React.FC<ComposerProps> = ({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : 'max-w-[var(--feed-content-width,42rem)]'}
+      className={isRecordingAudio ? 'max-w-[420px]' : isModal ? 'w-full' : `max-w-[var(--feed-content-width,42rem)]${isMobile ? ' gap-1!' : ''}`}
     />
   );
 };

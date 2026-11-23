@@ -45,8 +45,8 @@ export function MobileShell() {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas text-fg-primary [--mobile-tab-dock-height:3rem] [--mobile-tab-dock-reserve:calc(var(--mobile-tab-dock-height)+max(var(--sab),0.75rem))]">
-      <main inert={mobileFolderInfoOpen} className={`mobile-screen-view relative flex min-h-0 flex-1 flex-col overflow-hidden ${inInbox ? 'mb-[var(--mobile-tab-dock-reserve)]' : ''}`}
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas text-fg-primary [--mobile-tab-dock-height:3rem] [--mobile-tab-dock-reserve:calc(var(--mobile-tab-dock-height)+var(--sab)+1px)]">
+      <main inert={mobileFolderInfoOpen} className={`mobile-screen-view relative flex min-h-0 flex-1 flex-col overflow-hidden ${inInbox ? 'mb-[var(--mobile-tab-dock-reserve)] [--folder-composer-safe-bottom:0px]' : ''}`}
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { swipeStart.current = null; }}>
         {folderTab && <MobileFoldersView />}
         {activeMobileTab === 'tasks' && <MobileTasksView />}

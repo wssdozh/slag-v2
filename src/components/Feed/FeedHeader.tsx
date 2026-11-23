@@ -1,13 +1,12 @@
 // The feed's header: folder picker, filter badges, sort, materials toggle.
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { folderIconName } from '../UI/icons/icons';
 import { ActiveFilterBadges } from './ActiveFilterBadges';
 import { FolderViewButton } from './FolderViewButton';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
 import { Icon } from '../UI/icons/Icon';
-import { Select } from '../UI/Select';
+import { FolderSelect } from '../UI/FolderSelect';
 import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import type { FeedViewMode } from '../../types';
@@ -34,8 +33,6 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     navigateToFolder,
   } = useApp();
 
-  const headerRef = useRef<HTMLElement | null>(null);
-
   const activeViewMode = controlledViewMode ?? contextViewMode;
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
@@ -49,21 +46,8 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
 
   const canTriageInbox = isInbox && items.some(i => i.folder === DEFAULT_INBOX_FOLDER);
 
-  const folderIconComp = folderMeta?.icon ? (
-    <Icon
-      name={folderIconName(folderMeta.icon)}
-      size="md"
-      className="group-hover:text-fg-soft transition-colors shrink-0"
-    />
-  ) : isInbox ? (
-    <Icon name="entity.inbox" size="md" tone="tertiary" className="group-hover:text-white transition-colors shrink-0" />
-  ) : (
-    <Icon name="entity.folder" size="md" className="group-hover:text-fg-soft transition-colors shrink-0" />
-  );
-
   return (
     <header
-      ref={headerRef}
       className="h-12 px-3 sm:px-4 border-b border-tint-6 bg-panel grid grid-cols-[1fr_auto_1fr] items-center gap-2 select-none shrink-0 relative"
     >
       {/* Left Column: Active Filter Badges */}
@@ -73,18 +57,11 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
 
       {/* Center Column: Folder Picker */}
       <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
-        {folderIconComp}
-        <Select
-          size="sm"
-          variant="ghost"
-          direction="down"
+        <FolderSelect
           value={currentFolder}
           onChange={navigateToFolder}
           options={folderOptions}
           aria-label={`Переключить папку: ${folderMeta?.name ?? currentFolder}`}
-          title="Переключить папку"
-          className="min-w-0 max-w-[240px]"
-          triggerClassName="font-semibold"
         />
       </div>
 
