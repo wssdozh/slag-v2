@@ -11,7 +11,7 @@ import net from 'node:net';
 import { chromium } from '@playwright/test';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const { values, positionals } = parseArgs({
-  allowPositionals: true, options: { dist: { type: 'string', default: 'dist' } },
+  allowPositionals: true, options: { dist: { type: 'string', default: 'dist' }, channel: { type: 'string' } },
 });
 const DIST = resolve(ROOT, values.dist);
 const PORT = 18841;
@@ -129,8 +129,8 @@ const server = await startPreview();
 try {
   let browser;
   try {
-    browser = await chromium.launch({ headless: true });
-    console.log(`startup-input  dist=${DIST}  chromium=${browser.version()}`);
+    browser = await chromium.launch({ headless: true, channel: values.channel });
+    console.log(`startup-input  dist=${DIST}  ${values.channel ?? 'chromium'}=${browser.version()}`);
     for (const vp of VIEWPORTS) {
       for (const size of SIZES) {
         try { rows.push(await scenario(browser, size, vp)); }
