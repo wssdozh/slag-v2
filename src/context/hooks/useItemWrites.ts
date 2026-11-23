@@ -84,20 +84,22 @@ export function useItemWrites(deps: ItemWritesDeps) {
   }, [selectedItem, refreshData, setSelectedItem]);
 
   const deleteItem = useCallback((id: string) => {
-    storage.moveToTrash(id);
-    if (selectedItem?.id === id) {
-      setSelectedItem(null);
-    }
+    const vault = storage.getCurrentVault();
+    const committed = storage.moveToTrash(id);
+    if (selectedItem?.id === id) setSelectedItem(null);
     refreshData();
-    // Единственный источник уведомления об удалении: слой модели, а не каждый вызывающий.
-    addToast('Запись в корзине', 'info', {
-      kind: 'restore',
-      label: 'Вернуть',
-      onClick: () => {
-        storage.restoreFromTrash(id);
-        refreshData();
-      },
-    });
+    void Promise.resolve(committed).then(() => {
+      if (storage.getCurrentVault() !== vault) return;
+      addToast('Запись в корзине', 'info', {
+        kind: 'restore',
+        label: 'Вернуть',
+        onClick: () => {
+          const restored = storage.restoreFromTrash(id);
+          if (restored) void storage.whenNoteSaved(restored).catch(() => addToast('Не удалось восстановить запись', 'error'));
+          refreshData();
+        },
+      });
+    }, () => addToast('Не удалось переместить запись в корзину', 'error'));
   }, [selectedItem, refreshData, addToast, setSelectedItem]);
 
   const restoreFromTrash = useCallback((id: string) => {
@@ -108,7 +110,8 @@ export function useItemWrites(deps: ItemWritesDeps) {
         folder: restored.folder,
       });
       refreshData();
-      addToast(`Запись «${restored.title}» восстановлена`, 'success');
+      void storage.whenNoteSaved(restored).then(() => addToast(`Запись «${restored.title}» восстановлена`, 'success'),
+        () => addToast('Не удалось восстановить запись', 'error'));
     }
   }, [refreshData, addToast]);
 
@@ -121,9 +124,10 @@ export function useItemWrites(deps: ItemWritesDeps) {
       from: prevFolder,
       to: targetFolder,
     });
-    storage.moveItem(itemId, targetFolder);
+    const moved = storage.moveItem(itemId, targetFolder);
     refreshData();
-    addToast(`Перемещено в «${targetFolder}»`, 'success');
+    if (moved) void storage.whenNoteSaved(moved).then(() => addToast(`Перемещено в «${targetFolder}»`, 'success'),
+      () => addToast('Не удалось переместить запись', 'error'));
   }, [items, refreshData, addToast]);
 
   const toggleTaskComplete = useCallback((itemId: string, subtaskId?: string) => {

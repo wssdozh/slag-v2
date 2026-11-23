@@ -213,7 +213,7 @@ export interface SectionHydration {
   error: unknown | null;
 }
 
-export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionStore, isCurrent = () => true): Promise<SectionHydration> {
+export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionStore, isCurrent = () => true, useLegacy = true): Promise<SectionHydration> {
   let raw: Record<string, unknown>;
   try {
     await flushChain;
@@ -237,7 +237,7 @@ export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionSto
   }
   resetSection();
   const stored = sectionFromState(raw);
-  const legacy = readLegacySection(scope.vaultId);
+  const legacy = useLegacy ? readLegacySection(scope.vaultId) : { state: {}, keys: [] };
   const merged = mergeSectionState(stored, legacy.state);
   section = merged;
   sectionVaultId = scope.vaultId;

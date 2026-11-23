@@ -26,6 +26,8 @@ import {
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
+import { enrolledMarker } from '../node/vaultGuard';
+import { writeFileDurable } from '../node/durableWrite';
 
 /** What came out of one attachment: text, raw bytes, or a reason there is nothing to give. */
 export type AttachmentPayload =
@@ -80,7 +82,7 @@ export class McpVault {
 
   public async init(): Promise<void> {
     // An enrolled vault owns its directories. Reads never recreate a removed inbox.
-    if (await this.hasRegistryMarker()) return;
+    if (await this.hasEnrolledMarker()) return;
     await fs.mkdir(this.config.notesDir, { recursive: true });
     await fs.mkdir(this.config.trashDir, { recursive: true });
     await fs.mkdir(path.join(this.config.notesDir, DEFAULT_INBOX_FOLDER), { recursive: true });
@@ -99,37 +101,22 @@ export class McpVault {
     return value as VaultStateData;
   }
 
-  private async hasRegistryMarker(): Promise<boolean> {
-    const roots = new Set([this.config.vaultPath, this.config.notesDir === this.config.vaultPath && path.basename(this.config.notesDir) === 'notes'
-      ? path.dirname(this.config.notesDir) : this.config.vaultPath]);
-    for (const root of roots) {
-      try {
-        await fs.lstat(path.join(root, 'note-registry.json'));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-        throw error;
-      }
-      return true;
-    }
-    return false;
+  private async hasEnrolledMarker(): Promise<boolean> {
+    return (await enrolledMarker(this.config.vaultPath)) !== null;
   }
 
   private async assertLegacyWritable(): Promise<void> {
-    if (await this.hasRegistryMarker()) throw new Error('Это хранилище использует реестр синхронизации. Изменяйте записи в приложении SLAG.');
+    if (await this.hasEnrolledMarker()) throw new Error('Это хранилище использует реестр синхронизации. Изменяйте записи в приложении SLAG.');
   }
 
   public async writeState(data: VaultStateData): Promise<void> {
     await this.assertLegacyWritable();
+    // An unreadable state is not an empty state: reading it before the replace keeps the write
+    // path from replacing a file it could not understand. Reading is not a mutation, so reads
+    // stay allowed in a vault this writer refuses to change.
     const current = await this.readState();
     const updated = { ...current, ...data, updatedAt: Date.now() };
-    const temp = `${this.config.statePath}.${crypto.randomUUID()}.tmp`;
-    try {
-      await fs.writeFile(temp, JSON.stringify(updated, null, 2), 'utf-8');
-      await fs.rename(temp, this.config.statePath);
-    } catch (error) {
-      await fs.rm(temp, { force: true }).catch(() => undefined);
-      throw error;
-    }
+    await writeFileDurable(this.config.statePath, JSON.stringify(updated, null, 2));
   }
 
   public async getFolders(): Promise<FolderMeta[]> {
@@ -524,14 +511,16 @@ export class McpVault {
       const newFilename = getSafeNoteFilename(updatedItem.title, updatedItem.id);
       const newAbsPath = path.join(targetDir, newFilename);
 
+      updatedItem.filename = newFilename;
+      const markdown = serializeItemToMarkdown(updatedItem);
+      // Write the new bytes before dropping the old file: a failed save must leave the note
+      // where it was, not delete it first and then fail to replace it.
+      await writeFileDurable(newAbsPath, markdown);
+
       // If location or filename changed, remove old file
       if (existingMatch.absolutePath !== newAbsPath && existsSync(existingMatch.absolutePath)) {
         await fs.unlink(existingMatch.absolutePath);
       }
-
-      updatedItem.filename = newFilename;
-      const markdown = serializeItemToMarkdown(updatedItem);
-      await fs.writeFile(newAbsPath, markdown, 'utf-8');
 
       return {
         item: updatedItem,
@@ -588,7 +577,7 @@ export class McpVault {
     };
 
     const markdown = serializeItemToMarkdown(newItem);
-    await fs.writeFile(candidatePath, markdown, 'utf-8');
+    await writeFileDurable(candidatePath, markdown);
 
     return {
       item: newItem,
@@ -642,7 +631,8 @@ export class McpVault {
     }
 
     const markdown = serializeItemToMarkdown(item);
-    await fs.writeFile(match.absolutePath, markdown, 'utf-8');
+    // Same path, but never the same file object: replace it, do not truncate and rewrite it.
+    await writeFileDurable(match.absolutePath, markdown);
     return item;
   }
 

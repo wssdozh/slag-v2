@@ -81,14 +81,19 @@ export async function hydrateConfig(
   store: SyncConfigHost,
   vaultId: string,
   seed: string | null,
-  section: Record<string, unknown> | null
+  section: Record<string, unknown> | null,
+  protectedBinding = false,
 ): Promise<SyncConfig> {
   store.currentVaultId = vaultId;
   const fromFile = configFromState(section?.[CONFIG_KEY]);
   const legacyKeys = fallbackConfigKeys(vaultId);
-  const fromLegacy = readLegacyConfigRecord(legacyKeys);
+  const fromLegacy = protectedBinding ? null : readLegacyConfigRecord(legacyKeys);
   const stored = mergeConfigState(fromFile, fromLegacy ?? {});
   const config = buildConfig(seed, Object.keys(stored).length > 0 ? stored : null);
+  if (protectedBinding) {
+    if (!seed || !fromFile.deviceId || !fromFile.serverUrl) throw new Error('Existing vault synchronization identity is unavailable');
+    return { ...config, deviceId: fromFile.deviceId, serverUrl: fromFile.serverUrl };
+  }
 
   if (!config.seedPhrase) {
     // The only place a key is ever minted. It goes to the secret store before the config exists,

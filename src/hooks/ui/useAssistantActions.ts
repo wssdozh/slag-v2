@@ -46,7 +46,7 @@ export function useAssistantActions(
 
   useEffect(() => {
     const apply = async (requestId: string, raw: unknown): Promise<void> => {
-      if (handled.current.has(requestId)) return;
+      if (handled.current.has(requestId) || !syncEngine.canUseVaultRelay()) return;
       const vaultId = syncEngine.getSyncVaultId();
       if (!vaultId) {
         assistantLog.warn('Telegram action dropped: no sync vault', { requestId });

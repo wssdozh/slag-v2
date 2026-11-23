@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **683**, строк: **118037**, зон: **48**.
+Модулей: **692**, строк: **119594**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -12,21 +12,21 @@
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `e2e/slag/editor.spec.ts` | 1737 | 0 |
-| `src/lib/sync/syncEngine.ts` | 1647 | 28 |
-| `src/lib/storage/index.ts` | 1539 | 51 |
+| `src/lib/sync/syncEngine.ts` | 1722 | 28 |
+| `src/lib/storage/index.ts` | 1568 | 51 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
+| `src/lib/storage/vaultFiles.ts` | 1042 | 2 |
 | `src/lib/sync/notes/replica.ts` | 1042 | 1 |
 | `src/lib/storage/settingsStore.ts` | 959 | 5 |
 | `e2e/slag/feed.spec.ts` | 945 | 0 |
-| `src/lib/storage/vaultFiles.ts` | 938 | 2 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
 | `e2e/mobile.spec.ts` | 837 | 0 |
-| `src/mcp/vault.ts` | 811 | 6 |
-| `src/context/AppContext.tsx` | 784 | 72 |
-| `src/components/Feed/Composer.tsx` | 759 | 4 |
+| `src/mcp/vault.ts` | 801 | 6 |
+| `src/context/AppContext.tsx` | 775 | 72 |
+| `src/components/Feed/Composer.tsx` | 760 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 720 | 1 |
 
-## e2e (playwright) — 157 файлов, 28848 строк
+## e2e (playwright) — 159 файлов, 29150 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -95,7 +95,7 @@
 |---|---:|---:|---|---|
 | `QuickComposerWindow.tsx` | 103 | 1 | QuickComposerWindow | The transparent quick-capture window: hosts the composer and resets between i… |
 
-## src/components/Editor — 13 файлов, 2666 строк
+## src/components/Editor — 13 файлов, 2750 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -111,9 +111,9 @@
 | `FullscreenEditor.tsx` | 605 | 1 | FullscreenEditor | The focused editor surface: CodeMirror wiring, hotkeys and the sheet's chrome. |
 | `MarkdownPalette.tsx` | 259 | 1 | MarkdownPalette | Markdown utilities: history, styles, lists, inline formatting, links, attachm… |
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
-| `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
+| `useFullscreenDraft.ts` | 526 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 54 файлов, 7889 строк
+## src/components/Feed — 54 файлов, 7973 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -128,8 +128,8 @@
 | `assistant/AssistantToolCalls.tsx` | 28 | 1 | AssistantToolCalls | The mono trace of tool calls a reply made: name plus the query it ran, nothin… |
 | `assistant/ChatTaskBlock.tsx` | 53 | 1 | ChatTaskBlock | A task rendered inside a chat reply: title plus checkbox lines, read-only. |
 | `AssistantChat.tsx` | 235 | 2 | AssistantChat | The assistant view: thread state, input, expanded traces, and the diff it ope… |
-| `BaseComposer.tsx` | 332 | 3 | BaseComposerProps, BaseComposer | The shared composer shell: the text surface, slot layout, and the send plate. |
-| `Composer.tsx` | 759 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
+| `BaseComposer.tsx` | 332 | 4 | BaseComposerProps, BaseComposer | The shared composer shell: the text surface, slot layout, and the send plate. |
+| `Composer.tsx` | 760 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
 | `composer/ComposerAiButton.tsx` | 31 | 1 | ComposerAiButtonProps, ComposerAiButton | The +AI button: asks the model for folder and tags, spinning while the call r… |
 | `composer/ComposerAttachmentStrip.tsx` | 113 | 1 | ComposerAttachmentStripProps, ComposerAttachmentStrip | The tray of what is about to be sent: attachment chips, each removable. |
 | `composer/composerDecorations.ts` | 50 | 1 | setComposerHighlights, composerHighlightExtensions | Paints the tokens the parser understood right inside the CodeMirror composer … |
@@ -146,10 +146,10 @@
 | `composer/useComposerField.ts` | 51 | 1 | ComposerEngine, useComposerField | React wrapper for the field handle: the DOM is read lazily inside callbacks, … |
 | `composer/useComposerFiles.ts` | 152 | 1 | useComposerFiles | Files into the composer: picker, drop and paste, with no opinion on titles or… |
 | `composer/useComposerSlashCommands.ts` | 141 | 1 | UseComposerSlashCommandsOptions, useComposerSlashCommands | What a `/command` does to the draft: swap the type, set a property, start a r… |
-| `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
+| `composer/useComposerSubmit.ts` | 286 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
 | `FeedHeader.tsx` | 132 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder picker, filter badges, sort, materials toggle. |
-| `FeedList.tsx` | 662 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
+| `FeedList.tsx` | 663 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 179 | 1 | FolderSuggestionMenu | The `@folder` autocomplete: the folder tree as branch rows, the selected one,… |
 | `FolderViewButton.tsx` | 23 | 2 | FolderViewButton |  |
 | `item/ItemAttachmentGrid.tsx` | 106 | 2 | AttachmentTile, ItemAttachmentGrid |  |
@@ -212,7 +212,7 @@
 | `useFolderBrowser.ts` | 91 | 1 | useFolderBrowser | Granted folders and the entries inside one, loaded only while the picker is o… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo | A clip in the viewer: custom transport that hides with the chrome, and play m… |
 
-## src/components/Mobile — 24 файлов, 2904 строк
+## src/components/Mobile — 24 файлов, 2930 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -235,10 +235,10 @@
 | `MobileFloatingDock.tsx` | 130 | 1 | MobileFloatingDockProps, MobileFloatingDock | The floating tab dock and capture action for mobile tab roots. |
 | `MobileFolderInfoView.tsx` | 71 | 1 | MobileFolderInfoView | Phone folder page: the profile fills the screen and editing happens in place. |
 | `MobileFolderRoot.tsx` | 166 | 1 | MobileFolderRoot | The phone folder root screen: vault switcher header, sync button, pinned inbo… |
-| `MobileFoldersView.tsx` | 129 | 1 | MobileFoldersView | The phone's folder view: header, active surface, and the shared composer posi… |
+| `MobileFoldersView.tsx` | 132 | 1 | MobileFoldersView | The phone's folder view: header, active surface, and the shared composer posi… |
 | `MobileScreenHeader.tsx` | 93 | 5 | MobileScreenHeaderProps, MobileScreenHeader | The phone screen's top bar: back, title slots, and the status-bar inset. |
 | `MobileSettingsView.tsx` | 150 | 1 | MobileSettingsView | The phone settings tab: grouped rows, live sync status, and the vault switche… |
-| `MobileShell.tsx` | 66 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
+| `MobileShell.tsx` | 89 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
 | `MobileTasksView.tsx` | 271 | 1 | MobileTasksView | The phone tasks tab: status tabs you swipe between, plus the calendar mode. |
 
 ## src/components/Modals — 11 файлов, 2435 строк
@@ -418,7 +418,7 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `ai.ts` | 87 | 1 | AI_ENDPOINTS, DEFAULT_AI_MODELS, SUBSCRIPTION_TIER_EFFORT, AI_LIMITS, AI_STOP_TAGS, +1 | Default endpoints, models and size limits for every AI provider the app can r… |
-| `index.ts` | 8 | 97 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
+| `index.ts` | 8 | 98 | * from ./storage, * from ./sync, * from ./ai, * from ./search, * from ./ui, +1 | Barrel: re-exports storage, sync, AI, search, UI and typography config as one… |
 | `search.ts` | 10 | 1 | SEARCH_LIMITS | Tuning for the Orama index and the palette: result counts, typo tolerance, te… |
 | `settingsTabs.ts` | 47 | 4 | SettingsTabId, SettingsTabDefinition, SETTINGS_TABS, settingsTabLabel | Names and orders the settings sections once, so desktop and mobile cannot dri… |
 | `site.ts` | 4 | 2 | SITE_URL | Address of the public site, which lives in its own repository: the app build … |
@@ -427,11 +427,11 @@
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
-## src/context — 2 файлов, 1032 строк
+## src/context — 2 файлов, 1023 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 784 | 72 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `AppContext.tsx` | 775 | 72 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
 | `appContext.types.ts` | 248 | 9 | ToastMessage, AttachSheetRequest, ContextMenuTarget, FolderViewTarget, FolderViewSection, +1 | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 103 строк
@@ -440,7 +440,7 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 103 | 4 | FeedViewQuery, hasFeedFilters, selectVisibleItems | Which records the feed shows and in what order — the inbox's three modes as a… |
 
-## src/context/hooks — 14 файлов, 2189 строк
+## src/context/hooks — 14 файлов, 2194 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -450,10 +450,10 @@
 | `useBackup.ts` | 146 | 1 | useBackup | Backups: scheduled and manual snapshots on disk, restore, and the zip round t… |
 | `useFeedView.ts` | 179 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
 | `useFolderAdmin.ts` | 137 | 1 | useFolderAdmin | A folder's own writes: save, describe, rename, move, delete and the create mo… |
-| `useItemWrites.ts` | 225 | 1 | ItemWritesDeps, useItemWrites | Every write to a note: create, save, delete, restore from trash, move, comple… |
+| `useItemWrites.ts` | 229 | 1 | ItemWritesDeps, useItemWrites | Every write to a note: create, save, delete, restore from trash, move, comple… |
 | `useLocalDay.ts` | 35 | 1 | useLocalDay | One calendar-day signal for the workspace, independent of task writes. |
 | `useMobileNav.ts` | 136 | 1 | DEFAULT_MOBILE_DOCK_TABS, defaultsToMobileLayout, useMobileNav | Mobile tabs, folder transitions and temporary navigation surfaces. |
-| `useNotifyArm.ts` | 148 | 1 | useNotifyArm | Keeps the relay armed with the current reminders and fires the local ones. |
+| `useNotifyArm.ts` | 149 | 1 | useNotifyArm | Keeps the relay armed with the current reminders and fires the local ones. |
 | `useOverlays.ts` | 221 | 1 | useOverlays | Everything above the app: modals, lightbox, context menu, toasts, confirm, at… |
 | `useRecurringRollover.ts` | 80 | 1 | useRecurringRollover | Reconcile the active vault after its read, incoming changes, and local midnig… |
 | `useVaults.ts` | 172 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
@@ -468,14 +468,15 @@
 | `useItemActions.ts` | 283 | 4 | TYPE_LABELS, useItemActions | The action set behind every item menu: open, reply, pin, move, decompose, del… |
 | `useSuggestedActions.ts` | 277 | 1 | ActionHistoryEntry, useSuggestedActions | Applies, rejects and undoes the actions the assistant proposes in chat. |
 
-## src/hooks/gestures — 6 файлов, 1207 строк
+## src/hooks/gestures — 7 файлов, 1339 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useDragToScroll.ts` | 233 | 2 | DragToScrollOptions, useDragToScroll | Mouse grab-to-scroll with a click threshold and Apple-style flick momentum. |
+| `useFeedBackSwipe.ts` | 131 | 1 | useFeedBackSwipe | Interactive back on the phone feed: one axis owns the touch until it ends. |
 | `usePhotoPager.ts` | 321 | 2 | PhotoPagerOptions, usePhotoPager | One-finger deck for the full-screen viewer: pager, pinch, pan, swipe to close. |
 | `usePointerDnd.ts` | 245 | 5 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd | Pointer-based drag and drop: one live gesture, hover zones, payload on drop. |
-| `usePullToSearch.ts` | 199 | 2 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
+| `usePullToSearch.ts` | 200 | 2 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
 | `useSheetDrag.ts` | 158 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet, transforms written straight to the co… |
 | `useSwipeGesture.ts` | 51 | 3 | SwipeGestureOptions, useSwipeGesture | Left/right swipe detection with a threshold and axis lock, for phone rows. |
 
@@ -516,7 +517,7 @@
 | `backupService.ts` | 596 | 2 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS | Vault snapshots: pack a zip, list what is there, restore one, drop old ones. |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
 | `memory.ts` | 374 | 6 | MEMORY_LIMIT, MEMORY_PROMPT_LIMIT, MEMORY_TAG_PROMPT_LIMIT, MEMORY_KINDS, MEMORY_KIND_LABEL, +14 | The assistant's own memory: what it knows about the person, how it ages, how … |
-| `motion.ts` | 229 | 11 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +6 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
+| `motion.ts` | 229 | 12 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +6 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
 | `navigation.ts` | 13 | 5 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `searchService.ts` | 311 | 4 | preloadSearchEngine, getSearchableAttachmentText, RU_ENDINGS, RU_STOPWORDS, initSearchIndex, +1 | Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note prob… |
 
@@ -594,13 +595,14 @@
 | `prefs.ts` | 78 | 6 | DEFAULT_NOTIFY_PREFS, integrationsLive, describeError, getNotifyRoutes, saveNotifyRoutes, +3 | Notify settings: what this vault wants to hear, where reminders go, and the w… |
 | `quiet.ts` | 38 | 1 | DAY_MS, inQuietHours, shiftOutOfQuiet | Quiet hours: the window where a reminder waits instead of ringing. |
 
-## src/lib/platform — 14 файлов, 1475 строк
+## src/lib/platform — 15 файлов, 1493 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `appUpdate.ts` | 158 | 1 | updateErrorCode, updateErrorText, getAppUpdatePlatform, checkAppUpdate, installAppUpdate, +6 | In-app self-update: the only place that talks to the Rust updater commands an… |
 | `deepLink.ts` | 60 | 1 | OPEN_LINK_EVENT, parseNoteLink, takePendingNoteLink, onDeepLinkOpened | `slag://` links: the OS hands a URL to the app, this turns it into the note b… |
 | `deviceAccess.ts` | 37 | 4 | isAndroidApp, getDeviceAccessStatus, openDeviceAccessSettings, DeviceAccessStatus, DeviceAccessTarget | The Android grants a reminder needs that are not runtime permissions: draw ov… |
+| `durableVaultFile.ts` | 22 | 4 | durableVaultReplace, durableVaultMove, durableVaultRemove, readVaultGeneration, writeVaultGeneration |  |
 | `encryptedLocalStore.ts` | 193 | 1 | getLocalSecret, setLocalSecret, deleteLocalSecret | Secrets at rest for builds without an OS keychain: AES-GCM envelopes under a … |
 | `folderOpener.ts` | 73 | 5 | OpenFolderResult, openAppFolder | Opens logs, notes or backups in the OS file manager, with a toast when no she… |
 | `installResume.ts` | 28 | 2 | InstallResumeInput, shouldResumeInstall | Resuming an Android apk install after the person flips "install unknown apps". |
@@ -611,17 +613,17 @@
 | `secretStore.ts` | 266 | 8 | SECRET_KEYS, SecretBackend, installSecretBackend, initSecretStore, getCachedSecret, +3 | One place for sync secrets at rest. Desktop uses the OS keychain; a build wit… |
 | `updateChannel.ts` | 27 | 2 | DEFAULT_UPDATE_CHANNEL, UPDATE_CHANNEL_OPTIONS, normalizeUpdateChannel, readUpdateChannel, writeUpdateChannel | Which release stream this install follows. The choice is device-local on purp… |
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
-| `writeJsonAtomic.ts` | 35 | 3 | writeJsonAtomic, writeAppDataTextAtomic | The one way a JSON file this app owns gets replaced: the next snapshot is wri… |
+| `writeJsonAtomic.ts` | 31 | 2 | writeJsonAtomic | Installation prefs and encrypted secret snapshots use write-then-rename. Vaul… |
 
-## src/lib/storage — 32 файлов, 7435 строк
+## src/lib/storage — 34 файлов, 8002 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `attachmentData.ts` | 21 | 4 | stripAttachmentList, stripAttachmentData | Attachments as they belong in the localStorage index: metadata only. |
-| `attachments.ts` | 364 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
+| `attachments.ts` | 363 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
 | `folderStore.ts` | 275 | 2 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 1539 | 51 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `index.ts` | 1568 | 51 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 160 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 163 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
@@ -639,18 +641,20 @@
 | `sharedProjection.ts` | 68 | 2 | workspaceSharedMutations, memorySharedMutations, draftSharedMutation, sharedSettingsProjection |  |
 | `stateSections.ts` | 491 | 6 | STATE_SECTIONS, ComposerDraftMap, FullscreenDraftMap, TelegramThreadEntry, DraftsSection, +24 | The shape of what a vault's `state.json` keeps for `settingsStore`: drafts, t… |
 | `syncReconcile.ts` | 165 | 1 | SyncedVaultSnapshot, StagedSyncImport, ReconciledSyncImport, reconcileSyncedVault | A bundle is written from a snapshot: the user keeps typing while it travels t… |
-| `trashStore.ts` | 80 | 2 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
+| `trashStore.ts` | 94 | 2 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 938 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
-| `vaultRegistry.ts` | 179 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
+| `vaultFiles.ts` | 1042 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultNoteMove.ts` | 304 | 1 | VAULT_NOTE_MOVE_INTENT_FILE, VAULT_NOTE_MOVE_VERSION, VaultNoteMoveIo, VaultNoteMoveRequest, VaultNoteMoveIntentV1, +4 | A local note move — rename, or a move to another folder — is two disk operati… |
+| `vaultRecovery.ts` | 116 | 1 | RECOVERY_LOCAL_ONLY, VaultRecovery, isMissingVaultFile, readVaultBytes, parseVaultObject, +1 | Recover the local vault before the normal scanner, watcher or sync engine can… |
+| `vaultRegistry.ts` | 180 | 2 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
 | `vaultWatch.ts` | 193 | 1 | VaultWatchOptions, VaultWatch, canWatchVault, startVaultWatch | Notices .md files and folders that appeared, changed or vanished under the va… |
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 50 файлов, 11638 строк
+## src/lib/sync — 51 файлов, 11828 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -684,7 +688,7 @@
 | `notes/merge.ts` | 96 | 10 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
 | `notes/mergeValidation.ts` | 51 | 1 | noteMergeViolations | Reject combinations whose individual property edits do not compose safely. |
 | `notes/migrationExport.ts` | 84 | 1 | exportMigrationSnapshot, canExportMigrationSnapshot | Local-only evidence: preserve physical copies, including duplicate IDs and tr… |
-| `notes/persistence.ts` | 156 | 3 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
+| `notes/persistence.ts` | 156 | 4 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
 | `notes/reconcile.ts` | 46 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
 | `notes/replica.ts` | 1042 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/session.ts` | 233 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
@@ -696,14 +700,15 @@
 | `presence.ts` | 28 | 1 | DevicePresence, devicePresence | Who is actually on the line right now. The relay touches a device's `lastSeen… |
 | `pullPage.ts` | 64 | 1 | PullPageState, PullStep, nextPullStep, pullDeadlineMs, shrinkPullBudget, +1 | Pure pull-page policy: how big one page of the room feed may be, how long to … |
 | `pushBundle.ts` | 361 | 1 | pushLocalChanges | Packing the local state into an outgoing bundle: what is dirty, what was alre… |
-| `syncConfig.ts` | 220 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
-| `syncEngine.ts` | 1647 | 28 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
-| `syncSection.ts` | 269 | 3 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
+| `syncConfig.ts` | 225 | 4 | SyncConfigHost, computeSubscription, loadConfig, hydrateConfig, saveConfig, +4 | Where the sync config lives per vault, how requests are authorized, how a see… |
+| `syncEngine.ts` | 1722 | 28 | PendingPush, SyncEngine, syncEngine, storage, accountClient | Owns sync: config, push of local changes, apply of incoming bundles, status r… |
+| `syncSection.ts` | 269 | 4 | SyncSectionState, emptySection, sectionFromState, sectionToPatch, mergeSectionState, +7 | The shape of `state.json`'s `sync` section: which keys it holds, what each ma… |
 | `syncSocket.ts` | 54 | 1 | SyncSocketHost, connectSocket, handleIncoming, acknowledgeBundle | The live socket: open it for the current room, accept a frame, acknowledge a … |
 | `tombstones.ts` | 52 | 4 | TombstoneMap, tombstonesFromState, mergeTombstones, sanitizeTombstones | The tombstones a delete leaves behind, and the shape they take in `state.json… |
 | `transport.ts` | 291 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
 | `types.ts` | 218 | 30 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
-| `vaultSharing.ts` | 85 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
+| `vaultSharing.ts` | 88 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
+| `vaultSyncFiles.ts` | 107 | 3 | folderFence, validateSyncLedger, readProtectedSyncState, migrateVaultSyncFiles, updateProtectedSyncFiles | The room binding and delivery ledger have separate lifetimes. Neither is a ca… |
 
 ## src/lib/tasks — 4 файлов, 204 строк
 
@@ -757,11 +762,11 @@
 | `markdownSerializer.ts` | 217 | 7 | serializeItemToMarkdown, parseMarkdownToItem | Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatibl… |
 | `noteFilename.ts` | 35 | 5 | getSafeNoteFilename, withIdSuffix | ponytail: regex-санитизация под ограничения windows/unix без slug-библиотек; … |
 | `noteSemantics.ts` | 31 | 2 | stripNoteTransportFields, frontmatterTags, normalizeNoteBody, noteProperties | Domain defaults shared by Markdown projection and registry comparison. |
-| `safePath.ts` | 69 | 9 | SafeVaultPathOptions, safeVaultRelativePath, isSafeVaultRelativePath | One answer to "is this path allowed inside the vault": normalizes separators … |
+| `safePath.ts` | 69 | 10 | SafeVaultPathOptions, safeVaultRelativePath, isSafeVaultRelativePath | One answer to "is this path allowed inside the vault": normalizes separators … |
 | `stats.ts` | 67 | 2 | VaultStats, collectExistingTags, computeVaultStats | Read-only counters and tag tallies, with the inbox treated as the whole vault. |
 | `vaultDisplay.ts` | 24 | 5 | getVaultDisplayName | Names a vault for the UI, adding a short id suffix only when two names collid… |
 
-## src/mcp — 11 файлов, 2189 строк
+## src/mcp — 11 файлов, 2179 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -775,17 +780,19 @@
 | `serverInfo.ts` | 16 | 1 | SERVER_INFO | What a host shows beside the tools: a name and a version alone leave the serv… |
 | `tools.ts` | 480 | 3 | registerMcpTools | MCP tools that read and write notes, tasks, folders and attachments in a vaul… |
 | `types.ts` | 101 | 3 | McpVaultConfig, VaultStateData, NoteMatch, SaveNoteSchema, GetNoteSchema, +7 | Zod schemas and vault shapes the MCP tools accept, with their user-facing des… |
-| `vault.ts` | 811 | 6 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
+| `vault.ts` | 801 | 6 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
 
-## src/node — 5 файлов, 917 строк
+## src/node — 7 файлов, 1085 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `cli.ts` | 363 | 1 | CliOptions, parseFlags, runCli | The commands the node answers to. Loaded only after the environment and the s… |
+| `durableWrite.ts` | 89 | 2 | DurableBytes, writeFileDurable, writeFileDurableSync | Durable replacement for the standalone Node writers: the MCP server and the h… |
 | `env.ts` | 109 | 2 | slagHome, installNodeEnvironment | The browser surfaces the sync core still leans on, backed by files. Installed… |
 | `index.ts` | 25 | 0 |  | Entry for the headless node. Everything below it is imported dynamically on p… |
 | `secrets.ts` | 52 | 1 | initNodeSecretStore | Secrets at rest for the headless node: one 0600 file. A server has no keychai… |
-| `vaultPort.ts` | 368 | 1 | NodeVault | The vault as the headless node sees it: notes are files under `notes/`, every… |
+| `vaultGuard.ts` | 87 | 2 | isEnrolledMarkerName, guardRoots, enrolledMarkerSync, enrolledMarker | What a second writer owes the app's own storage: do not mutate a vault the SL… |
+| `vaultPort.ts` | 360 | 1 | NodeVault | The vault as the headless node sees it: notes are files under `notes/`, every… |
 
 ## src/node/stubs — 3 файлов, 89 строк
 

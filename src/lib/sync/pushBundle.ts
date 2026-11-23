@@ -19,7 +19,7 @@ const syncLog = logger.scope('SYNC');
  * it must read, but the packing rules are not the transport's business.
  */
 export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
-if (engine.status.authRequired && !accountClient.getToken(engine.config.serverUrl)) return;
+    if (!engine.canUseVaultRelay() || (engine.status.authRequired && !accountClient.getToken(engine.config.serverUrl))) return;
     if (engine.isProcessingSync || !engine.activeVaultKey || !engine.activeRoomId) {
       // An edit landing mid-push must not be dropped: repush right after this bundle.
       if (engine.isProcessingSync) engine.pushDirty = true;

@@ -170,6 +170,7 @@ mod secure_store;
 mod media_plugin;
 mod device_access;
 mod updater;
+mod durable_file;
 
 #[cfg(desktop)]
 #[tauri::command]
@@ -412,7 +413,12 @@ pub fn run() {
             // Desktop has none of these grants; the commands answer "unknown" so the webview
             // still gets an answer instead of a missing-command error.
             device_access::device_access_status,
-            device_access::device_access_open
+            device_access::device_access_open,
+            durable_file::vault_replace,
+            durable_file::vault_move,
+            durable_file::vault_remove,
+            durable_file::vault_read_generation,
+            durable_file::vault_write_generation
         ]);
     }
 
@@ -428,7 +434,12 @@ pub fn run() {
             updater::update_install,
             updater::update_open_install_settings,
             device_access::device_access_status,
-            device_access::device_access_open
+            device_access::device_access_open,
+            durable_file::vault_replace,
+            durable_file::vault_move,
+            durable_file::vault_remove,
+            durable_file::vault_read_generation,
+            durable_file::vault_write_generation
         ]);
     }
 

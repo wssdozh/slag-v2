@@ -211,50 +211,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useVaultWatch({ vault, addToast });
   const appUpdate = useAppUpdates(addToast, confirmAction);
 
-  // Application Startup Log (guarded against React StrictMode double invocation)
-  const hasLoggedInitRef = useRef(false);
   useEffect(() => {
     // One window owns the machine. The quick composer mounts this provider too (its composer
     // needs the same actions), so without the guard every boot ran two disk scans, armed every
     // reminder twice, polled the relay twice and wrote the note index from both windows.
     if (!isPrimaryWindow()) return;
-    if (hasLoggedInitRef.current) return;
-    hasLoggedInitRef.current = true;
-    const currentVault = storage.getCurrentVault();
-    const currentItems = storage.getItems();
-    const currentFolders = storage.getFolders();
-    appLog.info('SLAG v2 application initialized', {
-      vault: currentVault.name,
-      itemsCount: currentItems.length,
-      foldersCount: currentFolders.length,
-    });
-    // The disk is read before the engine wakes. A push built from an index that has not loaded yet
-    // says the vault is empty, and the relay believes it: sync used to start from here and race
-    // this scan, and one second of an empty index was enough to empty every device.
-    void storage
-      .getCurrentVaultRead()
-      .then(() => {
-        // The frame after the data lands is the first one a person sees notes in. One number, so a
-        // claim about a slow start has something to be compared with.
-        requestAnimationFrame(() =>
-          appLog.info('Первый кадр ленты', { fromBootMs: Math.round(performance.now()) })
-        );
-      })
-      .finally(() => void syncEngine.init());
+    let cancelled = false;
+    const openingRead = storage.getCurrentVaultRead();
+    void openingRead.then(() => {
+      if (cancelled || storage.getCurrentVaultRead() !== openingRead) return;
+      refreshData();
+      const itemCount = storage.getItems().length;
+      requestAnimationFrame(() => appLog.info('Первый кадр после чтения хранилища', {
+        fromBootMs: Math.round(performance.now()), itemCount,
+      }));
+      void syncEngine.init();
+    }).catch((error: unknown) => appLog.error('Could not open vault', error));
 
-    accountClient.startPolling(syncEngine.getConfig().serverUrl);
+    let pollingAt: string | undefined;
+    const updatePolling = () => {
+      const url = syncEngine.canUseVaultRelay() ? syncEngine.getConfig().serverUrl : undefined;
+      if (url === pollingAt) return;
+      pollingAt = url;
+      if (url) accountClient.startPolling(url);
+      else accountClient.stopPolling();
+    };
+    const unsubscribeSync = syncEngine.subscribe(updatePolling);
     let wasAuthenticated = accountClient.isAuthenticated();
     const unsubscribeAccount = accountClient.subscribe(() => {
       const isAuthenticated = accountClient.isAuthenticated();
       if (isAuthenticated === wasAuthenticated) return;
       wasAuthenticated = isAuthenticated;
-      if (isAuthenticated) {
-        accountClient.startPolling(syncEngine.getConfig().serverUrl);
-        void syncEngine.init();
-      } else {
-        accountClient.stopPolling();
-        syncEngine.disconnect();
-      }
+      if (isAuthenticated) void syncEngine.init();
+      else syncEngine.disconnect();
     });
     const cleanupDesktop = listenDesktopEvents({
       onOpenComposer: () => {
@@ -269,7 +258,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     return () => {
+      cancelled = true;
       unsubscribeAccount();
+      unsubscribeSync();
       accountClient.stopPolling();
       cleanupDesktop();
     };

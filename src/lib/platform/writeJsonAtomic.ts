@@ -1,5 +1,5 @@
-// The one way a JSON file this app owns gets replaced: the next snapshot is written beside the real
-// one and renamed over it, so a crash mid-write leaves the previous file whole.
+// Installation prefs and encrypted secret snapshots use write-then-rename. Vault commits that
+// need to survive a system crash use the native durableVaultFile adapter instead.
 //
 // The temp name carries a random suffix, and that is the whole point of it being random. It used to
 // be a fixed `<file>.tmp`, which quietly assumed one writer per file — and there are two: the main
@@ -15,12 +15,8 @@ import { BaseDirectory, remove, rename, writeTextFile } from '@tauri-apps/plugin
 
 /** Write-then-rename, pretty-printed: how a JSON file that must survive a crash is replaced. */
 export async function writeJsonAtomic(file: string, value: unknown): Promise<void> {
-  await writeAppDataTextAtomic(file, JSON.stringify(value, null, 2));
-}
-
-export async function writeAppDataTextAtomic(file: string, text: string): Promise<void> {
   const temp = `${file}.${crypto.randomUUID()}.tmp`;
-  await writeTextFile(temp, text, { baseDir: BaseDirectory.AppData });
+  await writeTextFile(temp, JSON.stringify(value, null, 2), { baseDir: BaseDirectory.AppData });
   try {
     await rename(temp, file, {
       oldPathBaseDir: BaseDirectory.AppData,

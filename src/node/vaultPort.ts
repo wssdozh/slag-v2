@@ -20,6 +20,8 @@ import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markd
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER, DEFAULT_WORKSPACE_STATE } from '../config';
+import { enrolledMarkerSync } from './vaultGuard';
+import { writeFileDurableSync } from './durableWrite';
 
 interface VaultStateFile {
   vault: { id: string; name: string; syncId?: string };
@@ -54,14 +56,10 @@ export class NodeVault implements VaultPort {
   }
 
   private assertLegacyWritable(): void {
-    // Headless currently speaks legacy only. Refuse before touching files, even offline.
-    for (const root of [this.root, ...(path.basename(this.root) === 'notes' ? [path.dirname(this.root)] : [])]) {
-      try {
-        fs.lstatSync(path.join(root, 'note-registry.json'));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-        throw error;
-      }
+    // Headless currently speaks legacy only. Refuse before touching files, even offline. The
+    // probe itself can fail (permissions, a path that is not a directory): not knowing whether
+    // the app owns this vault is not permission to write into it.
+    if (enrolledMarkerSync(this.root)) {
       throw new Error('Headless sync cannot open an enrolled note registry vault');
     }
   }
@@ -168,7 +166,7 @@ export class NodeVault implements VaultPort {
     const target = path.join(this.attachmentsDir, safeAttachmentName(attachment));
     try {
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, bytes);
+      writeFileDurableSync(target, bytes);
       return true;
     } catch {
       // The caller must not mark these bytes delivered; it asks for them again later.
@@ -255,7 +253,7 @@ export class NodeVault implements VaultPort {
     if (previous && previous !== target) removeQuietly(previous);
 
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    writeAtomic(target, serializeItemToMarkdown({ ...item, filename }));
+    writeFileDurableSync(target, serializeItemToMarkdown({ ...item, filename }));
     this.paths.set(item.id, target);
   }
 
@@ -333,18 +331,12 @@ export class NodeVault implements VaultPort {
       workspaceState: this.workspaceState,
       memory: this.memory,
     };
-    writeAtomic(file, JSON.stringify(payload, null, 2));
+    writeFileDurableSync(file, JSON.stringify(payload, null, 2));
   }
 
   private emit(event: StorageChangeEvent): void {
     for (const listener of this.listeners) listener(event);
   }
-}
-
-function writeAtomic(file: string, content: string): void {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, content, 'utf-8');
-  fs.renameSync(tmp, file);
 }
 
 function removeQuietly(file: string): void {

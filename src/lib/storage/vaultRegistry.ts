@@ -81,7 +81,8 @@ export function ensureVaultSyncId(store: VaultRegistryHost, vaultId: string): st
   const updated = { ...vault, syncId };
   saveVaultMeta(store, updated);
   if (store.currentVault.id === vaultId) {
-    store.currentVault = { ...store.currentVault, syncId };
+    // A binding update is not a vault selection; preserve the in-flight disk scope.
+    store.currentVault.syncId = syncId;
     setPref(CURRENT_VAULT_KEY, JSON.stringify(store.currentVault));
   }
   return syncId;
