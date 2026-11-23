@@ -82,17 +82,18 @@ docs/project-map/  база знаний проекта, 15 документов
 | telegram-бот: канал, приглашение, доставка | `wssdozh/slag-relay` (`bot.py`, `delivery.py`, `DEPLOYMENT.md`), `src/lib/notify/prefs.ts` |
 | вопрос из бота: режимы и ответ | `src/lib/notify/assistant.ts`, `src/lib/ai/orchestrator.ts`, `wssdozh/slag-relay` (`server.py`) |
 | ссылки `slag://`: страница-переходник на релее, схема в ОС | `wssdozh/slag-relay` (`tg.py`, `render_answer_links`), `src/lib/platform/deepLink.ts`, `src-tauri/src/deeplink.rs` |
-| лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx` |
+| лента и карточка записи | `src/components/Feed/FeedList.tsx`, `ItemCard.tsx`; секции сроков и окна — `src/components/Feed/list/` |
+| сегодня, просрочка и автоматический повтор | `src/lib/tasks/taskSchedule.ts`, `src/context/hooks/useLocalDay.ts`, `useRecurringRollover.ts`, `src/lib/time/recurrenceHelper.ts` |
 | композер, создание и сохранение записи | `src/components/Feed/Composer.tsx`, `src/lib/vault/markdownSerializer.ts` |
 | запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |
 | папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |
 | хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
 | корзина | `src/lib/storage/trashStore.ts` |
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
-| полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
+| первое открытие редактора и черновики | `src/App.tsx` загружает модуль по запросу; `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts`; замер `scripts/bench/startup-input.mjs` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
-| быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/hooks/useLocalDay.ts` — локальная дата |
-| мобильные экраны и жесты | `src/components/Mobile/`, `src/context/hooks/useMobileNav.ts` — папки и «Назад»; `src/hooks/layout/useIsMobile.ts` — выбор оболочки |
+| быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/context/hooks/useLocalDay.ts` — локальная дата |
+| мобильные экраны и жесты | `src/components/Mobile/`, `src/context/hooks/useMobileNav.ts` — папки и «Назад»; `src/hooks/layout/useIsMobile.ts` — выбор оболочки; `src/hooks/gestures/usePullToSearch.ts` — жест поиска в ленте и `MobileFolderRoot.tsx` |
 | переключатель папок | `src/components/Mobile/folders/` — верхний список и нижний поиск; `src/components/Feed/BaseComposer.tsx` — общий каркас ввода; `src/components/Feed/FeedHeader.tsx` — десктопный дроплист |
 | сведения о папке | `src/components/FolderProfile/` — общий профиль; `src/components/RightPanel/FolderInfoPanel.tsx` — док «Инфо»; `src/components/Mobile/MobileFolderInfoView.tsx` — мобильная страница из `⋯` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |

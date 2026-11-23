@@ -45,11 +45,12 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
       const methods: string[] = [];
       const frames: Array<string | Uint8Array> = [];
       let postStatus = 200;
+      let postReceipt: Record<string, string> = {};
       window.fetch = async (_url, opts) => {
         const method = (opts && opts.method) || 'GET';
         methods.push(method);
         if (method !== 'POST') return Response.json({ bundles: [], head: 0, oldest: 0 });
-        return new Response('{}', { status: postStatus });
+        return Response.json(postReceipt, { status: postStatus });
       };
       await init('synthetic push seed');
       const ack = async (bundleId: string) => {
@@ -93,7 +94,7 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
         : '';
       await ack(binaryBundleId);
 
-      // 3. No socket at all: HTTP POST, and 409 replay still counts as delivered.
+      // 3. No socket at all: HTTP POST, with explicit replay as the only successful 409.
       clear();
       engine.ws = null;
       methods.length = 0;
@@ -102,13 +103,22 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
       const httpCommitted = getPref(stateKey()) !== null;
       clear();
       postStatus = 409;
+      postReceipt = { error: 'bundle_replay' };
       methods.length = 0;
       await push();
       const replayAccepted = methods.filter(m => m === 'POST').length === 1
         && engine.status.error === null
         && getPref(stateKey()) !== null;
 
-      return { textOverSocket, committedOnAck, binaryFrame, binaryHeader, headerPulledNothing, firstOverHttp, httpCommitted, replayAccepted };
+      clear();
+      postReceipt = { error: 'note_room_frozen' };
+      methods.length = 0;
+      await push();
+      const freezeRejected = methods.filter(m => m === 'POST').length === 1
+        && engine.status.error !== null
+        && getPref(stateKey()) === null;
+
+      return { textOverSocket, committedOnAck, binaryFrame, binaryHeader, headerPulledNothing, firstOverHttp, httpCommitted, replayAccepted, freezeRejected };
     });
   });
   expect(result).toEqual({
@@ -120,6 +130,7 @@ test('push uses the open socket (text or binary frame) and only falls back to HT
     firstOverHttp: true,
     httpCommitted: true,
     replayAccepted: true,
+    freezeRejected: true,
   });
 });
 

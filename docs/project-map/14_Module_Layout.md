@@ -24,6 +24,7 @@ src/
     Feed/assistant/   по компоненту на вид сообщения
     Feed/item/        слоты карточки: картинки, файлы, аудио, видео, подзадачи, баннер, действия
     Feed/composer/    стрип вложений, тип, ИИ, запись, отправка, резолвер полей
+    Feed/list/        окна хронологии, секции сегодняшних и просроченных задач
     Editor/fullscreen/ вложения, инлайн-ИИ, строка свойств таски
     Workspace/       Dockview: раскладка, адресация быстрого фильтра активной вкладки
     Settings/devices/  список, карточка, права, действия, pairing
@@ -38,14 +39,14 @@ src/
   hooks/
     gestures/       drag, pointer dnd, sheet drag, swipe
     layout/         container width, flip layout, is mobile, visual viewport
-    media/          useAttachmentSrc, useAudioAnalyser, useComposerMedia
+    media/          useAttachmentSrc для карточек; useAttachmentSrcOnDemand для видимых плиток и кадров просмотрщика; аудио и медиа композера
     ui/             useLayerStack, usePresence, useGlobalHotkeys
   lib/
     ai/             оркестратор, tools, prompt, action parser, адаптеры, aiService; fallback/ — по файлу на группу интентов
     logger/         logger (уровни, скоупы, буфер, ретеншн) и logRedaction (что не попадёт в лог)
     platform/       platform, windowControls, folderOpener — всё, что говорит с ОС и Tauri
     text/           chatMarkdown, diffUtils, formatBytes
-    tasks/          чекбоксы в Markdown, переходы статусов, предикат быстрых фильтров
+    tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока), taskQuickFilter (быстрые фильтры)
     storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
     sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
       notes/        wire, channel, session, replica, journal, merge, persistence, conflicts, bootstrap

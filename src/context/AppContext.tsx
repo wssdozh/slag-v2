@@ -37,7 +37,7 @@ import {
   STORAGE_KEYS,
   DEFAULT_INBOX_FOLDER,
 } from '../config';
-import { evaluateRecurringTasks } from '../lib/time/recurrenceHelper';
+import { useLocalDay } from './hooks/useLocalDay';
 import { setPref } from '../lib/storage/prefs';
 
 const uiLog = logger.scope('UI');
@@ -62,15 +62,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ? initialWorkspace.currentFolder
       : DEFAULT_INBOX_FOLDER
   ));
-  const [items, setItems] = useState<SlagItem[]>(() => {
-    const rawItems = storage.getItems();
-    const { updatedItems, changedCount } = evaluateRecurringTasks(rawItems);
-    if (changedCount > 0) {
-      storage.saveItems(updatedItems);
-      return updatedItems;
-    }
-    return rawItems;
-  });
+  const [items, setItems] = useState<SlagItem[]>(() => storage.getItems());
+  const today = useLocalDay();
   const [selectedItem, setSelectedItem] = useState<SlagItem | null>(() => {
     const fsState = initialWorkspace.fullscreenEditorState;
     if (fsState?.isOpen && fsState.itemId) {
@@ -210,8 +203,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     else if (event.kind === 'folder') setFolders(storage.getFolders());
   }), [refreshItems]);
 
-  useRecurringRollover(refreshData);
-  useNotifyArm(items, vault);
+  const vaultRead = storage.getCurrentVaultRead();
+  const tasksReady = useRecurringRollover(vaultRead, today, refreshData);
+  useNotifyArm(items, vault, tasksReady, vaultRead);
   // The disk can move without us: the MCP server, an outside editor. The sweep brings those notes
   // into the feed and reports a note that already changed under an edit about to be saved.
   useVaultWatch({ vault, addToast });
@@ -238,9 +232,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // says the vault is empty, and the relay believes it: sync used to start from here and race
     // this scan, and one second of an empty index was enough to empty every device.
     void storage
-      .initTauriFs()
-      .then((loadedNew) => {
-        if (loadedNew) refreshData();
+      .getCurrentVaultRead()
+      .then(() => {
         // The frame after the data lands is the first one a person sees notes in. One number, so a
         // claim about a slow start has something to be compared with.
         requestAnimationFrame(() =>
@@ -263,11 +256,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         syncEngine.disconnect();
       }
     });
-    const handleSyncUpdate = () => {
-      refreshData();
-    };
-    window.addEventListener('slag-sync-updated', handleSyncUpdate);
-
     const cleanupDesktop = listenDesktopEvents({
       onOpenComposer: () => {
         openComposerModal();
@@ -284,7 +272,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubscribeAccount();
       accountClient.stopPolling();
       cleanupDesktop();
-      window.removeEventListener('slag-sync-updated', handleSyncUpdate);
     };
   }, [refreshData, openComposerModal]);
 
@@ -641,6 +628,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isKanbanMaterialsOpen,
         setIsKanbanMaterialsOpen,
         items,
+        today,
         selectedItem,
         activeTypeFilter,
         activeTagFilter,

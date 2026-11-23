@@ -1,6 +1,21 @@
 // Pure windowing for the feed: how many cards stay mounted and when to grow the window.
 import type { SlagItem } from '../../../types';
-import { noteGapPx } from '../../../lib/time/dateUtils';
+import { noteGapPx, parseISODateString } from '../../../lib/time/dateUtils';
+import { classifyTaskSchedule } from '../../../lib/tasks/taskSchedule';
+
+export function partitionFeedBySchedule(items: readonly SlagItem[], today: string) {
+  const history: SlagItem[] = [];
+  const scheduledToday: SlagItem[] = [];
+  const overdue: SlagItem[] = [];
+  for (const item of items) {
+    const status = classifyTaskSchedule(item, today);
+    if (status === 'today') scheduledToday.push(item);
+    else if (status === 'overdue') overdue.push(item);
+    else history.push(item);
+  }
+  overdue.sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''));
+  return { history, scheduledToday, overdue };
+}
 
 /** Карточек в окне; столько же добавляет один шаг догрузки старого. */
 export const WINDOW_CHUNK = 15;
@@ -49,9 +64,11 @@ export interface FeedDateGroup {
  * у записей не из текущего. Внутри группы шаг — это разрыв во времени между соседями,
  * а не ровный отступ колонки: лента дышит, но не пляшет.
  */
-export function groupFeedByDate(items: readonly SlagItem[], todayMidnight: number): FeedDateGroup[] {
-  const yesterdayMidnight = todayMidnight - 86400000;
-  const currentYear = new Date(todayMidnight || 0).getFullYear();
+export function groupFeedByDate(items: readonly SlagItem[], today: string | number): FeedDateGroup[] {
+  const day = typeof today === 'string' ? parseISODateString(today) : new Date(today);
+  const todayMidnight = day.setHours(0, 0, 0, 0);
+  const currentYear = day.getFullYear();
+  const yesterdayMidnight = day.setDate(day.getDate() - 1);
   const groups: FeedDateGroup[] = [];
 
   for (let index = 0; index < items.length; index += 1) {

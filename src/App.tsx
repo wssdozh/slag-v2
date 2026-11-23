@@ -10,6 +10,7 @@ import { InitialSyncBoundary } from './components/InitialSyncBoundary';
 import { ConfirmDialog } from './components/Modals/ConfirmDialog';
 import { ToastContainer } from './components/UI/Toast';
 import { Icon } from './components/UI/icons/Icon';
+import { logger } from './lib/logger/logger';
 import { enrichAttachment } from './lib/media/enrichment/dispatch';
 import { extractFocalContext } from './lib/media/enrichment/text';
 import { setupAudioCollisionGuard } from './lib/media/audioHelper';
@@ -21,9 +22,18 @@ const WorkspaceShell = lazy(() =>
 const SearchModal = lazy(() =>
   import('./components/Search/SearchModal').then((m) => ({ default: m.SearchModal }))
 );
-const FullscreenEditor = lazy(() =>
-  import('./components/Editor/FullscreenEditor').then((m) => ({ default: m.FullscreenEditor }))
-);
+let editorModule: Promise<React.ComponentType> | null = null;
+let resolvedEditor: React.ComponentType | null = null;
+const editorLog = logger.scope('UI');
+const loadFullscreenEditor = () => {
+  if (resolvedEditor) return Promise.resolve(resolvedEditor);
+  editorModule ??= import('./components/Editor/FullscreenEditor')
+    .then((m) => { resolvedEditor = m.FullscreenEditor; return resolvedEditor; })
+    // A transport failure can recover, so drop the memo and let the next open try again. A module
+    // that failed to evaluate stays cached by the engine; retrying then rejects immediately.
+    .catch((error: unknown) => { editorModule = null; throw error; });
+  return editorModule;
+};
 const SettingsModal = lazy(() =>
   import('./components/Modals/SettingsModal').then((m) => ({ default: m.SettingsModal }))
 );
@@ -89,6 +99,21 @@ const useMountedOnOpen = (isOpen: boolean) => {
 const LazyOverlay: React.FC<{ mounted: boolean; children: React.ReactNode }> = ({ mounted, children }) =>
   mounted ? <Suspense fallback={null}>{children}</Suspense> : null;
 
+/**
+ * The editor's import is resolved into a component before it renders, so a requested open never
+ * sits behind Suspense's first retry. This is only up while the module is in flight: it takes no
+ * pointer events and the editor replaces it as soon as the import settles.
+ */
+const EditorOpeningFallback: React.FC<{ error: string | null }> = ({ error }) => (
+  <div data-testid="editor-opening-fallback" role="status" aria-live="polite"
+    className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center">
+    <span className="flex items-center gap-2 rounded-full border border-tint-8 bg-surface px-3 py-1.5 text-xs font-mono text-fg-secondary">
+      <span className="size-1.5 shrink-0 rounded-full bg-fg-dim motion-safe:animate-pulse" />
+      {error ?? 'Открываю редактор…'}
+    </span>
+  </div>
+);
+
 const AppContent: React.FC = () => {
   const {
     isMobile,
@@ -127,11 +152,31 @@ const AppContent: React.FC = () => {
   // happens where the model is, not where the card is, so the wiring lives at the shell.
   useAssistantActions(executeSuggestedAction);
 
-  // A lazy component starts importing the moment React renders it, so the editor's CodeMirror
-  // chunk (641 kB, the second biggest in the build) used to land on the first paint even though
-  // the editor renders null until a note opens. Mount it on first open and keep it mounted
-  // afterwards: unmounting on close would cut the exit animation short.
-  const isEditorMounted = useMountedOnOpen(isFullscreenEditorOpen);
+  // The editor's chunk stays off the startup path, but a requested open resolves the module into
+  // a component instead of suspending: after the first success it renders directly, closed or not,
+  // so close/reopen never waits for React's Suspense retry. The epoch keeps a failed attempt from
+  // leaking its message into the next open while that attempt is retried.
+  const [editorOpenEpoch, setEditorOpenEpoch] = useState(0);
+  const [editorWasOpen, setEditorWasOpen] = useState(false);
+  if (isFullscreenEditorOpen !== editorWasOpen) {
+    setEditorWasOpen(isFullscreenEditorOpen);
+    if (isFullscreenEditorOpen) setEditorOpenEpoch((epoch) => epoch + 1);
+  }
+  const [EditorComponent, setEditorComponent] = useState<React.ComponentType | null>(null);
+  const [editorFailure, setEditorFailure] = useState<{ epoch: number; message: string } | null>(null);
+  useEffect(() => {
+    if (!isFullscreenEditorOpen || EditorComponent) return;
+    let alive = true;
+    loadFullscreenEditor().then((Component) => {
+      if (alive) setEditorComponent(() => Component);
+    }).catch((error: unknown) => {
+      editorLog.error('Editor module failed to load', { cause: error });
+      if (alive) setEditorFailure({ epoch: editorOpenEpoch, message: 'Не удалось открыть редактор. Попробуйте ещё раз или перезапустите приложение.' });
+    });
+    return () => { alive = false; };
+  }, [isFullscreenEditorOpen, EditorComponent, editorOpenEpoch]);
+  const ReadyEditor = EditorComponent ?? (isFullscreenEditorOpen ? resolvedEditor : null);
+  const editorError = editorFailure && editorFailure.epoch === editorOpenEpoch ? editorFailure.message : null;
   const isFolderModalMounted = useMountedOnOpen(isFolderModalOpen);
   const isFolderMoveModalMounted = useMountedOnOpen(folderMoveTarget !== null);
   const isFolderViewModalMounted = useMountedOnOpen(isFolderViewModalOpen);
@@ -297,11 +342,7 @@ const AppContent: React.FC = () => {
         <LazyOverlay mounted={isActionSheetMounted}>
           <MobileActionSheet />
         </LazyOverlay>
-        {isEditorMounted && (
-          <Suspense fallback={null}>
-            <FullscreenEditor />
-          </Suspense>
-        )}
+        {ReadyEditor ? <ReadyEditor /> : isFullscreenEditorOpen && <EditorOpeningFallback error={editorError} />}
         <LazyOverlay mounted={isSearchModalMounted}>
           <SearchModal />
         </LazyOverlay>
@@ -385,11 +426,7 @@ const AppContent: React.FC = () => {
       <LazyOverlay mounted={isSearchModalMounted}>
         <SearchModal />
       </LazyOverlay>
-      {(isEditorMounted) && (
-        <Suspense fallback={null}>
-          <FullscreenEditor />
-        </Suspense>
-      )}
+      {ReadyEditor ? <ReadyEditor /> : isFullscreenEditorOpen && <EditorOpeningFallback error={editorError} />}
       <LazyOverlay mounted={isFolderModalMounted}>
         <FolderModal />
       </LazyOverlay>

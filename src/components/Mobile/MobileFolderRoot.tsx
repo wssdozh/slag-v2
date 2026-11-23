@@ -1,8 +1,9 @@
 // The phone folder root screen: vault switcher header, sync button, pinned inbox card,
-// and a Telegram-grouped list of top-level folders.  Uses current `useApp` /
-// `navigateToFolder`.  No modal dialogs or extra local state beyond the vault menu toggle.
+// and a Telegram-grouped list of top-level folders with pull-to-search.
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
+import { PullSearchHint } from '../UI/PullSearchHint';
 import { Icon } from '../UI/icons/Icon';
 import { folderIconName } from '../UI/icons/icons';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -31,6 +32,10 @@ export const MobileFolderRoot: React.FC = () => {
   } = useApp();
 
   const [isVaultMenuOpen, setIsVaultMenuOpen] = useState(false);
+  const { pull, side, offset, handlers: pullHandlers } = usePullToSearch({
+    onTrigger: () => setIsSearchOpen(true),
+    topOnly: true,
+  });
 
   const unsortedCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
 
@@ -85,57 +90,69 @@ export const MobileFolderRoot: React.FC = () => {
       />
 
       {/* ── Scrollable list ────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 pb-24">
-        {/* Pinned Inbox Card */}
-        <div className="rounded-2xl bg-surface/80 overflow-hidden">
-          <button
-            onClick={() => navigateToFolder(DEFAULT_INBOX_FOLDER)}
-            className="w-full flex items-center justify-between p-3.5 hover:bg-tint-4 active:bg-tint-10 transition-colors text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-6 h-6 flex items-center justify-center text-fg-soft shrink-0">
-                <Icon name="entity.inbox" size="lg" tone="inherit" />
-              </div>
-              <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
-            </div>
-            {unsortedCount > 0 && (
-              <span className="text-xs font-mono text-fg-muted shrink-0">
-                {unsortedCount} {unsortedLabel(unsortedCount)}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* User Folders Group */}
-        <div className="flex flex-col gap-1.5 mt-1">
-          <div className="px-1 text-2xs font-mono text-fg-muted uppercase tracking-wider">
-            Папки
-          </div>
-
-          <div className="rounded-2xl bg-surface/80 overflow-hidden">
-            {directFolders.map(folder => {
-              const iconName = folderIconName(folder.icon);
-              return (
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div {...pullHandlers} data-testid="mobile-folders-scroll" className="flex-1 overflow-y-auto">
+          {/* Translate the rows without extending the scroller's layout height. */}
+          <div className="min-h-full overflow-clip">
+            <div
+              data-testid="mobile-folders-pull-surface"
+              className="flex flex-col gap-3 px-4 py-4 pb-24"
+              style={{ transform: offset ? `translate3d(0, ${offset}px, 0)` : undefined }}
+            >
+              {/* Pinned Inbox Card */}
+              <div className="rounded-2xl bg-surface/80 overflow-hidden">
                 <button
-                  key={folder.path}
-                  onClick={() => navigateToFolder(folder.path)}
-                  className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 transition-colors text-left cursor-pointer"
+                  onClick={() => navigateToFolder(DEFAULT_INBOX_FOLDER)}
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-tint-4 active:bg-tint-10 transition-colors text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      data-folder-color={folder.color}
-                      style={{ color: folderColorCss(folder.color) }}
-                      className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0"
-                    >
-                      <Icon name={iconName} size="lg" tone="inherit" />
+                    <div className="w-6 h-6 flex items-center justify-center text-fg-soft shrink-0">
+                      <Icon name="entity.inbox" size="lg" tone="inherit" />
                     </div>
-                    <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
+                    <div className="text-sm font-semibold text-white truncate">{DEFAULT_INBOX_FOLDER}</div>
                   </div>
+                  {unsortedCount > 0 && (
+                    <span className="text-xs font-mono text-fg-muted shrink-0">
+                      {unsortedCount} {unsortedLabel(unsortedCount)}
+                    </span>
+                  )}
                 </button>
-              );
-            })}
+              </div>
+
+              {/* User Folders Group */}
+              <div className="flex flex-col gap-1.5 mt-1">
+                <div className="px-1 text-2xs font-mono text-fg-muted uppercase tracking-wider">
+                  Папки
+                </div>
+
+                <div className="rounded-2xl bg-surface/80 overflow-hidden">
+                  {directFolders.map(folder => {
+                    const iconName = folderIconName(folder.icon);
+                    return (
+                      <button
+                        key={folder.path}
+                        onClick={() => navigateToFolder(folder.path)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-tint-4 active:bg-tint-10 transition-colors text-left cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            data-folder-color={folder.color}
+                            style={{ color: folderColorCss(folder.color) }}
+                            className="w-6 h-6 flex items-center justify-center text-fg-secondary shrink-0"
+                          >
+                            <Icon name={iconName} size="lg" tone="inherit" />
+                          </div>
+                          <div className="text-sm font-medium text-fg-soft truncate">{folder.name}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+        {side === 'top' && <PullSearchHint pull={pull} side={side} testId="mobile-folders-pull-search" />}
       </div>
 
       <VaultSwitcherMenu

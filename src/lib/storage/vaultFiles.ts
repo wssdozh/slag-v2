@@ -55,6 +55,7 @@ export interface VaultFilesDeps {
 export class VaultFiles {
   private deps: VaultFilesDeps;
   private tauriInitialization: Promise<boolean> | null = null;
+  private scanGeneration = 0;
   // `state.json` has two writers now — folder metadata and the workspace — and both read before
   // they write. One queue per file keeps a slower write from putting its stale copy back.
   private stateWrite: Promise<void> = Promise.resolve();
@@ -165,29 +166,36 @@ export class VaultFiles {
   public async syncCurrentVaultFs(): Promise<boolean> {
     if (!isTauri()) return false;
     const startedAt = performance.now();
+    const generation = ++this.scanGeneration;
     try {
       const vault = this.vault;
+      const isCurrent = () => this.vault.id === vault.id && generation === this.scanGeneration;
       const notesPath = this.getVaultNotesPath(vault);
       const trashPath = this.getVaultTrashPath(vault);
       const statePath = this.getVaultStatePath(vault);
       const fence = await this.readStateSection('pendingFolderProjection', vault, true);
-      if (this.vault !== vault) return false;
+      if (!isCurrent()) return false;
 
       await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
+      if (!isCurrent()) return false;
       // The inbox comes first: it is where a note without a folder goes, and folders are read back
       // from these directories.
       await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
 
       const notesStartedAt = performance.now();
-      const loadedItems = (await this.scanNotesDir(notesPath)).filter(({ id }) => !Object.hasOwn(fence, id));
-      if (this.vault !== vault) return false;
+      let incomplete = false;
+      const markIncomplete = () => { incomplete = true; };
+      const loadedItems = (await this.scanNotesDir(notesPath, vault, false, undefined, markIncomplete))
+        .filter(({ id }) => !Object.hasOwn(fence, id));
+      if (!isCurrent()) return false;
       const notesMs = performance.now() - notesStartedAt;
       if (loadedItems.length > 0 || Object.keys(fence).length > 0) {
         this.deps.cacheItems(this.deps.getItemsKey(), loadedItems);
         fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.vault.name}" from ${notesPath}`);
-      } else {
+      } else if (!incomplete) {
         const current = this.deps.getItems();
         for (const item of current) {
+          if (!isCurrent()) return false;
           await this.flushItemToDisk(item);
         }
       }
@@ -202,7 +210,7 @@ export class VaultFiles {
         this.listFolderPaths(),
         this.readFolderState(),
       ]);
-      if (this.vault !== vault) return false;
+      if (!isCurrent()) return false;
       const sideMs = performance.now() - sideStartedAt;
       this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
       fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
@@ -217,9 +225,9 @@ export class VaultFiles {
       else this.deps.persistFolders(folders, 'external');
       fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
 
-      if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) {
-        await this.flushStateToDisk();
-      }
+      const hasState = await exists(statePath, { baseDir: BaseDirectory.AppData });
+      if (!isCurrent()) return false;
+      if (!hasState) await this.flushStateToDisk();
       // One line with the numbers, because "the start feels slow" is not a measurement: the notes,
       // the side reads and the total answer which of them to touch next.
       fsLog.info('Vault read from disk', {
@@ -231,7 +239,7 @@ export class VaultFiles {
         sideMs: Math.round(sideMs),
         totalMs: Math.round(performance.now() - startedAt),
       });
-      return true;
+      return !incomplete;
     } catch (err) {
       fsLog.error(`Failed to sync vault "${this.vault.name}" in AppData:`, err);
       return false;
@@ -505,8 +513,9 @@ export class VaultFiles {
   public initTauriFs(): Promise<boolean> {
     if (!isTauri()) return Promise.resolve(false);
     if (!this.tauriInitialization) {
+      const generation = this.scanGeneration;
       this.tauriInitialization = this.migrateLegacyNotesToVaults()
-        .then(() => this.syncCurrentVaultFs());
+        .then(() => generation === this.scanGeneration && this.syncCurrentVaultFs());
     }
     return this.tauriInitialization;
   }
@@ -576,7 +585,7 @@ export class VaultFiles {
     if (await this.fileBelongsTo(path, copy.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
   }
 
-  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>): Promise<SlagItem[]> {
+  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>, onReadError?: () => void): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
@@ -607,6 +616,7 @@ export class VaultFiles {
               return [entry.name, parsed] as const;
             } catch (e) {
               if (strict) throw e;
+              onReadError?.();
               fsLog.warn(`Failed to read note file ${subPath}:`, e);
               return null;
             }
@@ -627,7 +637,7 @@ export class VaultFiles {
           // files. Walking into them would put deleted notes back in the feed — and the folder
           // list skips them too, so a note from there would land in a folder nothing draws.
           if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const nested = await this.scanNotesDir(subPath, vault, strict, markers);
+          const nested = await this.scanNotesDir(subPath, vault, strict, markers, onReadError);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
               firstIndexById.set(nestedItem.id, items.length);
@@ -656,6 +666,7 @@ export class VaultFiles {
       }
     } catch (err) {
       if (strict) throw err;
+      onReadError?.();
       fsLog.warn(`Failed reading dir ${dirPath}:`, err);
     }
     return items;

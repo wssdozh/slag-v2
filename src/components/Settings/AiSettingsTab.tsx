@@ -219,10 +219,9 @@ export const AiSettingsTab: React.FC = () => {
       {/* что ассистент запомнил о человеке */}
       <MemoryList />
     </form>
-    {/* The dialogs live outside the settings form: a form inside a form is not a form at all. */}
-    {editing && (
-      <AiPromptModal key={editing} field={editing} isOpen onClose={() => setEditing(null)} />
-    )}
+    {/* The dialogs live outside the settings form: a form inside a form is not a form at all.
+        They stay mounted so the surface can finish its exit; `field: null` is the closed state. */}
+    <AiPromptModal field={editing} isOpen={editing !== null} onClose={() => setEditing(null)} />
     </>
   );
 };

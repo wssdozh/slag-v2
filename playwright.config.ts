@@ -5,6 +5,8 @@ import { defineConfig, devices } from '@playwright/test';
 // this tree on its own port.
 const port = Number(process.env.SLAG_E2E_PORT || 5173);
 const baseURL = `http://127.0.0.1:${port}`;
+// Opt in to an installed Chromium channel without changing the default runner.
+const channel = process.env.SLAG_E2E_CHANNEL || undefined;
 
 // Each runner gets its own pre-bundled deps directory. Worktrees share one node_modules through
 // a junction, and two Vite instances rewriting `.vite/deps` at once end in EPERM on the rename,
@@ -52,8 +54,8 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: channel || 'chromium',
+      use: { ...devices['Desktop Chrome'], channel },
     },
   ],
   webServer,

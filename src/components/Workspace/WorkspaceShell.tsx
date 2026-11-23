@@ -25,7 +25,6 @@ import { isDesktopApp, startDraggingWindow } from '../../lib/platform/windowCont
 import { useDockPanels } from './useDockPanels';
 import { getPanelComponent, getPanelMaxWidth, getPanelMinWidth, syncAllGroupConstraints } from './dockPanelUtils';
 import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
-import { useLocalDay } from '../../hooks/useLocalDay';
 import { useWorkspaceTaskFilter } from './useWorkspaceTaskFilter';
 import { WorkspaceTaskFilterContext, useWorkspaceTaskFilterContext } from './workspaceTaskFilterContext';
 import { useCrossWindowDnd } from './useCrossWindowDnd';
@@ -128,10 +127,9 @@ export interface WorkspaceShellProps {
 }
 
 export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) => {
-  const { currentFolder, vault } = useApp();
+  const { currentFolder, vault, today } = useApp();
   const [dockApi, setDockApi] = useState<DockviewApi | null>(null);
   const { panelId, activeFilter, toggleFilter } = useWorkspaceTaskFilter(dockApi, JSON.stringify([vault.id, currentFolder]));
-  const today = useLocalDay();
   const taskFilterContext = useMemo(() => ({ panelId, toggleFilter, filter: activeFilter ? { id: activeFilter, today } : undefined }), [panelId, toggleFilter, activeFilter, today]);
   const apiRef = useRef<DockviewApi | null>(null);
 

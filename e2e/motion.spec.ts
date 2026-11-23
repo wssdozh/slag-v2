@@ -474,6 +474,7 @@ test('a closing dialog keeps its whole exit instead of blinking out', async ({ p
   await page.getByTestId('sidebar-settings-btn').click();
   const modal = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Настройки', exact: true }) });
   await expect(modal).toHaveAttribute('data-motion-state', 'open');
+  await page.screenshot({ path: 'test-results/screenshots/settings-close-button.png', animations: 'disabled' });
 
   const exit = modal.evaluate(element => new Promise<{ duration: number; alive: boolean }>(resolve => {
     const observer = new MutationObserver(() => {

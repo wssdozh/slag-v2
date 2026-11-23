@@ -12,6 +12,7 @@ export async function openNoteSession(options: {
   serverUrl: string; roomId: string; vaultId: string; key: CryptoKey; signal: AbortSignal;
   port: VaultPort; headers: (json: boolean) => Record<string, string>; readOnly: boolean;
   sendLive: (message: string) => boolean; onProgress: () => void; onError: (error: unknown) => void;
+  isLiveOpen?: () => boolean;
   onDeliveryChange?: () => void;
   log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
   onStatus?: (status: import('./wire.ts').NoteStatus) => void;
@@ -152,6 +153,7 @@ export async function openNoteSession(options: {
       send: async (...args) => { requireVerified(); return channel.send(...args); },
     },
     sendLive: (message) => verified && options.sendLive(message),
+    isLiveOpen: () => verified && options.isLiveOpen?.() === true,
     save,
     uploadAttachment: registryMedia && readRegistryAttachment ? async (attachment) => {
       requireVerified();

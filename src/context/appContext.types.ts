@@ -78,6 +78,7 @@ export interface AppContextType {
   isKanbanMaterialsOpen: boolean;
   setIsKanbanMaterialsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   items: SlagItem[];
+  today: string;
   selectedItem: SlagItem | null;
   activeTypeFilter: SlagItemType | 'all';
   activeTagFilter: string | null;
