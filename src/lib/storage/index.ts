@@ -113,7 +113,7 @@ export { DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_INBOX_FOLDER };
 export type StorageOrigin = 'local' | 'remote' | 'external';
 
 export type StorageChangeEvent =
-  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; noteOrigin?: NoteOrigin | null; intentId?: string; origin?: StorageOrigin }
+  | { kind: 'item'; action: 'upsert' | 'delete' | 'conflict'; id: string; payload?: SlagItem; previous?: SlagItem; noteOrigin?: NoteOrigin | null; intentId?: string; pendingDisk?: true; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'upsert' | 'delete'; id: string; payload?: FolderMeta; origin?: StorageOrigin }
   | { kind: 'folder'; action: 'rename'; id: string; payload: FolderMeta; oldPath: string; origin?: StorageOrigin }
   | { kind: 'workspace'; action: 'upsert'; id: string; payload?: WorkspaceState; origin?: StorageOrigin }
@@ -151,6 +151,7 @@ export class StorageService {
   private sharedEnrollmentReads = new Map<string, Promise<void>>();
   private checkedSharedEnrollment = new Set<string>();
   private noteFileWrite: Promise<void> = Promise.resolve();
+  private noteCommits = new WeakMap<SlagItem, Promise<void>>();
 
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
@@ -300,7 +301,7 @@ export class StorageService {
   }
 
   public persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined {
-    if (!changes.length || !this.noteIntentListeners.size) return;
+    if (!changes.length || !this.noteIntentListeners.size || (isTauri() && this.files.vaultRecoveryKind !== 'ready')) return;
     return Promise.all([...this.noteIntentListeners].map((listener) => listener(changes))).then(() => undefined);
   }
 
@@ -311,10 +312,8 @@ export class StorageService {
   }
 
   public queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void> {
-    if (!before) return write();
-    // Enter the disk queue only after the journal is durable. A remote apply can itself hold the
-    // journal lock; awaiting an uncommitted intent in the disk queue would deadlock both.
-    const run = before.then(() => this.serializeNoteWrite(write));
+    // Wait for the journal outside the file queue: remote projection can hold its lock.
+    const run = before ? before.then(() => this.serializeNoteWrite(write)) : this.serializeNoteWrite(write);
     void run.catch((error: unknown) => fsLog.error('Could not persist note intent or note file', error));
     return run;
   }
@@ -337,14 +336,21 @@ export class StorageService {
 
   public async allowLegacySharedMigration(vault: VaultMeta): Promise<boolean> {
     await this.prepareSharedWrites(vault);
-    return this.checkedSharedEnrollment.has(vault.id) && !this.sharedListeners.has(vault.id);
+    return this.files.vaultRecoveryKind === 'ready' && this.checkedSharedEnrollment.has(vault.id) && !this.sharedListeners.has(vault.id);
   }
 
   public prepareSharedWrites(vault = this.currentVault): Promise<void> {
     if (!isTauri() || this.sharedListeners.has(vault.id) || this.checkedSharedEnrollment.has(vault.id)) return Promise.resolve();
     const existing = this.sharedEnrollmentReads.get(vault.id);
     if (existing) return existing;
-    const read = this.files.readRegistryState(vault).then((stored) => {
+    const read = this.currentVaultRead.then(async () => {
+      if (vault !== this.currentVault) throw new Error('Vault changed during local recovery');
+      if (this.files.vaultRecoveryKind === 'local-only') {
+        this.checkedSharedEnrollment.add(vault.id);
+        return;
+      }
+      const stored = await this.files.readRegistryState(vault);
+      if (vault !== this.currentVault) throw new Error('Vault changed during enrollment read');
       if (hasSharedRegistryEnrollment(stored) && !this.sharedListeners.has(vault.id)) this.sharedListeners.set(vault.id, null);
       this.checkedSharedEnrollment.add(vault.id);
     }).finally(() => this.sharedEnrollmentReads.delete(vault.id));
@@ -369,6 +375,7 @@ export class StorageService {
 
   private captureSharedWrite(origin: 'local' | 'remote', collect: () => SharedMutation[], applyLocal?: () => void): Promise<void> | undefined {
     const vaultId = this.currentVault.id;
+    if (isTauri() && this.files.vaultRecoveryKind === 'local-only') return undefined;
     const listener = this.sharedListeners.get(vaultId);
     if (listener === undefined) {
       if (isTauri() && !this.checkedSharedEnrollment.has(vaultId)) {
@@ -589,11 +596,19 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public syncCurrentVaultFs(): Promise<boolean> {
-    if (isTauri()) {
-      void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
-    }
     this.currentVaultRead = isTauri() ? this.files.syncCurrentVaultFs() : Promise.resolve(true);
     return this.currentVaultRead;
+  }
+
+  public async getCurrentVaultRecovery(): Promise<{ kind: 'ready' | 'local-only' | 'unavailable'; fresh?: boolean }> {
+    if (!isTauri()) return { kind: 'ready' };
+    const vault = this.currentVault;
+    const read = this.currentVaultRead;
+    const complete = await read;
+    if (this.currentVault !== vault || this.currentVaultRead !== read) return { kind: 'unavailable' };
+    const result = await this.files.openVault(vault);
+    if (this.currentVault !== vault || this.currentVaultRead !== read) return { kind: 'unavailable' };
+    return complete || result.kind === 'local-only' ? result : { kind: 'unavailable' };
   }
 
   /** The existing read for this vault selection; promise identity distinguishes A → B → A. */
@@ -773,7 +788,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public captureFolderCascade(changes: NoteMutation[], folders: FolderMeta[]): Promise<void> | undefined {
     const vaultId = this.currentVault.id;
-    if (!this.registryAtomicFolderVaults.has(vaultId) || !changes.length) return;
+    if (!this.registryAtomicFolderVaults.has(vaultId) || !changes.length || this.files.vaultRecoveryKind === 'local-only') return;
     const group = this.folderTreeListeners.get(vaultId)?.group;
     if (!group) return Promise.reject(new Error('Групповая синхронизация папок ещё не готова'));
     // Leave both tree and notes at their confirmed paths until the group receipt arrives.
@@ -783,9 +798,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   public persistFolders(folders: FolderMeta[], origin: StorageOrigin): Promise<void> | undefined {
     const vault = this.currentVault;
     const previous = this.getFolders();
-    const hasRegistry = this.registryFolderVaults.has(vault.id);
+    const localOnly = this.files.vaultRecoveryKind === 'local-only';
+    const hasRegistry = !localOnly && this.registryFolderVaults.has(vault.id);
     if (hasRegistry && origin !== 'local') return;
-    const listener = this.folderTreeListeners.get(vault.id)?.tree;
+    const listener = localOnly ? undefined : this.folderTreeListeners.get(vault.id)?.tree;
     if (hasRegistry && !listener) {
       throw new Error('Синхронизация папок ещё не готова; дерево не изменено');
     }
@@ -798,9 +814,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       void saved.catch((error: unknown) => fsLog.error('Could not persist folder tree intent or metadata', error));
       return saved;
     } else if (isTauri()) {
-      void this.files.writeFolderMeta(folders, vault).catch((error: unknown) => {
-        fsLog.warn('Failed to write folder metadata to state.json', error);
-      });
+      const write = this.files.assertLocalWrite(vault).then(() => this.files.writeFolderMeta(folders, vault));
+      void write.catch((error: unknown) => fsLog.warn('Failed to write folder metadata to state.json', error));
+      if (localOnly) return write;
     }
   }
 
@@ -872,6 +888,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.saveNoteEdit(item, { origin, restoring }).item;
   }
 
+  public whenNoteSaved(item: SlagItem): Promise<void> {
+    return this.noteCommits.get(item) ?? Promise.resolve();
+  }
+
   public saveNoteEdit(item: SlagItem, options: { origin?: 'local' | 'remote'; restoring?: boolean; editedFrom?: SlagItem | null } = {}): { item: SlagItem; durable?: Promise<void> } {
     const { origin = 'local', restoring = false, editedFrom } = options;
     const items = this.getItems();
@@ -881,7 +901,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (this.noteIntentListeners.size && origin === 'local' && !restoring && oldItem && previous && sameNote(previous, item)) {
       return { item: oldItem };
     }
-    const filename = getSafeNoteFilename(item.title, item.id);
+    const filename = oldItem?.title === item.title && oldItem.filename ? oldItem.filename : getSafeNoteFilename(item.title, item.id);
     const updatedItem: SlagItem = {
       ...item,
       filename,
@@ -911,28 +931,37 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.attachments.persistNew([updatedItem]);
     this.cacheItems(this.getItemsKey(), items);
 
+    let durable = before;
     if (isTauri()) {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
-      // A local edit is the only one that can be stale: a remote bundle is applied state, and a
-      // note without a file behind it has nothing to lose.
-      if (before) {
-        void this.queueNoteFileWrite(async () => {
-          // A watcher or canonical projection may have won while the intent was being journaled.
-          if (!this.isCurrentNoteWrite(vault, updatedItem)) return;
-          if (restoring) await this.files.restoreItemOnDisk(updatedItem, vault, true);
-          else await this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true);
-          this.noteProjectionCache(vault).set(item.id, { original: updatedItem });
-        }, before);
-      } else if (origin === 'local' && oldItem && oldFilename) {
-        void this.flushGuarded(updatedItem, oldItem, oldFilename);
-      } else {
-        if (!restoring) void this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename);
-        else void this.files.restoreItemOnDisk(updatedItem, vault);
-      }
+      durable = this.queueNoteFileWrite(async () => {
+        await this.files.assertLocalWrite(vault, item.id);
+        if (before && !this.isCurrentNoteWrite(vault, updatedItem)) throw new Error('Заметка изменилась до записи');
+        if (restoring) await this.files.restoreItemOnDisk(updatedItem, vault, true);
+        else if (origin === 'local' && !before && oldItem && oldFilename) await this.flushGuarded(updatedItem, oldItem, oldFilename, vault);
+        else await this.files.flushItemToDisk(updatedItem, oldItem?.folder, oldFilename, vault, true);
+        if (before) this.noteProjectionCache(vault).set(item.id, { original: updatedItem });
+      }, before);
+      void durable.catch(() => {
+        if (vault !== this.currentVault) return;
+        const current = this.getItems();
+        const failed = current.find(({ id }) => id === item.id);
+        if (!failed || failed.updatedAt !== updatedItem.updatedAt || !sameNote(failed, updatedItem)) return;
+        const stillVisible = current.filter(({ id }) => id !== item.id);
+        if (oldItem) stillVisible.push(oldItem);
+        this.cacheItems(this.getItemsKey(), stillVisible);
+        this.emitChange({ kind: 'item', action: 'conflict', id: item.id, origin: 'external' });
+      });
     }
 
-    this.emitChange({ kind: 'item', action: 'upsert', id: updatedItem.id, payload: updatedItem, origin });
-    return { item: updatedItem, durable: before };
+    if (durable) this.noteCommits.set(updatedItem, durable);
+    const event = { kind: 'item', action: 'upsert', id: updatedItem.id, payload: updatedItem, origin } as const;
+    if (isTauri() && durable && origin === 'local' && !before) {
+      // Local subscribers repaint optimistically, but the legacy outbox must not see a failed write.
+      this.emitChange({ ...event, action: 'upsert', origin: 'local', pendingDisk: true });
+      void durable.then(() => { if (this.currentVault === vault) this.emitChange(event); }, () => undefined);
+    } else this.emitChange(event);
+    return { item: updatedItem, durable };
   }
 
   /**
@@ -940,10 +969,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * editor, a sync that landed between the read and the save. The disk wins and the index is
    * told, so the person sees the truth instead of watching their edit vanish at the next reload.
    */
-  private async flushGuarded(item: SlagItem, previous: SlagItem, previousFilename: string): Promise<void> {
+  private async flushGuarded(item: SlagItem, previous: SlagItem, previousFilename: string, vault: VaultMeta): Promise<void> {
     const seenAt = previous.updatedAt;
     const target = `${previous.folder || DEFAULT_INBOX_FOLDER}/${previousFilename}`;
     const onDisk = await this.files.readNoteIdentity(target);
+    if (this.currentVault !== vault) throw new Error('Хранилище сменилось до записи заметки');
 
     if (hasNewerVersionOnDisk(onDisk, { id: previous.id, updatedAt: seenAt })) {
       const { items: reloaded } = await this.files.reloadNotesFromDisk([target]);
@@ -955,12 +985,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
         else items.unshift(diskItem);
         this.cacheItems(this.getItemsKey(), items);
         this.emitChange({ kind: 'item', action: 'conflict', id: diskItem.id, payload: diskItem, origin: 'external' });
-        fsLog.warn(`Refused to overwrite "${diskItem.title}" (${diskItem.id}): the file is newer on disk`);
-        return;
+        throw new Error('Заметка была изменена снаружи');
       }
     }
-
-    await this.files.flushItemToDisk(item, previous.folder, previousFilename);
+    await this.files.flushItemToDisk(item, previous.folder, previousFilename, vault, true);
   }
 
   public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
@@ -991,10 +1019,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (isTauri()) {
       void this.queueNoteFileWrite(async () => {
         for (const it of saveMap.values()) {
-          if (before && !this.isCurrentNoteWrite(vault, it)) continue;
+          await this.files.assertLocalWrite(vault, it.id);
+          if (before && this.noteOrigins.has(it) && !this.isCurrentNoteWrite(vault, it)) continue;
           const old = oldItemsMap.get(it.id);
           const oldFilename = old?.filename || (old ? getSafeNoteFilename(old.title, old.id) : undefined);
-          await this.files.flushItemToDisk(it, old?.folder, oldFilename, vault, !!before);
+          await this.files.flushItemToDisk(it, old?.folder, oldFilename, vault, true);
           if (before) this.noteProjectionCache(vault).set(it.id, { original: it });
         }
       }, before);
@@ -1031,15 +1060,15 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
     // On failure the watcher may see files already written by a group whose cursor did not move.
     // Leave those IDs alone until registry replay finishes the projection.
-    const fenced = await this.files.readStateSection('pendingFolderProjection', vault, true);
-    if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
+    const fenced = this.files.vaultRecoveryKind === 'ready' ? await this.files.readStateSection('pendingFolderProjection', vault, true) : {};
+    if (vault !== this.currentVault) return { updated: 0, removed: 0 };
     if (!Object.keys(fenced).length) this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
     const current = this.getItems();
     const byId = new Map(current.map(item => [item.id, item]));
     const events: StorageChangeEvent[] = [];
 
     for (const parsedItem of parsed) {
-      if (Object.hasOwn(fenced, parsedItem.id)) continue;
+      if (Object.hasOwn(fenced, parsedItem.id) || this.files.isAmbiguousNote(parsedItem.id)) continue;
       const cached = byId.get(parsedItem.id);
       const projected = tracked ? projections.get(parsedItem.id) : undefined;
       const marker = markers.get(parsedItem);
@@ -1117,8 +1146,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.cacheItems(this.getTrashKey(), items);
   }
 
-  public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {
-    trashItem(this, id, origin);
+  public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
+    return trashItem(this, id, origin);
   }
 
   public restoreFromTrash(id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {

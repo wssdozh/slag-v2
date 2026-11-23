@@ -27,6 +27,7 @@ const PENDING_PULL_MS = 5_000;
 const notifyLog = logger.scope('NOTIFY');
 
 function syncVaultId(): string {
+  if (!syncEngine.canUseVaultRelay()) return '';
   try {
     return syncEngine.getSyncVaultId();
   } catch {

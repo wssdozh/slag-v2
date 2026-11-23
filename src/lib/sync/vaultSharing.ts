@@ -26,7 +26,10 @@ export async function shareVaultWithDevice(
 ): Promise<void> {
   const session = accountClient.getSession();
   if (session && device.id === session.deviceId) throw new Error('Это хранилище уже находится на текущем устройстве');
-  const syncId = storage.ensureVaultSyncId(vault.id);
+  if (storage.getCurrentVault().id === vault.id && !syncEngine.canUseVaultRelay(vault.id)) {
+    throw new Error('Привязка хранилища не проверена');
+  }
+  const syncId = storage.getCurrentVault().id === vault.id ? syncEngine.getSyncVaultId() : storage.ensureVaultSyncId(vault.id);
   const serverVault = accountClient.getState().vaults.find((entry) => entry.id === syncId);
   const existingGrant = serverVault ? serverVault.grants.find((entry) => entry.deviceId === device.id) : undefined;
   if (existingGrant && existingGrant.status !== 'revoked' && existingGrant.mode === mode) return;

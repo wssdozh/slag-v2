@@ -377,6 +377,7 @@ export const Composer: React.FC<ComposerProps> = ({
     dismissals,
     saveItem,
     updateItem,
+    addToast,
     setAttachments,
     setIsRecordingAudio,
     setIsRecordingVideo,

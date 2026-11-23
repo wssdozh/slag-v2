@@ -25,6 +25,7 @@ import {
   type SyncSectionStore,
 } from './localBookkeeping';
 import { logger } from '../logger/logger';
+import { migrateVaultSyncFiles, readProtectedSyncState, validateSyncLedger } from './vaultSyncFiles';
 // Re-exported for the sync e2e specs, which drive sync through the real store. The headless
 // build swaps this module out (config/vite.node.config.ts), so nothing here reaches the node.
 import { storage } from '../storage';
@@ -156,6 +157,8 @@ export class SyncEngine {
   public retryDelayMs = SYNC_INTERVALS.RETRY_DELAY_MS;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   public initGeneration = 0;
+  private relayRead: Promise<boolean> | undefined;
+  private validatedSyncId: string | undefined;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -353,14 +356,14 @@ export class SyncEngine {
     this.status.subscription = computeSubscription(this);
     accountClient.subscribe((accountState) => {
       this.status.isAuthenticated = accountClient.getToken(this.config.serverUrl) !== null;
-      applyAccountDevices(this, accountState);
+      if (this.canUseVaultRelay()) applyAccountDevices(this, accountState);
     });
 
     vault().subscribeChanges((event) => {
       // Remote-origin writes are already applied state, and an external one came from the disk
       // under us (the MCP server, another editor): pushing it would echo back through the relay
       // and the two devices would ping-pong the same bundle forever.
-      if (event.origin === 'remote') return;
+      if (event.origin === 'remote' || (event.kind === 'item' && event.pendingDisk) || (isTauri() && !this.canUseVaultRelay())) return;
       if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
       if (this.hasSharedRegistry && isLegacySharedKind(event.kind)) return;
       if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
@@ -532,6 +535,7 @@ export class SyncEngine {
 
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
+    if (!this.canUseVaultRelay()) return;
     if (this.noteSession) {
       // The offline capture session exists before disk edits are safe from inbound projection.
       if (this.activeRoomId) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
@@ -908,7 +912,7 @@ export class SyncEngine {
    * The web build and the headless node have no disk: `hydrateSyncSection` is not even asked, and
    * every ledger keeps answering from the storage it answered from before.
    */
-  private async hydrateSyncState(generation: number): Promise<boolean> {
+  private async hydrateSyncState(generation: number, fresh = false): Promise<boolean> {
     const vaultId = this.currentVaultId;
     const isCurrent = () => generation === this.initGeneration && vaultId === this.currentVaultId;
     try {
@@ -916,21 +920,52 @@ export class SyncEngine {
       if (!isCurrent()) return false;
 
       let section: Record<string, unknown> | null = null;
-      if (isTauri()) {
-        const outcome = await hydrateSyncSection(this.bookkeeping, this.syncSectionStore(vaultId), isCurrent);
+      let protectedBinding = false;
+      let protectLegacyRegistry: unknown;
+      const meta = isTauri() ? storage.getCurrentVault() : undefined;
+      const dir = meta ? storage.files.getVaultDir(meta) : undefined;
+      let syncStore: SyncSectionStore | undefined;
+      let syncId: string | undefined;
+      if (dir && meta) {
+        if (meta.id !== vaultId) return false;
+        const existing = await readProtectedSyncState(dir, vaultId);
+        protectedBinding = !!existing.ledger && !!existing.config;
+        syncId = typeof existing.config?.syncId === 'string' ? existing.config.syncId : meta.syncId;
+        if (existing.config?.syncId && meta.syncId && existing.config.syncId !== meta.syncId) throw new Error('Изменилась привязка хранилища');
+        syncStore = this.syncSectionStore(vaultId);
+        const previousSection = await syncStore.read();
+        validateSyncLedger(previousSection);
+        if (!isCurrent()) return false;
+        if (!protectedBinding || existing.ledger?.registryRequired !== true) protectLegacyRegistry = await storage.readNoteRegistry();
+        if (!seed && !fresh && (protectedBinding || !!meta.syncId || protectLegacyRegistry !== undefined || previousSection.config !== undefined)) {
+          throw new Error('Ключ существующего хранилища недоступен');
+        }
+        const outcome = await hydrateSyncSection(this.bookkeeping, syncStore, isCurrent, !protectedBinding);
         if (!outcome.persisted) throw new Error('Не удалось загрузить журнал синхронизации', { cause: outcome.error });
         section = outcome.section;
       }
       if (!isCurrent()) return false;
-
-      const config = await hydrateConfig(this, vaultId, seed, section);
+      const config = await hydrateConfig(this, vaultId, seed, section, protectedBinding);
       if (!isCurrent()) return false;
+      if (syncStore && dir && meta && !protectedBinding) {
+        const source = await syncStore.read();
+        const fence = await storage.files.readStateSection('pendingFolderProjection', meta, true);
+        if (!isCurrent() || storage.getCurrentVault() !== meta) return false;
+        await migrateVaultSyncFiles(dir, vaultId, source, fence, syncId);
+      }
+      if (!isCurrent()) return false;
+      if (meta && !protectedBinding) await storage.files.finishSyncMigration(meta);
+      if (!isCurrent()) return false;
+      if (protectLegacyRegistry !== undefined) await storage.writeNoteRegistry(protectLegacyRegistry);
+      if (!isCurrent()) return false;
+      this.validatedSyncId = syncId;
       this.config = config;
       this.status.subscription = computeSubscription(this);
       return true;
     } catch (error) {
       if (!isCurrent()) return false;
       syncLog.error(`Could not read the sync state of vault ${vaultId}:`, error);
+      this.status.initialSync = { vaultId, state: 'idle', processed: 0, rejected: 0 };
       this.status.state = 'error';
       this.status.error = 'Синхронизация остановлена: журнал хранилища не удалось прочитать или сохранить.';
       this.notify();
@@ -942,7 +977,18 @@ export class SyncEngine {
     return this.currentVaultId;
   }
 
+  public canUseVaultRelay(vaultId = this.currentVaultId): boolean {
+    return !isTauri() || (vaultId === this.currentVaultId && storage.getCurrentVault().id === vaultId
+      && this.relayRead === storage.getCurrentVaultRead());
+  }
+
   public getSyncVaultId(): string {
+    if (isTauri()) {
+      if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
+      if (this.validatedSyncId) return this.validatedSyncId;
+      const saved = storage.getCurrentVault().syncId;
+      if (saved) return saved;
+    }
     return vault().ensureVaultSyncId(this.currentVaultId);
   }
 
@@ -951,6 +997,7 @@ export class SyncEngine {
   }
 
   public saveConfig(newConfig: Partial<SyncConfig>): void {
+    if (!this.canUseVaultRelay()) return;
     saveConfig(this, newConfig);
   }
 
@@ -1052,9 +1099,19 @@ export class SyncEngine {
     this.disconnect();
     const generation = this.initGeneration;
     const startedAt = performance.now();
-    // The vault's own sync state — config, seed, ledgers — before anything decides whether sync
-    // can run at all: `enabled` and the seed phrase are fields of that config.
-    if (!await this.hydrateSyncState(generation) || generation !== this.initGeneration) return;
+    const read = isTauri() ? storage.getCurrentVaultRead() : undefined;
+    const recovery = isTauri() ? await storage.getCurrentVaultRecovery() : { kind: 'ready', fresh: false };
+    if (generation !== this.initGeneration || (read && (storage.getCurrentVaultRead() !== read || storage.getCurrentVault().id !== this.currentVaultId))) return;
+    if (recovery.kind !== 'ready') {
+      this.status.initialSync = { vaultId: this.currentVaultId, state: 'idle', processed: 0, rejected: 0 };
+      this.status.state = 'error';
+      this.status.error = 'Синхронизация приостановлена: состояние очереди не подтверждено.';
+      this.notify();
+      return;
+    }
+    if (!await this.hydrateSyncState(generation, recovery.fresh) || generation !== this.initGeneration) return;
+    if (read && storage.getCurrentVaultRead() !== read) return;
+    this.relayRead = read;
     const seedPhrase = this.config.seedPhrase;
     const initial = isInitialSyncPending(this.currentVaultId);
     if (initial) syncLog.info('Initial sync started', { vaultId: this.currentVaultId });
@@ -1079,7 +1136,7 @@ export class SyncEngine {
 
       const port = vault();
       const serverUrl = apiBase(this.config.serverUrl);
-      const vaultId = port.getCurrentVault().syncId;
+      const vaultId = this.validatedSyncId ?? port.getCurrentVault().syncId;
       const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
       if (generation !== this.initGeneration) return;
       const accountRoom = async (id: string) =>
@@ -1112,6 +1169,16 @@ export class SyncEngine {
            kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')
            || (sharedRecords === true && isLegacySharedKind(kind))),
       });
+      if (isTauri()) {
+        const registry = await storage.readNoteRegistry();
+        const expectedRoom = registry !== undefined && vaultId ? await accountRoom(vaultId) : undefined;
+        if (generation !== this.initGeneration || !this.canUseVaultRelay()) return;
+        if (registry !== undefined && (!expectedRoom || !registry || typeof registry !== 'object'
+          || !('room' in registry) || registry.room !== expectedRoom)) {
+          this.relayRead = undefined;
+          throw new Error('Локальный реестр относится к другой комнате; очередь сохранена');
+        }
+      }
       if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
         const roomId = await accountRoom(vaultId);
         if (generation !== this.initGeneration) return;
@@ -1239,6 +1306,7 @@ export class SyncEngine {
   }
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
+    if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     if (newPhrase !== this.config.seedPhrase) {
       // A new phrase is a new room: the checkpoints of the old one mean nothing there, and a stale
       // state hash would silence the full resend into the room this device is about to join.
@@ -1251,6 +1319,7 @@ export class SyncEngine {
   }
 
   public async updateServerUrl(url: string): Promise<void> {
+    if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     this.saveConfig({ serverUrl: url });
     clearSyncLedgers(this.bookkeeping);
     this.getOutbox().clear();
@@ -1267,10 +1336,12 @@ export class SyncEngine {
   }
 
   public connectWebSocket(): void {
+    if (!this.canUseVaultRelay()) return;
     connectSocket(this);
   }
 
   public async handleIncomingMessage(data: string): Promise<void> {
+    if (!this.canUseVaultRelay()) return;
     await handleIncoming(this, data);
   }
 
@@ -1292,6 +1363,7 @@ export class SyncEngine {
   }
 
   public async sendAck(bundleId: string): Promise<void> {
+    if (!this.canUseVaultRelay()) return;
     await acknowledgeBundle(this, bundleId);
   }
 
@@ -1435,7 +1507,7 @@ export class SyncEngine {
   }
 
   public fetchPendingBundlesHttp(): Promise<void> {
-    if (!this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
+    if (!this.canUseVaultRelay() || !this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
     const generation = this.initGeneration;
     if (this.pendingPull && this.pendingPull.generation === generation) return this.pendingPull.promise;
     const promise = this.pullPendingBundles(generation)
@@ -1564,6 +1636,8 @@ export class SyncEngine {
 
   public disconnect(): void {
     ++this.initGeneration;
+    this.relayRead = undefined;
+    this.validatedSyncId = undefined;
     this.failedItemHashes.clear();
     this.noteAbort?.abort();
     this.noteAbort = undefined;
@@ -1620,6 +1694,7 @@ export class SyncEngine {
   public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void { setDeviceSyncMode(this, deviceId, mode); }
 
   public async rotateVaultKey(): Promise<string> {
+    if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     if (this.usesAccountSync()) {
       const response = await fetch(`${apiBase(this.config.serverUrl)}/api/vaults/${encodeURIComponent(this.getSyncVaultId())}/rotate`, {
         method: 'POST', headers: authHeaders(this, true), body: '{}',

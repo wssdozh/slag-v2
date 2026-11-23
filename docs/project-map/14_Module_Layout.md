@@ -45,8 +45,8 @@ src/
     platform/       platform, windowControls, folderOpener — всё, что говорит с ОС и Tauri
     text/           chatMarkdown, diffUtils, formatBytes
     tasks/          taskUtils (чекбоксы), taskCompletion (завершение), taskSchedule (классификация срока), taskQuickFilter (быстрые фильтры)
-    storage/        StorageService, vaultRegistry, folderStore, trashStore, draft store, IndexedDB attachments
-    sync/           syncEngine, syncConfig, syncSocket, transport, devices, outbox, crypto
+    storage/        StorageService, VaultFiles, vaultRecovery, vaultNoteMove, папки, корзина, вложения
+    sync/           syncEngine, syncConfig, vaultSyncFiles, syncSocket, transport, devices, outbox, crypto
       notes/        wire, channel, session, replica, journal, merge, persistence, conflicts, bootstrap
     vault/          модель записи: schema, updates, markdown serializer, filename, vaultDisplay, demo
     time/           даты, recurrence, Todoist-парсер, раскладка календаря

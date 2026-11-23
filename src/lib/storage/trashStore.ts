@@ -2,13 +2,10 @@
 // of `.trash/`, rebuilt by the start-up scan; the host owns where that snapshot is kept.
 import type { SlagItem, VaultMeta } from '../../types';
 import { STORAGE_KEYS } from '../../config';
-import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import type { AttachmentStore } from './attachments';
 import type { StorageChangeEvent } from '.';
 import type { NoteMutation } from './noteRegistry';
-
-const fsLog = logger.scope('FS');
 
 const TRASH_STORAGE_PREFIX = STORAGE_KEYS.TRASH_PREFIX;
 
@@ -17,9 +14,11 @@ export interface TrashStoreHost {
   attachments: AttachmentStore;
   files: {
     removeItemFromDisk(item: SlagItem, vault?: VaultMeta, strict?: boolean): Promise<void>;
+    assertLocalWrite(vault: VaultMeta, id: string): Promise<void>;
   };
   getItems(): SlagItem[];
   saveItem(item: SlagItem, origin?: 'local' | 'remote', restoring?: boolean): SlagItem;
+  whenNoteSaved(item: SlagItem): Promise<void>;
   persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined;
   queueNoteFileWrite(write: () => Promise<void>, before?: Promise<void>): Promise<void>;
   cacheItems(key: string, items: SlagItem[]): void;
@@ -39,7 +38,7 @@ export function readTrash(store: TrashStoreHost): SlagItem[] {
   return store.attachments.hydrate(store.readTrashIndex()).map(item => ({ ...item }));
 }
 
-export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | 'remote' = 'local'): void {
+export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | 'remote' = 'local'): Promise<void> | undefined {
   const items = store.getItems();
   const item = items.find(i => i.id === id);
   if (!item) return;
@@ -54,12 +53,23 @@ export function trashItem(store: TrashStoreHost, id: string, origin: 'local' | '
   const trash = readTrash(store);
   trash.unshift({ ...item, updatedAt: Date.now() });
   store.cacheTrash(trash);
-  fsLog.info(`Moved "${item.title || item.id}" to .trash`);
-
-  if (isTauri()) {
-    void store.queueNoteFileWrite(() => store.files.removeItemFromDisk(item, vault, !!before), before);
+  const event = { kind: 'item', action: 'delete', id, payload: item, origin } as const;
+  if (!isTauri()) {
+    store.emitChange(event);
+    return;
   }
-  store.emitChange({ kind: 'item', action: 'delete', id, payload: item, origin });
+  store.emitChange({ ...event, pendingDisk: true });
+  const committed = store.queueNoteFileWrite(async () => {
+    await store.files.assertLocalWrite(vault, id);
+    await store.files.removeItemFromDisk(item, vault, true);
+  }, before);
+  void committed.then(() => { if (store.currentVault === vault) store.emitChange(event); }, () => {
+    if (store.currentVault !== vault || store.getItems().some((entry) => entry.id === id)) return;
+    store.cacheTrash(readTrash(store).filter((entry) => entry.id !== id));
+    store.cacheItems(store.getItemsKey(), [item, ...store.getItems()]);
+    store.emitChange({ kind: 'item', action: 'upsert', id, payload: item, origin: 'external' });
+  });
+  return committed;
 }
 
 export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
@@ -71,9 +81,13 @@ export function recoverFromTrash(store: TrashStoreHost, id: string, origin: 'loc
   store.cacheTrash(trash.filter(i => i.id !== id));
 
   // Restore to active items
+  const vault = store.currentVault;
   const restored = store.saveItem(item, origin, true);
-  fsLog.info(`Restored "${restored.title || restored.id}" from .trash to "${restored.folder}"`);
-
-  store.emitChange({ kind: 'trash', action: 'restore', id: restored.id, payload: restored, origin });
+  const emit = () => store.emitChange({ kind: 'trash', action: 'restore', id: restored.id, payload: restored, origin });
+  if (isTauri()) {
+    void store.whenNoteSaved(restored).then(() => { if (store.currentVault === vault) emit(); }, () => {
+      if (store.currentVault === vault && !store.getItems().some((entry) => entry.id === item.id)) store.cacheTrash([item, ...readTrash(store)]);
+    });
+  } else emit();
   return restored;
 }

@@ -76,7 +76,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | эхо записи на диск и семантика Markdown | `src/lib/storage/noteDiskProjection.ts`, `src/lib/vault/noteSemantics.ts`, `src/lib/vault/markdownSerializer.ts`; построчное слияние — `src/lib/text/mergeMarkdown.ts` |
 | загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
 | сверка корней между устройствами, манифест комнаты | `src/lib/sync/manifest/`: `sync.ts` — диагностическая сверка legacy и чтение сохранённых бандлов, `channel.ts` — формат и сравнение, `peers.ts` — чтение чужих корней, `publish.ts` — свой POST, `schedule.ts` — тайминги. Хэши заметок — `src/lib/vault/integrity/manifest.ts` |
-| конфиг синка, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts` |
+| конфиг синка, миграция очереди, авторизация, сид-фраза | `src/lib/sync/syncConfig.ts`, `src/lib/sync/vaultSyncFiles.ts` |
 | экран синка, аккаунт, устройства | `src/components/Settings/`, `src/lib/sync/account.ts` |
 | уведомления и напоминания | `src/lib/notify/`, `src/context/hooks/useNotifyArm.ts` |
 | telegram-бот: канал, приглашение, доставка | `wssdozh/slag-relay` (`bot.py`, `delivery.py`, `DEPLOYMENT.md`), `src/lib/notify/prefs.ts` |
@@ -88,6 +88,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | запись: создать, изменить, удалить, восстановить, переместить | `src/context/hooks/useItemWrites.ts` |
 | папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |
 | хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
+| самовосстановление при открытии, незавершённый перенос, фиксация на диске | `src/lib/storage/vaultRecovery.ts`, `vaultNoteMove.ts`, `src/lib/platform/durableVaultFile.ts`, `src-tauri/src/durable_file.rs` |
 | корзина | `src/lib/storage/trashStore.ts` |
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |

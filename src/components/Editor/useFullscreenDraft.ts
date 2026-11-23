@@ -111,6 +111,15 @@ export function useFullscreenDraft({
   // A restored shared draft is not evidence of the revision it was edited against.
   const editedFrom = useRef<SlagItem | null>(initialDraft ? null : item);
   const savingNote = useRef<Promise<SlagItem> | null>(null);
+  // A create waits for the disk before the surface clears and closes; this is the in-flight
+  // write, so a second click on Save cannot create the same note twice.
+  const creatingNote = useRef<Promise<void> | null>(null);
+  // Set when a note committed while newer text stayed in the editor: the next save edits that
+  // note instead of creating a second one from the leftover draft.
+  const createdNote = useRef<SlagItem | null>(null);
+  // A commit that resolves after the surface is gone must not delete what the unmount
+  // cleanup just handed back to the composer.
+  const mountedRef = useRef(true);
   useLayoutEffect(() => {
     itemRef.current = item;
     latestDraft.current = draft;
@@ -132,6 +141,53 @@ export function useFullscreenDraft({
       subtasks: subtasks?.length ? subtasks : undefined, readingTimeMinutes: type === 'article' ? readTime : undefined,
       updatedAt: Date.now() };
   }, [title, content, type, folder, tags, attachments, status, priority, dueDate, reminder, duration, recurrence, readTime]);
+
+  const trackPending = useCallback((write: Promise<void>) => {
+    const tracked = write.finally(() => {
+      if (creatingNote.current === tracked) creatingNote.current = null;
+    });
+    creatingNote.current = tracked;
+    void tracked.catch(() => {});
+  }, []);
+
+  /** Clearing the draft and folding the surface back belong to a note that is already on disk. */
+  const closeAfterCommit = useCallback((saved: SlagItem) => {
+    if (mountedRef.current) {
+      didSaveRef.current = true;
+      void storage.clearFullscreenDraft(item.id);
+      consumeComposerDraft(item);
+    }
+    onSaved?.(saved);
+    onClose();
+  }, [item, onSaved, onClose]);
+
+  /**
+   * The create committed while the person kept typing. The editor now owns the note that
+   * landed: writing the newer text edits it, and closing does the same once it is safe.
+   */
+  const commitCreatedEdit = useCallback((onCommitted?: () => void) => {
+    const base = createdNote.current;
+    if (!base || creatingNote.current) return;
+    const snapshot = latestDraft.current;
+    const saved = updateItem(buildItem(base, base.id), base);
+    setSaveStatus('saving');
+    const write = Promise.resolve(saved.durable).then(() => {
+      if (!equal(snapshot, latestDraft.current)) {
+        // More typing arrived during the write; it is still the same note.
+        createdNote.current = saved.item;
+        setSaveStatus('idle');
+        return;
+      }
+      createdNote.current = null;
+      setSaveStatus('saved');
+      closeAfterCommit(saved.item);
+      onCommitted?.();
+    }, () => {
+      setSaveStatus('idle');
+      addToast?.('Не удалось записать правку; черновик оставлен', 'error');
+    });
+    trackPending(write);
+  }, [buildItem, updateItem, closeAfterCommit, addToast, trackPending]);
 
   const flushAutosave = useCallback((): Promise<SlagItem> | null => {
     if (adopting.current || item.id.startsWith('draft_')) return null;
@@ -337,6 +393,7 @@ export function useFullscreenDraft({
   });
   useEffect(() => {
     return () => {
+      mountedRef.current = false;
       if (autosaveTimerRef.current) {
         clearTimeout(autosaveTimerRef.current);
         autosaveTimerRef.current = null;
@@ -356,18 +413,36 @@ export function useFullscreenDraft({
 
   const handleSave = useCallback(() => {
     if (adopting.current) return;
+    if (creatingNote.current) return;
     if (autosaveTimerRef.current) {
       clearTimeout(autosaveTimerRef.current);
       autosaveTimerRef.current = null;
     }
+    if (createdNote.current) {
+      commitCreatedEdit(() => addToast?.('Запись сохранена', 'success'));
+      return;
+    }
     if (item.id.startsWith('draft_')) {
+      const snapshot = latestDraft.current;
       const saved = saveItem(buildItem(item, 'item_' + Date.now()));
-      didSaveRef.current = true;
-      void storage.clearFullscreenDraft(item.id);
-      consumeComposerDraft(item);
-      onSaved?.(saved);
-      addToast?.('Запись создана и сохранена', 'success');
-      onClose();
+      setSaveStatus('saving');
+      const write = storage.whenNoteSaved(saved).then(() => {
+        if (!equal(snapshot, latestDraft.current)) {
+          // The note is committed. The text typed during the write stays in the editor, and
+          // the next save edits the note that landed instead of creating a duplicate.
+          createdNote.current = saved;
+          setSaveStatus('idle');
+          return;
+        }
+        createdNote.current = null;
+        setSaveStatus('saved');
+        addToast?.('Запись создана и сохранена', 'success');
+        closeAfterCommit(saved);
+      }, () => {
+        setSaveStatus('idle');
+        addToast?.('Не удалось сохранить запись; текст оставлен в редакторе', 'error');
+      });
+      trackPending(write);
       return;
     }
     // A reopened draft has no trustworthy revision. Explicit Save must still submit it;
@@ -383,7 +458,7 @@ export function useFullscreenDraft({
     const save = flushAutosave();
     if (save) void save.then(finish, () => { /* Autosave reports the failure and retains the draft. */ });
     else finish(editedFrom.current ?? item);
-  }, [item, initialDraft, buildItem, saveItem, flushAutosave, onSaved, addToast, onClose]);
+  }, [item, initialDraft, buildItem, saveItem, flushAutosave, onSaved, addToast, onClose, commitCreatedEdit, trackPending, closeAfterCommit]);
 
   const handleClose = useCallback(() => {
     if (adopting.current) {
@@ -391,6 +466,15 @@ export function useFullscreenDraft({
       void retryAdoption.current?.().then(() => {
         if (!adopting.current) onClose();
       });
+      return;
+    }
+    if (creatingNote.current) {
+      // Hiding the surface before the write confirms would lose text that may still be
+      // rejected; the success path closes the editor itself once the note is committed.
+      return;
+    }
+    if (createdNote.current) {
+      commitCreatedEdit();
       return;
     }
     if (!item.id.startsWith('draft_')) {
@@ -401,7 +485,7 @@ export function useFullscreenDraft({
     // Closing is the moment the text stops being visible; a pending write cannot wait out its window.
     storage.flushDrafts();
     onClose();
-  }, [item.id, flushAutosave, syncDraftBackToComposer, onClose]);
+  }, [item.id, flushAutosave, syncDraftBackToComposer, onClose, commitCreatedEdit]);
 
   return {
     title,

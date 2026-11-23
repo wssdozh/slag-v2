@@ -1,7 +1,10 @@
 import type { FolderMeta, KanbanColumn, SlagItem, VaultMeta, WorkspaceState } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
-import { writeAppDataTextAtomic, writeJsonAtomic } from '../platform/writeJsonAtomic';
+import { durableVaultMove, durableVaultRemove, durableVaultReplace, readVaultGeneration, writeVaultGeneration } from '../platform/durableVaultFile';
+import { isMissingVaultFile, parseVaultObject, readVaultBytes, recoverVault, type VaultRecovery } from './vaultRecovery';
+import { performVaultNoteMove, resumeVaultNoteMove, type VaultNoteMoveIo } from './vaultNoteMove';
+import { readProtectedSyncState, updateProtectedSyncFiles } from '../sync/vaultSyncFiles';
 import {
   readTextFile,
   readDir,
@@ -56,6 +59,11 @@ export class VaultFiles {
   private deps: VaultFilesDeps;
   private tauriInitialization: Promise<boolean> | null = null;
   private scanGeneration = 0;
+  private recoveryRun: { vault: VaultMeta; promise: Promise<VaultRecovery> } | null = null;
+  private recoveryKind: VaultRecovery['kind'] | 'opening' = 'opening';
+  private ambiguousNotes = new Set<string>();
+  private stateReads = new Map<string, Promise<Record<string, unknown>>>();
+  private registryProtected = new Set<string>();
   // `state.json` has two writers now — folder metadata and the workspace — and both read before
   // they write. One queue per file keeps a slower write from putting its stale copy back.
   private stateWrite: Promise<void> = Promise.resolve();
@@ -154,12 +162,68 @@ export class VaultFiles {
         if (!mainStateExists) {
           const state = this.parseStateStrict(await readTextFile('state.json', { baseDir: BaseDirectory.AppData }));
           await mkdir('vaults/main', { baseDir: BaseDirectory.AppData, recursive: true });
-          await writeJsonAtomic('vaults/main/state.json', state);
+          await durableVaultReplace('vaults/main/state.json', JSON.stringify(state));
           await remove('state.json', { baseDir: BaseDirectory.AppData });
         }
       }
     } catch (err) {
       fsLog.warn('Legacy vault migration error:', err);
+    }
+  }
+
+  private noteMoveIo(vault: VaultMeta): VaultNoteMoveIo {
+    const dir = this.getVaultDir(vault);
+    return {
+      async readText(path) {
+        const bytes = await readVaultBytes(`${dir}/${path}`);
+        return bytes === undefined ? null : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
+      },
+      writeText: (path, text) => durableVaultReplace(`${dir}/${path}`, text),
+      removeFile: (path, digest) => durableVaultRemove(`${dir}/${path}`, digest),
+    };
+  }
+
+  public openVault(vault = this.vault): Promise<VaultRecovery> {
+    if (this.recoveryRun?.vault === vault) return this.recoveryRun.promise;
+    const dir = this.getVaultDir(vault);
+    this.recoveryKind = 'opening';
+    this.ambiguousNotes.clear();
+    const promise = readDir(dir, { baseDir: BaseDirectory.AppData })
+      .then(() => recoverVault(dir, vault.id, true), (error: unknown) => isMissingVaultFile(error)
+        ? recoverVault(dir, vault.id, false)
+        : { kind: 'unavailable', state: {} } as const)
+      .then(async (result): Promise<VaultRecovery> => {
+        if (result.kind !== 'unavailable') {
+          const move = await resumeVaultNoteMove(this.noteMoveIo(vault));
+          if (move.status === 'blocked') {
+            fsLog.warn('Could not complete interrupted note move', { reason: move.reason });
+            await durableVaultReplace(`${dir}/recovery-local-only.json`, '{"version":1,"reason":"note-move"}');
+            result = { kind: 'local-only', state: result.state, fence: result.fence };
+          }
+        }
+        return result;
+      }).catch((): VaultRecovery => ({ kind: 'unavailable', state: {} }))
+      .then((result) => {
+        if (this.recoveryRun?.promise === promise) this.recoveryKind = result.kind;
+        return result;
+      });
+    this.recoveryRun = { vault, promise };
+    return promise;
+  }
+
+  public get vaultRecoveryKind(): VaultRecovery['kind'] | 'opening' {
+    return this.recoveryRun?.vault === this.vault ? this.recoveryKind : 'opening';
+  }
+
+  public isAmbiguousNote(id: string): boolean {
+    return this.ambiguousNotes.has(id);
+  }
+
+  public async assertLocalWrite(vault: VaultMeta, id?: string): Promise<void> {
+    if (this.vault !== vault) throw new Error('Хранилище сменилось до записи');
+    const result = await this.openVault(vault);
+    if (this.vault !== vault || result.kind === 'unavailable' || (id && this.ambiguousNotes.has(id))) {
+      throw new Error('Нельзя безопасно записать заметку в это хранилище');
     }
   }
 
@@ -169,65 +233,58 @@ export class VaultFiles {
     const generation = ++this.scanGeneration;
     try {
       const vault = this.vault;
-      const isCurrent = () => this.vault.id === vault.id && generation === this.scanGeneration;
+      const isCurrent = () => this.vault === vault && generation === this.scanGeneration;
       const notesPath = this.getVaultNotesPath(vault);
       const trashPath = this.getVaultTrashPath(vault);
-      const statePath = this.getVaultStatePath(vault);
-      const fence = await this.readStateSection('pendingFolderProjection', vault, true);
+      const recovery = await this.openVault(vault);
       if (!isCurrent()) return false;
-
-      await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
+      const ready = recovery.kind === 'ready';
+      if (ready && recovery.fresh) {
+        await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
+        if (!isCurrent()) return false;
+        await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
+      }
+      const fence = recovery.kind === 'unavailable' ? {} : recovery.fence ?? {};
       if (!isCurrent()) return false;
-      // The inbox comes first: it is where a note without a folder goes, and folders are read back
-      // from these directories.
-      await this.ensureFolderOnDisk(DEFAULT_INBOX_FOLDER);
-
       const notesStartedAt = performance.now();
       let incomplete = false;
       const markIncomplete = () => { incomplete = true; };
-      const loadedItems = (await this.scanNotesDir(notesPath, vault, false, undefined, markIncomplete))
-        .filter(({ id }) => !Object.hasOwn(fence, id));
-      if (!isCurrent()) return false;
-      const notesMs = performance.now() - notesStartedAt;
-      if (loadedItems.length > 0 || Object.keys(fence).length > 0) {
-        this.deps.cacheItems(this.deps.getItemsKey(), loadedItems);
-        fsLog.info(`Loaded ${loadedItems.length} notes for vault "${this.vault.name}" from ${notesPath}`);
-      } else if (!incomplete) {
-        const current = this.deps.getItems();
-        for (const item of current) {
-          if (!isCurrent()) return false;
-          await this.flushItemToDisk(item);
-        }
-      }
-
-      // The trash list is the `.trash/` snapshot, exactly as the notes list is the `notes/` one:
-      // a note deleted in an earlier session still has to be restorable. Three independent reads,
-      // one wait: the trash, the directory tree and the folder metadata never look at each other,
-      // and running them in sequence was most of the start-up.
-      const sideStartedAt = performance.now();
-      const [trashedItems, folderPaths, folderState] = await Promise.all([
-        this.scanTrashDir(),
-        this.listFolderPaths(),
-        this.readFolderState(),
+      const folderPaths: string[] = [];
+      const [physicalNotes, rawTrash] = await Promise.all([
+        this.scanNotesDir(notesPath, vault, false, undefined, markIncomplete, folderPaths, !ready),
+        this.scanTrashDir(vault),
       ]);
       if (!isCurrent()) return false;
-      const sideMs = performance.now() - sideStartedAt;
+      const notesMs = performance.now() - notesStartedAt;
+      const sideStartedAt = performance.now();
+      let loadedItems = physicalNotes.filter(({ id }) => !Object.hasOwn(fence, id));
+      let trashedItems = rawTrash;
+      if (!ready) {
+        const seen = new Set<string>();
+        const ambiguous = new Set(Object.keys(fence));
+        for (const { id } of [...physicalNotes, ...rawTrash]) {
+          if (seen.has(id)) ambiguous.add(id);
+          seen.add(id);
+        }
+        this.ambiguousNotes = ambiguous;
+        loadedItems = loadedItems.filter(({ id }) => !ambiguous.has(id));
+        trashedItems = rawTrash.filter(({ id }) => !ambiguous.has(id));
+      }
+      if (loadedItems.length > 0 || !incomplete) this.deps.cacheItems(this.deps.getItemsKey(), loadedItems);
       this.deps.cacheItems(this.deps.getTrashKey(), trashedItems);
-      fsLog.info(`Loaded ${trashedItems.length} trashed notes for vault "${this.vault.name}"`);
-
-      // After the notes: a note that lands on disk creates its folder, and the list read before that
-      // would leave the note in a folder the sidebar does not show. `external` keeps this read-only:
-      // the list came from the disk, so there is nothing to write back to it.
-      const authoritative = folderState.authoritative || Object.keys(fence).length > 0;
+      const folderState = this.folderStateFromObject(recovery.state);
+      const authoritative = ready && (folderState.authoritative || Object.keys(fence).length > 0);
       const folders = authoritative ? folderState.folders
         : folderMetaFor(folderPaths, folderState.folders, DEFAULT_INBOX_FOLDER);
       if (authoritative) this.deps.hydrateRegistryFolders(folders);
       else this.deps.persistFolders(folders, 'external');
-      fsLog.info(`Found ${folders.length} folders for vault "${this.vault.name}" under ${notesPath}`);
-
-      const hasState = await exists(statePath, { baseDir: BaseDirectory.AppData });
-      if (!isCurrent()) return false;
-      if (!hasState) await this.flushStateToDisk();
+      if (ready && recovery.fresh) {
+        const statePath = this.getVaultStatePath(vault);
+        await this.queueStateWrite(async () => {
+          if (!(await exists(statePath, { baseDir: BaseDirectory.AppData }))) await durableVaultReplace(statePath, '{}');
+        });
+      }
+      const sideMs = performance.now() - sideStartedAt;
       // One line with the numbers, because "the start feels slow" is not a measurement: the notes,
       // the side reads and the total answer which of them to touch next.
       fsLog.info('Vault read from disk', {
@@ -239,7 +296,7 @@ export class VaultFiles {
         sideMs: Math.round(sideMs),
         totalMs: Math.round(performance.now() - startedAt),
       });
-      return !incomplete;
+      return !incomplete && recovery.kind !== 'unavailable';
     } catch (err) {
       fsLog.error(`Failed to sync vault "${this.vault.name}" in AppData:`, err);
       return false;
@@ -290,6 +347,10 @@ export class VaultFiles {
       fsLog.warn('Could not read folder metadata:', error);
       return {} as Record<string, unknown>;
     });
+    return this.folderStateFromObject(state);
+  }
+
+  private folderStateFromObject(state: Record<string, unknown>): { folders: FolderMeta[]; authoritative: boolean } {
     if (!Array.isArray(state.folders)) return { folders: [], authoritative: false };
     const folders: FolderMeta[] = [];
     for (const entry of state.folders) {
@@ -326,7 +387,7 @@ export class VaultFiles {
       for (const folder of folders) byPath.set(folder.path, folder);
       state.folders = [...byPath.values()];
       if (replace) state.registryFolderTree = true;
-      await writeJsonAtomic(statePath, state);
+      await durableVaultReplace(statePath, JSON.stringify(state));
     });
   }
 
@@ -334,7 +395,17 @@ export class VaultFiles {
     const statePath = this.getVaultStatePath(vault);
     await this.stateWrite.catch(() => undefined);
     try {
-      const state = await this.readStateObject(statePath);
+      if (name === 'sync' || name === 'pendingFolderProjection') {
+        const { ledger, config } = await readProtectedSyncState(this.getVaultDir(vault), vault.id);
+        if (ledger && config) return name === 'pendingFolderProjection' ? asStateObject(ledger.pendingFolderProjection) : { ...ledger, config };
+        if (ledger || config) throw new Error('Incomplete synchronization migration');
+      }
+      if (!this.stateReads.has(statePath)) {
+        const reading = this.readStateObject(statePath).finally(() => this.stateReads.delete(statePath));
+        this.stateReads.set(statePath, reading);
+      }
+      const state = await this.stateReads.get(statePath)!;
+      if ((name === 'sync' || name === 'pendingFolderProjection') && state.protectedSync === true) throw new Error('Protected synchronization state is missing');
       const section = state[name];
       if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
         throw new Error(`Invalid vault state section: ${name}`);
@@ -357,21 +428,42 @@ export class VaultFiles {
     const statePath = this.getVaultStatePath(vault);
     return this.queueStateWrite(async () => {
       try {
-        const state = await this.readStateObject(statePath);
-        const section = state[name];
-        if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
-          throw new Error(`Invalid vault state section: ${name}`);
+        const merge = (section: unknown) => {
+          if (strict && section !== undefined && (!section || typeof section !== 'object' || Array.isArray(section))) {
+            throw new Error(`Invalid vault state section: ${name}`);
+          }
+          const current = asStateObject(section);
+          const next = typeof patch === 'function' ? patch(current) : patch;
+          return replace ? next : { ...current, ...next };
+        };
+        if (name === 'sync' || name === 'pendingFolderProjection') {
+          const written = await updateProtectedSyncFiles(this.getVaultDir(vault), vault.id, (previous) => name === 'sync'
+            ? merge(previous)
+            : { ...previous, pendingFolderProjection: merge(previous.pendingFolderProjection) });
+          if (written) return;
         }
-        const current = asStateObject(section);
-        const next = typeof patch === 'function' ? patch(current) : patch;
-        state[name] = replace ? next : { ...current, ...next };
+        const state = await this.readStateObject(statePath);
+        if ((name === 'sync' || name === 'pendingFolderProjection') && state.protectedSync === true) throw new Error('Protected synchronization state is missing');
+        state[name] = merge(state[name]);
         // The first sync write can race native vault hydration before it creates the directory.
         await mkdir(this.getVaultDir(vault), { baseDir: BaseDirectory.AppData, recursive: true });
-        await writeJsonAtomic(statePath, state);
+        await durableVaultReplace(statePath, JSON.stringify(state));
       } catch (err) {
         if (strict) throw err;
         fsLog.warn(`Failed to write the "${name}" section of state.json:`, err);
       }
+    });
+  }
+
+  public finishSyncMigration(vault: VaultMeta): Promise<void> {
+    const path = this.getVaultStatePath(vault);
+    return this.queueStateWrite(async () => {
+      const state = await this.readStateObject(path);
+      if (state.protectedSync === true && state.sync === undefined && state.pendingFolderProjection === undefined) return;
+      delete state.sync;
+      delete state.pendingFolderProjection;
+      state.protectedSync = true;
+      await durableVaultReplace(path, JSON.stringify(state));
     });
   }
 
@@ -383,6 +475,10 @@ export class VaultFiles {
 
   private async readRegistryFile(vault: VaultMeta): Promise<unknown> {
     const path = `${this.getVaultDir(vault)}/note-registry.json`;
+    const active = await readVaultGeneration(path);
+    if (active !== null) return parseVaultObject(active);
+    const { ledger } = await readProtectedSyncState(this.getVaultDir(vault), vault.id);
+    if (ledger?.registryRequired === true) throw new Error('Сохранённый реестр синхронизации недоступен');
     const text = await readTextFile(path, { baseDir: BaseDirectory.AppData }).catch((error: unknown) => {
       // `exists` can also return false on access errors; those must keep the fence closed.
       if (/\(os error [23]\)$/.test(String(error))) return undefined;
@@ -392,21 +488,16 @@ export class VaultFiles {
   }
 
   public writeRegistryState(vault: VaultMeta, value: unknown): Promise<void> {
-    return this.writeNoteSyncJson(this.getVaultDir(vault), 'note-registry.json', value);
-  }
-
-  private writeNoteSyncJson(dir: string, name: string, value: unknown): Promise<void> {
-    const path = `${dir}/${name}`;
+    const dir = this.getVaultDir(vault);
     return this.queueStateWrite(async () => {
-      await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
-      await writeJsonAtomic(path, value);
+      await writeVaultGeneration(`${dir}/note-registry.json`, JSON.stringify(value));
+      if (!this.registryProtected.has(vault.id) && await updateProtectedSyncFiles(dir, vault.id,
+        (previous) => ({ ...previous, registryRequired: true }))) this.registryProtected.add(vault.id);
     });
   }
 
   private parseStateStrict(text: string): Record<string, unknown> {
-    const value: unknown = JSON.parse(text);
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid vault state');
-    return value as Record<string, unknown>;
+    return parseVaultObject(text);
   }
 
   /** A first run has no file. An existing unreadable file is not an empty journal. */
@@ -432,16 +523,7 @@ export class VaultFiles {
     try {
       return this.parseStateStrict(text);
     } catch (err) {
-      await this.backupBrokenState(statePath, text);
       throw new Error('state.json повреждён', { cause: err });
-    }
-  }
-
-  private async backupBrokenState(statePath: string, text: string): Promise<void> {
-    try {
-      await writeTextFile(`${statePath}.broken`, text, { baseDir: BaseDirectory.AppData });
-    } catch (err) {
-      fsLog.error('Could not keep a copy of the broken state.json:', err);
     }
   }
 
@@ -525,8 +607,8 @@ export class VaultFiles {
    * note and never nests — and a note keeps its frontmatter, so its folder survives the trip and
    * a restore knows where to put it back. A missing or unreadable directory is an empty trash.
    */
-  public async scanTrashDir(): Promise<SlagItem[]> {
-    const trashPath = this.getVaultTrashPath();
+  public async scanTrashDir(vault = this.vault): Promise<SlagItem[]> {
+    const trashPath = this.getVaultTrashPath(vault);
     let entries: Awaited<ReturnType<typeof readDir>>;
     try {
       entries = await readDir(trashPath, { baseDir: BaseDirectory.AppData });
@@ -585,7 +667,8 @@ export class VaultFiles {
     if (await this.fileBelongsTo(path, copy.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
   }
 
-  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>, onReadError?: () => void): Promise<SlagItem[]> {
+  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>, onReadError?: () => void,
+    folderPaths?: string[], preserveCopies = false): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
@@ -637,7 +720,8 @@ export class VaultFiles {
           // files. Walking into them would put deleted notes back in the feed — and the folder
           // list skips them too, so a note from there would land in a folder nothing draws.
           if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const nested = await this.scanNotesDir(subPath, vault, strict, markers, onReadError);
+          folderPaths?.push(subPath.replaceAll('\\', '/').slice(notesBase.length + 1));
+          const nested = await this.scanNotesDir(subPath, vault, strict, markers, onReadError, folderPaths, preserveCopies);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
               firstIndexById.set(nestedItem.id, items.length);
@@ -647,9 +731,9 @@ export class VaultFiles {
         } else if (entry.name.endsWith('.md')) {
           const parsed = parsedByName.get(entry.name);
           if (!parsed) continue;
-          if (strict) {
-            // Recovery needs physical paths, including both copies if a move stopped after write.
-            parsed.folder = normalized === notesBase ? '' : folderPart;
+          if (strict || preserveCopies) {
+            // Keep physical paths and duplicate IDs until recovery can classify the copies.
+            parsed.folder = normalized === notesBase && strict ? '' : folderPart;
             items.push(parsed);
             continue;
           }
@@ -724,7 +808,6 @@ export class VaultFiles {
       const notesBase = this.getVaultNotesPath(vault);
       const folder = safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
       const targetDir = `${notesBase}/${folder}`;
-      await mkdir(targetDir, { baseDir: BaseDirectory.AppData, recursive: true });
 
       const baseDir = BaseDirectory.AppData;
       let newFilename = safeVaultRelativePath(this.claimNoteFilename(item, folder));
@@ -736,30 +819,43 @@ export class VaultFiles {
           newFilename = withIdSuffix(n === 1 ? base : `${base.slice(0, -3)}-${n}.md`, item.id);
         }
       }
-      item.filename = newFilename;
       const newPath = `${targetDir}/${newFilename}`;
-
       const prevFolder = oldFolder ? safeVaultRelativePath(oldFolder) : folder;
       const prevFilename = oldFilename ? safeVaultRelativePath(oldFilename) : newFilename;
       if (prevFilename.includes('/')) throw new Error('Invalid previous note filename');
       const safeId = isSafeVaultRelativePath(item.id) ? item.id : null;
       const oldPath = `${notesBase}/${prevFolder}/${prevFilename}`;
+      let targetPath = newPath;
+      // A title-only casing change need not rename the file. Preserve its actual name instead of
+      // treating the two spellings as different notes on a case-insensitive volume.
+      if (oldPath !== targetPath && oldPath.toLowerCase() === targetPath.toLowerCase()) {
+        targetPath = oldPath;
+        newFilename = prevFilename;
+      }
+      item.filename = newFilename;
       const legacyOldPath = safeId ? `${notesBase}/${prevFolder}/${safeId}.md` : '';
       const legacyTargetPath = safeId ? `${targetDir}/${safeId}.md` : '';
 
       // Write the replacement before removing the previous filename.
       const content = serializeItemToMarkdown(item, registryBodyMarker);
-      if (strict) await writeAppDataTextAtomic(newPath, content);
-      else await writeTextFile(newPath, content, { baseDir });
-      if (vault.id === this.vault.id) await this.deps.attachments.persistAll(item);
+      if (vault === this.vault) await this.deps.attachments.persistAll(item);
+      const ownsOld = oldPath !== targetPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id, strict);
+      const relocate = ownsOld && !registryBodyMarker && protectedPaths.size === 0;
+      if (relocate) {
+        const root = this.getVaultDir(vault).length + 1;
+        const result = await performVaultNoteMove(this.noteMoveIo(vault), {
+          noteId: item.id, from: oldPath.slice(root), to: targetPath.slice(root), markdown: content,
+        });
+        if (result.status !== 'completed') throw new Error('Не удалось завершить перемещение заметки');
+      } else await durableVaultReplace(targetPath, content);
 
       // The old path may be somebody else's file when two notes shared a title, so a rename
       // only deletes a file that is really this note.
-      if (oldPath !== newPath && !protectedPaths.has(oldPath) && await this.fileBelongsTo(oldPath, item.id, strict)) {
+      if (!relocate && ownsOld) {
         await remove(oldPath, { baseDir: BaseDirectory.AppData });
       }
       for (const path of new Set([legacyOldPath, legacyTargetPath])) {
-        if (path && path !== newPath && !protectedPaths.has(path) &&
+        if (!relocate && path && path.toLowerCase() !== targetPath.toLowerCase() && !protectedPaths.has(path) &&
           await (strict ? this.fileBelongsTo(path, item.id, true) : exists(path, { baseDir }))) await remove(path, { baseDir });
       }
 
@@ -790,12 +886,11 @@ export class VaultFiles {
       if (pathToRemove) {
         if (!discardLiveCopy) {
           await mkdir(trashBase, { baseDir, recursive: true });
-          const content = await readTextFile(pathToRemove, { baseDir });
-          const trashPath = `${trashBase}/${await this.freeTrashFilename(trashBase, filename, item.id, strict)}`;
-          if (strict) await writeAppDataTextAtomic(trashPath, content);
-          else await writeTextFile(trashPath, content, { baseDir });
+          const trashPath = `${trashBase}/${await this.freeTrashFilename(trashBase, filename, item.id, false)}`;
+          await durableVaultMove(pathToRemove, trashPath);
+        } else {
+          await remove(pathToRemove, { baseDir });
         }
-        await remove(pathToRemove, { baseDir });
       }
     } catch (err) {
       fsLog.error(`Failed to remove note ${item.id} from disk:`, err);
@@ -807,8 +902,17 @@ export class VaultFiles {
     if (!isTauri()) return;
     try {
       const filenameInTrash = item.filename;
-      await this.flushItemToDisk(item, undefined, undefined, vault, true);
-      await this.removeTrashCopy(item, filenameInTrash, vault);
+      if (filenameInTrash && this.vaultRecoveryKind === 'local-only') {
+        const folder = safeVaultRelativePath(item.folder || DEFAULT_INBOX_FOLDER);
+        const source = `${this.getVaultTrashPath(vault)}/${safeVaultRelativePath(filenameInTrash)}`;
+        const filename = this.claimNoteFilename(item, folder);
+        if (!(await this.fileBelongsTo(source, item.id, true))) throw new Error('Запись в корзине изменилась');
+        await durableVaultMove(source, `${this.getVaultNotesPath(vault)}/${folder}/${filename}`);
+        item.filename = filename;
+      } else {
+        await this.flushItemToDisk(item, undefined, undefined, vault, true);
+        await this.removeTrashCopy(item, filenameInTrash, vault);
+      }
     } catch (err) {
       fsLog.error(`Failed to restore note ${item.id} on disk:`, err);
       if (strict) throw err;
@@ -841,7 +945,7 @@ export class VaultFiles {
         const state = await this.readStateObject(statePath);
         const enrolled = hasSharedRegistryEnrollment(await this.readRegistryFile(vault));
         state.workspace = enrolled ? mergeRegistryDeviceWorkspace(asStateObject(state.workspace), workspace) : workspace;
-        await writeJsonAtomic(statePath, state);
+        await durableVaultReplace(statePath, JSON.stringify(state));
       } catch (err) {
         if (strict) throw err;
         fsLog.warn(`Failed to flush state.json to disk:`, err);

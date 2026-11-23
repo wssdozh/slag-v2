@@ -2,10 +2,10 @@
 import type { SlagAttachment, SlagItem } from '../../types';
 import { logger } from '../logger/logger';
 import { isTauri } from '@tauri-apps/api/core';
+import { durableVaultReplace } from '../platform/durableVaultFile';
 import {
   readDir,
   readFile,
-  writeFile,
   mkdir,
   exists,
   BaseDirectory,
@@ -181,7 +181,9 @@ export class AttachmentStore {
 
   /** Persist base64 bytes to .attachments/ once; markdown keeps only metadata. */
   public async persistAll(item: SlagItem): Promise<void> {
-    for (const att of item.attachments || []) await this.persistOne(att);
+    for (const att of item.attachments || []) {
+      if (att.dataUrl && !await this.persistOne(att)) throw new Error('Не удалось сохранить новые байты вложения');
+    }
   }
 
   /**
@@ -209,17 +211,14 @@ export class AttachmentStore {
       const dir = this.attachmentsDir();
       await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
       const path = `${dir}/${this.basename(att)}`;
-      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
-        this.persistedIds.add(att.id);
-        return true;
-      }
-
       const decoded = dataUrlToBytes(att.dataUrl);
-      if (!decoded) {
-        fsLog.warn(`Attachment ${att.id} has a non-base64 data URL; bytes were not written`);
-        return false;
+      if (!decoded) return false;
+      if (await exists(path, { baseDir: BaseDirectory.AppData })) {
+        const existing = await readFile(path, { baseDir: BaseDirectory.AppData });
+        if (existing.length !== decoded.bytes.length || existing.some((byte, index) => byte !== decoded.bytes[index])) return false;
+      } else {
+        await durableVaultReplace(path, decoded.bytes);
       }
-      await writeFile(path, decoded.bytes, { baseDir: BaseDirectory.AppData });
       this.persistedIds.add(att.id);
       return true;
     } catch (err) {
@@ -286,7 +285,7 @@ export class AttachmentStore {
           throw new Error('Accepted attachment would overwrite different local bytes');
         }
       } else {
-        await writeFile(path, bytes, { baseDir: BaseDirectory.AppData, createNew: true });
+        await durableVaultReplace(path, bytes);
       }
     } else {
       const dataUrl = `data:${attachment.mimeType};base64,${bytesToBase64(bytes)}`;
