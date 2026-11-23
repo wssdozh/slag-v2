@@ -81,6 +81,7 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
   });
 
   test('Mobile: Browser Back navigates from Tasks tab back to Folders tab', async ({ page }) => {
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await expect(dock).toBeVisible();
 
@@ -91,26 +92,25 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
     // Emulate system back
     await page.goBack();
 
-    // Should return to Folders tab ("Заметки")
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
   });
 
   test('Mobile: Browser Back navigates out of folder back to root folders list', async ({ page }) => {
     await chooseMobileFolder(page, 'Проекты');
-    const folderBackBtn = page.getByRole('button', { name: 'Назад во Входящие' });
+    const folderBackBtn = page.getByRole('button', { name: 'Назад к папкам' });
     await expect(folderBackBtn).toBeVisible();
 
     // Emulate system back
     await page.goBack();
 
     // Should be back at root folders list (h1 "Заметки" visible)
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
     await expect(folderBackBtn).toBeHidden();
   });
 
   test('Mobile: Stacked Layers - closes top layer first, then underlying folder', async ({ page }) => {
     await chooseMobileFolder(page, 'Проекты');
-    const folderBackBtn = page.getByRole('button', { name: 'Назад во Входящие' });
+    const folderBackBtn = page.getByRole('button', { name: 'Назад к папкам' });
     const profile = await openMobileFolderProfile(page);
 
     // First Back closes the profile, not the underlying folder.
@@ -120,7 +120,7 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
 
     // Second Back -> Exits "Входящие" folder back to root
     await page.goBack();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
     await expect(folderBackBtn).toBeHidden();
   });
 });

@@ -1,12 +1,12 @@
 // The phone shell: which tab is on screen, and the edge swipe that goes back.
 import { useRef, type TouchEvent } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { AudioPanel } from '../Audio/AudioPanel';
 import { MobileAssistantView } from './MobileAssistantView';
 import { MobileCalendarView } from './MobileCalendarView';
 import { MobileFloatingDock } from './MobileFloatingDock';
 import { MobileFolderInfoView } from './MobileFolderInfoView';
+import { MobileFolderRoot } from './MobileFolderRoot';
 import { MobileFoldersView } from './MobileFoldersView';
 import { MobileSettingsView } from './MobileSettingsView';
 import { MobileTasksView } from './MobileTasksView';
@@ -15,11 +15,10 @@ const EDGE_SWIPE_WIDTH = 28;
 const SWIPE_DISTANCE = 64;
 
 export function MobileShell() {
-  const { activeMobileTab, mobileFolderInfoOpen, dismissTopLayer, currentFolder, isMobileFolderPickerOpen, feedViewMode } = useApp();
+  const { activeMobileTab, mobileFolderInfoOpen, dismissTopLayer, isMobileFolderOpen } = useApp();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const folderTab = activeMobileTab === 'folders';
-  const inInbox = folderTab && currentFolder === DEFAULT_INBOX_FOLDER;
-  const isDockVisible = activeMobileTab !== 'assistant' && (!folderTab || inInbox) && !isMobileFolderPickerOpen && !mobileFolderInfoOpen;
+  const isDockVisible = activeMobileTab !== 'assistant' && !(folderTab && isMobileFolderOpen) && !mobileFolderInfoOpen;
 
   function handleTouchStart(event: TouchEvent<HTMLElement>) {
     swipeStart.current = null;
@@ -45,10 +44,10 @@ export function MobileShell() {
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas text-fg-primary [--mobile-tab-dock-height:3rem] [--mobile-tab-dock-reserve:calc(var(--mobile-tab-dock-height)+max(var(--sab),0.75rem))]">
-      <main inert={mobileFolderInfoOpen} className={`mobile-screen-view relative flex min-h-0 flex-1 flex-col overflow-hidden ${inInbox ? 'mb-[var(--mobile-tab-dock-reserve)]' : ''}`}
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas text-fg-primary [--mobile-tab-dock-height:3rem]">
+      <main inert={mobileFolderInfoOpen} className="mobile-screen-view relative flex min-h-0 flex-1 flex-col overflow-hidden"
         onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { swipeStart.current = null; }}>
-        {folderTab && <MobileFoldersView />}
+        {folderTab && (isMobileFolderOpen ? <MobileFoldersView /> : <MobileFolderRoot />)}
         {activeMobileTab === 'tasks' && <MobileTasksView />}
         {activeMobileTab === 'assistant' && <MobileAssistantView />}
         {activeMobileTab === 'settings' && <MobileSettingsView />}
@@ -59,7 +58,7 @@ export function MobileShell() {
           </div>
         )}
       </main>
-      <MobileFloatingDock isVisible={isDockVisible} hideCapture={inInbox && feedViewMode === 'feed'} />
+      <MobileFloatingDock isVisible={isDockVisible} />
       {mobileFolderInfoOpen && <MobileFolderInfoView />}
     </div>
   );

@@ -226,6 +226,7 @@ export interface AppContextType {
   activeMobileTab: MobileTabId;
   setActiveMobileTab: React.Dispatch<React.SetStateAction<MobileTabId>>;
   goBackFromMobileFolder: () => void;
+  isMobileFolderOpen: boolean;
   isMobileFolderPickerOpen: boolean;
   setIsMobileFolderPickerOpen: (open: boolean) => void;
   mobileFolderInfoOpen: boolean;

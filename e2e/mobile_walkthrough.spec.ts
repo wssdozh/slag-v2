@@ -75,6 +75,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     }
 
     // 7. The capture shortcut stays available from tabs without the feed composer.
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const tabNav = page.getByRole('navigation', { name: 'Мобильная навигация' });
     await tabNav.getByRole('button', { name: 'Таски', exact: true }).click();
     await page.getByRole('button', { name: 'Создать новую запись' }).click();
@@ -92,6 +93,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
 
     // 8. Return to Inbox and switch to Kanban.
     await tabNav.getByRole('button', { name: 'Папки', exact: true }).click();
+    await page.getByRole('button', { name: /^Входящие/ }).click();
     await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     const dotsBtn = page.locator('button[aria-label="Вид и фильтры папки"]');
     if (await dotsBtn.isVisible()) {
@@ -160,6 +162,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     }
 
     // 10. Tasks Tab
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await dock.locator('button[aria-label="Таски"]').click();
     await expect(page.locator('h1', { hasText: /Таски|Задачи/ })).toBeVisible();

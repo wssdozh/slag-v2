@@ -33,6 +33,7 @@ test('updates row is reachable from the phone settings list', async ({ page }) =
   await page.goto('/');
   await expect(page.locator('main').first()).toBeVisible({ timeout: 120000 });
 
+  await page.getByRole('button', { name: 'Назад к папкам' }).click();
   await page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]').click();
   await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
   await page.getByTestId('mobile-settings-updates').click();

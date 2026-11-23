@@ -28,6 +28,7 @@ test.describe('screen swaps on a phone', () => {
   });
 
   test('dock tabs cross-fade and never stack two screens', async ({ page }) => {
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     const pill = dock.locator('[data-testid="dock-active-pill"]');
     await expect(pill).toBeVisible();
@@ -44,8 +45,8 @@ test.describe('screen swaps on a phone', () => {
     await page.screenshot({ path: 'test-results/screenshots/motion_dock_pill.png' });
 
     await dock.getByRole('button', { name: /^Папки/ }).click();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
-    expect(await swaps(page)).toEqual(['tab-next', 'tab-prev']);
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+    expect(await swaps(page)).toEqual(['pop', 'tab-next', 'tab-prev']);
   });
 
   test('subtasks accordion expands and collapses smoothly without layout jump', async ({ page }) => {
@@ -63,16 +64,20 @@ test.describe('screen swaps on a phone', () => {
   });
 
   test('a folder pushes in and pops back out', async ({ page }) => {
-    await chooseMobileFolder(page, 'Проекты');
-    const back = page.locator('header').getByRole('button', { name: 'Назад во Входящие' });
-    await expect(back).toBeVisible();
-    expect(await swaps(page)).toEqual(['push']);
+    const back = page.locator('header').getByRole('button', { name: 'Назад к папкам' });
+    await back.click();
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+    await expect(page.locator('html[data-motion-swap]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Проекты', exact: true }).click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Проекты');
+    expect(await swaps(page)).toEqual(['pop', 'push']);
 
     await page.screenshot({ path: 'test-results/screenshots/motion_folder_push.png' });
+    await expect(page.locator('html[data-motion-swap]')).toHaveCount(0);
 
     await back.click();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
-    expect(await swaps(page)).toEqual(['push', 'pop']);
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+    expect(await swaps(page)).toEqual(['pop', 'push', 'pop']);
   });
 
   test('the folder info screen is part of the same stack', async ({ page }) => {
@@ -91,11 +96,14 @@ test.describe('screen swaps on a phone', () => {
     });
     await page.goto('/');
     await chooseMobileFolder(page, 'Проекты');
-    await expect(page.locator('header').getByRole('button', { name: 'Назад во Входящие' })).toBeVisible();
+    await expect(page.locator('header').getByRole('button', { name: 'Назад к папкам' })).toBeVisible();
     expect(await swaps(page)).toEqual([]);
   });
 
   test('the dock is pinned during a swap instead of being erased by the screen snapshot', async ({ page }) => {
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
+    await expect(page.getByRole('navigation', { name: 'Мобильная навигация' })).toBeVisible();
+    await expect(page.locator('html[data-motion-swap]')).toHaveCount(0);
     // The screen snapshot paints above the live page, so a dock without its own
     // group disappears for the whole swap and pops back in — the "blink".
     const pseudos = await page.evaluate(() => new Promise<string[]>(resolve => {

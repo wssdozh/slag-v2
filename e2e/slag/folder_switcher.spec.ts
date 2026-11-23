@@ -42,13 +42,12 @@ test.describe('Phone folder switcher', () => {
       const field = engine === 'markdown' ? dock.locator('.cm-content') : dock.locator('textarea');
       const feed = page.getByTestId('feed-list-container');
       const tabs = page.getByRole('navigation', { name: 'Мобильная навигация' });
-      await expect(tabs).toBeVisible();
+      await expect(tabs).toHaveCount(0);
+      await expect(page.getByTestId('mobile-sync-btn')).toHaveCount(0);
       await expect(field).toBeVisible();
-      expect((await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeLessThanOrEqual((await tabs.boundingBox())!.y + 1);
       await expect(dock.getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
       if (engine === 'textarea') {
-        await dock.getByRole('button', { name: 'Отменить ответ' }).click();
-        await page.screenshot({ path: 'test-results/screenshots/folder-switcher-mobile-inbox.png' });
+        await page.screenshot({ path: 'test-results/screenshots/mobile-inbox-no-dock.png' });
       }
       await field.fill('Черновик не из поиска');
       const attachment = dock.getByText('план.txt', { exact: true });
@@ -123,9 +122,27 @@ test.describe('Phone folder switcher', () => {
     await page.goBack();
     await expect(trigger).toHaveAccessibleName('Переключить папку: Проекты');
     await page.goBack();
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+    await page.getByRole('button', { name: /^Входящие/ }).click();
     await expect(trigger).toHaveAccessibleName(`Переключить папку: ${inbox}`);
     await expect(field).toHaveValue('Черновик входящих');
     await expect(page.getByTestId('composer-dock').getByRole('button', { name: 'Отменить ответ' })).toBeVisible();
+  });
+
+  test('Inbox Back opens the folder root with sync and dock; a root folder has neither', async ({ page }) => {
+    const back = page.getByRole('button', { name: 'Назад к папкам' });
+    await back.tap();
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
+    await expect(page.getByTestId('mobile-sync-btn')).toBeVisible();
+    const tabs = page.getByRole('navigation', { name: 'Мобильная навигация' });
+    await expect(tabs).toBeVisible();
+    await page.screenshot({ path: 'test-results/screenshots/mobile-folders-root.png' });
+    await page.getByRole('button', { name: 'Проекты', exact: true }).tap();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Проекты');
+    await expect(tabs).toBeHidden();
+    await expect(page.getByTestId('mobile-sync-btn')).toHaveCount(0);
+    await back.tap();
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
   });
 
   test('opens folder search over Kanban and Calendar; folder info is still available', async ({ page }) => {

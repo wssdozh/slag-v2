@@ -5,6 +5,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 375, height: 812 
     await page.setViewportSize(viewport);
     await page.goto('/');
     if (viewport.width < 768) {
+      await page.getByRole('button', { name: 'Назад к папкам' }).click();
       await page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]').click();
       await expect(page.getByTestId('mobile-settings-root')).toBeVisible();
       await page.screenshot({ path: 'test-results/screenshots/settings-root-375.png' });

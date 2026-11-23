@@ -233,6 +233,7 @@ test('assistant: narrow desktop dock and mobile main area', async ({ page }) => 
   await page.screenshot({ path: `${screenshots}/composer-assistant-unified.png`, animations: 'disabled' });
 
   await page.setViewportSize({ width: 390, height: 850 });
+  await page.getByRole('button', { name: 'Назад к папкам' }).click();
   await page.getByRole('navigation', { name: 'Мобильная навигация' }).getByRole('button', { name: 'ИИ', exact: true }).click();
   await expect(page.locator('header h1', { hasText: 'Ассистент' })).toBeVisible();
   await assistant.locator('textarea').fill('Проверка основной области');

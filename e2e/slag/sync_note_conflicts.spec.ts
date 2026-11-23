@@ -5,6 +5,7 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
     await page.setViewportSize({ width, height });
     await page.goto('/');
     if (layout === 'mobile') {
+      await page.getByRole('button', { name: 'Назад к папкам' }).click();
       await page.getByTestId('mobile-sync-btn').click({ timeout: 60_000 });
       await page.getByTestId('mobile-sync-open-settings').click();
     } else {

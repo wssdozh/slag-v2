@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { MobileTabId, SlagItem, WorkspaceState } from '../../types';
-import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
+import { STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { isDesktopApp, isMobilePlatform } from '../../lib/platform/windowControls';
 import { getPrefJson, setPref } from '../../lib/storage/prefs';
@@ -21,9 +21,8 @@ export function defaultsToMobileLayout(
   return !isStandalonePanel() && (isMobilePlatform() || (!isDesktopApp() && narrow));
 }
 
-/** The inbox is the root; only descendant paths add back steps. */
-export function mobileFolderDepth(folder: string): number {
-  return folder === DEFAULT_INBOX_FOLDER ? 0 : folder.split('/').length;
+function mobileFolderDepth(folder: string): number {
+  return folder.split('/').length;
 }
 
 export function useMobileNav(
@@ -47,6 +46,7 @@ export function useMobileNav(
   const [activeMobileTab, setActiveMobileTabState] = useState<MobileTabId>(
     () => startInInbox ? 'folders' : initialWorkspace.activeMobileTab || 'folders',
   );
+  const [isMobileFolderOpen, setIsMobileFolderOpen] = useState(startInInbox);
   const [isMobileFolderPickerOpen, setIsMobileFolderPickerOpen] = useState(false);
   const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState(false);
   const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
@@ -85,23 +85,28 @@ export function useMobileNav(
   }, [mobileDockTabs]);
 
   const navigateMobileFolder = useCallback((folder: string) => {
-    if (folder === currentFolder && activeTabRef.current === 'folders') {
+    if (folder === currentFolder && isMobileFolderOpen && activeTabRef.current === 'folders') {
       setIsMobileFolderPickerOpen(false);
       return;
     }
-    const delta = mobileFolderDepth(folder) - mobileFolderDepth(currentFolder);
+    const delta = mobileFolderDepth(folder) - (isMobileFolderOpen && activeTabRef.current === 'folders' ? mobileFolderDepth(currentFolder) : 0);
     const kind: ScreenSwap = delta > 0 ? 'push' : delta < 0 ? 'pop' : 'tab';
     swapScreen(kind, () => {
       activeTabRef.current = 'folders';
       setActiveMobileTabState('folders');
       setIsMobileFolderPickerOpen(false);
+      setIsMobileFolderOpen(true);
       onSelectFolder(folder);
     });
-  }, [currentFolder, onSelectFolder]);
+  }, [currentFolder, isMobileFolderOpen, onSelectFolder]);
 
   const goBackFromMobileFolder = useCallback(() => {
     const parentEnd = currentFolder.lastIndexOf('/');
-    navigateMobileFolder(parentEnd < 0 ? DEFAULT_INBOX_FOLDER : currentFolder.slice(0, parentEnd));
+    if (parentEnd >= 0) {
+      navigateMobileFolder(currentFolder.slice(0, parentEnd));
+    } else {
+      swapScreen('pop', () => setIsMobileFolderOpen(false));
+    }
   }, [currentFolder, navigateMobileFolder]);
 
   const setMobileFolderInfoOpen = useCallback((open: boolean) => {
@@ -116,6 +121,8 @@ export function useMobileNav(
     setActiveMobileTab,
     navigateMobileFolder,
     goBackFromMobileFolder,
+    isMobileFolderOpen,
+    mobileFolderDepth: isMobileFolderOpen ? mobileFolderDepth(currentFolder) : 0,
     isMobileFolderPickerOpen,
     setIsMobileFolderPickerOpen,
     mobileFolderInfoOpen,

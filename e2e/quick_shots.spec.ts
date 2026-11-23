@@ -27,6 +27,7 @@ test.describe('Quick Shots Suite', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     // mobile dock settings
     const dockSettings = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]').first();
     await dockSettings.click();
@@ -73,6 +74,7 @@ test.describe('Quick Shots Suite', () => {
 
     const dockFolders = page.getByRole('navigation', { name: 'Мобильная навигация' }).getByRole('button', { name: 'Папки' });
     await dockFolders.click();
+    await page.getByRole('button', { name: /^Входящие/ }).click();
     await page.locator('header').getByRole('button', { name: /^Переключить папку:/ }).click();
     await page.getByRole('combobox', { name: 'Найти папку' }).waitFor();
     await page.screenshot({ path: path.join(outDir, 'mobile_folder_dropdown.png'), animations: 'disabled' });

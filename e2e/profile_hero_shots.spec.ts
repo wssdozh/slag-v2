@@ -22,6 +22,7 @@ async function seedProfile(page: import('@playwright/test').Page) {
 async function openMobileSettings(page: import('@playwright/test').Page) {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Назад к папкам' }).click();
   await page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]').click();
   await expect(page.getByTestId('mobile-settings-root')).toBeVisible({ timeout: 120_000 });
   await seedProfile(page);

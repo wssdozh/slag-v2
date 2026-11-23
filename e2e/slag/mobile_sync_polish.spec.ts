@@ -5,6 +5,7 @@ test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true
 
 test('mobile cloud opens a compact sync summary and its settings', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Назад к папкам' }).tap();
   const cloud = page.getByTestId('mobile-sync-btn');
   await expect(cloud).toBeVisible({ timeout: 120_000 });
   await page.evaluate(async () => {
@@ -48,7 +49,7 @@ test('mobile subfolders are flat navigation links', async ({ page }) => {
     ]));
   });
   await page.goto('/');
-  await expect(page.getByTestId('mobile-sync-btn')).toBeVisible({ timeout: 120_000 });
+  await expect(mobileFolderTrigger(page)).toBeVisible({ timeout: 120_000 });
   await chooseMobileFolder(page, 'Проекты');
   const subfolder = page.getByRole('button', { name: 'Дизайн (0)', exact: true });
   await expect(subfolder).toBeVisible();

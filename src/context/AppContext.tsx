@@ -21,7 +21,7 @@ import { useGlobalHotkeys } from '../hooks/ui/useGlobalHotkeys';
 import { useLayerStack, type AppLayer } from '../hooks/ui/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
 import { useOverlays } from './hooks/useOverlays';
-import { defaultsToMobileLayout, mobileFolderDepth, useMobileNav } from './hooks/useMobileNav';
+import { defaultsToMobileLayout, useMobileNav } from './hooks/useMobileNav';
 import { useFeedView } from './hooks/useFeedView';
 import { useBackup } from './hooks/useBackup';
 import { useAssistant } from './hooks/useAssistant';
@@ -156,7 +156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const {
     isMobile, forceMobileMode, toggleMobileMode,
     activeMobileTab, setActiveMobileTab,
-    navigateMobileFolder, goBackFromMobileFolder,
+    navigateMobileFolder, goBackFromMobileFolder, isMobileFolderOpen, mobileFolderDepth,
     isMobileFolderPickerOpen, setIsMobileFolderPickerOpen,
     mobileFolderInfoOpen, setMobileFolderInfoOpen,
     mobileActionSheetItem, setMobileActionSheetItem,
@@ -409,9 +409,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { isOpen: isFullscreenEditorOpen, close: () => { setIsFullscreenEditorOpen(false); setSelectedItem(null); } },
     { isOpen: isMobile && mobileFolderInfoOpen, close: () => setMobileFolderInfoOpen(false) },
     { isOpen: isMobile && isMobileFolderPickerOpen, close: () => setIsMobileFolderPickerOpen(false) },
-    { isOpen: replyTarget !== null && (!isMobile || activeMobileTab === 'folders'), close: () => setReplyTarget(null) },
+    { isOpen: replyTarget !== null && (!isMobile || (activeMobileTab === 'folders' && isMobileFolderOpen)), close: () => setReplyTarget(null) },
     { isOpen: isMobile && activeMobileTab !== 'folders', close: () => setActiveMobileTab('folders') },
-    { isOpen: isMobile && currentFolder !== DEFAULT_INBOX_FOLDER, depth: mobileFolderDepth(currentFolder), close: goBackFromMobileFolder },
+    { isOpen: isMobile && isMobileFolderOpen, depth: mobileFolderDepth, close: goBackFromMobileFolder },
   ];
   const { dismissTopLayer } = useLayerStack(layers, isMobile);
   const toggleAssistant = useCallback(() => {
@@ -764,6 +764,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeMobileTab,
         setActiveMobileTab,
         goBackFromMobileFolder,
+        isMobileFolderOpen,
         isMobileFolderPickerOpen,
         setIsMobileFolderPickerOpen,
         mobileFolderInfoOpen,

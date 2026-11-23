@@ -61,27 +61,29 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('header').first()).toBeVisible({ timeout: 120000 });
   });
 
-  test('1. Inbox opens with the feed and a dock without a second capture button', async ({ page }) => {
+  test('1. Inbox opens with the feed; Back shows the folder root and dock', async ({ page }) => {
     await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     await expect(page.getByTestId('composer-dock')).toBeVisible();
     const dock = page.getByRole('navigation', { name: 'Мобильная навигация' });
+    await expect(dock).toBeHidden();
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
     for (const name of ['Папки', 'Таски', 'ИИ', 'Настройки']) {
       await expect(dock.getByRole('button', { name, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('button', { name: 'Создать новую запись' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Создать новую запись' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
   });
 
-  test('Inbox has no parent button; a project has an icon-only Back to Inbox', async ({ page }) => {
+  test('Inbox and projects use the same icon-only Back affordance', async ({ page }) => {
     const header = page.locator('header').first();
-    const back = header.getByRole('button', { name: 'Назад во Входящие' });
-    await expect(back).toHaveCount(0);
-    await header.screenshot({ path: 'test-results/screenshots/mobile_inbox_header.png' });
-    await chooseMobileFolder(page, 'Проекты');
+    const back = header.getByRole('button', { name: 'Назад к папкам' });
     await expect(back).toBeVisible();
     await expect(back).toHaveText('');
+    await header.screenshot({ path: 'test-results/screenshots/mobile_inbox_header.png' });
+    await chooseMobileFolder(page, 'Проекты');
     await back.tap();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
   });
 
   test('2. Hierarchical folder navigation & Telegram-style Composer', async ({ page }) => {
@@ -139,7 +141,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_folder_feed.png' });
 
-    await expect(page.locator('nav[aria-label="Мобильная навигация"]')).toBeVisible();
+    await expect(page.locator('nav[aria-label="Мобильная навигация"]')).toBeHidden();
   });
 
   test('android composer wrappers stay transparent and preserve safe areas', async ({ browser }) => {
@@ -176,6 +178,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
       await expect(footer).toHaveCSS('padding-right', '28px');
       await page.screenshot({ path: 'test-results/screenshots/android_composer_outer_surface.png' });
 
+      await page.getByRole('button', { name: 'Назад к папкам' }).click();
       await page.getByRole('button', { name: 'ИИ', exact: true }).click();
       const assistantComposer = page.locator('[data-composer-root]');
       for (const wrapper of [assistantComposer, assistantComposer.locator('..'), assistantComposer.locator('../..')]) {
@@ -222,7 +225,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('4. Mobile Tasks & Kanban View', async ({ page }) => {
-    // Tap on "Таски" tab in dock
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const tasksTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Таски"]');
     await tasksTab.click();
 
@@ -243,7 +246,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('5. Mobile Settings & Dock Customization', async ({ page }) => {
-    // Tap on "Настройки" tab in dock
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
@@ -317,7 +320,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('8. Mobile Settings Modal Fullscreen with Clean Subview (No Tabs)', async ({ page }) => {
-    // Tap on "Настройки" tab in dock
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
@@ -343,7 +346,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('9. Mobile Assistant Header & Floating Dock Hidden', async ({ page }) => {
-    // Tap on "ИИ" tab in dock
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const aiTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="ИИ"]');
     await expect(aiTab).toBeVisible();
     await aiTab.click();
@@ -365,11 +368,11 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Dock is visible again and root folders are shown
     await expect(dock).toBeVisible();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
   });
 
   test('10. Custom Form Controls (Select, Checkbox, NumberInput)', async ({ page }) => {
-    // Tap on Settings tab
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
@@ -405,7 +408,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('11. UI Scale & Density Configuration (Control Matrix)', async ({ page }) => {
-    // Navigate to mobile settings
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const settingsTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]');
     await settingsTab.click();
 
@@ -453,7 +456,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('12. Mobile Todoist-style Calendar (Week Strip, No Date Sheet, Month Picker)', async ({ page }) => {
-    // Tap on "Таски" tab in dock
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const tasksTab = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Таски"]');
     await tasksTab.click();
 
@@ -548,7 +551,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.screenshot({ path: 'test-results/screenshots/mobile_composer_task_mode.png' });
 
     // 4. Test Assistant grounding on "чо на завтра"
-    // Tap "ИИ" dock tab
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await dock.locator('button[aria-label="ИИ"]').click();
 
@@ -574,6 +577,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('14. Mobile Audio Player Tab & Dock Customization', async ({ page }) => {
+    await page.getByRole('button', { name: 'Назад к папкам' }).click();
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await expect(dock).toBeVisible();
 
@@ -611,7 +615,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // 5. Test Hardware/Browser back from Audio Player returns to Folders
     await page.goBack();
-    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('mobile-vault-switcher-btn')).toBeVisible();
   });
 });
 

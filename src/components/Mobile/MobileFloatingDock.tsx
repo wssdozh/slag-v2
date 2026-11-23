@@ -1,6 +1,4 @@
-// The floating tab dock at the bottom of the phone shell.
-// NOTE: FAB removed from here — it is rendered separately in MobileShell
-// as <InboxFAB> so it does not overlap the Composer dock.
+// The floating tab dock and capture action for mobile tab roots.
 import React, { useRef, useState, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
@@ -25,10 +23,9 @@ const ALL_TABS: Record<MobileTabId, TabConfig> = {
 
 export interface MobileFloatingDockProps {
   isVisible?: boolean;
-  hideCapture?: boolean;
 }
 
-export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisible = true, hideCapture = false }) => {
+export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisible = true }) => {
   const { activeMobileTab, setActiveMobileTab, mobileDockTabs, openNewNote, currentFolder } = useApp();
 
   const { ref: dockRef, phase, isPresent, onTransitionEnd } = usePresence(isVisible);
@@ -56,7 +53,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
 
   useLayoutEffect(() => {
     updateIndicator();
-  }, [updateIndicator, mobileDockTabs, isPresent, hideCapture]);
+  }, [updateIndicator, mobileDockTabs, isPresent]);
 
   useEffect(() => {
     window.addEventListener('resize', updateIndicator);
@@ -123,12 +120,10 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
           );
         })}
       </nav>
-      {!hideCapture && (
-        <button type="button" onClick={() => openNewNote(currentFolder)} aria-label="Создать новую запись" title="Новая запись"
-          className="motion-press pointer-events-auto grid size-12 shrink-0 place-items-center rounded-full bg-accent text-white shadow-2xl shadow-scrim-80 hover:bg-accent-strong focus-visible:bg-accent-strong">
-          <Icon name="action.add" size="lg" tone="primary" />
-        </button>
-      )}
+      <button type="button" onClick={() => openNewNote(currentFolder)} aria-label="Создать новую запись" title="Новая запись"
+        className="motion-press pointer-events-auto grid size-12 shrink-0 place-items-center rounded-full bg-accent text-white shadow-2xl shadow-scrim-80 hover:bg-accent-strong focus-visible:bg-accent-strong">
+        <Icon name="action.add" size="lg" tone="primary" />
+      </button>
     </div>
   );
 };

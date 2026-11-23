@@ -10,7 +10,6 @@ import { ActiveFilterBadges } from '../Feed/ActiveFilterBadges';
 import { Composer } from '../Feed/Composer';
 import { FeedList } from '../Feed/FeedList';
 import { FolderViewButton } from '../Feed/FolderViewButton';
-import { SyncStatusButton } from '../Sidebar/SyncStatusButton';
 import { Icon } from '../UI/icons/Icon';
 import { KanbanBoard } from '../Views/KanbanBoard';
 import { FolderOverlay } from './folders/FolderOverlay';
@@ -21,7 +20,7 @@ import { MobileScreenHeader } from './MobileScreenHeader';
 export function MobileFoldersView() {
   const {
     vault, folders, items, currentFolder, navigateToFolder, goBackFromMobileFolder,
-    openCreateFolderModal, openSettingsModal, feedViewMode, isKanbanMaterialsOpen,
+    openCreateFolderModal, feedViewMode, isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen, setIsTriageModalOpen, isMobileFolderPickerOpen,
     setIsMobileFolderPickerOpen,
   } = useApp();
@@ -61,10 +60,9 @@ export function MobileFoldersView() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-canvas text-fg-primary select-none">
       <MobileScreenHeader
-        onBack={isInbox ? undefined : isMobileFolderPickerOpen ? closePicker : goBackFromMobileFolder}
+        onBack={isMobileFolderPickerOpen ? closePicker : goBackFromMobileFolder}
         iconOnlyBack
-        backLabel={parent ? `Назад: ${nameFromPath(parent)}` : 'Назад во Входящие'}
-        leadingAction={isInbox && <div inert={isMobileFolderPickerOpen}><SyncStatusButton mobile onSettings={() => openSettingsModal('sync')} /></div>}
+        backLabel={parent ? `Назад: ${nameFromPath(parent)}` : 'Назад к папкам'}
         centerSlot={(
           <button ref={titleRef} type="button" onClick={togglePicker} aria-label={`Переключить папку: ${folderName}`}
             aria-haspopup="listbox" aria-expanded={isMobileFolderPickerOpen} aria-controls={isMobileFolderPickerOpen ? listId : undefined}

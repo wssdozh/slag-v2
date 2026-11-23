@@ -86,6 +86,7 @@ test('the profile rides the workspace channel and lands on the other device', as
 test('the settings block picks up a profile that arrived after it mounted', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Назад к папкам' }).click();
   await page.locator('nav[aria-label="Мобильная навигация"] button[aria-label="Настройки"]').click();
   await expect(page.getByTestId('mobile-settings-root')).toBeVisible({ timeout: 120_000 });
 
