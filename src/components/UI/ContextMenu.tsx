@@ -15,7 +15,7 @@ export const ContextMenu: React.FC = () => {
     contextMenu,
     closeContextMenu,
     openCreateFolderModal,
-    openFolderInfoModal,
+    navigateToFolder,
     openFolderInExplorer,
     deleteFolder,
     setIsSearchOpen,
@@ -308,7 +308,11 @@ export const ContextMenu: React.FC = () => {
           <FolderMenuSections
             folder={folder}
             activeSubmenu={activeSubmenu}
-            onOpenFolderInfo={openFolderInfoModal}
+            onSelectAndOpenInfo={(path) => {
+              navigateToFolder(path);
+              window.dispatchEvent(new CustomEvent('slag:show-folder-info'));
+              closeContextMenu();
+            }}
             onCreateSubfolder={openCreateFolderModal}
             onDeleteFolder={deleteFolder}
             onClose={closeContextMenu}

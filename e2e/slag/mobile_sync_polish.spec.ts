@@ -1,4 +1,5 @@
 import { test, expect } from '../support/selfhostFixture';
+import { chooseMobileFolder, mobileFolderTrigger } from '../support/mobileFolders';
 
 test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, reducedMotion: 'reduce' });
 
@@ -48,10 +49,10 @@ test('mobile subfolders are flat navigation links', async ({ page }) => {
   });
   await page.goto('/');
   await expect(page.getByTestId('mobile-sync-btn')).toBeVisible({ timeout: 120_000 });
-  await page.getByRole('button', { name: 'Проекты', exact: true }).tap();
+  await chooseMobileFolder(page, 'Проекты');
   const subfolder = page.getByRole('button', { name: 'Дизайн (0)', exact: true });
   await expect(subfolder).toBeVisible();
   await page.screenshot({ path: 'test-results/screenshots/mobile-folder-tabs.png', animations: 'disabled' });
   await subfolder.tap();
-  await expect(page.getByRole('button', { name: 'Информация о папке' })).toContainText('Проекты/Дизайн');
+  await expect(mobileFolderTrigger(page)).toContainText('Проекты/Дизайн');
 });

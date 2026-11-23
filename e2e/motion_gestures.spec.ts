@@ -58,7 +58,6 @@ async function waitForStillSheet(panel: import('@playwright/test').Locator) {
 test('the action sheet drags 1:1, snaps back, then dismisses', async ({ page }) => {
   // The first load in a cold tree pays Vite's transform of the whole module graph.
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
-  await page.locator('button', { hasText: 'Входящие' }).first().click();
 
   const text = 'Жест шита ' + Date.now();
   await page.locator('main textarea, .relative textarea').first().fill(text);

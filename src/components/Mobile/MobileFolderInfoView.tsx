@@ -50,7 +50,8 @@ export const MobileFolderInfoView: React.FC = () => {
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none overflow-hidden">
+    <div role="dialog" aria-modal="true" aria-label="Информация о папке"
+      className="absolute inset-0 z-50 bg-canvas flex flex-col text-fg-primary select-none overflow-hidden">
       <MobileScreenHeader onBack={() => setMobileFolderInfoOpen(false)} backLabel="Назад" />
 
       <div className="flex-1 overflow-y-auto pb-16">

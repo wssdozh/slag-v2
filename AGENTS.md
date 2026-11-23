@@ -41,7 +41,7 @@
 src/
   components/   UI по зонам: Feed, Editor, Views, Mobile, Modals, Workspace, Admin, UI
                 (+ подпапки зон: Feed/assistant, Feed/item, Feed/composer,
-                 Editor/fullscreen, Settings/devices, Mobile/calendar,
+                 Editor/fullscreen, Settings/devices, Mobile/calendar, Mobile/folders,
                  Audio/panel, UI/menu, Admin/tabs)
   context/      AppContext — единственный стейт-хаб; hooks/ — записи, папки, хранилища, лента
   hooks/        gestures/ (drag, swipe), layout/ (размеры), media/ (вложения, аудио, композер),
@@ -92,7 +92,9 @@ docs/project-map/  база знаний проекта, 15 документов
 | полноэкранный редактор и черновики | `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts` |
 | канбан, календарь, поток | `src/components/Views/`, `src/lib/time/` |
 | быстрые фильтры задач | `src/components/Workspace/useWorkspaceTaskFilter.ts` — вкладка; `src/lib/tasks/taskQuickFilter.ts` — срок и статус; `src/hooks/useLocalDay.ts` — локальная дата |
-| мобильные экраны и жесты | `src/components/Mobile/`, `src/hooks/layout/useIsMobile.ts` |
+| мобильные экраны и жесты | `src/components/Mobile/`, `src/context/hooks/useMobileNav.ts` — папки и «Назад»; `src/hooks/layout/useIsMobile.ts` — выбор оболочки |
+| переключатель папок | `src/components/Mobile/folders/` — верхний список и нижний поиск; `src/components/Feed/BaseComposer.tsx` — общий каркас ввода; `src/components/Feed/FeedHeader.tsx` — десктопный дроплист |
+| сведения о папке | `src/components/FolderProfile/` — общий профиль; `src/components/RightPanel/FolderInfoPanel.tsx` — док «Инфо»; `src/components/Mobile/MobileFolderInfoView.tsx` — мобильная страница из `⋯` |
 | ИИ-ассистент, инструменты, действия | `src/lib/ai/orchestrator.ts`, `tools.ts`, `actionParser.ts` |
 | память ассистента: факты, типы, темы, скоринг | `src/lib/memory.ts`, `src/lib/ai/prompt.ts`, `src/lib/sync/applyBundle.ts` |
 | поиск | `src/lib/searchService.ts` |

@@ -563,7 +563,6 @@ test.describe('the composer on a phone', () => {
   test('offers the fullscreen editor button', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
     await expect(page.locator('button[aria-label="Раскрыть в полноэкранный редактор"]').first()).toBeVisible();
   });
 });

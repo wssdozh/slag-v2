@@ -1,36 +1,41 @@
-// Which phone surface is showing and how we got there: tabs, push, pop, dock order.
+// Mobile tabs, folder transitions and temporary navigation surfaces.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { MobileTabId, SlagItem, WorkspaceState } from '../../types';
-import { STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
-
-export const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
+import { DEFAULT_INBOX_FOLDER, STORAGE_KEYS, UI_BREAKPOINTS } from '../../config';
 import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { isDesktopApp, isMobilePlatform } from '../../lib/platform/windowControls';
 import { getPrefJson, setPref } from '../../lib/storage/prefs';
 import { swapScreen, type ScreenSwap } from '../../lib/motion';
 
+export const DEFAULT_MOBILE_DOCK_TABS: MobileTabId[] = ['folders', 'tasks', 'assistant', 'settings'];
 const MOBILE_DOCK_TABS_KEY = STORAGE_KEYS.MOBILE_DOCK_TABS;
 
-/**
- * Which mobile surface is showing, and how we got there.
- *
- * Tabs are peers (cross-fade or directional slide), entering a folder is a push,
- * leaving is a pop. The depth and the active tab live in refs so the setters stay
- * stable for the dock and for Escape. Nothing here knows about notes: the one
- * thing it cannot own is the folder the app is on, so the caller passes it in.
- */
+function isStandalonePanel(): boolean {
+  return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('panel');
+}
+
+export function defaultsToMobileLayout(
+  narrow = typeof window !== 'undefined' && window.innerWidth < UI_BREAKPOINTS.MOBILE,
+): boolean {
+  return !isStandalonePanel() && (isMobilePlatform() || (!isDesktopApp() && narrow));
+}
+
+/** The inbox is the root; only descendant paths add back steps. */
+export function mobileFolderDepth(folder: string): number {
+  return folder === DEFAULT_INBOX_FOLDER ? 0 : folder.split('/').length;
+}
+
 export function useMobileNav(
   initialWorkspace: WorkspaceState,
+  currentFolder: string,
   onSelectFolder: (folder: string) => void,
+  startInInbox: boolean,
 ) {
-  // Desktop and standalone popouts never default to the phone layout.
   const isMobileScreen = useIsMobile(UI_BREAKPOINTS.MOBILE);
   const [forceMobileMode, setForceMobileMode] = useState<boolean | null>(null);
-  const isDesktop = isDesktopApp();
-  const isStandalone =
-    typeof window !== 'undefined' && Boolean(new URLSearchParams(window.location.search).get('panel'));
-  const isMobile = !isStandalone && (forceMobileMode !== null ? forceMobileMode : (isMobilePlatform() || (!isDesktop && isMobileScreen)));
+  const isMobile = forceMobileMode === null ? defaultsToMobileLayout(isMobileScreen)
+    : !isStandalonePanel() && forceMobileMode;
 
   const toggleMobileMode = useCallback(() => {
     setForceMobileMode((prev) => {
@@ -39,9 +44,11 @@ export function useMobileNav(
     });
   }, [isMobileScreen]);
 
-  const [activeMobileTab, setActiveMobileTabState] = useState<MobileTabId>(() => initialWorkspace.activeMobileTab || 'folders');
-  const [mobileActiveFolder, setMobileActiveFolderState] = useState<string | null>(null);
-  const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState<boolean>(false);
+  const [activeMobileTab, setActiveMobileTabState] = useState<MobileTabId>(
+    () => startInInbox ? 'folders' : initialWorkspace.activeMobileTab || 'folders',
+  );
+  const [isMobileFolderPickerOpen, setIsMobileFolderPickerOpen] = useState(false);
+  const [mobileFolderInfoOpen, setMobileFolderInfoOpenState] = useState(false);
   const [mobileActionSheetItem, setMobileActionSheetItem] = useState<SlagItem | null>(null);
   const [mobileDockTabs, setMobileDockTabsState] = useState<MobileTabId[]>(() =>
     getPrefJson(MOBILE_DOCK_TABS_KEY, DEFAULT_MOBILE_DOCK_TABS, (value) =>
@@ -54,13 +61,10 @@ export function useMobileNav(
     setPref(MOBILE_DOCK_TABS_KEY, JSON.stringify(tabs));
   }, []);
 
-  const mobileFolderRef = useRef<string | null>(null);
-  const activeTabRef = useRef<MobileTabId>(initialWorkspace.activeMobileTab || 'folders');
+  const activeTabRef = useRef(activeMobileTab);
   useEffect(() => {
     activeTabRef.current = activeMobileTab;
   }, [activeMobileTab]);
-
-  const folderDepth = (path: string | null) => (path ? path.split('/').length : 0);
 
   const setActiveMobileTab = useCallback((next: React.SetStateAction<MobileTabId>) => {
     const prev = activeTabRef.current;
@@ -72,33 +76,33 @@ export function useMobileNav(
         ? nextIdx > prevIdx ? 'tab-next' : 'tab-prev'
         : 'tab';
 
-    swapScreen(kind, () => setActiveMobileTabState(resolvedNext));
+    if (resolvedNext === prev) return;
+    swapScreen(kind, () => {
+      activeTabRef.current = resolvedNext;
+      setActiveMobileTabState(resolvedNext);
+      setIsMobileFolderPickerOpen(false);
+    });
   }, [mobileDockTabs]);
 
-  const setMobileActiveFolder = useCallback((folder: string | null) => {
-    const previous = mobileFolderRef.current;
-    mobileFolderRef.current = folder;
-    // Depth decides the direction: deeper is a push, shallower a pop, and a sibling
-    // folder is a lateral move, not a step back.
-    const previousDepth = previous === null ? 0 : folderDepth(previous);
-    const nextDepth = folder === null ? 0 : folderDepth(folder);
-    const kind: ScreenSwap =
-      folder === null || nextDepth < previousDepth
-        ? 'pop'
-        : previous === null || nextDepth > previousDepth
-          ? 'push'
-          : 'tab';
+  const navigateMobileFolder = useCallback((folder: string) => {
+    if (folder === currentFolder && activeTabRef.current === 'folders') {
+      setIsMobileFolderPickerOpen(false);
+      return;
+    }
+    const delta = mobileFolderDepth(folder) - mobileFolderDepth(currentFolder);
+    const kind: ScreenSwap = delta > 0 ? 'push' : delta < 0 ? 'pop' : 'tab';
     swapScreen(kind, () => {
-      setMobileActiveFolderState(folder);
-      if (folder) onSelectFolder(folder);
+      activeTabRef.current = 'folders';
+      setActiveMobileTabState('folders');
+      setIsMobileFolderPickerOpen(false);
+      onSelectFolder(folder);
     });
-  }, [onSelectFolder]);
+  }, [currentFolder, onSelectFolder]);
 
-  /** A renamed folder leaves the phone on a path that no longer exists: follow the move. */
-  const remapMobileFolder = useCallback((remap: (path: string | null) => string | null) => {
-    setMobileActiveFolderState((previous) => remap(previous));
-    mobileFolderRef.current = remap(mobileFolderRef.current);
-  }, []);
+  const goBackFromMobileFolder = useCallback(() => {
+    const parentEnd = currentFolder.lastIndexOf('/');
+    navigateMobileFolder(parentEnd < 0 ? DEFAULT_INBOX_FOLDER : currentFolder.slice(0, parentEnd));
+  }, [currentFolder, navigateMobileFolder]);
 
   const setMobileFolderInfoOpen = useCallback((open: boolean) => {
     swapScreen(open ? 'push' : 'pop', () => setMobileFolderInfoOpenState(open));
@@ -110,11 +114,12 @@ export function useMobileNav(
     toggleMobileMode,
     activeMobileTab,
     setActiveMobileTab,
-    mobileActiveFolder,
-    setMobileActiveFolder,
+    navigateMobileFolder,
+    goBackFromMobileFolder,
+    isMobileFolderPickerOpen,
+    setIsMobileFolderPickerOpen,
     mobileFolderInfoOpen,
     setMobileFolderInfoOpen,
-    remapMobileFolder,
     mobileActionSheetItem,
     setMobileActionSheetItem,
     mobileDockTabs,

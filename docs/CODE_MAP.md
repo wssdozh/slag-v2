@@ -4,48 +4,48 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **660**, строк: **115122**, зон: **48**.
+Модулей: **666**, строк: **115018**, зон: **48**.
 
 ## Самые длинные файлы
 
 | файл | строк | импортят |
 |---|---:|---:|
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
-| `e2e/slag/editor.spec.ts` | 1753 | 0 |
+| `e2e/slag/editor.spec.ts` | 1737 | 0 |
 | `src/lib/sync/syncEngine.ts` | 1646 | 28 |
 | `src/lib/storage/index.ts` | 1532 | 49 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/sync/notes/replica.ts` | 1019 | 1 |
 | `src/lib/storage/settingsStore.ts` | 959 | 5 |
-| `e2e/slag/feed.spec.ts` | 944 | 0 |
+| `e2e/slag/feed.spec.ts` | 945 | 0 |
 | `src/lib/storage/vaultFiles.ts` | 927 | 2 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
-| `e2e/mobile.spec.ts` | 903 | 0 |
+| `e2e/mobile.spec.ts` | 837 | 0 |
 | `src/mcp/vault.ts` | 811 | 6 |
-| `src/context/AppContext.tsx` | 806 | 72 |
+| `src/context/AppContext.tsx` | 795 | 71 |
 | `src/components/Feed/ItemCard.tsx` | 761 | 1 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 
-## e2e (playwright) — 142 файлов, 26359 строк
+## e2e (playwright) — 144 файлов, 26442 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
-- `e2e/slag/editor.spec.ts` — 1753
+- `e2e/slag/editor.spec.ts` — 1737
 - `e2e/slag/views.spec.ts` — 1098
-- `e2e/slag/feed.spec.ts` — 944
+- `e2e/slag/feed.spec.ts` — 945
 - `e2e/slag/workspace.spec.ts` — 917
-- `e2e/mobile.spec.ts` — 903
-- `e2e/motion.spec.ts` — 570
+- `e2e/mobile.spec.ts` — 837
+- `e2e/motion.spec.ts` — 569
 - `e2e/adversarial_memory_time.spec.ts` — 567
 - `e2e/assistant_memory.spec.ts` — 555
 - `e2e/admin_panel.spec.ts` — 493
 - `e2e/adversarial_memory_contradictions.spec.ts` — 429
 
-## src — 2 файлов, 553 строк
+## src — 2 файлов, 542 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `App.tsx` | 473 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
+| `App.tsx` | 462 | 1 | App | The app shell: routes, lazy-loaded screens, viewport height and global overla… |
 | `main.tsx` | 80 | 0 |  | Boots the React root into #root, in StrictMode, after the settings store, the… |
 
 ## src/components — 1 файлов, 56 строк
@@ -113,7 +113,7 @@
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 54 файлов, 8088 строк
+## src/components/Feed — 54 файлов, 8102 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -128,7 +128,7 @@
 | `assistant/AssistantToolCalls.tsx` | 28 | 1 | AssistantToolCalls | The mono trace of tool calls a reply made: name plus the query it ran, nothin… |
 | `assistant/ChatTaskBlock.tsx` | 53 | 1 | ChatTaskBlock | A task rendered inside a chat reply: title plus checkbox lines, read-only. |
 | `AssistantChat.tsx` | 235 | 2 | AssistantChat | The assistant view: thread state, input, expanded traces, and the diff it ope… |
-| `BaseComposer.tsx` | 325 | 2 | BaseComposerProps, BaseComposer | The shared composer shell: the text surface, slot layout, and the send plate. |
+| `BaseComposer.tsx` | 332 | 3 | BaseComposerProps, BaseComposer | The shared composer shell: the text surface, slot layout, and the send plate. |
 | `Composer.tsx` | 759 | 4 | ComposerProps, Composer | The create-a-note form: wiring, the autocomplete overlay, and composition of … |
 | `composer/ComposerAiButton.tsx` | 31 | 1 | ComposerAiButtonProps, ComposerAiButton | The +AI button: asks the model for folder and tags, spinning while the call r… |
 | `composer/ComposerAttachmentStrip.tsx` | 113 | 1 | ComposerAttachmentStripProps, ComposerAttachmentStrip | The tray of what is about to be sent: attachment chips, each removable. |
@@ -142,13 +142,13 @@
 | `composer/field.ts` | 115 | 6 | FieldSelection, ComposerFieldHandle, textareaFieldHandle, codeMirrorFieldHandle | The composer's text surface, abstracted away from the <textarea> it used to b… |
 | `composer/useComposerAiTags.ts` | 70 | 1 | UseComposerAiTagsOptions, useComposerAiTags | +AI in the composer: writes the suggested folder and tags back as @ and # tok… |
 | `composer/useComposerAutocomplete.ts` | 354 | 1 | ComposerKeyEvent, UseComposerAutocompleteOptions, useComposerAutocomplete | The composer's suggestions: which trigger is open, what it matches, and apply… |
-| `composer/useComposerDraft.ts` | 524 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft | The composer draft on disk: restore, autosave, reset, and repairing pre-reply… |
+| `composer/useComposerDraft.ts` | 526 | 1 | ComposerDraftState, UseComposerDraftOptions, reviveReplyTarget, useComposerDraft | The composer draft on disk: restore, autosave, reset, and repairing pre-reply… |
 | `composer/useComposerField.ts` | 51 | 1 | ComposerEngine, useComposerField | React wrapper for the field handle: the DOM is read lazily inside callbacks, … |
 | `composer/useComposerFiles.ts` | 152 | 1 | useComposerFiles | Files into the composer: picker, drop and paste, with no opinion on titles or… |
 | `composer/useComposerSlashCommands.ts` | 141 | 1 | UseComposerSlashCommandsOptions, useComposerSlashCommands | What a `/command` does to the draft: swap the type, set a property, start a r… |
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
-| `FeedHeader.tsx` | 127 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder name and icon, filter badges, sort, materials toggl… |
+| `FeedHeader.tsx` | 132 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder picker, filter badges, sort, materials toggle. |
 | `FeedList.tsx` | 576 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 179 | 1 | FolderSuggestionMenu | The `@folder` autocomplete: the folder tree as branch rows, the selected one,… |
 | `FolderViewButton.tsx` | 23 | 2 | FolderViewButton |  |
@@ -172,16 +172,16 @@
 | `SuggestionMenuShell.tsx` | 57 | 4 | SuggestionMenuShell | Shared placement and presence for the suggestion lists, plus keeping the row … |
 | `TagSuggestionMenu.tsx` | 68 | 2 | TagMeta, TagSuggestionMenu | The `#tag` suggestions: matching vault tags with usage counts, keyboard selec… |
 
-## src/components/FolderProfile — 8 файлов, 737 строк
+## src/components/FolderProfile — 8 файлов, 691 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `FolderActionsMenu.tsx` | 73 | 1 | FolderActionsMenuProps, FolderActionsMenu | The one ⋯ menu for a folder: rename, move and delete in every container. |
 | `FolderAppearancePicker.tsx` | 42 | 2 | FolderAppearancePicker |  |
 | `FolderIconGrid.tsx` | 86 | 1 | FolderIconGridProps, FolderIconGrid | Icon picker grid shared by the desktop popover and the phone sheet. |
-| `FolderProfile.tsx` | 110 | 3 | FolderProfileProps, FolderProfile | One folder profile in three containers: dock panel, modal and phone screen. |
-| `FolderProfileHeader.tsx` | 195 | 1 | FolderProfileVariant, FolderProfileHeaderProps, FolderProfileHeader | Folder header: name, icon, path, counters and the inline edit controls. |
-| `FolderStats.tsx` | 91 | 1 | FolderStatsVariant, FolderStatsProps, FolderStats | The folder's six counters, laid out as rows, an inline strip or a grid. |
+| `FolderProfile.tsx` | 104 | 2 | FolderProfileProps, FolderProfile | One folder profile in the desktop dock and the phone screen. |
+| `FolderProfileHeader.tsx` | 183 | 1 | FolderProfileVariant, FolderProfileHeaderProps, FolderProfileHeader | Folder header: name, icon, path, counters and the inline edit controls. |
+| `FolderStats.tsx` | 63 | 1 | FolderStatsVariant, FolderStatsProps, FolderStats | Compact record counts in the dock, a six-counter grid on the phone. |
 | `folderStatsConfig.ts` | 35 | 2 | FolderStatKey, FolderStatDefinition, FOLDER_STATS, recordCountLabel | The single list of folder counters, labels and the Russian record count. |
 | `useFolderProfileEdit.ts` | 105 | 2 | FolderProfileEditMode, FolderProfileEditOptions, FolderProfileEdit, useFolderProfileEdit | Inline folder editing: one field at a time, committed through the storage act… |
 
@@ -212,7 +212,7 @@
 | `useFolderBrowser.ts` | 91 | 1 | useFolderBrowser | Granted folders and the entries inside one, loaded only while the picker is o… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo | A clip in the viewer: custom transport that hides with the chrome, and play m… |
 
-## src/components/Mobile — 18 файлов, 2817 строк
+## src/components/Mobile — 23 файлов, 2751 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -225,29 +225,33 @@
 | `calendar/MonthPickerSheet.tsx` | 147 | 1 | MonthPickerSheetProps, MonthPickerSheet | The month sheet: a month grid with a dot on days that have tasks, and a today… |
 | `calendar/ThreeDayGrid.tsx` | 242 | 1 | ThreeDayGridProps, ThreeDayGrid | The 24-hour three-day grid: day headers, all-day band, hour rail, and timed b… |
 | `calendar/WeekStrip.tsx` | 74 | 1 | WeekStripProps, WeekStrip | The seven-day strip: weekday, number, and a dot when that day has tasks. |
+| `folders/FolderOverlay.tsx` | 40 | 1 | FolderOverlay | One temporary navigation surface: results above the view, search in the compo… |
+| `folders/FolderPickerList.tsx` | 46 | 1 | FolderPickerList | The upper folder list: browse the tree or pick a result by its full path. |
+| `folders/FolderSearchComposer.tsx` | 34 | 1 | FolderSearchComposer | A single-line folder search in the same shell as the note composer. |
+| `folders/MobileSubfolders.tsx` | 49 | 1 | MobileSubfolders | One row of shortcuts to direct subfolders; counts the physical folder only. |
+| `folders/useFolderPicker.ts` | 54 | 2 | folderOptionId, useFolderPicker, FolderPickerRow | Search and keyboard selection over the current vault's prebuilt folder tree. |
 | `MobileAssistantView.tsx` | 72 | 1 | MobileAssistantView | The phone's assistant tab: a chat under a screen header, scoped to the open f… |
 | `MobileCalendarView.tsx` | 434 | 3 | MobileCalendarView | The phone calendar: agenda and three-day modes, day swipes, and a month picke… |
-| `MobileFloatingDock.tsx` | 153 | 1 | MobileFloatingDockProps, MobileFloatingDock | The floating tab dock at the bottom of the phone shell, with its capture butt… |
-| `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView | Phone folder page: the profile fills the screen and editing happens in place. |
-| `MobileFoldersView.tsx` | 353 | 1 | MobileFoldersView | The phone folder screen: header, feed/Kanban/calendar switch, and the pinned … |
+| `MobileFloatingDock.tsx` | 135 | 1 | MobileFloatingDockProps, MobileFloatingDock | The floating tab dock at the bottom of the phone shell. |
+| `MobileFolderInfoView.tsx` | 71 | 1 | MobileFolderInfoView | Phone folder page: the profile fills the screen and editing happens in place. |
+| `MobileFoldersView.tsx` | 131 | 1 | MobileFoldersView | The phone's folder view: header, active surface, and the shared composer posi… |
 | `MobileScreenHeader.tsx` | 93 | 4 | MobileScreenHeaderProps, MobileScreenHeader | The phone screen's top bar: back, title slots, and the status-bar inset. |
 | `MobileSettingsView.tsx` | 150 | 1 | MobileSettingsView | The phone settings tab: grouped rows, live sync status, and the vault switche… |
-| `MobileShell.tsx` | 117 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
+| `MobileShell.tsx` | 67 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
 | `MobileTasksView.tsx` | 271 | 1 | MobileTasksView | The phone tasks tab: status tabs you swipe between, plus the calendar mode. |
 
-## src/components/Modals — 12 файлов, 2473 строк
+## src/components/Modals — 11 файлов, 2395 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `BaseModal.tsx` | 169 | 15 | BaseModalProps, BaseModal | The dialog frame every modal wears: presence, backdrop, header, footer, Escap… |
+| `BaseModal.tsx` | 169 | 14 | BaseModalProps, BaseModal | The dialog frame every modal wears: presence, backdrop, header, footer, Escap… |
 | `ComposerModal.tsx` | 61 | 1 | ComposerModal | The composer in a dialog: keeps its last options and folder through the exit. |
 | `ConfirmDialog.tsx` | 56 | 1 | ConfirmDialog | The app's own yes/no for destructive actions, instead of the platform's confi… |
 | `ConflictTextPane.tsx` | 55 | 1 | ConflictTextPane |  |
 | `DiffModal.tsx` | 574 | 2 | DiffModalItemEntry, DiffModalProps, DiffModal | What an AI edit would change, before it is applied: the line diff and the acc… |
-| `FolderInfoModal.tsx` | 94 | 1 | FolderInfoModal | The folder dialog: its profile, plus triage, a new note, and its tags as filt… |
 | `FolderModal.tsx` | 168 | 1 | FolderModal | Creating a folder: name, parent and icon; editing that lives in the folder pr… |
 | `FolderMoveModal.tsx` | 108 | 1 | FolderMoveModal | Moving a folder to another parent: a dialog over the profile, not an inline f… |
-| `FolderViewModal.tsx` | 158 | 1 | FolderViewModal | The folder's layout is one click away; detailed choices stay on their own pag… |
+| `FolderViewModal.tsx` | 174 | 1 | FolderViewModal | The folder's layout is one click away; detailed choices stay on their own pag… |
 | `SettingsModal.tsx` | 268 | 1 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
 | `TriageModal.tsx` | 478 | 1 | TriageModal | AI triage of the inbox: one batch of notes, folders and tags confirmed in a s… |
 | `VaultModal.tsx` | 284 | 1 | VaultModal | The vault switcher: choose a store, create one on a backend, or delete one. |
@@ -328,21 +332,21 @@
 | `syncGlyph.ts` | 29 | 1 | syncGlyph | Keep the rail quiet during background traffic; comparison details belong in t… |
 | `SyncStatusButton.tsx` | 112 | 2 | SyncStatusButton |  |
 
-## src/components/UI — 38 файлов, 6794 строк
+## src/components/UI — 38 файлов, 6798 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `AnchoredPopover.tsx` | 95 | 5 | AnchoredPopover | Keep an anchored surface in the visible window, outside any scrolling parent. |
 | `AudioPlayer.tsx` | 359 | 5 | AudioPlayer | Plays a note's audio: waveform scrub, speed, transcript and on-demand enrichm… |
 | `AudioRecorder.tsx` | 209 | 2 | AudioRecorder | Records a voice memo in a bottom bar, previews its length, then hands the cli… |
-| `Button.tsx` | 57 | 8 | ButtonProps, Button | The kit's one button: four tones, three sizes, optional icon, ref-forwarded. |
+| `Button.tsx` | 57 | 7 | ButtonProps, Button | The kit's one button: four tones, three sizes, optional icon, ref-forwarded. |
 | `Checkbox.tsx` | 75 | 2 | CheckboxProps, Checkbox | A checkbox with a label and hint, toggled by click or keyboard for settings r… |
-| `ContextMenu.tsx` | 357 | 1 | ContextMenu | Right-click menu for items, folders and feed rows: sections, submenus and hov… |
+| `ContextMenu.tsx` | 361 | 1 | ContextMenu | Right-click menu for items, folders and feed rows: sections, submenus and hov… |
 | `DatePickerPopover.tsx` | 306 | 1 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
-| `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
-| `icons/Icon.tsx` | 109 | 151 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
-| `icons/icons.ts` | 571 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
+| `IconButton.tsx` | 51 | 9 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
+| `icons/Icon.tsx` | 109 | 153 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
+| `icons/icons.ts` | 571 | 17 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 91 | 2 | HintBubble, InfoHintProps, InfoHint | One question mark for every explanation in the app. |
 | `LightboxTextPanel.tsx` | 151 | 1 | LightboxTextPanelProps, LightboxTextPanel | OCR results beside a photo in the lightbox, with copy and retry when the pass… |
@@ -358,7 +362,7 @@
 | `priorityTone.ts` | 47 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Maps a priority to its one colour family; text, dot and chip classes hang off… |
 | `ResponsiveSegmented.tsx` | 243 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
 | `segmentedVariants.ts` | 56 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Class presets for the segmented strip, so mobile headers share one geometry. |
-| `Select.tsx` | 288 | 10 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
+| `Select.tsx` | 288 | 11 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
 | `SendButton.tsx` | 50 | 4 | SendButtonProps, SendButton | The round accent arrow that confirms: send, attach or save, one plate for all… |
 | `SheetPanel.tsx` | 441 | 2 | SheetPanelApi, SheetPanelProps, SheetPanel | The bottom-sheet shell: detents, drag-to-fold, velocity-aware release, scroll… |
 | `TagChip.tsx` | 81 | 5 | TagChipProps, TagChip | A tag as a chip: clickable to filter, removable while editing, flat or pill. |
@@ -375,7 +379,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `VaultSwitcherMenu.tsx` | 227 | 3 | VaultSwitcherMenuProps, VaultSwitcherMenu | Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete. |
+| `VaultSwitcherMenu.tsx` | 227 | 2 | VaultSwitcherMenuProps, VaultSwitcherMenu | Vault switcher as a dropdown or phone sheet: pick, create, reveal, delete. |
 
 ## src/components/Views — 13 файлов, 2565 строк
 
@@ -395,7 +399,7 @@
 | `KanbanBoard.tsx` | 171 | 2 | KanbanBoard | The Kanban board: columns by status, drag between them, and the materials doc… |
 | `useCalendarInteractions.ts` | 257 | 1 | DEFAULT_HOUR_HEIGHT, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT, TimelineResizingState, ResizingTaskState, +1 | Timeline state: zooming the hour ruler by dragging it, and stretching a task'… |
 
-## src/components/Workspace — 7 файлов, 1580 строк
+## src/components/Workspace — 7 файлов, 1610 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -404,7 +408,7 @@
 | `useCrossWindowDnd.ts` | 614 | 1 | DropPreviewRect, DropTargetResult, UseCrossWindowDndOptions, useCrossWindowDnd | Dragging a note between workspace panels: the preview rect, the drop target u… |
 | `useDockPanels.ts` | 278 | 1 | UseDockPanelsOptions, useDockPanels | Dockview wiring: default layout, panel creation, tab menus, and saving the la… |
 | `useWorkspaceTaskFilter.ts` | 50 | 1 | useWorkspaceTaskFilter | Keeps one ephemeral filter addressed to the current visible content panel. |
-| `WorkspaceShell.tsx` | 314 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
+| `WorkspaceShell.tsx` | 344 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 | `workspaceTaskFilterContext.ts` | 14 | 2 | WorkspaceTaskFilterContext, useWorkspaceTaskFilterContext | Shares ephemeral filter state across Dockview's stable panel components. |
 
 ## src/config — 9 файлов, 472 строк
@@ -421,12 +425,12 @@
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
 | `ui.ts` | 64 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
-## src/context — 2 файлов, 1054 строк
+## src/context — 2 файлов, 1041 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `AppContext.tsx` | 806 | 72 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
-| `appContext.types.ts` | 248 | 9 | ToastMessage, AttachSheetRequest, ContextMenuTarget, FolderViewTarget, FolderViewSection, +1 | The context's public contract and the shapes passed around it, kept out of st… |
+| `AppContext.tsx` | 795 | 71 | AppContext, AppProvider, useApp, ToastMessage, AttachSheetRequest, +1 | The single state hub: vault, folders, items, overlays, sync and every action. |
+| `appContext.types.ts` | 246 | 9 | ToastMessage, AttachSheetRequest, ContextMenuTarget, FolderViewTarget, FolderViewSection, +1 | The context's public contract and the shapes passed around it, kept out of st… |
 
 ## src/context/feed — 1 файлов, 103 строк
 
@@ -434,7 +438,7 @@
 |---|---:|---:|---|---|
 | `feedView.ts` | 103 | 4 | FeedViewQuery, hasFeedFilters, selectVisibleItems | Which records the feed shows and in what order — the inbox's three modes as a… |
 
-## src/context/hooks — 13 файлов, 2152 строк
+## src/context/hooks — 13 файлов, 2131 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -442,14 +446,14 @@
 | `useAppUpdates.ts` | 418 | 1 | useAppUpdates | Owns the app-update state: one silent check after boot, a manual check, the d… |
 | `useAssistant.ts` | 113 | 1 | useAssistant | The assistant session: transcript, model choice and one send that never write… |
 | `useBackup.ts` | 146 | 1 | useBackup | Backups: scheduled and manual snapshots on disk, restore, and the zip round t… |
-| `useFeedView.ts` | 182 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
-| `useFolderAdmin.ts` | 147 | 1 | useFolderAdmin | A folder's own writes: save, describe, rename, move, delete and the create mo… |
+| `useFeedView.ts` | 179 | 1 | useFeedView | The feed's view state: folder, mode, filters, sorting, persisted per folder. |
+| `useFolderAdmin.ts` | 137 | 1 | useFolderAdmin | A folder's own writes: save, describe, rename, move, delete and the create mo… |
 | `useItemWrites.ts` | 225 | 1 | ItemWritesDeps, useItemWrites | Every write to a note: create, save, delete, restore from trash, move, comple… |
-| `useMobileNav.ts` | 124 | 1 | DEFAULT_MOBILE_DOCK_TABS, useMobileNav | Which phone surface is showing and how we got there: tabs, push, pop, dock or… |
+| `useMobileNav.ts` | 129 | 1 | DEFAULT_MOBILE_DOCK_TABS, defaultsToMobileLayout, mobileFolderDepth, useMobileNav | Mobile tabs, folder transitions and temporary navigation surfaces. |
 | `useNotifyArm.ts` | 146 | 1 | useNotifyArm | Keeps the relay armed with the current reminders and fires the local ones. |
-| `useOverlays.ts` | 240 | 1 | useOverlays | Everything above the app: modals, lightbox, context menu, toasts, confirm, at… |
+| `useOverlays.ts` | 221 | 1 | useOverlays | Everything above the app: modals, lightbox, context menu, toasts, confirm, at… |
 | `useRecurringRollover.ts` | 68 | 1 | useRecurringRollover | Rolls recurring tasks over at midnight and after the tab wakes, with no user. |
-| `useVaults.ts` | 164 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
+| `useVaults.ts` | 170 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
 | `useVaultWatch.ts` | 92 | 1 | UseVaultWatchOptions, useVaultWatch | Keeps the open vault honest about the disk. Files the MCP server, another edi… |
 
 ## src/hooks — 5 файлов, 747 строк
@@ -473,11 +477,11 @@
 | `useSheetDrag.ts` | 158 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet, transforms written straight to the co… |
 | `useSwipeGesture.ts` | 51 | 3 | SwipeGestureOptions, useSwipeGesture | Left/right swipe detection with a threshold and axis lock, for phone rows. |
 
-## src/hooks/layout — 5 файлов, 335 строк
+## src/hooks/layout — 5 файлов, 334 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useComposerInset.ts` | 39 | 2 | useComposerInset | Publishes the composer dock's live height as --composer-inset for the feed. |
+| `useComposerInset.ts` | 38 | 2 | useComposerInset | Publishes the composer dock's live height as --composer-inset for the feed. |
 | `useEditorPaneRect.ts` | 59 | 1 | EditorPaneRect, useEditorPaneRect | Measures the dockview pane a note opened from, before paint, and follows resi… |
 | `useFlipLayout.ts` | 150 | 2 | useFlipLayout | FLIP motion for a list: moved cards glide, one appended card rises, scroll st… |
 | `useIsMobile.ts` | 31 | 4 | useIsMobile | Tracks whether the viewport sits below the mobile breakpoint, on load and res… |
@@ -490,16 +494,16 @@
 | `useAttachmentSrc.ts` | 63 | 13 | AttachmentSrcs, AttachmentSources, useAttachmentSrcs, useAttachmentSrc | Resolves attachment ids to object URLs on demand, keeping media bytes out of … |
 | `useComposerMedia.ts` | 204 | 1 | UseComposerMediaOptions, useComposerMedia | Composer's record controls: hold or lock, audio/video switch, finish and send. |
 
-## src/hooks/ui — 6 файлов, 524 строк
+## src/hooks/ui — 6 файлов, 525 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useAssistantActions.ts` | 90 | 1 | useAssistantActions | Applies an action tapped under a telegram answer, and tells the relay what it… |
 | `useDeepLink.ts` | 38 | 1 | useDeepLink | Opens the note an external `slag://` link points at. |
-| `useGlobalHotkeys.ts` | 55 | 1 | useGlobalHotkeys | Routes keydown through the APP_COMMANDS catalogue and the top-layer Escape. |
+| `useGlobalHotkeys.ts` | 56 | 1 | useGlobalHotkeys | Routes keydown through the APP_COMMANDS catalogue and the top-layer Escape. |
 | `useIntegrity.ts` | 122 | 1 | UseIntegrity, useIntegrity | The storage panel's state: run a check, hand the plan to the repair, keep the… |
 | `useLayerStack.ts` | 123 | 1 | AppLayer, useLayerStack | LIFO dismiss stack shared by Escape and Android/browser back, synced to histo… |
-| `usePresence.ts` | 96 | 29 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
+| `usePresence.ts` | 96 | 28 | usePresence | Keeps a surface in the DOM through its exit transition, so CSS can finish it. |
 
 ## src/lib — 7 файлов, 1917 строк
 
@@ -733,11 +737,11 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `demoVault.ts` | 250 | 1 | generateDemoItems | Generates a clean, cohesive set of starter demo items across the default fold… |
-| `folderColor.ts` | 19 | 5 | isFolderColor, folderHue, folderColorCss |  |
+| `folderColor.ts` | 19 | 4 | isFolderColor, folderHue, folderColorCss |  |
 | `folderItems.ts` | 37 | 3 | itemsInFolder, materialsInFolder | Records that belong to a folder. Inbox is a leaf: it holds only the items that |
-| `folderOptions.ts` | 47 | 6 | FolderSelectOption, buildFolderOptions | Turns the flat folder list into the one tree of picker options every menu sha… |
+| `folderOptions.ts` | 47 | 7 | FolderSelectOption, buildFolderOptions | Turns the flat folder list into the one tree of picker options every menu sha… |
 | `folderPaths.ts` | 38 | 4 | sanitizeFolderName, parentPathOf, folderPathForName, folderPathUnder, isFolderPathFree, +2 | Folder names are file names on disk, so the OS-forbidden characters become da… |
-| `folderTree.ts` | 153 | 9 | FolderNode, FolderTreeRow, FolderDropMode, folderName, folderRank, +5 | The folder hierarchy and the order it is drawn in: one tree for the sidebar, … |
+| `folderTree.ts` | 153 | 11 | FolderNode, FolderTreeRow, FolderDropMode, folderName, folderRank, +5 | The folder hierarchy and the order it is drawn in: one tree for the sidebar, … |
 | `integrity/fingerprint.ts` | 75 | 2 | canonicalJson, fingerprint, sha256Hex | One line per note that a device can compare byte for byte. |
 | `integrity/manifest.ts` | 95 | 2 | buildManifest, compare | A vault reduced to three levels of hashes: one line per note, one per folder,… |
 | `integrity/repair.ts` | 135 | 1 | planRepair | What a sweep would do, decided before anything is touched. |
@@ -791,5 +795,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 692 | 237 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 692 | 240 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

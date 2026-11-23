@@ -46,6 +46,7 @@ export function useVaults(deps: {
   setActiveTypeFilter: Dispatch<SetStateAction<SlagItemType | 'all'>>;
   setActiveTagFilter: Dispatch<SetStateAction<string | null>>;
   setActiveMobileTab: Dispatch<SetStateAction<MobileTabId>>;
+  setIsMobileFolderPickerOpen: (open: boolean) => void;
   setIsKanbanMaterialsOpen: Dispatch<SetStateAction<boolean>>;
   setSortBy: Dispatch<SetStateAction<SortField>>;
   setSortOrder: Dispatch<SetStateAction<SortOrder>>;
@@ -64,7 +65,7 @@ export function useVaults(deps: {
   const {
     vault, setVault, setVaults, setFolders, setItems,
     setCurrentFolder, setFeedViewMode, setInboxMode, setActiveTypeFilter,
-    setActiveTagFilter, setActiveMobileTab, setIsKanbanMaterialsOpen,
+    setActiveTagFilter, setActiveMobileTab, setIsMobileFolderPickerOpen, setIsKanbanMaterialsOpen,
     setSortBy, setSortOrder, setFolderSettings,
     setChatMessages, setSelectedItem, refreshData, addToast,
   } = deps;
@@ -90,7 +91,10 @@ export function useVaults(deps: {
     swapScreen('tab', () => {
       storage.switchVault(vaultId);
       const newWs = storage.getWorkspaceState();
-      setCurrentFolder(newWs.currentFolder || DEFAULT_INBOX_FOLDER);
+      const nextFolders = storage.getFolders();
+      setIsMobileFolderPickerOpen(false);
+      setCurrentFolder(nextFolders.some(folder => folder.path === newWs.currentFolder)
+        ? newWs.currentFolder : DEFAULT_INBOX_FOLDER);
       setFeedViewMode(newWs.feedViewMode || 'feed');
       setInboxMode(newWs.inboxMode || 'all');
       setActiveTypeFilter(newWs.activeTypeFilter || 'all');
@@ -117,6 +121,7 @@ export function useVaults(deps: {
     } else if (!id) {
       void syncEngine.switchVault(newMeta.id);
     }
+    setIsMobileFolderPickerOpen(false);
     setCurrentFolder(DEFAULT_INBOX_FOLDER);
     setSelectedItem(null);
     refreshData();
@@ -132,6 +137,7 @@ export function useVaults(deps: {
         setVault(storage.getCurrentVault());
         setFolders(storage.getFolders());
         setItems(storage.getItems());
+        setIsMobileFolderPickerOpen(false);
         setCurrentFolder(DEFAULT_INBOX_FOLDER);
         setSelectedItem(null);
       }

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { chooseMobileFolder, mobileFolderTrigger, openMobileFolderProfile, openMobileNoteSearch } from './support/mobileFolders';
 
 test.describe('Back Navigation Engine: Desktop Mouse Back & Keyboard', () => {
   test.beforeEach(async ({ page }) => {
@@ -69,18 +70,14 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
   });
 
   test('Mobile: Browser Back (page.goBack()) closes Search modal without leaving app', async ({ page }) => {
-    // Open Search by clicking Search icon in mobile header
-    await page.locator('button[aria-label="Поиск"]').click();
-
-    const searchInput = page.locator('input[placeholder*="Поиск по заметкам"]');
-    await expect(searchInput).toBeVisible();
+    const searchInput = await openMobileNoteSearch(page);
 
     // Emulate Android back gesture / browser back
     await page.goBack();
 
     // Search should be dismissed, mobile shell remains active
     await expect(searchInput).toBeHidden();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 
   test('Mobile: Browser Back navigates from Tasks tab back to Folders tab', async ({ page }) => {
@@ -95,45 +92,35 @@ test.describe('Back Navigation Engine: Mobile Touch, Gestures & PopState', () =>
     await page.goBack();
 
     // Should return to Folders tab ("Заметки")
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 
   test('Mobile: Browser Back navigates out of folder back to root folders list', async ({ page }) => {
-    // Click on "Входящие" folder
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-
-    // Inside folder view: back button in header has title "Назад к списку папок"
-    const folderBackBtn = page.locator('button[title*="Назад к списку папок"]');
+    await chooseMobileFolder(page, 'Проекты');
+    const folderBackBtn = page.getByRole('button', { name: 'Назад во Входящие' });
     await expect(folderBackBtn).toBeVisible();
 
     // Emulate system back
     await page.goBack();
 
     // Should be back at root folders list (h1 "Заметки" visible)
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     await expect(folderBackBtn).toBeHidden();
   });
 
   test('Mobile: Stacked Layers - closes top layer first, then underlying folder', async ({ page }) => {
-    // 1. Drill into "Входящие" folder
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-    const folderBackBtn = page.locator('button[title*="Назад к списку папок"]');
-    await expect(folderBackBtn).toBeVisible();
+    await chooseMobileFolder(page, 'Проекты');
+    const folderBackBtn = page.getByRole('button', { name: 'Назад во Входящие' });
+    const profile = await openMobileFolderProfile(page);
 
-    // 2. Open Folder Info profile on top
-    await page.locator('button[aria-label="Информация о папке"]').click();
-    const photoTab = page.locator('button', { hasText: /Фото/ });
-    await expect(photoTab).toBeVisible();
-
-    // First Back -> Closes Folder Info
+    // First Back closes the profile, not the underlying folder.
     await page.goBack();
-    await expect(photoTab).toBeHidden();
-    // Still inside "Входящие" folder
+    await expect(profile).toBeHidden();
     await expect(folderBackBtn).toBeVisible();
 
     // Second Back -> Exits "Входящие" folder back to root
     await page.goBack();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     await expect(folderBackBtn).toBeHidden();
   });
 });

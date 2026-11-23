@@ -5,7 +5,6 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     await page.emulateMedia({ reducedMotion });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
-    await page.getByRole('button', { name: 'Входящие', exact: false }).first().click();
     const composer = page.locator('[data-composer-panel]').first();
     await expect(composer).toBeVisible();
     await composer.locator('.composer-record-type').click();

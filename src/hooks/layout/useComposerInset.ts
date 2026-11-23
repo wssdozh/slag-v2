@@ -9,9 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * a gap short of it. The value is published as the `--composer-inset` custom property by whoever
  * owns both the list and the dock, so the list never measures the DOM itself.
  *
- * Returns an attach callback, not a ref object: the dock is not mounted on every screen (the
- * phone shows the folder list before any composer exists), and an effect keyed on a ref object
- * would never see it appear.
+ * Returns an attach callback, not a ref object: views like Kanban mount no composer,
+ * and an effect keyed on a ref object would never see the dock appear.
  */
 export function useComposerInset(): readonly [(element: HTMLElement | null) => void, number] {
   const [inset, setInset] = useState(0);

@@ -123,7 +123,6 @@ test.describe('Mobile: composer island over the feed', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
     await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(400);
 

@@ -8,7 +8,8 @@ import type { MenuSubmenuName } from './MenuSubmenus';
 export interface FolderMenuSectionsProps {
   folder: FolderMeta;
   activeSubmenu: MenuSubmenuName | null;
-  onOpenFolderInfo: (path: string) => void;
+  /** Navigate to folder + fire slag:show-folder-info event (replaces modal). */
+  onSelectAndOpenInfo: (path: string) => void;
   onCreateSubfolder: (path: string) => void;
   onDeleteFolder: (path: string) => void;
   onClose: () => void;
@@ -20,7 +21,7 @@ export interface FolderMenuSectionsProps {
 export const FolderMenuSections: React.FC<FolderMenuSectionsProps> = ({
   folder,
   activeSubmenu,
-  onOpenFolderInfo,
+  onSelectAndOpenInfo,
   onCreateSubfolder,
   onDeleteFolder,
   onClose,
@@ -31,8 +32,7 @@ export const FolderMenuSections: React.FC<FolderMenuSectionsProps> = ({
   <>
     <button
       onClick={() => {
-        onOpenFolderInfo(folder.path);
-        onClose();
+        onSelectAndOpenInfo(folder.path);
       }}
       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-tint-6 hover:text-white transition-colors text-left cursor-pointer"
     >

@@ -21,7 +21,7 @@ import { useGlobalHotkeys } from '../hooks/ui/useGlobalHotkeys';
 import { useLayerStack, type AppLayer } from '../hooks/ui/useLayerStack';
 import { useSuggestedActions, type ActionHistoryEntry } from '../hooks/useSuggestedActions';
 import { useOverlays } from './hooks/useOverlays';
-import { useMobileNav } from './hooks/useMobileNav';
+import { defaultsToMobileLayout, mobileFolderDepth, useMobileNav } from './hooks/useMobileNav';
 import { useFeedView } from './hooks/useFeedView';
 import { useBackup } from './hooks/useBackup';
 import { useAssistant } from './hooks/useAssistant';
@@ -53,14 +53,15 @@ export const AppContext = createContext<AppContextType | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [initialWorkspace] = useState(() => storage.getWorkspaceState());
-  const [vault, setVault] = useState<VaultMeta>(storage.getCurrentVault());
-  const [vaults, setVaults] = useState<VaultMeta[]>(storage.getVaults());
+  const [vault, setVault] = useState<VaultMeta>(() => storage.getCurrentVault());
+  const [vaults, setVaults] = useState<VaultMeta[]>(() => storage.getVaults());
   const [folders, setFolders] = useState<FolderMeta[]>(() => storage.getFolders());
-  const initialCurFolder = storage.getFolders().some(f => f.path === initialWorkspace.currentFolder)
-    ? initialWorkspace.currentFolder
-    : DEFAULT_INBOX_FOLDER;
-
-  const [currentFolder, setCurrentFolder] = useState<string>(initialCurFolder);
+  const [startInInbox] = useState(() => defaultsToMobileLayout());
+  const [currentFolder, setCurrentFolder] = useState(() => (
+    !startInInbox && folders.some(f => f.path === initialWorkspace.currentFolder)
+      ? initialWorkspace.currentFolder
+      : DEFAULT_INBOX_FOLDER
+  ));
   const [items, setItems] = useState<SlagItem[]>(() => {
     const rawItems = storage.getItems();
     const { updatedItems, changedCount } = evaluateRecurringTasks(rawItems);
@@ -104,7 +105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     aiItemFilter, applyAiFilter, clearAiFilter,
     folderSettings, setFolderSettings,
     updateCurrentFolderViewSettings, resetCurrentFolderViewSettings,
-  } = useFeedView(currentFolder, initialWorkspace);
+  } = useFeedView(currentFolder, initialWorkspace, startInInbox);
 
   const {
     chatMessages, setChatMessages, isChatLoading,
@@ -119,9 +120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isSearchOpen, setIsSearchOpen, isSettingsOpen, setIsSettingsOpen,
     settingsTab, setSettingsTab, openSettingsModal, isLogViewerOpen, setIsLogViewerOpen,
     isFolderModalOpen, setIsFolderModalOpen, folderModalParent, setFolderModalParent,
-    isFolderInfoModalOpen, setIsFolderInfoModalOpen, folderInfoTarget, setFolderInfoTarget,
     folderMoveTarget, openFolderMoveModal, closeFolderMoveModal,
-    openFolderInfoModal, closeFolderInfoModal,
     isVaultModalOpen, setIsVaultModalOpen, openVaultModal, closeVaultModal,
     isTriageModalOpen, setIsTriageModalOpen,
     isComposerModalOpen, setIsComposerModalOpen, composerModalOptions, setComposerModalOptions,
@@ -129,7 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     contextMenu, openContextMenu, closeContextMenu,
     toasts, addToast, removeToast, confirmRequest, resolveConfirm, confirmAction,
     attachSheet, openAttachSheet, closeAttachSheet,
-  } = useOverlays(currentFolder, initialWorkspace);
+  } = useOverlays(initialWorkspace);
 
   const [folderViewTarget, setFolderViewTarget] = useState<FolderViewTarget | null>(null);
   const [folderViewSection, setFolderViewSection] = useState<FolderViewSection>('main');
@@ -146,14 +145,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
 
+  const selectMobileFolder = useCallback((folder: string) => {
+    if (folder !== currentFolder) {
+      setReplyTarget(null);
+      setActiveTagFilter(null);
+      clearAiFilter();
+    }
+    setCurrentFolder(folder);
+  }, [currentFolder, setActiveTagFilter, clearAiFilter]);
   const {
     isMobile, forceMobileMode, toggleMobileMode,
     activeMobileTab, setActiveMobileTab,
-    mobileActiveFolder, setMobileActiveFolder,
+    navigateMobileFolder, goBackFromMobileFolder,
+    isMobileFolderPickerOpen, setIsMobileFolderPickerOpen,
     mobileFolderInfoOpen, setMobileFolderInfoOpen,
     mobileActionSheetItem, setMobileActionSheetItem,
-    mobileDockTabs, setMobileDockTabs, remapMobileFolder,
-  } = useMobileNav(initialWorkspace, setCurrentFolder);
+    mobileDockTabs, setMobileDockTabs,
+  } = useMobileNav(initialWorkspace, currentFolder, selectMobileFolder, startInInbox);
 
   const {
     uiConfig, updateUiConfig,
@@ -394,27 +402,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, depth: 0 },
     { isOpen: isVaultModalOpen, close: () => setIsVaultModalOpen(false) },
     { isOpen: folderMoveTarget !== null, close: closeFolderMoveModal },
-    { isOpen: isFolderInfoModalOpen, close: () => { setIsFolderInfoModalOpen(false); setFolderInfoTarget(null); } },
     { isOpen: isTriageModalOpen, close: () => setIsTriageModalOpen(false) },
     { isOpen: isComposerModalOpen, close: () => { setIsComposerModalOpen(false); setComposerModalOptions(null); } },
     { isOpen: isSettingsOpen, close: () => setIsSettingsOpen(false) },
     { isOpen: isSearchOpen, close: () => setIsSearchOpen(false) },
-    { isOpen: replyTarget !== null, close: () => setReplyTarget(null) },
     { isOpen: isFullscreenEditorOpen, close: () => { setIsFullscreenEditorOpen(false); setSelectedItem(null); } },
     { isOpen: isMobile && mobileFolderInfoOpen, close: () => setMobileFolderInfoOpen(false) },
-    {
-      isOpen: isMobile && mobileActiveFolder !== null,
-      depth: mobileActiveFolder ? mobileActiveFolder.split('/').length : 0,
-      close: () => {
-        if (!mobileActiveFolder) return;
-        if (mobileActiveFolder.includes('/')) {
-          setMobileActiveFolder(mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/')));
-        } else {
-          setMobileActiveFolder(null);
-        }
-      },
-    },
+    { isOpen: isMobile && isMobileFolderPickerOpen, close: () => setIsMobileFolderPickerOpen(false) },
+    { isOpen: replyTarget !== null && (!isMobile || activeMobileTab === 'folders'), close: () => setReplyTarget(null) },
     { isOpen: isMobile && activeMobileTab !== 'folders', close: () => setActiveMobileTab('folders') },
+    { isOpen: isMobile && currentFolder !== DEFAULT_INBOX_FOLDER, depth: mobileFolderDepth(currentFolder), close: goBackFromMobileFolder },
   ];
   const { dismissTopLayer } = useLayerStack(layers, isMobile);
   const toggleAssistant = useCallback(() => {
@@ -433,7 +430,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     openComposer: openComposerModal,
     openSettings: openSettingsModal,
     dismissTopLayer,
-    isOverlayOpen: () => Boolean(isFullscreenEditorOpen || isComposerModalOpen || isSearchOpen || isSettingsOpen || contextMenu),
+    isOverlayOpen: () => Boolean(isFullscreenEditorOpen || isComposerModalOpen || isSearchOpen || isSettingsOpen || contextMenu || isMobileFolderPickerOpen),
   });
 
   // scrollToItem rides down into every card, so a new identity on each save kept the markdown
@@ -494,11 +491,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [addToast, setCurrentFolder]);
 
   const navigateToFolder = useCallback((folder: string, itemId?: string) => {
-    setCurrentFolder(folder);
-    if (isMobile) {
-      setMobileActiveFolder(folder);
-      setActiveMobileTab('folders');
-    }
+    if (isMobile) navigateMobileFolder(folder);
+    else setCurrentFolder(folder);
     setIsPinnedOnlyFilter(false);
     clearAiFilter();
 
@@ -527,8 +521,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [
     setCurrentFolder,
     isMobile,
-    setMobileActiveFolder,
-    setActiveMobileTab,
+    navigateMobileFolder,
     setFeedViewMode,
     setIsPinnedOnlyFilter,
     clearAiFilter,
@@ -601,8 +594,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveFolder, updateFolderDescription, renameFolder, moveFolder, deleteFolder,
     openCreateFolderModal, closeFolderModal,
   } = useFolderAdmin({
-    currentFolder, setCurrentFolder, setFolderInfoTarget,
-    remapMobileFolder, refreshData, addToast,
+    currentFolder, setCurrentFolder, refreshData, addToast,
     setIsFolderModalOpen, setFolderModalParent,
   });
 
@@ -611,7 +603,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   } = useVaults({
     vault, setVault, setVaults, setFolders, setItems,
     setCurrentFolder, setFeedViewMode, setInboxMode, setActiveTypeFilter,
-    setActiveTagFilter, setActiveMobileTab, setIsKanbanMaterialsOpen,
+    setActiveTagFilter, setActiveMobileTab, setIsMobileFolderPickerOpen, setIsKanbanMaterialsOpen,
     setSortBy, setSortOrder, setFolderSettings,
     setChatMessages, setSelectedItem, refreshData, addToast,
   });
@@ -660,10 +652,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSettingsOpen,
         isFolderModalOpen,
         folderModalParent,
-        isFolderInfoModalOpen,
-        folderInfoTarget,
-        openFolderInfoModal,
-        closeFolderInfoModal,
         folderMoveTarget,
         openFolderMoveModal,
         closeFolderMoveModal,
@@ -775,8 +763,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isMobile,
         activeMobileTab,
         setActiveMobileTab,
-        mobileActiveFolder,
-        setMobileActiveFolder,
+        goBackFromMobileFolder,
+        isMobileFolderPickerOpen,
+        setIsMobileFolderPickerOpen,
         mobileFolderInfoOpen,
         setMobileFolderInfoOpen,
         mobileActionSheetItem,

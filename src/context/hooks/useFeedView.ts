@@ -23,18 +23,15 @@ import { UI_BREAKPOINTS } from '../../config';
 export function useFeedView(
   currentFolder: string,
   initialWorkspace: WorkspaceState,
+  startInInbox: boolean,
 ) {
-  const initialCurFolder =
-    initialWorkspace.currentFolder && initialWorkspace.currentFolder !== DEFAULT_INBOX_FOLDER
-      ? initialWorkspace.currentFolder
-      : DEFAULT_INBOX_FOLDER;
-  const initialFolderSetting = (initialWorkspace.folderSettings || {})[initialCurFolder];
+  const initialFolderSetting = initialWorkspace.folderSettings?.[currentFolder];
 
   const [inboxMode, setInboxMode] = useState<InboxMode>(
-    () => initialFolderSetting?.inboxMode || initialWorkspace.inboxMode || 'all',
+    () => initialFolderSetting?.inboxMode || (!startInInbox && initialWorkspace.inboxMode) || 'all',
   );
   const [feedViewMode, setFeedViewMode] = useState<import('../../types').FeedViewMode>(
-    () => initialFolderSetting?.viewMode || initialWorkspace.feedViewMode || 'feed',
+    () => startInInbox ? 'feed' : initialFolderSetting?.viewMode || initialWorkspace.feedViewMode || 'feed',
   );
   const [isKanbanMaterialsOpen, setIsKanbanMaterialsOpen] = useState<boolean>(() => {
     if (typeof initialWorkspace.isKanbanMaterialsOpen === 'boolean') {
@@ -50,17 +47,17 @@ export function useFeedView(
   );
 
   const [activeTypeFilter, setActiveTypeFilter] = useState<SlagItemType | 'all'>(
-    () => initialFolderSetting?.typeFilter || initialWorkspace.activeTypeFilter || 'all',
+    () => initialFolderSetting?.typeFilter || (!startInInbox && initialWorkspace.activeTypeFilter) || 'all',
   );
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(
-    () => initialWorkspace.activeTagFilter ?? null,
+    () => startInInbox ? null : initialWorkspace.activeTagFilter ?? null,
   );
   const [isPinnedOnlyFilter, setIsPinnedOnlyFilter] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<SortField>(
-    () => initialFolderSetting?.sortBy || initialWorkspace.sortBy || 'createdAt',
+    () => initialFolderSetting?.sortBy || (!startInInbox && initialWorkspace.sortBy) || 'createdAt',
   );
   const [sortOrder, setSortOrder] = useState<SortOrder>(
-    () => initialFolderSetting?.sortOrder || initialWorkspace.sortOrder || 'asc',
+    () => initialFolderSetting?.sortOrder || (!startInInbox && initialWorkspace.sortOrder) || 'asc',
   );
   // Session-only, like the pinned and AI filters: a launch never reopens with done tasks
   // hidden because of something switched on days ago.

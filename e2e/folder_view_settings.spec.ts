@@ -4,12 +4,9 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   test(`Active filters share compact styling and clear independently at ${viewport.width}px`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/');
-    if (viewport.width < 768) {
-      await page.getByRole('button', { name: /^Входящие/ }).first().click();
-    }
     const dots = page.getByRole('button', { name: 'Вид и фильтры папки' });
     const header = dots.locator('xpath=ancestor::header');
-    await expect(header.getByRole('button', { name: 'Информация о папке' })).toHaveText('Входящие');
+    await expect(header.getByRole('button', { name: 'Переключить папку: Входящие' })).toBeVisible();
     await expect(header.getByRole('button', { name: 'Запустить ИИ-Сортировку' })).toHaveText('');
     await dots.click();
     const modal = page.getByRole('dialog', { name: 'Вид и фильтры', exact: true });

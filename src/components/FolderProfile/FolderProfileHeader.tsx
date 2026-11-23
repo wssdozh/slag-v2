@@ -3,13 +3,12 @@ import React, { useEffect, useRef } from 'react';
 import { Icon, type IconSize } from '../UI/icons/Icon';
 import type { FolderMeta } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
-import { IconButton } from '../UI/IconButton';
 import { FolderAppearancePicker } from './FolderAppearancePicker';
 import { FolderActionsMenu } from './FolderActionsMenu';
 import { recordCountLabel } from './folderStatsConfig';
 import type { FolderProfileEdit } from './useFolderProfileEdit';
 
-export type FolderProfileVariant = 'dock' | 'modal' | 'screen';
+export type FolderProfileVariant = 'dock' | 'screen';
 
 export interface FolderProfileHeaderProps {
   folder: FolderMeta | undefined;
@@ -20,30 +19,25 @@ export interface FolderProfileHeaderProps {
   onSaveFolder: (folder: FolderMeta) => void;
   onMove: () => void;
   onDelete: () => void;
-  onClose?: () => void;
 }
 
 const iconButtonClass: Record<FolderProfileVariant, string> = {
   dock: 'w-8 h-8 rounded-lg',
-  modal: 'w-8 h-8 rounded-lg',
   screen: 'w-11 h-11 rounded-xl',
 };
 
 const iconGlyphSize: Record<FolderProfileVariant, IconSize> = {
   dock: 'xl',
-  modal: 'md',
   screen: 'lg',
 };
 
 const nameClass: Record<FolderProfileVariant, string> = {
   dock: 'text-sm font-semibold',
-  modal: 'text-sm font-semibold',
   screen: 'text-base font-bold',
 };
 
 const descriptionClass: Record<FolderProfileVariant, string> = {
   dock: 'text-xs leading-relaxed line-clamp-4',
-  modal: 'text-ui leading-relaxed',
   screen: 'text-xs leading-relaxed',
 };
 
@@ -61,7 +55,6 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
   onSaveFolder,
   onMove,
   onDelete,
-  onClose,
 }) => {
   const isSystem = path === DEFAULT_INBOX_FOLDER;
   const isEditingName = edit.mode === 'name';
@@ -134,11 +127,6 @@ export const FolderProfileHeader: React.FC<FolderProfileHeaderProps> = ({
               onDelete={isSystem ? undefined : onDelete}
               onDescription={variant === 'dock' ? edit.startDescription : undefined}
             />
-          )}
-          {onClose && (
-            <IconButton size="sm" title="Закрыть (Esc)" aria-label="Закрыть" onClick={onClose}>
-              <Icon name="action.close" size="md" tone="inherit" />
-            </IconButton>
           )}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupSlag } from '../support/slagSetup';
+import { chooseMobileFolder, openMobileFolderProfile } from '../support/mobileFolders';
 
 const STAT_KEYS = ['notes', 'tasks', 'articles', 'media', 'audio', 'links'] as const;
 
@@ -7,11 +8,10 @@ const folderRow = (page: Page, folderPath: string) =>
   page.locator(`[data-testid="folder-tree-row"][data-folder-path="${folderPath}"]`);
 
 const dockProfile = (page: Page) => page.locator('[data-testid="folder-profile"][data-variant="dock"]');
-const modalProfile = (page: Page) => page.locator('[data-testid="folder-profile"][data-variant="modal"]');
 
 async function readStats(scope: Locator): Promise<string[]> {
   const values: string[] = [];
-  for (const key of STAT_KEYS) {
+  for (const key of STAT_KEYS.slice(0, 3)) {
     values.push((await scope.getByTestId(`folder-stat-${key}-value`).innerText()).trim());
   }
   return values;
@@ -25,9 +25,8 @@ async function seedDemo(page: Page) {
   }
 }
 
-async function openProfileModal(page: Page) {
-  await page.locator('header button[title*="Информация и медиа папки"]').first().click();
-  const profile = modalProfile(page);
+async function displayedDockProfile(page: Page) {
+  const profile = dockProfile(page);
   await expect(profile).toBeVisible();
   return profile;
 }
@@ -38,7 +37,7 @@ test.describe('Folder profile', () => {
     await seedDemo(page);
   });
 
-  test('dock panel and modal share one set of counters that feed filters do not touch', async ({ page }) => {
+  test('feed filters do not change the dock profile record counts', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Проекты').click();
 
@@ -57,9 +56,6 @@ test.describe('Folder profile', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     expect(await readStats(dock)).toEqual(dockValues);
-
-    const modal = await openProfileModal(page);
-    expect(await readStats(modal)).toEqual(dockValues);
   });
 
   test('the folder icon and color can be changed from navigation', async ({ page }) => {
@@ -129,7 +125,7 @@ test.describe('Folder profile', () => {
   test('inline rename moves the folder and keeps its records', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Проекты').click();
-    const modal = await openProfileModal(page);
+    const modal = await displayedDockProfile(page);
     const before = await readStats(modal);
     const foldersBefore = await page.locator('[data-testid="folder-tree-row"]').count();
 
@@ -150,8 +146,9 @@ test.describe('Folder profile', () => {
     const description = 'Тестовое описание: проектные заметки и задачи';
 
     await folderRow(page, 'Проекты').click();
-    let modal = await openProfileModal(page);
-    await modal.locator('button[title="Изменить описание для ИИ"]').click();
+    let modal = await displayedDockProfile(page);
+    await modal.getByRole('button', { name: 'Действия с папкой' }).click();
+    await page.getByRole('button', { name: 'Описание для ИИ', exact: true }).click();
     const textarea = modal.getByLabel('Описание папки для ИИ');
     await expect(textarea).toBeVisible();
     await textarea.fill(description);
@@ -162,18 +159,18 @@ test.describe('Folder profile', () => {
     // build has no disk to write it to. A reload assertion would be testing the harness, not the app.
     await page.keyboard.press('Escape');
     await folderRow(page, 'Карьера').click();
-    modal = await openProfileModal(page);
+    modal = await displayedDockProfile(page);
     await expect(modal.getByText(description, { exact: true })).not.toBeVisible();
     await page.keyboard.press('Escape');
     await folderRow(page, 'Проекты').click();
-    modal = await openProfileModal(page);
+    modal = await displayedDockProfile(page);
     await expect(modal.getByText(description, { exact: true })).toBeVisible();
   });
 
   test('deleting a folder asks first and removes it only after confirmation', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Архив').click();
-    const modal = await openProfileModal(page);
+    const modal = await displayedDockProfile(page);
 
     await modal.locator('button[aria-label="Действия с папкой"]').click();
     await page.getByRole('button', { name: 'Удалить папку' }).click();
@@ -185,13 +182,13 @@ test.describe('Folder profile', () => {
     await page.getByRole('button', { name: 'Удалить папку' }).click();
     await page.getByRole('button', { name: 'Удалить', exact: true }).click();
     await expect(folderRow(page, 'Архив')).toHaveCount(0);
-    await expect(modal).toBeHidden();
+    await expect(modal.getByText('Входящие', { exact: true })).toBeVisible();
   });
 
   test('the actions menu is its own layer: Escape and an outside click leave the profile open', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Проекты').click();
-    const modal = await openProfileModal(page);
+    const modal = await displayedDockProfile(page);
     const renameItem = page.getByRole('button', { name: 'Переименовать' });
 
     await modal.locator('button[aria-label="Действия с папкой"]').click();
@@ -210,7 +207,7 @@ test.describe('Folder profile', () => {
   test('moving a folder opens a dialog over the profile and keeps the profile in place', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await folderRow(page, 'Проекты').click();
-    const modal = await openProfileModal(page);
+    const modal = await displayedDockProfile(page);
     await page.waitForTimeout(400);
     const before = await modal.boundingBox();
 
@@ -257,22 +254,20 @@ test.describe('Folder profile', () => {
 
   test('inbox profile offers no rename or delete', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    const modal = await openProfileModal(page);
+    const modal = await displayedDockProfile(page);
 
     await expect(modal.getByText('Входящие', { exact: true })).toBeVisible();
     await expect(modal.locator('button[title="Переименовать папку"]')).toHaveCount(0);
-    await expect(modal.locator('button[aria-label="Действия с папкой"]')).toHaveCount(0);
-    expect(await readStats(modal)).toHaveLength(6);
+    await modal.getByRole('button', { name: 'Действия с папкой' }).click();
+    await expect(page.getByRole('button', { name: 'Описание для ИИ', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Удалить папку', exact: true })).toHaveCount(0);
+    expect(await readStats(modal)).toHaveLength(3);
   });
 
   test('mobile profile shows six counters and renames in place', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.locator('nav[aria-label="Мобильная навигация"] button[aria-label*="Папки"]').first().click();
-    await page.getByRole('button', { name: 'Проекты', exact: true }).click();
-    await page.locator('button[aria-label="Информация о папке"]').first().click();
-
-    const profile = page.locator('[data-testid="folder-profile"][data-variant="screen"]');
-    await expect(profile).toBeVisible();
+    await chooseMobileFolder(page, 'Проекты');
+    const profile = await openMobileFolderProfile(page);
     for (const key of STAT_KEYS) {
       await expect(profile.getByTestId(`folder-stat-${key}`)).toBeVisible();
     }

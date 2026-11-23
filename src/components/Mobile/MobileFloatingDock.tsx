@@ -1,7 +1,8 @@
-// The floating tab dock at the bottom of the phone shell, with its capture button.
+// The floating tab dock at the bottom of the phone shell.
+// NOTE: FAB removed from here — it is rendered separately in MobileShell
+// as <InboxFAB> so it does not overlap the Composer dock.
 import React, { useRef, useState, useLayoutEffect, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { usePresence } from '../../hooks/ui/usePresence';
 import type { MobileTabId } from '../../types';
 import { Icon } from '../UI/icons/Icon';
@@ -24,19 +25,14 @@ const ALL_TABS: Record<MobileTabId, TabConfig> = {
 
 export interface MobileFloatingDockProps {
   isVisible?: boolean;
+  hideCapture?: boolean;
 }
 
-export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisible = true }) => {
-  const {
-    activeMobileTab,
-    setActiveMobileTab,
-    mobileDockTabs,
-    items,
-    openNewNote,
-    currentFolder
-  } = useApp();
+export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisible = true, hideCapture = false }) => {
+  const { activeMobileTab, setActiveMobileTab, mobileDockTabs, openNewNote, currentFolder } = useApp();
 
   const { ref: dockRef, phase, isPresent, onTransitionEnd } = usePresence(isVisible);
+
   const navRef = useRef<HTMLElement | null>(null);
 
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number; ready: boolean }>({
@@ -60,18 +56,12 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
 
   useLayoutEffect(() => {
     updateIndicator();
-  }, [updateIndicator, mobileDockTabs]);
+  }, [updateIndicator, mobileDockTabs, isPresent, hideCapture]);
 
   useEffect(() => {
     window.addEventListener('resize', updateIndicator);
     return () => window.removeEventListener('resize', updateIndicator);
   }, [updateIndicator]);
-
-  const unsortedCount = items.filter(i => i.folder === DEFAULT_INBOX_FOLDER).length;
-
-  const handleFabClick = () => {
-    openNewNote(currentFolder);
-  };
 
   if (!isPresent) return null;
 
@@ -80,16 +70,14 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
       ref={dockRef}
       data-motion-state={phase}
       onTransitionEnd={onTransitionEnd}
-      className="fixed left-0 right-0 z-40 pointer-events-none flex items-center justify-center gap-2.5 px-4 motion-dock"
-      style={{
-        bottom: 'max(var(--sab), 0.75rem)',
-      }}
+      inert={!isVisible}
+      className="motion-dock pointer-events-none absolute inset-x-0 bottom-[max(var(--sab),0.75rem)] z-40 flex items-center justify-center gap-2.5 px-4"
     >
       {/* Main Linear-style Floating Capsule Dock */}
       <nav
         ref={navRef}
         aria-label="Мобильная навигация"
-        className="relative pointer-events-auto h-12 bg-surface border border-tint-8 rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-scrim-80"
+        className="relative pointer-events-auto h-[var(--mobile-tab-dock-height)] bg-surface border border-tint-8 rounded-full px-1.5 py-1 flex items-center gap-1 shadow-2xl shadow-scrim-80"
       >
         {/* Animated sliding capsule indicator */}
         {indicatorStyle.ready && (
@@ -108,7 +96,6 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
           const tab = ALL_TABS[tabId];
           if (!tab) return null;
           const isActive = activeMobileTab === tabId;
-          const hasDot = tabId === 'folders' && unsortedCount > 0;
 
           return (
             <button
@@ -121,7 +108,7 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
                   : 'text-fg-secondary hover:text-fg-soft hover:bg-tint-4'
               }`}
               title={tab.label}
-              aria-label={hasDot ? `${tab.label}, ${unsortedCount} неразобранных записей` : tab.label}
+              aria-label={tab.label}
             >
               <div className="relative flex items-center justify-center">
                 <Icon
@@ -131,22 +118,17 @@ export const MobileFloatingDock: React.FC<MobileFloatingDockProps> = ({ isVisibl
                   variant={isActive ? 'filled' : 'outline'}
                   className="transition-colors duration-150"
                 />
-
               </div>
             </button>
           );
         })}
       </nav>
-
-      <button
-        type="button"
-        onClick={handleFabClick}
-        className="pointer-events-auto flex size-12 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-2xl shadow-scrim-80 outline-none ring-0 transition-colors hover:bg-accent-strong focus-visible:bg-accent-strong motion-press cursor-pointer"
-        title="Новая запись"
-        aria-label="Создать новую запись"
-      >
-        <Icon name="action.add" size="lg" tone="primary" />
-      </button>
+      {!hideCapture && (
+        <button type="button" onClick={() => openNewNote(currentFolder)} aria-label="Создать новую запись" title="Новая запись"
+          className="motion-press pointer-events-auto grid size-12 shrink-0 place-items-center rounded-full bg-accent text-white shadow-2xl shadow-scrim-80 hover:bg-accent-strong focus-visible:bg-accent-strong">
+          <Icon name="action.add" size="lg" tone="primary" />
+        </button>
+      )}
     </div>
   );
 };

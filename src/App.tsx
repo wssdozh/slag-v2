@@ -45,9 +45,6 @@ const AdminPanel = lazy(() =>
 const FolderModal = lazy(() =>
   import('./components/Modals/FolderModal').then((m) => ({ default: m.FolderModal }))
 );
-const FolderInfoModal = lazy(() =>
-  import('./components/Modals/FolderInfoModal').then((m) => ({ default: m.FolderInfoModal }))
-);
 const FolderMoveModal = lazy(() =>
   import('./components/Modals/FolderMoveModal').then((m) => ({ default: m.FolderMoveModal }))
 );
@@ -107,7 +104,6 @@ const AppContent: React.FC = () => {
     aiSettings,
     isFullscreenEditorOpen,
     isFolderModalOpen,
-    isFolderInfoModalOpen,
     folderMoveTarget,
     isFolderViewModalOpen,
     isVaultModalOpen,
@@ -137,7 +133,6 @@ const AppContent: React.FC = () => {
   // afterwards: unmounting on close would cut the exit animation short.
   const isEditorMounted = useMountedOnOpen(isFullscreenEditorOpen);
   const isFolderModalMounted = useMountedOnOpen(isFolderModalOpen);
-  const isFolderInfoModalMounted = useMountedOnOpen(isFolderInfoModalOpen);
   const isFolderMoveModalMounted = useMountedOnOpen(folderMoveTarget !== null);
   const isFolderViewModalMounted = useMountedOnOpen(isFolderViewModalOpen);
   const isVaultModalMounted = useMountedOnOpen(isVaultModalOpen);
@@ -316,9 +311,6 @@ const AppContent: React.FC = () => {
         <LazyOverlay mounted={isFolderModalMounted}>
           <FolderModal />
         </LazyOverlay>
-        <LazyOverlay mounted={isFolderInfoModalMounted}>
-          <FolderInfoModal />
-        </LazyOverlay>
         <LazyOverlay mounted={isFolderMoveModalMounted}>
           <FolderMoveModal />
         </LazyOverlay>
@@ -400,9 +392,6 @@ const AppContent: React.FC = () => {
       )}
       <LazyOverlay mounted={isFolderModalMounted}>
         <FolderModal />
-      </LazyOverlay>
-      <LazyOverlay mounted={isFolderInfoModalMounted}>
-        <FolderInfoModal />
       </LazyOverlay>
       <LazyOverlay mounted={isFolderMoveModalMounted}>
         <FolderMoveModal />

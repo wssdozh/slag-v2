@@ -71,18 +71,10 @@ test.describe('Quick Shots Suite', () => {
       await page.waitForTimeout(150);
     }
 
-    // Go to folders tab and test the header vault dropdown
-    const dockFolders = page.locator('nav[aria-label="Мобильная навигация"] button[aria-label*="Папки"]').first();
-    if (await dockFolders.isVisible()) {
-      await dockFolders.click();
-      await page.waitForTimeout(200);
-
-      const headerVaultBtn = page.locator('button[data-testid="mobile-vault-switcher-btn"]').first();
-      if (await headerVaultBtn.isVisible()) {
-        await headerVaultBtn.click();
-        await page.waitForTimeout(200);
-        await page.screenshot({ path: path.join(outDir, 'mobile_vault_dropdown.png') });
-      }
-    }
+    const dockFolders = page.getByRole('navigation', { name: 'Мобильная навигация' }).getByRole('button', { name: 'Папки' });
+    await dockFolders.click();
+    await page.locator('header').getByRole('button', { name: /^Переключить папку:/ }).click();
+    await page.getByRole('combobox', { name: 'Найти папку' }).waitFor();
+    await page.screenshot({ path: path.join(outDir, 'mobile_folder_dropdown.png'), animations: 'disabled' });
   });
 });

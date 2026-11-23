@@ -1,116 +1,66 @@
 // The phone shell: which tab is on screen, and the edge swipe that goes back.
-import React, { useRef } from 'react';
+import { useRef, type TouchEvent } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MobileFoldersView } from './MobileFoldersView';
-import { MobileTasksView } from './MobileTasksView';
-import { MobileAssistantView } from './MobileAssistantView';
-import { MobileSettingsView } from './MobileSettingsView';
-import { MobileCalendarView } from './MobileCalendarView';
+import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { AudioPanel } from '../Audio/AudioPanel';
-import { MobileFolderInfoView } from './MobileFolderInfoView';
+import { MobileAssistantView } from './MobileAssistantView';
+import { MobileCalendarView } from './MobileCalendarView';
 import { MobileFloatingDock } from './MobileFloatingDock';
+import { MobileFolderInfoView } from './MobileFolderInfoView';
+import { MobileFoldersView } from './MobileFoldersView';
+import { MobileSettingsView } from './MobileSettingsView';
+import { MobileTasksView } from './MobileTasksView';
 
-/** Ширина левой кромки, с которой начинается edge-swipe назад. */
 const EDGE_SWIPE_WIDTH = 28;
-/** Минимальный горизонтальный ход, чтобы считать жест свайпом назад. */
 const SWIPE_DISTANCE = 64;
 
-export const MobileShell: React.FC = () => {
-  const {
-    activeMobileTab,
-    setActiveMobileTab,
-    mobileActiveFolder,
-    setMobileActiveFolder,
-    mobileFolderInfoOpen
-  } = useApp();
-
+export function MobileShell() {
+  const { activeMobileTab, mobileFolderInfoOpen, dismissTopLayer, currentFolder, isMobileFolderPickerOpen, feedViewMode } = useApp();
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
+  const folderTab = activeMobileTab === 'folders';
+  const inInbox = folderTab && currentFolder === DEFAULT_INBOX_FOLDER;
+  const isDockVisible = activeMobileTab !== 'assistant' && (!folderTab || inInbox) && !isMobileFolderPickerOpen && !mobileFolderInfoOpen;
 
-  // Show floating dock when at the root level of tabs (not deep in a folder's feed, and not in assistant)
-  const isInsideFolderFeed = activeMobileTab === 'folders' && mobileActiveFolder !== null;
-  const isFloatingDockVisible = !isInsideFolderFeed && activeMobileTab !== 'assistant';
-
-  const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
     swipeStart.current = null;
     if (event.touches.length !== 1) return;
-
     const touch = event.touches[0];
     if (touch.clientX > EDGE_SWIPE_WIDTH) return;
-
     const target = event.target;
-    if (
-      target instanceof Element &&
-      target.closest('[data-swipe-ignore], .overflow-x-auto, input, textarea, [contenteditable="true"]')
-    ) {
-      return;
-    }
-
+    if (target instanceof Element && target.closest('[data-swipe-ignore], .overflow-x-auto, input, textarea, [contenteditable="true"]')) return;
     swipeStart.current = { x: touch.clientX, y: touch.clientY };
-  };
+  }
 
-  const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+  function handleTouchEnd(event: TouchEvent<HTMLElement>) {
     const start = swipeStart.current;
     swipeStart.current = null;
-    if (!start) return;
-
     const touch = event.changedTouches[0];
-    if (!touch) return;
-
+    if (!start || !touch) return;
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
     if (dx <= SWIPE_DISTANCE || dx <= Math.abs(dy) * 1.5) return;
-
-    if (activeMobileTab === 'folders') {
-      // Корень папок — выше некуда, свайп ничего не делает.
-      if (!mobileActiveFolder) return;
-      if (mobileActiveFolder.includes('/')) {
-        setMobileActiveFolder(mobileActiveFolder.substring(0, mobileActiveFolder.lastIndexOf('/')));
-      } else {
-        setMobileActiveFolder(null);
-      }
-      return;
-    }
-
-    // У tasks и calendar свои горизонтальные жесты — их не перехватываем.
-    if (
-      activeMobileTab === 'assistant' ||
-      activeMobileTab === 'settings' ||
-      activeMobileTab === 'audio'
-    ) {
-      setActiveMobileTab('folders');
-    }
-  };
-
-  const handleTouchCancel = () => {
-    swipeStart.current = null;
-  };
+    // Tasks and calendar handle their own horizontal gestures.
+    if (activeMobileTab === 'tasks' || activeMobileTab === 'calendar') return;
+    dismissTopLayer();
+  }
 
   return (
-    <div className="w-full h-full flex flex-col bg-canvas text-fg-primary overflow-hidden relative">
-      {/* Active Tab Screen */}
-      <main
-        className="flex-1 min-h-0 flex flex-col overflow-hidden relative mobile-screen-view"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchCancel}
-      >
-        {activeMobileTab === 'folders' && <MobileFoldersView />}
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas text-fg-primary [--mobile-tab-dock-height:3rem] [--mobile-tab-dock-reserve:calc(var(--mobile-tab-dock-height)+max(var(--sab),0.75rem))]">
+      <main inert={mobileFolderInfoOpen} className={`mobile-screen-view relative flex min-h-0 flex-1 flex-col overflow-hidden ${inInbox ? 'mb-[var(--mobile-tab-dock-reserve)]' : ''}`}
+        onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd} onTouchCancel={() => { swipeStart.current = null; }}>
+        {folderTab && <MobileFoldersView />}
         {activeMobileTab === 'tasks' && <MobileTasksView />}
         {activeMobileTab === 'assistant' && <MobileAssistantView />}
         {activeMobileTab === 'settings' && <MobileSettingsView />}
         {activeMobileTab === 'calendar' && <MobileCalendarView />}
         {activeMobileTab === 'audio' && (
-          <div className="flex-1 flex flex-col bg-canvas text-fg-primary overflow-hidden select-none relative pt-[max(var(--sat),0px)]">
+          <div className="flex flex-1 flex-col overflow-hidden bg-canvas pt-[max(var(--sat),0px)] text-fg-primary select-none">
             <AudioPanel />
           </div>
         )}
       </main>
-
-      {/* Floating Linear Island Dock (Smooth presence transition on root views) */}
-      <MobileFloatingDock isVisible={isFloatingDockVisible} />
-
-      {/* Fullscreen Slide-over Folder Info & Media Profile */}
+      <MobileFloatingDock isVisible={isDockVisible} hideCapture={inInbox && feedViewMode === 'feed'} />
       {mobileFolderInfoOpen && <MobileFolderInfoView />}
     </div>
   );
-};
+}

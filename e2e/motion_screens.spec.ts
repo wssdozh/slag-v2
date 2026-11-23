@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { chooseMobileFolder, mobileFolderTrigger, openMobileFolderProfile } from './support/mobileFolders';
 
 /** Records which direction each swap asked for, at the moment it was started. */
 async function watchSwaps(page: Page) {
@@ -35,7 +36,7 @@ test.describe('screen swaps on a phone', () => {
 
     // The outgoing screen is a snapshot, not a live second tree.
     expect(await page.locator('header').count()).toBe(1);
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toHaveCount(0);
+    await expect(mobileFolderTrigger(page)).toHaveCount(0);
     expect(await swaps(page)).toContain('tab-next');
 
     // Pill stays visible and slides under the active tab
@@ -43,12 +44,11 @@ test.describe('screen swaps on a phone', () => {
     await page.screenshot({ path: 'test-results/screenshots/motion_dock_pill.png' });
 
     await dock.getByRole('button', { name: /^Папки/ }).click();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     expect(await swaps(page)).toEqual(['tab-next', 'tab-prev']);
   });
 
   test('subtasks accordion expands and collapses smoothly without layout jump', async ({ page }) => {
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
     const accordionBtn = page.locator('button[aria-label*="Подзадачи"]').first();
     if (await accordionBtn.count()) {
       await expect(accordionBtn).toBeVisible();
@@ -63,26 +63,26 @@ test.describe('screen swaps on a phone', () => {
   });
 
   test('a folder pushes in and pops back out', async ({ page }) => {
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-    const back = page.locator('header').getByRole('button', { name: 'Папки', exact: true });
+    await chooseMobileFolder(page, 'Проекты');
+    const back = page.locator('header').getByRole('button', { name: 'Назад во Входящие' });
     await expect(back).toBeVisible();
     expect(await swaps(page)).toEqual(['push']);
 
     await page.screenshot({ path: 'test-results/screenshots/motion_folder_push.png' });
 
     await back.click();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     expect(await swaps(page)).toEqual(['push', 'pop']);
   });
 
   test('the folder info screen is part of the same stack', async ({ page }) => {
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-    await page.getByRole('button', { name: 'Информация о папке' }).click();
-    await expect(page.getByRole('button', { name: 'Назад' })).toBeVisible();
-    expect(await swaps(page)).toEqual(['push', 'push']);
+    await openMobileFolderProfile(page);
+    const back = page.getByRole('button', { name: 'Назад', exact: true });
+    await expect(back).toBeVisible();
+    expect(await swaps(page)).toEqual(['push']);
 
-    await page.getByRole('button', { name: 'Назад' }).click();
-    expect(await swaps(page)).toEqual(['push', 'push', 'pop']);
+    await back.click();
+    expect(await swaps(page)).toEqual(['push', 'pop']);
   });
 
   test('without view transitions the screens still switch', async ({ page }) => {
@@ -90,8 +90,8 @@ test.describe('screen swaps on a phone', () => {
       delete (Document.prototype as unknown as { startViewTransition?: unknown }).startViewTransition;
     });
     await page.goto('/');
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-    await expect(page.locator('header').getByRole('button', { name: 'Папки', exact: true })).toBeVisible();
+    await chooseMobileFolder(page, 'Проекты');
+    await expect(page.locator('header').getByRole('button', { name: 'Назад во Входящие' })).toBeVisible();
     expect(await swaps(page)).toEqual([]);
   });
 

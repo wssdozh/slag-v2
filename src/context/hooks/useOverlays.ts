@@ -18,10 +18,9 @@ import { logger } from '../../lib/logger/logger';
  * the confirm question and the attach sheet.
  *
  * One reason to change вЂ” a new surface, or a new rule about layers. Nothing here
- * knows about notes, sync or the feed; when a modal needs vault data, the caller
- * passes it (folder info needs the current folder, that is the whole contract).
+ * owns the open folder or the feed; a dialog gets a target when it opens.
  */
-export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceState) {
+export function useOverlays(initialWorkspace: WorkspaceState) {
   // Lightbox
   const [lightboxImages, setLightboxImages] = useState<LightboxImage[]>([]);
   const [activeLightboxIndex, setActiveLightboxIndex] = useState<number | null>(null);
@@ -68,19 +67,7 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
   // Folder surfaces
   const [isFolderModalOpen, setIsFolderModalOpen] = useState<boolean>(false);
   const [folderModalParent, setFolderModalParent] = useState<string | null>(null);
-  const [isFolderInfoModalOpen, setIsFolderInfoModalOpen] = useState<boolean>(false);
-  const [folderInfoTarget, setFolderInfoTarget] = useState<string | null>(null);
   const [folderMoveTarget, setFolderMoveTarget] = useState<string | null>(null);
-
-  const openFolderInfoModal = useCallback((folderPath?: string) => {
-    setFolderInfoTarget(folderPath || currentFolder);
-    setIsFolderInfoModalOpen(true);
-  }, [currentFolder]);
-
-  const closeFolderInfoModal = useCallback(() => {
-    setIsFolderInfoModalOpen(false);
-    setFolderInfoTarget(null);
-  }, []);
 
   // A move gets its own dialog: the folder stays where it is until the dialog commits.
   const openFolderMoveModal = useCallback((folderPath: string) => {
@@ -202,12 +189,6 @@ export function useOverlays(currentFolder: string, initialWorkspace: WorkspaceSt
     setIsFolderModalOpen,
     folderModalParent,
     setFolderModalParent,
-    isFolderInfoModalOpen,
-    setIsFolderInfoModalOpen,
-    folderInfoTarget,
-    setFolderInfoTarget,
-    openFolderInfoModal,
-    closeFolderInfoModal,
     folderMoveTarget,
     openFolderMoveModal,
     closeFolderMoveModal,

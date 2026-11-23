@@ -71,7 +71,7 @@ export function FolderViewModal() {
             (event.shiftKey ? last : first)?.focus();
           }
         }}
-        className="z-50 w-72 select-none rounded-xl border border-tint-8 bg-surface-elevated p-2 text-xs text-fg-soft shadow-xl shadow-scrim-90 motion-popover">
+        className={`z-50 w-72 select-none rounded-xl border border-tint-8 bg-surface-elevated p-2 text-xs text-fg-soft shadow-xl shadow-scrim-90 motion-popover ${target?.mobile ? '[&_button]:min-h-12' : ''}`}>
         {section === 'main' ? (
           <>
             <div role="group" aria-label="Режим отображения" className="mb-1 flex gap-0.5">
@@ -103,6 +103,22 @@ export function FolderViewModal() {
                 <Icon name="nav.next" size="xs" tone="inherit" />
               </span>
             </button>
+            {target?.mobile && (
+              <div className="mt-1 border-t border-tint-6 pt-1" role="group" aria-label="Действия папки">
+                <button type="button" className={row} onClick={() => {
+                  closeFolderViewModal();
+                  app.setMobileFolderInfoOpen(true);
+                }}>Информация о папке</button>
+                <button type="button" className={row} onClick={() => {
+                  closeFolderViewModal();
+                  app.setIsSearchOpen(true);
+                }}>Поиск по записям</button>
+                <button type="button" className={row} onClick={() => {
+                  closeFolderViewModal();
+                  app.openCreateFolderModal(isInbox ? undefined : currentFolder);
+                }}>{isInbox ? 'Новая папка' : 'Создать подпапку'}</button>
+              </div>
+            )}
             <div className="mt-1 border-t border-tint-6 pt-2">
               <Button variant="secondary" size="sm" className="w-full focus-visible:border-accent" onClick={() => {
                 app.resetCurrentFolderViewSettings();

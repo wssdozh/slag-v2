@@ -1,81 +1,53 @@
-// State machine for the folder picker overlay: open/closed, search text, keyboard navigation.
-import { useState, useMemo, useCallback } from 'react';
+// Search and keyboard selection over the current vault's prebuilt folder tree.
+import { useMemo, useState, type KeyboardEvent } from 'react';
+import { DEFAULT_INBOX_FOLDER } from '../../../config';
+import { folderTreeRows } from '../../../lib/vault/folderTree';
 import type { FolderMeta } from '../../../types';
-import { folderTreeRows, type FolderTreeRow } from '../../../lib/vault/folderTree';
 
-export interface UseFolderPickerParams {
-  folders: FolderMeta[];
-  currentFolder: string;
-  onSelect: (path: string) => void;
-}
+export const folderOptionId = (listId: string, index: number) => `${listId}-option-${index}`;
 
-export interface UseFolderPickerResult {
-  query: string;
-  setQuery: (v: string) => void;
-  rows: FolderTreeRow[];
-  /** Index of the currently active row inside `rows`. Component layer composes activeOptionId via makeOptionId. */
-  selectedIndex: number;
-  onSearchKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-}
+export function useFolderPicker(folders: FolderMeta[], currentFolder: string, onSelect: (path: string) => void) {
+  const [query, setQuery] = useState('');
+  const [highlighted, setHighlighted] = useState<number | null>(null);
+  const options = useMemo(() => {
+    const rest = folders.filter(folder => folder.path !== DEFAULT_INBOX_FOLDER);
+    const inbox = folders.find(folder => folder.path === DEFAULT_INBOX_FOLDER)
+      ?? { path: DEFAULT_INBOX_FOLDER, name: DEFAULT_INBOX_FOLDER, description: '' };
+    return folderTreeRows([inbox, ...rest]).flatMap(row => {
+      if (!row.meta) return [];
+      const parentEnd = row.path.lastIndexOf('/');
+      const parent = parentEnd < 0 ? '' : row.path.slice(0, parentEnd);
+      return [{ ...row, name: row.meta.name, parent, searchText: `${row.meta.name} ${row.path}`.toLowerCase() }];
+    });
+  }, [folders]);
+  const needle = query.trim().toLowerCase();
+  const rows = useMemo(() => needle ? options.filter(row => row.searchText.includes(needle)) : options, [needle, options]);
+  const found = !needle ? rows.findIndex(row => row.path === currentFolder) : 0;
+  const activeIndex = Math.min(highlighted ?? Math.max(0, found), rows.length - 1);
 
-/** Build the DOM id used by aria-activedescendant / role="option". Shared between hook + two components. */
-export function makeOptionId(containerId: string, index: number): string {
-  return `${containerId}-opt-${index}`;
-}
+  function onSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.nativeEvent.isComposing || event.keyCode === 229 || activeIndex < 0) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onSelect(rows[activeIndex].path);
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const step = event.key === 'ArrowDown' ? 1 : -1;
+      setHighlighted(Math.max(0, Math.min(rows.length - 1, activeIndex + step)));
+    }
+  }
 
-const MATCH = (name: string, path: string, q: string) =>
-  name.toLowerCase().includes(q) || path.toLowerCase().includes(q);
-
-/** Filter and memoize tree rows from the raw folder list. */
-const buildRows = (folders: FolderMeta[], query: string): FolderTreeRow[] => {
-  const filtered = query
-    ? folders.filter((f) => MATCH(f.name, f.path, query))
-    : folders;
-  return folderTreeRows(filtered);
-};
-
-export function useFolderPicker({
-  folders,
-  onSelect,
-}: UseFolderPickerParams): UseFolderPickerResult {
-  const [query, _setQuery] = useState('');
-  const [selectedIndex, setSelectedIndex] = useState(0);
-
-  const setQuery = useCallback((v: string) => {
-    _setQuery(v);
-    setSelectedIndex(0);
-  }, []);
-
-  // Only real folders can be selected — Inbox too, but not intermediate nodes.
-  const selectable = useMemo(
-    () => buildRows(folders, query).filter((row) => row.meta !== undefined),
-    [folders, query],
-  );
-
-  const onSearchKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // IME composition must pass arrows/Enter through — the user is still typing.
-      if (e.nativeEvent.isComposing) return;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedIndex((i) => (selectable.length > 0 && i < selectable.length - 1 ? i + 1 : i));
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedIndex((i) => (i > 0 ? i - 1 : 0));
-        return;
-      }
-      if (e.key === 'Enter' && selectable.length > 0) {
-        e.preventDefault();
-        const chosen = selectable[selectedIndex];
-        if (chosen?.meta) onSelect(chosen.meta.path);
-        return;
-      }
+  return {
+    query,
+    isFiltering: needle !== '',
+    rows,
+    activeIndex,
+    onSearchKeyDown,
+    setQuery(next: string) {
+      setQuery(next);
+      setHighlighted(null);
     },
-    [selectable, selectedIndex, onSelect],
-  );
-
-  return { query, setQuery, rows: selectable, selectedIndex, onSearchKeyDown };
+  };
 }
+
+export type FolderPickerRow = ReturnType<typeof useFolderPicker>['rows'][number];

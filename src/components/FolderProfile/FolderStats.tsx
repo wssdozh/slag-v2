@@ -1,10 +1,10 @@
-// The folder's six counters, laid out as rows, an inline strip or a grid.
+// Compact record counts in the dock, a six-counter grid on the phone.
 import React from 'react';
 import type { FolderMediaData } from '../RightPanel/useFolderMedia';
 import { FOLDER_STATS } from './folderStatsConfig';
 import { Icon } from '../UI/icons/Icon';
 
-export type FolderStatsVariant = 'rows' | 'inline' | 'grid';
+export type FolderStatsVariant = 'rows' | 'grid';
 
 export interface FolderStatsProps {
   mediaData: FolderMediaData;
@@ -12,9 +12,7 @@ export interface FolderStatsProps {
 }
 
 /**
- * The same six numbers, laid out for the container: the dock panel is narrow,
- * the modal is wide, the phone screen is tall. Values are computed in
- * `useFolderMedia` from the folder's own items, so every layout shows one truth.
+ * Counts come from the same folder records on both surfaces.
  */
 export const FolderStats: React.FC<FolderStatsProps> = ({ mediaData, variant }) => {
   if (variant === 'rows') {
@@ -41,47 +39,21 @@ export const FolderStats: React.FC<FolderStatsProps> = ({ mediaData, variant }) 
     );
   }
 
-  if (variant === 'grid') {
-    return (
-      <div className="grid grid-cols-3 gap-x-2 gap-y-3">
-        {FOLDER_STATS.map(({ key, label, icon, count }) => {
-          const value = count(mediaData);
-          const hasItems = value > 0;
-          return (
-            <div key={key} data-testid={`folder-stat-${key}`} className="flex flex-col items-center gap-0.5 text-center">
-              <Icon name={icon} size="sm" tone="inherit" className={`w-3.5 h-3.5 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
-              <span
-                data-testid={`folder-stat-${key}-value`}
-                className={`font-mono text-base font-semibold ${hasItems ? 'text-fg-primary' : 'text-fg-dim'}`}
-              >
-                {value}
-              </span>
-              <span className="text-3xs text-fg-muted">{label}</span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex items-stretch">
-      {FOLDER_STATS.map(({ key, label, count }, index) => {
+    <div className="grid grid-cols-3 gap-x-2 gap-y-3">
+      {FOLDER_STATS.map(({ key, label, icon, count }) => {
         const value = count(mediaData);
         const hasItems = value > 0;
         return (
-          <div
-            key={key}
-            data-testid={`folder-stat-${key}`}
-            className={`flex-1 min-w-0 text-center py-1 ${index > 0 ? 'border-l border-subtle' : ''}`}
-          >
+          <div key={key} data-testid={`folder-stat-${key}`} className="flex flex-col items-center gap-0.5 text-center">
+            <Icon name={icon} size="sm" tone="inherit" className={`w-3.5 h-3.5 ${hasItems ? 'text-fg-muted' : 'text-fg-dim'}`} />
             <span
               data-testid={`folder-stat-${key}-value`}
-              className={`block font-mono text-base font-semibold ${hasItems ? 'text-fg-primary' : 'text-fg-dim'}`}
+              className={`font-mono text-base font-semibold ${hasItems ? 'text-fg-primary' : 'text-fg-dim'}`}
             >
               {value}
             </span>
-            <span className="block text-3xs text-fg-muted truncate">{label}</span>
+            <span className="text-3xs text-fg-muted">{label}</span>
           </div>
         );
       })}

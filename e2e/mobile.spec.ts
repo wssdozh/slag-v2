@@ -1,4 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
+import { chooseMobileFolder, mobileFolderTrigger, openMobileFolderProfile, openMobileNoteSearch } from './support/mobileFolders';
 
 /**
  * The sheet travels with a damped spring painted from `requestAnimationFrame`, so it is not a
@@ -60,80 +61,31 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await expect(page.locator('header').first()).toBeVisible({ timeout: 120000 });
   });
 
-  test('1. Mobile Root Folders View & Linear Floating Dock', async ({ page }) => {
-    // Verify "Заметки" header
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
-
-    // Verify Linear-style floating dock at the bottom
-    const dock = page.locator('nav[aria-label="Мобильная навигация"]');
-    await expect(dock).toBeVisible();
-
-    // Verify tabs in dock
-    await expect(dock.locator('button[aria-label^="Папки"]')).toBeVisible();
-    await expect(dock.locator('button[aria-label="Таски"]')).toBeVisible();
-    await expect(dock.locator('button[aria-label="ИИ"]')).toBeVisible();
-    await expect(dock.locator('button[aria-label="Настройки"]')).toBeVisible();
-
-    // Verify FAB button
-    const fab = page.locator('button[aria-label="Создать новую запись"]');
-    await expect(fab).toBeVisible();
-
-    // Verify root folders list has "Входящие"
-    await expect(page.locator('button', { hasText: 'Входящие' }).first()).toBeVisible();
-
-    await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
-
-    // Press feedback: a folder row tints the moment the finger lands, then fades back.
-    const folderRow = page.getByText('Папки', { exact: true }).locator('..').getByRole('button').first();
-    await expect(folderRow).toBeVisible();
-    await expect(folderRow).toHaveCSS('border-bottom-width', '0px');
-    const rowBox = await folderRow.boundingBox();
-    if (rowBox) {
-      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
-      await page.mouse.down();
-      // The flash is set on pointer-down and outlives the finger, so a fast tap is
-      // acknowledged even when `:active` never paints a frame.
-      await expect(folderRow).toHaveAttribute('data-tapped', 'true');
-      await expect
-        .poll(() =>
-          folderRow.evaluate(el => {
-            const color = getComputedStyle(el).backgroundColor;
-            const alpha = color.match(/\/\s*([\d.]+)\)$/)?.[1] ?? color.match(/,\s*([\d.]+)\)$/)?.[1];
-            return Number(alpha ?? 0);
-          })
-        )
-        .toBe(0.1);
-      await page.screenshot({ path: 'test-results/screenshots/mobile_folder_press.png' });
-      await page.mouse.up();
+  test('1. Inbox opens with the feed and a dock without a second capture button', async ({ page }) => {
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
+    await expect(page.getByTestId('composer-dock')).toBeVisible();
+    const dock = page.getByRole('navigation', { name: 'Мобильная навигация' });
+    for (const name of ['Папки', 'Таски', 'ИИ', 'Настройки']) {
+      await expect(dock.getByRole('button', { name, exact: true })).toBeVisible();
     }
+    await expect(page.getByRole('button', { name: 'Создать новую запись' })).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/screenshots/mobile_root_folders.png' });
   });
 
-  test('Inbox header has an icon-only back button and no subtitle', async ({ page }) => {
-    await page.getByRole('button', { name: /^Входящие/ }).first().tap();
-
+  test('Inbox has no parent button; a project has an icon-only Back to Inbox', async ({ page }) => {
     const header = page.locator('header').first();
-    const back = header.getByRole('button', { name: 'Папки', exact: true });
-    await expect(header.getByText('Входящие', { exact: true })).toBeVisible();
-    await expect(header.getByText('Лента входящих', { exact: true })).toHaveCount(0);
+    const back = header.getByRole('button', { name: 'Назад во Входящие' });
+    await expect(back).toHaveCount(0);
+    await header.screenshot({ path: 'test-results/screenshots/mobile_inbox_header.png' });
+    await chooseMobileFolder(page, 'Проекты');
     await expect(back).toBeVisible();
     await expect(back).toHaveText('');
-    await header.screenshot({ path: 'test-results/screenshots/mobile_inbox_header.png' });
-
     await back.tap();
-    await expect(page.getByRole('heading', { name: /^Заметки/ })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 
   test('2. Hierarchical folder navigation & Telegram-style Composer', async ({ page }) => {
-    // Tap on "Входящие" folder
-    const inboxFolderBtn = page.locator('button', { hasText: 'Входящие' }).first();
-    await inboxFolderBtn.click();
-
-    // Verify folder header with a back button and title "Входящие"
-    await expect(page.locator('header span', { hasText: 'Входящие' })).toBeVisible();
-    await expect(page.locator('button[title*="Назад к списку папок"]')).toBeVisible();
-
-    // Verify info button exists in header
-    await expect(page.locator('button[aria-label="Информация о папке"]')).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
 
     // Verify Telegram-style Composer is visible at the bottom of the feed
     const composerTextarea = page.locator('main textarea, .relative textarea').first();
@@ -158,7 +110,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     const feed = page.locator('.overflow-y-auto').filter({ has: page.locator('[id^="item-"]') }).first();
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
     await composerTextarea.fill(Array.from({ length: 20 }, (_, i) => `строка ${i}`).join('\n'));
-    await expect(composerTextarea).toHaveCSS('height', '220px');
+    await expect(composerTextarea).toHaveCSS('height', `${Math.min(220, (page.viewportSize()?.height ?? 0) / 4)}px`);
     // Resize above invalidates the scroll anchor; the grown composer shrinks the
     // viewport, so pin the feed to the bottom after the new height lands.
     await feed.evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -187,11 +139,6 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_folder_feed.png' });
 
-    // Tap Back to return to root folders
-    await page.locator('button[title*="Назад к списку папок"]').click();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
-
-    // Floating dock is visible again
     await expect(page.locator('nav[aria-label="Мобильная навигация"]')).toBeVisible();
   });
 
@@ -205,7 +152,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     try {
       const page = await context.newPage();
       await page.goto('/');
-      await page.locator('button', { hasText: 'Входящие' }).first().click();
+      await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
       await page.evaluate(() => {
         document.documentElement.style.setProperty('--sab', '24px');
         document.documentElement.style.setProperty('--sal', '12px');
@@ -229,7 +176,6 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
       await expect(footer).toHaveCSS('padding-right', '28px');
       await page.screenshot({ path: 'test-results/screenshots/android_composer_outer_surface.png' });
 
-      await page.locator('button[title*="Назад к списку папок"]').click();
       await page.getByRole('button', { name: 'ИИ', exact: true }).click();
       const assistantComposer = page.locator('[data-composer-root]');
       for (const wrapper of [assistantComposer, assistantComposer.locator('..'), assistantComposer.locator('../..')]) {
@@ -256,11 +202,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('3. Mobile Folder Info Profile with Media Tabs', async ({ page }) => {
-    // Open "Входящие"
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
-
-    // Tap on info button
-    await page.locator('button[aria-label="Информация о папке"]').click();
+    await openMobileFolderProfile(page);
 
     // Verify Folder Profile view
     await expect(page.locator('h1', { hasText: 'Входящие' })).toBeVisible();
@@ -276,7 +218,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Tap Back to return to feed
     await page.locator('header button', { hasText: 'Назад' }).click();
-    await expect(page.locator('header span', { hasText: 'Входящие' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 
   test('4. Mobile Tasks & Kanban View', async ({ page }) => {
@@ -339,12 +281,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
   });
 
   test('6. Mobile Fullscreen Search Modal', async ({ page }) => {
-    // Click Search icon in header
-    await page.locator('button[aria-label="Поиск"]').click();
-
-    // Verify full screen search modal
-    const searchInput = page.locator('input[placeholder*="Поиск по заметкам"]');
-    await expect(searchInput).toBeVisible();
+    const searchInput = await openMobileNoteSearch(page);
 
     await page.screenshot({ path: 'test-results/screenshots/mobile_search.png' });
 
@@ -355,7 +292,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
   test('7. Mobile Action Sheet on Note item', async ({ page }) => {
     // Enter "Входящие"
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
 
     // Три точки с мобилки убраны: меню открывается долгим нажатием по карточке
     await expect(page.locator('.feed-card-contain').first()).toBeVisible();
@@ -428,7 +365,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // Dock is visible again and root folders are shown
     await expect(dock).toBeVisible();
-    await expect(page.locator('h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 
   test('10. Custom Form Controls (Select, Checkbox, NumberInput)', async ({ page }) => {
@@ -563,7 +500,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
   test('13. Mobile Filters alignment, streamlined Task Composer & Assistant calendar grounding', async ({ page }) => {
     // 1. Navigate to "Входящие"
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
 
     // 2. Verify unified clean header: no bloated filter strip, only vertical 3-dots button
     const dotsBtn = page.locator('header button[aria-label="Вид и фильтры папки"]');
@@ -611,9 +548,6 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
     await page.screenshot({ path: 'test-results/screenshots/mobile_composer_task_mode.png' });
 
     // 4. Test Assistant grounding on "чо на завтра"
-    // Tap Back to root folders
-    await page.locator('button[title*="Назад к списку папок"]').click();
-
     // Tap "ИИ" dock tab
     const dock = page.locator('nav[aria-label="Мобильная навигация"]');
     await dock.locator('button[aria-label="ИИ"]').click();
@@ -677,7 +611,7 @@ test.describe('SLAG v2 Mobile Shell & Touch UX', () => {
 
     // 5. Test Hardware/Browser back from Audio Player returns to Folders
     await page.goBack();
-    await expect(page.locator('header h1', { hasText: 'Заметки' })).toBeVisible();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
   });
 });
 
@@ -695,7 +629,7 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
 
   const openInboxWithCards = async (page: Page) => {
     await expect(page.locator('header').first()).toBeVisible({ timeout: 15000 });
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
 
     const seedBtn = page.locator('button', { hasText: 'Сгенерировать демо-заметки' });
     if (await seedBtn.count()) {

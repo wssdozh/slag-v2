@@ -17,8 +17,6 @@ import type { ToastMessage } from '../appContext.types';
 export function useFolderAdmin(deps: {
   currentFolder: string;
   setCurrentFolder: Dispatch<SetStateAction<string>>;
-  setFolderInfoTarget: Dispatch<SetStateAction<string | null>>;
-  remapMobileFolder: (remap: (value: string | null) => string | null) => void;
   refreshData: () => void;
   addToast: (text: string, type?: 'info' | 'success' | 'error', action?: ToastMessage['action']) => void;
   setIsFolderModalOpen: Dispatch<SetStateAction<boolean>>;
@@ -33,8 +31,7 @@ export function useFolderAdmin(deps: {
   closeFolderModal: () => void;
 } {
   const {
-    currentFolder, setCurrentFolder, setFolderInfoTarget,
-    remapMobileFolder, refreshData, addToast,
+    currentFolder, setCurrentFolder, refreshData, addToast,
     setIsFolderModalOpen, setFolderModalParent,
   } = deps;
 
@@ -52,19 +49,12 @@ export function useFolderAdmin(deps: {
     addToast('Описание папки обновлено', 'success');
   }, [refreshData, addToast]);
 
-  // The profile modal and the phone screen point at the old path; a rename or a move has to take
-  // them, and the open folder, along.
+  // Both the workspace and its profile follow the renamed or moved path.
   const followFolderPath = useCallback((oldPath: string, newPath: string) => {
-    const remap = (value: string | null): string | null =>
-      value && (value === oldPath || value.startsWith(oldPath + '/'))
-        ? newPath + value.slice(oldPath.length)
-        : value;
     if (currentFolder === oldPath || currentFolder.startsWith(oldPath + '/')) {
       setCurrentFolder(newPath + currentFolder.slice(oldPath.length));
     }
-    setFolderInfoTarget(previous => remap(previous));
-    remapMobileFolder(remap);
-  }, [currentFolder, setCurrentFolder, setFolderInfoTarget, remapMobileFolder]);
+  }, [currentFolder, setCurrentFolder]);
 
   const reportQueued = useCallback((queued: Promise<void>) => {
     void queued.then(

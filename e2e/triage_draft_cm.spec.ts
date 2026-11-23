@@ -12,13 +12,11 @@ test('markdown composer consumes the expanded draft without restoring a duplicat
   await editor.locator('.cm-content').fill('изменённый markdown черновик');
   await page.getByRole('button', { name: 'Создать', exact: true }).click();
   await expect(editor).not.toBeVisible();
-  const documentText = () => composer.evaluate(async element => {
-    const modulePath = '/node_modules/.vite/deps/@codemirror_view.js';
-    const { EditorView } = await import(modulePath);
-    return EditorView.findFromDOM(element)?.state.doc.toString();
-  });
-  await expect.poll(documentText).toBe('');
+  const lines = composer.locator('.cm-line');
+  await expect(lines).toHaveCount(1);
+  await expect(lines).toBeEmpty();
   await page.reload();
-  await expect.poll(documentText).toBe('');
+  await expect(lines).toHaveCount(1);
+  await expect(lines).toBeEmpty();
   await page.screenshot({ path: 'test-results/screenshots/consolidate-draft-cm.png', fullPage: true });
 });

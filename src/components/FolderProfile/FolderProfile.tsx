@@ -1,4 +1,4 @@
-// One folder profile in three containers: dock panel, modal and phone screen.
+// One folder profile in the desktop dock and the phone screen.
 import React, { useCallback, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { itemsInFolder } from '../../lib/vault/folderItems';
@@ -11,7 +11,6 @@ import { useFolderProfileEdit } from './useFolderProfileEdit';
 export interface FolderProfileProps {
   folderPath: string;
   variant: FolderProfileVariant;
-  onClose?: () => void;
   onSelectTag?: (tag: string) => void;
   /** Container-specific buttons (create record, AI triage) rendered under the header. */
   actions?: React.ReactNode;
@@ -19,18 +18,15 @@ export interface FolderProfileProps {
 
 const containerClass: Record<FolderProfileVariant, string> = {
   dock: 'flex flex-col gap-4 min-w-0',
-  modal: 'flex flex-col gap-4 p-4 sm:p-5 min-w-0',
   screen: 'flex flex-col gap-3.5 px-4 py-3.5 min-w-0',
 };
 
 /**
- * One folder profile, three containers. Counters and media come from the folder's
- * own records, so the dock panel, the modal and the phone screen cannot disagree.
+ * Counters and media come from the folder's own records on desktop and mobile.
  */
 export const FolderProfile: React.FC<FolderProfileProps> = ({
   folderPath,
   variant,
-  onClose,
   onSelectTag,
   actions,
 }) => {
@@ -70,12 +66,11 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
     });
     if (!confirmed) return;
     deleteFolder(folderPath);
-    onClose?.();
-  }, [confirmAction, deleteFolder, folder, folderPath, onClose]);
+  }, [confirmAction, deleteFolder, folder, folderPath]);
 
   const handleMove = useCallback(() => openFolderMoveModal(folderPath), [folderPath, openFolderMoveModal]);
 
-  const statsVariant = variant === 'dock' ? 'rows' : variant === 'screen' ? 'grid' : 'inline';
+  const statsVariant = variant === 'dock' ? 'rows' : 'grid';
 
   return (
     <div className={containerClass[variant]} data-testid="folder-profile" data-variant={variant}>
@@ -88,7 +83,6 @@ export const FolderProfile: React.FC<FolderProfileProps> = ({
         onSaveFolder={saveFolder}
         onMove={handleMove}
         onDelete={handleDelete}
-        onClose={onClose}
       />
 
       {actions && <div className="flex items-center gap-2">{actions}</div>}

@@ -6,13 +6,19 @@ import { useIsMobile } from '../../hooks/layout/useIsMobile';
 import { segmentText, type ComposerHighlight } from './composer/composerHighlights';
 import { ComposerEditorField, type ComposerEditorKeyEvent } from './composer/ComposerEditorField';
 
-export interface BaseComposerProps {
-  /** Текстовое значение поля ввода */
+type ComposerFieldProps = {
   value: string;
-  /** Обработчик изменения текста */
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  /** Обработчик отправки (по Enter или кнопке Send) */
   onSubmit: () => void;
+  fieldOnlySlot?: never;
+} | {
+  fieldOnlySlot: React.ReactElement;
+  value?: never;
+  onChange?: never;
+  onSubmit?: never;
+};
+
+export type BaseComposerProps = ComposerFieldProps & {
   /** Плейсхолдер инпута */
   placeholder?: string;
   /** Внешний ref на textarea */
@@ -54,8 +60,6 @@ export interface BaseComposerProps {
   overlaySlot?: React.ReactNode;
   /** Полное замещение панели управления (например, при активной записи войса/видео) */
   customControls?: React.ReactNode;
-  /** Нейтральный контент в зоне поля ввода: рендерится внутри flex-row перед textarea. Без обработчиков. */
-  fieldOnlySlot?: React.ReactNode;
   /** Минимальная высота поля ввода в px (по умолчанию 22) */
   minHeight?: number;
   /** Максимальная высота поля ввода в px (по умолчанию 220) */
@@ -86,7 +90,7 @@ export interface BaseComposerProps {
  * и инкапсулирует динамический авторесайз textarea с обработкой Enter/Shift+Enter.
  */
 export const BaseComposer: React.FC<BaseComposerProps> = ({
-  value,
+  value = '',
   onChange,
   onSubmit,
   placeholder,
@@ -159,7 +163,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
 
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      if (!isSubmitDisabled) {
+      if (!isSubmitDisabled && onSubmit) {
         onSubmit();
         requestAnimationFrame(() => {
           effectiveRef.current?.focus({ preventScroll: true });
@@ -208,7 +212,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
         )}
 
         {/* Зона ввода */}
-        {!hideTextarea && (
+        {fieldOnlySlot ?? (!hideTextarea && (
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="relative flex min-w-0 flex-1">
             {mode === 'markdown' && editorContainerRef ? (
@@ -275,21 +279,16 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             </>
             )}
             </div>
-            {fieldOnlySlot && (
-              <div className="composer-field-extra shrink-0 flex items-center">
-                {fieldOnlySlot}
-              </div>
-            )}
             {topRightSlot && (
               <div className="composer-top-actions flex shrink-0 items-center gap-1">
                 {topRightSlot}
               </div>
             )}
           </div>
-        )}
+        ))}
 
         {/* Нижняя панель действий (Toolbar) — без внутренней линии-разделителя */}
-        {customControls ? (
+        {!fieldOnlySlot && (customControls ? (
           customControls
         ) : (
           <div className="composer-toolbar relative flex min-w-0 items-end justify-between gap-2 max-[430px]:[&_.composer-record-type_span.truncate]:hidden">
@@ -308,7 +307,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
                   onPointerDown={(e) => e.preventDefault()}
                   onClick={(e) => {
                     e.preventDefault();
-                    if (!isSubmitDisabled) {
+                    if (!isSubmitDisabled && onSubmit) {
                       onSubmit();
                       requestAnimationFrame(() => {
                         const field = effectiveRef.current;
@@ -325,7 +324,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
               )}
             </div>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

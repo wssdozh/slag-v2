@@ -486,6 +486,8 @@ export const useComposerDraft = ({
   }, [activeFolder, resetDraftState, setReplyTarget, setTargetFolder, field, addToast, preserveAlternative]);
 
   const notifyUserEdit = useCallback(() => {
+    // Do not let a pending echo guard skip edits made after a stored draft was adopted.
+    isApplyingRemoteDraftRef.current = false;
     lastLocalUserEditTimeRef.current = Date.now();
   }, []);
 

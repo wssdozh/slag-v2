@@ -59,6 +59,7 @@ export interface ContextMenuTarget {
 
 export interface FolderViewTarget {
   anchor: HTMLButtonElement;
+  mobile?: boolean;
   mode?: FeedViewMode;
   changeLocalMode?: (mode: FeedViewMode) => void;
 }
@@ -141,10 +142,6 @@ export interface AppContextType {
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   closeFolderModal: () => void;
-  isFolderInfoModalOpen: boolean;
-  folderInfoTarget: string | null;
-  openFolderInfoModal: (folderPath?: string) => void;
-  closeFolderInfoModal: () => void;
   folderMoveTarget: string | null;
   openFolderMoveModal: (folderPath: string) => void;
   closeFolderMoveModal: () => void;
@@ -228,8 +225,9 @@ export interface AppContextType {
   isMobile: boolean;
   activeMobileTab: MobileTabId;
   setActiveMobileTab: React.Dispatch<React.SetStateAction<MobileTabId>>;
-  mobileActiveFolder: string | null;
-  setMobileActiveFolder: (folder: string | null) => void;
+  goBackFromMobileFolder: () => void;
+  isMobileFolderPickerOpen: boolean;
+  setIsMobileFolderPickerOpen: (open: boolean) => void;
   mobileFolderInfoOpen: boolean;
   setMobileFolderInfoOpen: (open: boolean) => void;
   mobileActionSheetItem: SlagItem | null;

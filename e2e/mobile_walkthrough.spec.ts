@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { mobileFolderTrigger, openMobileFolderProfile, openMobileNoteSearch } from './support/mobileFolders';
+import { openViewModal } from './support/slagSetup';
 
 test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
   test.use({
@@ -15,7 +17,8 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await page.screenshot({ path: 'test-results/screenshots/audit/01_root_folders.png' });
 
     // 2. Open Create Folder Modal from Root Header
-    await page.locator('button[aria-label="Новая папка"]').click();
+    const folderMenu = await openViewModal(page);
+    await folderMenu.getByRole('button', { name: 'Новая папка', exact: true }).click();
     const folderModal = page.locator('h3', { hasText: 'Создать новую папку' });
     await expect(folderModal).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/02_create_folder_modal.png' });
@@ -24,9 +27,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await expect(folderModal).not.toBeVisible();
 
     // 3. Open Search Modal from Root Header
-    await page.locator('button[aria-label="Поиск"]').click();
-    const searchInput = page.locator('input[placeholder*="Поиск по заметкам"]');
-    await expect(searchInput).toBeVisible();
+    const searchInput = await openMobileNoteSearch(page);
     await page.screenshot({ path: 'test-results/screenshots/audit/03_search_initial.png' });
     // Type in search query to see active results
     await searchInput.fill('замет');
@@ -37,7 +38,7 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await expect(searchInput).not.toBeVisible();
 
     // 4. Enter "Входящие" Folder Feed
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     await expect(page.locator('header span', { hasText: 'Входящие' }).first()).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/05_folder_feed_inbox.png' });
 
@@ -73,12 +74,10 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
       await expect(actionSheetTitle).not.toBeVisible();
     }
 
-    // 7. Fullscreen Focus Editor (open via FAB from root or current view)
-    // Return to root to trigger FAB or use existing item
-    await page.locator('button[title*="Назад к списку папок"]').click();
-    const fabBtn = page.locator('button[aria-label="Создать новую запись"]');
-    await expect(fabBtn).toBeVisible();
-    await fabBtn.click();
+    // 7. The capture shortcut stays available from tabs without the feed composer.
+    const tabNav = page.getByRole('navigation', { name: 'Мобильная навигация' });
+    await tabNav.getByRole('button', { name: 'Таски', exact: true }).click();
+    await page.getByRole('button', { name: 'Создать новую запись' }).click();
 
     // Focus editor should be open
     const editorTitleInput = page.getByPlaceholder('Заголовок...');
@@ -91,8 +90,9 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     await editorBackBtn.click();
     await expect(editorTitleInput).not.toBeVisible();
 
-    // 8. Re-enter "Входящие" and switch to Kanban View
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    // 8. Return to Inbox and switch to Kanban.
+    await tabNav.getByRole('button', { name: 'Папки', exact: true }).click();
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Входящие');
     const dotsBtn = page.locator('button[aria-label="Вид и фильтры папки"]');
     if (await dotsBtn.isVisible()) {
       await dotsBtn.click();
@@ -123,8 +123,8 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     }
 
     // 9. Folder Info View (Profile & Media tabs)
-    await page.locator('button[aria-label="Информация о папке"]').click();
-    await expect(page.locator('h1', { hasText: 'Входящие' })).toBeVisible();
+    const profile = await openMobileFolderProfile(page);
+    await expect(profile.getByRole('heading', { name: 'Входящие' })).toBeVisible();
     await page.screenshot({ path: 'test-results/screenshots/audit/12_folder_info_main.png' });
 
     // Switch to "Файлы" tab
@@ -157,12 +157,6 @@ test.describe('SLAG v2 Mobile Full Walkthrough & Interaction Audit', () => {
     } else {
       // Close folder info
       await page.locator('header button', { hasText: 'Назад' }).click();
-    }
-
-    // Ensure we go back to root folders
-    const backToFoldersBtn = page.locator('button[title*="Назад к списку папок"]');
-    if (await backToFoldersBtn.isVisible()) {
-      await backToFoldersBtn.click();
     }
 
     // 10. Tasks Tab

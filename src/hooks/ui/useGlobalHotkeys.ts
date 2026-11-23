@@ -13,6 +13,7 @@ export function useGlobalHotkeys(
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       const ctx = contextRef.current;
 
       // 1. Escape

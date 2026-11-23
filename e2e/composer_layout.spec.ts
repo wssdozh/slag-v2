@@ -15,7 +15,6 @@ async function open(page: Page, width: number, density = 'compact', route = '/')
   await page.goto(route);
   await expect(page.locator('html')).toHaveAttribute('data-density', density);
   if (width < 768 && route === '/') {
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
   }
   await expect(page.locator('.composer-surface').first()).toBeVisible({ timeout: 15000 });
   await page.evaluate(() => document.fonts.ready);

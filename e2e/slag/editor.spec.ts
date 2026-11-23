@@ -1387,32 +1387,18 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     });
   });
 
-  test('43. Folder profile: merged header, six metrics, inline rename', async ({ page }) => {
-    // 1. Open a user folder, then its profile from the feed header title
+  test('43. Folder profile in the dock: compact counts and inline rename', async ({ page }) => {
     await page.locator('aside').getByText('Проекты', { exact: true }).first().click();
-    const folderHeaderBtn = page.locator('header button[title*="Информация и медиа папки"]').first();
-    await expect(folderHeaderBtn).toBeVisible();
-    await folderHeaderBtn.click();
-
-    // 2. Title and description live in one block, no edit toggle
-    const modal = page.locator('div[role="dialog"]').first();
-    await expect(modal).toBeVisible();
-    const profile = modal.getByTestId('folder-profile');
+    const profile = page.locator('[data-testid="folder-profile"][data-variant="dock"]');
     await expect(profile).toBeVisible();
     await expect(profile.getByText('Проекты', { exact: true })).toBeVisible();
     await expect(profile.getByText(/Активные рабочие и технические проекты/)).toBeVisible();
-    await expect(modal.locator('button[title*="Редактировать параметры"]')).toHaveCount(0);
-
-    // 3. Six metrics, one label per metric
-    for (const key of ['notes', 'tasks', 'articles', 'media', 'audio', 'links']) {
+    await expect(profile.locator('button[title*="Редактировать параметры"]')).toHaveCount(0);
+    for (const key of ['notes', 'tasks', 'articles']) {
       await expect(profile.getByTestId(`folder-stat-${key}`)).toBeVisible();
     }
     const notesBefore = await profile.getByTestId('folder-stat-notes-value').innerText();
-
-    // 4. Screenshot the merged block
-    await page.screenshot({ path: 'test-results/screenshots/folder-profile-modal.png' });
-    await modal.screenshot({ path: 'test-results/screenshots/folder-profile-modal-dialog.png' });
-    await profile.screenshot({ path: 'test-results/screenshots/folder-profile-modal-panel.png' });
+    await profile.screenshot({ path: 'test-results/screenshots/folder-profile-editor-regression.png' });
 
     // 5. Inline rename: the name becomes an input, Enter commits
     await profile.locator('button[title="Переименовать папку"]').click();
@@ -1429,9 +1415,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await profile.locator('input[aria-label="Название папки"]').fill('Проекты');
     await profile.locator('input[aria-label="Название папки"]').press('Enter');
 
-    // 7. Close modal via Escape
-    await page.keyboard.press('Escape');
-    await expect(modal).not.toBeVisible();
+    await expect(profile.getByText('Проекты', { exact: true })).toBeVisible();
   });
 
   test('44. Composer and Assistant focus retention and no placeholder vertical scroll', async ({ page }) => {

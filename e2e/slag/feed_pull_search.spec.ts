@@ -8,7 +8,6 @@ test('a real pull past the newest note opens search, a lazy one goes back', asyn
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   // A phone opens on the folder list; the feed lives behind a folder.
-  await page.locator('button', { hasText: 'Входящие' }).first().click();
   const list = page.locator('[data-testid="feed-list-container"]');
   await expect(list).toBeVisible({ timeout: 15000 });
 

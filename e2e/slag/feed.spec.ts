@@ -164,14 +164,15 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
 
   test('3. Hybrid Inbox mode switching (Unsorted, All, Sorted)', async ({ page }) => {
     // Navigate to Inbox
-    await page.locator('button', { hasText: 'Входящие' }).first().click();
+    await page.getByRole('navigation', { name: 'Входящие', exact: true }).getByRole('button').click();
 
     // Verify view modal allows switching inbox modes
     const modal = await openViewModal(page);
+    await modal.getByRole('button', { name: 'Фильтры', exact: true }).click();
 
-    const unsortedBtn = modal.locator('button', { hasText: 'Неразобранные' });
-    const allBtn = modal.locator('button', { hasText: 'Все' }).last();
-    const sortedBtn = modal.locator('button').filter({ hasText: /^Разобранные$/ });
+    const unsortedBtn = modal.getByRole('button', { name: 'Неразобранные', exact: true });
+    const allBtn = modal.getByRole('button', { name: 'Все', exact: true });
+    const sortedBtn = modal.getByRole('button', { name: 'Разобранные', exact: true });
 
     await expect(unsortedBtn).toBeVisible();
     await expect(allBtn).toBeVisible();

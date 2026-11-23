@@ -23,7 +23,7 @@ import { WindowControls } from '../UI/WindowControls';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { isDesktopApp, startDraggingWindow } from '../../lib/platform/windowControls';
 import { useDockPanels } from './useDockPanels';
-import { syncAllGroupConstraints } from './dockPanelUtils';
+import { getPanelComponent, getPanelMaxWidth, getPanelMinWidth, syncAllGroupConstraints } from './dockPanelUtils';
 import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import { useLocalDay } from '../../hooks/useLocalDay';
 import { useWorkspaceTaskFilter } from './useWorkspaceTaskFilter';
@@ -278,6 +278,36 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ initialPanel }) 
 
     window.addEventListener('slag:toggle-assistant', handleToggleAssistant);
     return () => window.removeEventListener('slag:toggle-assistant', handleToggleAssistant);
+  }, []);
+
+  useEffect(() => {
+    const showFolderInfo = () => {
+      const api = apiRef.current;
+      if (!api) return;
+      const component = 'folder-info';
+      const existing = api.panels.find(panel => getPanelComponent(panel) === component);
+      if (existing) {
+        existing.api.setActive();
+        return;
+      }
+      const assistant = api.panels.find(panel => getPanelComponent(panel) === 'assistant');
+      const center = api.panels.find(panel => ['feed', 'kanban', 'calendar'].includes(getPanelComponent(panel))) ?? api.panels[0];
+      const position = assistant ? { referencePanel: assistant }
+        : center ? { direction: 'right' as const, referencePanel: center } : undefined;
+      api.addPanel({
+        id: api.getPanel('panel_info') ? 'panel_folder_info' : 'panel_info',
+        component,
+        title: 'Инфо',
+        position,
+        initialWidth: 320,
+        minimumWidth: getPanelMinWidth(component),
+        maximumWidth: getPanelMaxWidth(component),
+      });
+      syncAllGroupConstraints(api);
+    };
+
+    window.addEventListener('slag:show-folder-info', showFolderInfo);
+    return () => window.removeEventListener('slag:show-folder-info', showFolderInfo);
   }, []);
 
   return (

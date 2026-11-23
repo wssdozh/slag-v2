@@ -1,4 +1,4 @@
-// The feed's header: folder name and icon, filter badges, sort, materials toggle.
+// The feed's header: folder picker, filter badges, sort, materials toggle.
 import React, { useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { folderIconName } from '../UI/icons/icons';
@@ -7,6 +7,8 @@ import { FolderViewButton } from './FolderViewButton';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { materialsInFolder } from '../../lib/vault/folderItems';
 import { Icon } from '../UI/icons/Icon';
+import { Select } from '../UI/Select';
+import { buildFolderOptions } from '../../lib/vault/folderOptions';
 import type { TaskQuickFilter } from '../../lib/tasks/taskQuickFilter';
 import type { FeedViewMode } from '../../types';
 
@@ -29,7 +31,7 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
     isKanbanMaterialsOpen,
     setIsKanbanMaterialsOpen,
     setIsTriageModalOpen,
-    openFolderInfoModal,
+    navigateToFolder,
   } = useApp();
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -37,6 +39,8 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
   const activeViewMode = controlledViewMode ?? contextViewMode;
   const folderMeta = folders.find(f => f.path === currentFolder);
   const isInbox = currentFolder === DEFAULT_INBOX_FOLDER;
+
+  const folderOptions = useMemo(() => buildFolderOptions(folders), [folders]);
 
   const folderMaterialsCount = useMemo(
     () => activeViewMode === 'kanban' && !taskFilter ? materialsInFolder(items, currentFolder).length : 0,
@@ -67,20 +71,21 @@ export const FeedHeader: React.FC<FeedHeaderProps> = ({
         <ActiveFilterBadges ignoreTypeAndCompletion={Boolean(taskFilter)} />
       </div>
 
-      {/* Center Column: Prominent Folder Title Button */}
+      {/* Center Column: Folder Picker */}
       <div className="flex items-center justify-center justify-self-center min-w-0 max-w-full px-1 z-0">
-        <button
-          type="button"
-          onClick={() => openFolderInfoModal(currentFolder)}
-          className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-lg hover:bg-tint-6 motion-press cursor-pointer group select-none min-w-0"
-          title={`Информация и медиа папки «${folderMeta?.name || currentFolder}»`}
-          aria-label="Информация о папке"
-        >
-          {folderIconComp}
-          <h2 className="text-xs sm:text-sm font-bold text-fg-primary group-hover:text-white tracking-tight transition-colors truncate max-w-[240px]">
-            {folderMeta?.name || currentFolder}
-          </h2>
-        </button>
+        {folderIconComp}
+        <Select
+          size="sm"
+          variant="ghost"
+          direction="down"
+          value={currentFolder}
+          onChange={navigateToFolder}
+          options={folderOptions}
+          aria-label={`Переключить папку: ${folderMeta?.name ?? currentFolder}`}
+          title="Переключить папку"
+          className="min-w-0 max-w-[240px]"
+          triggerClassName="font-semibold"
+        />
       </div>
 
       {/* Right Column: Actions (Materials, AI triage, 3-dots popover button) */}

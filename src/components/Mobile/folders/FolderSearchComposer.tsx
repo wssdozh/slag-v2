@@ -1,60 +1,33 @@
-// The search input at the top of the folder picker: plain input, clear button, keyboard pass-through.
-import React from 'react';
+// A single-line folder search in the same shell as the note composer.
+import type { KeyboardEventHandler, RefObject } from 'react';
+import { BaseComposer } from '../../Feed/BaseComposer';
+import { Icon } from '../../UI/icons/Icon';
 
-export interface FolderSearchComposerProps {
-  inputRef: React.RefObject<HTMLInputElement | null>;
+interface FolderSearchComposerProps {
+  inputRef: RefObject<HTMLInputElement | null>;
   query: string;
-  onQueryChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  onQueryChange: (query: string) => void;
+  onKeyDown: KeyboardEventHandler<HTMLInputElement>;
   onClose: () => void;
+  listId: string;
+  activeOptionId?: string;
 }
 
-/** Pure search input with a clear "×" plate. No list — that's FolderPickerList. */
-export const FolderSearchComposer: React.FC<FolderSearchComposerProps> = ({
-  inputRef,
-  query,
-  onQueryChange,
-  onKeyDown,
-  onClose,
-}) => {
+export function FolderSearchComposer({ inputRef, query, onQueryChange, onKeyDown, onClose, listId, activeOptionId }: FolderSearchComposerProps) {
   return (
-    <div className="flex items-center gap-1.5 px-3 py-2 bg-surface border-b border-tint-6">
-      {/* Magnifier icon placeholder — uses theme tokens */}
-      <svg
-        className="w-4 h-4 shrink-0 text-fg-muted"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="11" cy="11" r="8" />
-        <path d="M21 21l-4.35-4.35" />
-      </svg>
-
-      <input
-        ref={inputRef}
-        type="text"
-        value={query}
-        onChange={onQueryChange}
-        onKeyDown={onKeyDown}
-        placeholder="Поиск папок…"
-        className="flex-1 min-w-0 bg-transparent text-base text-fg-primary placeholder-fg-muted outline-none py-1"
-        aria-label="Поиск папок"
-      />
-
-      {query && (
-        <button
-          type="button"
-          onClick={onClose}
-          onPointerDown={(e) => e.preventDefault()}
-          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-fg-tertiary hover:text-fg-secondary hover:bg-tint-6 transition-colors cursor-pointer"
-          aria-label="Очистить"
-        >
-          ×
+    <BaseComposer className="p-0.5" fieldOnlySlot={
+      <div className="flex items-center gap-2 pl-3">
+        <Icon name="action.search" size="md" tone="secondary" className="shrink-0" />
+        <input ref={inputRef} type="text" role="combobox" aria-label="Найти папку" aria-expanded="true"
+          aria-autocomplete="list" aria-controls={listId} aria-activedescendant={activeOptionId}
+          inputMode="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false}
+          placeholder="Найти папку…" value={query} onChange={event => onQueryChange(event.target.value)} onKeyDown={onKeyDown}
+          className="h-12 min-w-0 flex-1 bg-transparent text-base text-fg-primary outline-none placeholder:text-fg-secondary" />
+        <button type="button" aria-label="Закрыть поиск папок" onClick={onClose}
+          className="grid size-12 shrink-0 place-items-center rounded-xl text-fg-secondary active:bg-tint-8 focus-visible:bg-tint-10">
+          <Icon name="action.close" size="md" tone="inherit" />
         </button>
-      )}
-    </div>
+      </div>
+    } />
   );
-};
+}
