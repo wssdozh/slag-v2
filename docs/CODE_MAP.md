@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **672**, строк: **116905**, зон: **48**.
+Модулей: **672**, строк: **116908**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 722 | 1 |
 
-## e2e (playwright) — 152 файлов, 27938 строк
+## e2e (playwright) — 152 файлов, 27939 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -35,7 +35,7 @@
 - `e2e/slag/feed.spec.ts` — 919
 - `e2e/slag/workspace.spec.ts` — 917
 - `e2e/mobile.spec.ts` — 899
-- `e2e/motion.spec.ts` — 570
+- `e2e/motion.spec.ts` — 571
 - `e2e/adversarial_memory_time.spec.ts` — 567
 - `e2e/assistant_memory.spec.ts` — 555
 - `e2e/admin_panel.spec.ts` — 493
@@ -235,7 +235,7 @@
 | `MobileShell.tsx` | 117 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
 | `MobileTasksView.tsx` | 271 | 1 | MobileTasksView | The phone tasks tab: status tabs you swipe between, plus the calendar mode. |
 
-## src/components/Modals — 12 файлов, 2511 строк
+## src/components/Modals — 12 файлов, 2513 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -248,7 +248,7 @@
 | `FolderModal.tsx` | 168 | 1 | FolderModal | Creating a folder: name, parent and icon; editing that lives in the folder pr… |
 | `FolderMoveModal.tsx` | 108 | 1 | FolderMoveModal | Moving a folder to another parent: a dialog over the profile, not an inline f… |
 | `FolderViewModal.tsx` | 158 | 1 | FolderViewModal | The folder's layout is one click away; detailed choices stay on their own pag… |
-| `SettingsModal.tsx` | 268 | 1 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
+| `SettingsModal.tsx` | 270 | 1 | SettingsModal | The settings shell: a rail of tabs, the mobile and desktop frames, and the pi… |
 | `TriageModal.tsx` | 478 | 1 | TriageModal | AI triage of the inbox: one batch of notes, folders and tags confirmed in a s… |
 | `VaultModal.tsx` | 284 | 1 | VaultModal | The vault switcher: choose a store, create one on a backend, or delete one. |
 

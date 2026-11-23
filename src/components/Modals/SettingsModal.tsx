@@ -252,6 +252,8 @@ export const SettingsModal: React.FC = () => {
               Настройки
             </h3>
             <button
+              type="button"
+              aria-label="Закрыть"
               onClick={() => setIsSettingsOpen(false)}
               className="p-1 rounded text-fg-dim hover:text-fg-primary hover:bg-surface-hover transition-colors cursor-pointer"
             >
