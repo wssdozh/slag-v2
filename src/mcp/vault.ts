@@ -114,18 +114,30 @@ export class McpVault {
     return false;
   }
 
-  private async assertLegacyWritable(): Promise<void> {
+  private async assertLegacyWritable(): Promise<VaultStateData> {
     if (await this.hasRegistryMarker()) throw new Error('Это хранилище использует реестр синхронизации. Изменяйте записи в приложении SLAG.');
+    // An unreadable state does not establish that this vault is safe to edit.
+    return this.readState();
   }
 
   public async writeState(data: VaultStateData): Promise<void> {
-    await this.assertLegacyWritable();
-    const current = await this.readState();
+    const current = await this.assertLegacyWritable();
     const updated = { ...current, ...data, updatedAt: Date.now() };
     const temp = `${this.config.statePath}.${crypto.randomUUID()}.tmp`;
+    const file = await fs.open(temp, 'wx');
     try {
-      await fs.writeFile(temp, JSON.stringify(updated, null, 2), 'utf-8');
+      try {
+        await file.writeFile(JSON.stringify(updated, null, 2), 'utf-8');
+        await file.sync();
+      } finally {
+        await file.close();
+      }
       await fs.rename(temp, this.config.statePath);
+      // Node does not expose Windows MoveFileExW's write-through flag. On Unix, sync the entry.
+      if (process.platform !== 'win32') {
+        const parent = await fs.open(path.dirname(this.config.statePath), 'r');
+        try { await parent.sync(); } finally { await parent.close(); }
+      }
     } catch (error) {
       await fs.rm(temp, { force: true }).catch(() => undefined);
       throw error;

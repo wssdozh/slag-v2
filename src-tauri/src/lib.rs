@@ -164,6 +164,7 @@ fn configure_window_border(_window: &tauri::Window) {}
 
 mod platform;
 mod deeplink;
+mod durable_json;
 #[cfg(desktop)]
 mod secure_store;
 #[cfg(target_os = "android")]
@@ -412,7 +413,8 @@ pub fn run() {
             // Desktop has none of these grants; the commands answer "unknown" so the webview
             // still gets an answer instead of a missing-command error.
             device_access::device_access_status,
-            device_access::device_access_open
+            device_access::device_access_open,
+            durable_json::durable_atomic_write,
         ]);
     }
 
@@ -428,7 +430,8 @@ pub fn run() {
             updater::update_install,
             updater::update_open_install_settings,
             device_access::device_access_status,
-            device_access::device_access_open
+            device_access::device_access_open,
+            durable_json::durable_atomic_write,
         ]);
     }
 

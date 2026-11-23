@@ -14,7 +14,7 @@ import { parseLegacyJson } from '../storage/legacyJson.ts';
 import { sanitizeTombstones } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
 import type { SyncOperation } from './entities/types.ts';
-import { emptySection, mergeSectionState, sanitizeNumbers, sanitizeOutbox, sectionFromState, sectionToPatch } from './syncSection.ts';
+import { assertSyncJournal, emptySection, mergeSectionState, sanitizeNumbers, sanitizeOutbox, sectionFromState, sectionToPatch } from './syncSection.ts';
 import type { SyncSectionState } from './syncSection.ts';
 
 /** The `state.json` section this module owns; the store adapter names it, nothing else does. */
@@ -224,10 +224,11 @@ export async function hydrateSyncSection(scope: SyncScope, store: SyncSectionSto
     return { section: {}, persisted: false, error };
   }
   if (!isCurrent()) return { section: {}, persisted: false, error: 'Stale sync hydration' };
-  if (raw.tombstones !== undefined && (!raw.tombstones || typeof raw.tombstones !== 'object' ||
-      Array.isArray(raw.tombstones) || Object.keys(raw.tombstones).length !== Object.keys(sanitizeTombstones(raw.tombstones)).length)) {
+  try {
+    assertSyncJournal(raw);
+  } catch (error) {
     if (!onDisk(scope.vaultId)) resetSection();
-    return { section: {}, persisted: false, error: 'Invalid deletion ledger' };
+    return { section: {}, persisted: false, error };
   }
   if (onDisk(scope.vaultId) && sectionStore && pendingPatch) {
     const pending = pendingPatch;

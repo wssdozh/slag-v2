@@ -356,6 +356,10 @@ export class SyncEngine {
       applyAccountDevices(this, accountState);
     });
 
+    if (isTauri()) storage.subscribeVaultRecovery(() => {
+      if (storage.getVaultRecovery()) this.disconnect();
+    });
+
     vault().subscribeChanges((event) => {
       // Remote-origin writes are already applied state, and an external one came from the disk
       // under us (the MCP server, another editor): pushing it would echo back through the relay
@@ -1052,6 +1056,12 @@ export class SyncEngine {
     this.disconnect();
     const generation = this.initGeneration;
     const startedAt = performance.now();
+    if (isTauri()) {
+      const vaultId = this.currentVaultId;
+      const read = storage.getCurrentVaultRead();
+      if (storage.getCurrentVault().id !== vaultId || !await read || generation !== this.initGeneration
+        || read !== storage.getCurrentVaultRead() || storage.getVaultRecovery()) return;
+    }
     // The vault's own sync state — config, seed, ledgers — before anything decides whether sync
     // can run at all: `enabled` and the seed phrase are fields of that config.
     if (!await this.hydrateSyncState(generation) || generation !== this.initGeneration) return;

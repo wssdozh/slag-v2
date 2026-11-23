@@ -29,7 +29,7 @@ import {
 import { stripAttachmentData } from './attachmentData';
 import { hasNewerVersionOnDisk } from './writeGuard';
 import { AttachmentStore } from './attachments';
-import { VaultFiles } from './vaultFiles';
+import { VaultFiles, type VaultRecoverySnapshot } from './vaultFiles';
 import {
   initCurrentVault,
   getVaults,
@@ -59,6 +59,7 @@ import {
 } from './trashStore';
 import {
   projectSharedSettings,
+  hydrateSettings,
   readComposerDrafts,
   readComposerDraft,
   writeComposerDraft,
@@ -90,7 +91,8 @@ import { notesRemovedByImport } from './noteRemoval';
 import type { AcceptedNote, FolderGroupListener, FolderTreeListener, NoteMutation, NoteOrigin } from './noteRegistry';
 import type { VaultPort } from './port';
 import { parseSharedRegistryId, readSharedBody, sharedRegistryId } from '../sync/notes/sharedBody';
-import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
+import { hasSharedRegistryEnrollment, loadNoteJournal } from '../sync/notes/persistence';
+import { assertSyncJournal } from '../sync/syncSection';
 import type { SharedBody, SharedMutation } from '../sync/notes/sharedBody';
 import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } from './sharedProjection';
 import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
@@ -155,6 +157,28 @@ export class StorageService {
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
   private currentVaultRead: Promise<boolean> = Promise.resolve(true);
+  private settleStartupState?: () => void;
+  private startupStateReady: Promise<void> = Promise.resolve();
+  private recovery: VaultRecoverySnapshot | null = null;
+  private recoveryListeners = new Set<() => void>();
+
+  public getVaultRecovery = (): VaultRecoverySnapshot | null => this.recovery;
+
+  public subscribeVaultRecovery = (listener: () => void): (() => void) => {
+    this.recoveryListeners.add(listener);
+    return () => { this.recoveryListeners.delete(listener); };
+  };
+
+  private setVaultRecovery(snapshot: VaultRecoverySnapshot | null): void {
+    if (snapshot === this.recovery || (snapshot && snapshot.vaultId !== this.currentVault.id)) return;
+    this.recovery = snapshot;
+    for (const listener of this.recoveryListeners) listener();
+  }
+
+  private assertVaultWritable(vault = this.currentVault): void {
+    if (this.recovery?.vaultId === vault.id) throw new Error('Хранилище открыто только для чтения');
+  }
+
   public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
   private crossWindowDraftChannel: BroadcastChannel | null = null;
   public attachments = new AttachmentStore(() => this.getVaultAttachmentsPath());
@@ -168,6 +192,12 @@ export class StorageService {
     getTrashKey: () => this.getTrashKey(),
     persistFolders: (folders, origin) => this.persistFolders(folders, origin),
     hydrateRegistryFolders: (folders) => this.hydrateRegistryFolders(folders),
+    onRecovery: (snapshot) => {
+      this.setVaultRecovery(snapshot);
+      this.markStartupStateReady();
+    },
+    onStateVerified: () => this.markStartupStateReady(),
+    validateRecoveryState: (vault, state) => this.validateVaultRecoveryState(vault, state),
     attachments: this.attachments,
   });
 
@@ -328,6 +358,7 @@ export class StorageService {
   }
 
   public async writeNoteRegistry(value: unknown): Promise<void> {
+    this.assertVaultWritable();
     if (isTauri()) {
       const captured = this.currentVault;
       if (hasSharedRegistryEnrollment(value) && !this.sharedListeners.has(captured.id)) this.sharedListeners.set(captured.id, null);
@@ -340,14 +371,36 @@ export class StorageService {
     return this.checkedSharedEnrollment.has(vault.id) && !this.sharedListeners.has(vault.id);
   }
 
+  private async validateVaultRecoveryState(vault: VaultMeta, state: Record<string, unknown> | undefined): Promise<void> {
+    const sync = state?.sync;
+    if (sync !== undefined) {
+      if (!sync || typeof sync !== 'object' || Array.isArray(sync)) throw new Error('Invalid sync section');
+      assertSyncJournal(sync as Record<string, unknown>);
+    }
+    // Unlike enrollment checks for ongoing writes, a fresh scan verifies the current disk copy.
+    const stored = await this.files.readRegistryState(vault);
+    if (stored !== undefined) {
+      hasSharedRegistryEnrollment(stored);
+      if (!state) throw new Error('Missing vault state for existing note registry');
+      // Enrollment validates these fields; now verify the journal without applying it.
+      const { room, generation } = stored as { room: string; generation: number };
+      loadNoteJournal(stored, room, generation);
+    }
+    this.rememberSharedEnrollment(vault, stored);
+  }
+
+  private rememberSharedEnrollment(vault: VaultMeta, stored: unknown): void {
+    if (hasSharedRegistryEnrollment(stored) && !this.sharedListeners.has(vault.id)) this.sharedListeners.set(vault.id, null);
+    this.checkedSharedEnrollment.add(vault.id);
+  }
+
   public prepareSharedWrites(vault = this.currentVault): Promise<void> {
     if (!isTauri() || this.sharedListeners.has(vault.id) || this.checkedSharedEnrollment.has(vault.id)) return Promise.resolve();
     const existing = this.sharedEnrollmentReads.get(vault.id);
     if (existing) return existing;
-    const read = this.files.readRegistryState(vault).then((stored) => {
-      if (hasSharedRegistryEnrollment(stored) && !this.sharedListeners.has(vault.id)) this.sharedListeners.set(vault.id, null);
-      this.checkedSharedEnrollment.add(vault.id);
-    }).finally(() => this.sharedEnrollmentReads.delete(vault.id));
+    const read = this.files.readRegistryState(vault)
+      .then((stored) => this.rememberSharedEnrollment(vault, stored))
+      .finally(() => this.sharedEnrollmentReads.delete(vault.id));
     // Keep a failed read closed too: unreadable state does not prove there is no registry.
     this.sharedEnrollmentReads.set(vault.id, read);
     return read;
@@ -492,6 +545,7 @@ export class StorageService {
   private async projectAcceptedNotes(notes: AcceptedNote[], folders: FolderMeta[] | undefined, vault: VaultMeta): Promise<void> {
     const assertVault = () => {
       if (vault.id !== this.currentVault.id) throw new Error('Vault changed while applying registry projection');
+      this.assertVaultWritable(vault);
     };
     assertVault();
     const previousFolders = this.getFolders();
@@ -589,11 +643,26 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public syncCurrentVaultFs(): Promise<boolean> {
-    if (isTauri()) {
-      void this.prepareSharedWrites().catch((error: unknown) => fsLog.error('Could not read shared registry enrollment', error));
-    }
     this.currentVaultRead = isTauri() ? this.files.syncCurrentVaultFs() : Promise.resolve(true);
-    return this.currentVaultRead;
+    const read = this.currentVaultRead;
+    const vaultId = this.currentVault.id;
+    void read.then(async (ok) => {
+      const isCurrent = () => read === this.currentVaultRead && vaultId === this.currentVault.id;
+      if (!ok || !this.recovery || !isCurrent()) return;
+      await hydrateSettings(this);
+      if (isCurrent()) this.setVaultRecovery(null);
+    }).catch((error: unknown) => fsLog.error('Could not leave vault recovery', error));
+    return read;
+  }
+
+  /** The shell may render after the state gate, without waiting for all Markdown files. */
+  public getStartupStateReady(): Promise<void> {
+    return this.startupStateReady;
+  }
+
+  private markStartupStateReady(): void {
+    this.settleStartupState?.();
+    this.settleStartupState = undefined;
   }
 
   /** The existing read for this vault selection; promise identity distinguishes A → B → A. */
@@ -625,7 +694,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     this.initCrossWindowDraftSync();
     installDraftFlushGuards(this);
     if (isTauri()) {
-      this.currentVaultRead = this.initTauriFs();
+      this.startupStateReady = new Promise(resolve => { this.settleStartupState = resolve; });
+      this.currentVaultRead = this.initTauriFs().finally(() => this.markStartupStateReady());
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
       const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
@@ -782,6 +852,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public persistFolders(folders: FolderMeta[], origin: StorageOrigin): Promise<void> | undefined {
     const vault = this.currentVault;
+    if (origin !== 'external') this.assertVaultWritable(vault);
     const previous = this.getFolders();
     const hasRegistry = this.registryFolderVaults.has(vault.id);
     if (hasRegistry && origin !== 'local') return;
@@ -873,6 +944,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public saveNoteEdit(item: SlagItem, options: { origin?: 'local' | 'remote'; restoring?: boolean; editedFrom?: SlagItem | null } = {}): { item: SlagItem; durable?: Promise<void> } {
+    this.assertVaultWritable();
     const { origin = 'local', restoring = false, editedFrom } = options;
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
@@ -965,6 +1037,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
     if (itemsToSave.length === 0) return;
+    this.assertVaultWritable();
     const items = this.getItems();
     const oldItemsMap = new Map(items.map(i => [i.id, i]));
     const saveMap = new Map(itemsToSave.map(i => {
@@ -1014,11 +1087,11 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    * index before the flush reaches the disk, and re-announcing that would fight the editor.
    */
   public async reloadFromDisk(change: VaultDiskChange): Promise<{ updated: number; removed: number }> {
-    if (!isTauri()) return { updated: 0, removed: 0 };
+    if (!isTauri() || this.recovery) return { updated: 0, removed: 0 };
     const vault = this.currentVault;
     let result = { updated: 0, removed: 0 };
     await this.serializeNoteWrite(async () => {
-      if (vault.id === this.currentVault.id) result = await this.readDiskChanges(change, vault);
+      if (vault.id === this.currentVault.id && !this.recovery) result = await this.readDiskChanges(change, vault);
     });
     return result;
   }
@@ -1118,14 +1191,17 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public moveToTrash(id: string, origin: 'local' | 'remote' = 'local'): void {
+    this.assertVaultWritable();
     trashItem(this, id, origin);
   }
 
   public restoreFromTrash(id: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
+    this.assertVaultWritable();
     return recoverFromTrash(this, id, origin);
   }
 
   public moveItem(id: string, targetFolder: string, origin: 'local' | 'remote' = 'local'): SlagItem | null {
+    this.assertVaultWritable();
     const item = this.getItemById(id);
     if (!item) return null;
     item.folder = targetFolder;
@@ -1368,6 +1444,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     registryNotes?: boolean;
   }): Promise<void> {
     const vault = this.currentVault;
+    this.assertVaultWritable(vault);
     const base = {
       items: this.getItems(),
       folders: this.getFolders(),
@@ -1486,6 +1563,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public async assertBackupRestoreAllowed(vault = this.currentVault): Promise<void> {
+    this.assertVaultWritable(vault);
     // Re-read durable enrollment even offline. An unreadable marker is not proof of legacy mode.
     if (this.currentVault.id !== vault.id) throw new Error('Хранилище изменилось во время импорта');
     const stored = await this.readNoteRegistry();
