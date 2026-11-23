@@ -84,7 +84,7 @@ try {
   const activated = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
   relay.stdin.write(`${JSON.stringify(seed)}\n`);
   assert.deepEqual(await activated, ['active']);
-  async function device(i, initial, local = new Map()) {
+  async function device(i, initial, local = new Map(), onApplied) {
     const controller = new AbortController();
     const signal = AbortSignal.any([stop.signal, controller.signal]);
     const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true,
@@ -117,7 +117,10 @@ try {
       return true;
     },
     isLiveOpen: () => ws.readyState === WebSocket.OPEN,
-    apply: async ({ id, item }) => local.set(id, item),
+    apply: async ({ id, item }) => {
+      local.set(id, item);
+      onApplied?.(id);
+    },
     applyFolderTree: async (tree) => { folders = tree; },
     applyFolderGroup: async (notes, tree) => {
       for (const { id, item } of notes) local.set(id, item);
@@ -146,20 +149,24 @@ try {
   }
   const note = (id, content = 'x'.repeat(64 * 1024)) => ({ id, type: 'note', title: id, content, folder: 'Inbox', attachments: [], tags: [], createdAt: 1, updatedAt: 1 });
   const save = (device, items) => device.replica.record(items.map((item) => ({ id: item.id, kind: 'create', item })));
+  const appliedAt = new Map();
   const author = await device(0);
-  let reader = await device(1);
+  let reader = await device(1, undefined, undefined, (id) => appliedAt.set(id, performance.now()));
   const base = author.saved().cursor;
   const initialReads = [author.stats().reads, reader.stats().reads];
   assert.equal(base, 1);
   assert.deepEqual(reader.folders(), tree);
   const timings = [];
+  const appliedTimings = [];
   for (let i = 0; i < 30; i++) {
     const id = `measured-${i}`;
     const start = performance.now();
     await save(author, [note(id)]);
     await until(() => reader.local.has(id) && author.replica.pendingCount === 0);
+    appliedTimings.push(appliedAt.get(id) - start);
     timings.push(performance.now() - start);
   }
+  assert.ok(appliedTimings.every((ms, i) => Number.isFinite(ms) && ms >= 0 && ms <= timings[i]));
   const start = performance.now();
   await save(author, Array.from({ length: 10 }, (_, i) => note(`burst-${i}`)));
   await until(() => reader.local.size === 40 && author.replica.pendingCount === 0);
@@ -382,9 +389,14 @@ try {
   const replay = cascadeWon ? await authorChannel.send(generation, 'race-replay', cascade, raceHead)
     : await phoneChannel.send(generation, 'race-replay', [create], raceHead);
   assert.deepEqual(replay.results, winner.results);
-  const p95Ms = Math.round(timings.sort((a, b) => a - b)[Math.ceil(timings.length * 0.95) - 1]);
-  assert.ok(p95Ms <= 1000, `loopback p95 ${p95Ms}ms`);
-  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, p95Ms, burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
+  const stats = (values) => {
+    const sorted = values.toSorted((a, b) => a - b);
+    const at = (p) => Math.round(sorted[Math.ceil(sorted.length * p) - 1]);
+    return { p50Ms: at(0.5), p95Ms: at(0.95), maxMs: at(1) };
+  };
+  const settled = stats(timings);
+  assert.ok(settled.p95Ms <= 1000, `loopback p95 ${settled.p95Ms}ms`);
+  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
 } finally {
   stop.abort();
   for (const ws of sockets) ws.close();
