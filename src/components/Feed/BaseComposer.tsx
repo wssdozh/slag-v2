@@ -54,6 +54,8 @@ export interface BaseComposerProps {
   overlaySlot?: React.ReactNode;
   /** Полное замещение панели управления (например, при активной записи войса/видео) */
   customControls?: React.ReactNode;
+  /** Нейтральный контент в зоне поля ввода: рендерится внутри flex-row перед textarea. Без обработчиков. */
+  fieldOnlySlot?: React.ReactNode;
   /** Минимальная высота поля ввода в px (по умолчанию 22) */
   minHeight?: number;
   /** Максимальная высота поля ввода в px (по умолчанию 220) */
@@ -106,6 +108,7 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
   topRightSlot,
   overlaySlot,
   customControls,
+  fieldOnlySlot,
   minHeight = 24,
   maxHeight = 220,
   variant = 'card',
@@ -272,6 +275,11 @@ export const BaseComposer: React.FC<BaseComposerProps> = ({
             </>
             )}
             </div>
+            {fieldOnlySlot && (
+              <div className="composer-field-extra shrink-0 flex items-center">
+                {fieldOnlySlot}
+              </div>
+            )}
             {topRightSlot && (
               <div className="composer-top-actions flex shrink-0 items-center gap-1">
                 {topRightSlot}
