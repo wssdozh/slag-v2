@@ -182,6 +182,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     items: typeof items;
     viewKey: string;
     aiFilter: typeof aiItemFilter;
+    scrollTop: number;
     cards: { id: string; top: number }[];
   } | null>(null);
 
@@ -202,7 +203,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       // Prefer the first readable top; keep partially visible cards as fallbacks.
       const first = cards.findIndex(({ top }) => top >= 0);
       if (first > 0) cards.push(...cards.splice(0, first));
-      if (cards.length) syncAnchorRef.current = { items, viewKey, aiFilter: aiItemFilter, cards };
+      if (cards.length) syncAnchorRef.current = { items, viewKey, aiFilter: aiItemFilter, scrollTop: container.scrollTop, cards };
     };
     window.addEventListener('slag-sync-updated', capture);
     return () => window.removeEventListener('slag-sync-updated', capture);
@@ -384,7 +385,8 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    syncAnchorRef.current = null;
+    const pendingAnchor = syncAnchorRef.current;
+    if (pendingAnchor && pendingAnchor.scrollTop !== container.scrollTop) syncAnchorRef.current = null;
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     // Unlock stick-to-bottom only when user deliberately scrolls up past threshold and not in mid-highlight
     if (!highlightedItemId) {
