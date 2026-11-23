@@ -43,6 +43,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const {
     today,
     items,
+    vault,
     openContextMenu,
     saveItem,
     updateItem,
@@ -153,8 +154,8 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   }
 
   const prependAnchorRef = useRef<{ id: string; top: number; viewKey: string; aiFilter: typeof aiItemFilter } | null>(null);
-  const skipPrependMotionRef = useRef(false);
-  const viewKey = JSON.stringify([highlightKey, inboxMode, isPinnedOnlyFilter, hideCompletedTasks, sortBy, sortOrder]);
+  const skipFeedMotionRef = useRef(false);
+  const viewKey = JSON.stringify([vault.id, highlightKey, inboxMode, isPinnedOnlyFilter, hideCompletedTasks, sortBy, sortOrder]);
 
   const hasMoreOlder = hasOlderItems(history.length, windowSize);
 
@@ -177,6 +178,35 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   }, [hasMoreOlder, history.length, viewKey, aiItemFilter]);
 
   const isStuckToBottomRef = useRef(true);
+  const syncAnchorRef = useRef<{
+    items: typeof items;
+    viewKey: string;
+    aiFilter: typeof aiItemFilter;
+    cards: { id: string; top: number }[];
+  } | null>(null);
+
+  // The sync event precedes React's publication of the new items. Capture the
+  // live viewport, not a stale FLIP snapshot or geometry from a scroll handler.
+  useLayoutEffect(() => {
+    const capture = (event: Event) => {
+      if ((event as CustomEvent<{ hasItemsChanged?: boolean }>).detail?.hasItemsChanged === false) return;
+      const container = containerRef.current;
+      if (!container || highlightedItemId || isStuckToBottomRef.current || syncAnchorRef.current) return;
+      const viewport = container.getBoundingClientRect();
+      const cards = [...container.querySelectorAll<HTMLElement>('[data-flip-id]')].flatMap((card) => {
+        const rect = card.getBoundingClientRect();
+        return rect.bottom > viewport.top && rect.top < viewport.bottom
+          ? [{ id: card.dataset.flipId!, top: rect.top - viewport.top }]
+          : [];
+      });
+      // Prefer the first readable top; keep partially visible cards as fallbacks.
+      const first = cards.findIndex(({ top }) => top >= 0);
+      if (first > 0) cards.push(...cards.splice(0, first));
+      if (cards.length) syncAnchorRef.current = { items, viewKey, aiFilter: aiItemFilter, cards };
+    };
+    window.addEventListener('slag-sync-updated', capture);
+    return () => window.removeEventListener('slag-sync-updated', capture);
+  }, [items, viewKey, aiItemFilter, highlightedItemId]);
 
   // One owner of the scroll position: a prepend restores the anchor, and a note
   // appended at the bottom settles before the motion is measured. Keep it a single
@@ -188,9 +218,24 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
 
     const anchor = prependAnchorRef.current;
     prependAnchorRef.current = null;
-    skipPrependMotionRef.current = false;
+    skipFeedMotionRef.current = false;
+    const remote = syncAnchorRef.current;
+    if (remote && (remote.items !== items || remote.viewKey !== viewKey || remote.aiFilter !== aiItemFilter)) {
+      syncAnchorRef.current = null;
+      if (!anchor && !highlightedItemId && !isStuckToBottomRef.current && remote.viewKey === viewKey && remote.aiFilter === aiItemFilter) {
+        const top = container.getBoundingClientRect().top;
+        for (const candidate of remote.cards) {
+          const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(candidate.id)}"]`);
+          if (!card) continue;
+          container.scrollTop += card.getBoundingClientRect().top - top - candidate.top;
+          // A whole-list glide would put the anchored card back in motion.
+          skipFeedMotionRef.current = true;
+          return;
+        }
+      }
+    }
     if (anchor && anchor.viewKey === viewKey && anchor.aiFilter === aiItemFilter) {
-      skipPrependMotionRef.current = true;
+      skipFeedMotionRef.current = true;
       const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(anchor.id)}"]`);
       if (card) {
         // Correct only the movement that remains after any browser anchoring.
@@ -211,7 +256,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   // boxes are the final ones and the delta carries the scroll the list just took.
   useFlipLayout(containerRef, windowedItems.map(item => item.id).join('|'), {
     enterFromBelow: true,
-    skipMotionRef: skipPrependMotionRef,
+    skipMotionRef: skipFeedMotionRef,
   });
 
   // The keyboard and a growing composer resize the scrollport without rendering this list.
@@ -339,6 +384,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
+    syncAnchorRef.current = null;
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     // Unlock stick-to-bottom only when user deliberately scrolls up past threshold and not in mid-highlight
     if (!highlightedItemId) {
