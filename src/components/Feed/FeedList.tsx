@@ -35,6 +35,16 @@ import {
   windowSizeAroundTarget,
 } from './list/feedWindow';
 
+// Writes the owner's own scroll position and leaves a mark, so the resulting scroll event is not
+// mistaken for the reader leaving the bottom. A write that changes nothing leaves no mark.
+function pinScroll(container: HTMLElement, top: number, target: { current: number | null }) {
+  if (container.scrollTop === top) return;
+  container.scrollTop = top;
+  // The browser may clamp (a scrollHeight target becomes scrollHeight - clientHeight); remember
+  // what actually landed, not what was asked.
+  target.current = container.scrollTop;
+}
+
 // Within this distance of the bottom the note is arriving in front of the reader:
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
@@ -158,11 +168,19 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const viewKey = JSON.stringify([vault.id, highlightKey, inboxMode, isPinnedOnlyFilter, hideCompletedTasks, sortBy, sortOrder]);
 
   const hasMoreOlder = hasOlderItems(history.length, windowSize);
+  const isStuckToBottomRef = useRef(true);
+  // Auto-follow writes scrollTop itself. Those events must not be read as a reader leaving the
+  // bottom; a scroll the code did not write is a reader (or an explicit jump).
+  const programmaticScrollRef = useRef<number | null>(null);
 
-  // Load more older items with scroll position preservation
-  const loadMoreOlder = useCallback(() => {
+  // Load more older items with scroll position preservation. An explicit click always opens
+  // history and hands scroll ownership to the reader; only the automatic sentinel yields to the
+  // pinned bottom, where growing the window would pull the reader away from the newest note.
+  const loadMoreOlder = useCallback((auto = false) => {
     const container = containerRef.current;
     if (!container || !hasMoreOlder) return;
+    if (auto && container.scrollHeight - container.scrollTop - container.clientHeight <= 40) return;
+    if (!auto) isStuckToBottomRef.current = false;
     // Предыдущая догрузка ещё держит анкор: вторая подряд даёт скачок.
     if (prependAnchorRef.current) return;
 
@@ -177,7 +195,6 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     setWindowSize(prev => nextWindowSize(prev, history.length));
   }, [hasMoreOlder, history.length, viewKey, aiItemFilter]);
 
-  const isStuckToBottomRef = useRef(true);
   const syncAnchorRef = useRef<{
     items: typeof items;
     viewKey: string;
@@ -228,7 +245,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
         for (const candidate of remote.cards) {
           const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(candidate.id)}"]`);
           if (!card) continue;
-          container.scrollTop += card.getBoundingClientRect().top - top - candidate.top;
+          pinScroll(container, container.scrollTop + card.getBoundingClientRect().top - top - candidate.top, programmaticScrollRef);
           // A whole-list glide would put the anchored card back in motion.
           skipFeedMotionRef.current = true;
           return;
@@ -241,14 +258,14 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       if (card) {
         // Correct only the movement that remains after any browser anchoring.
         const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top;
-        container.scrollTop += offset - anchor.top;
+        pinScroll(container, container.scrollTop + offset - anchor.top, programmaticScrollRef);
         return;
       }
     }
 
     if (highlightedItemId) return;
     if (isStuckToBottomRef.current) {
-      container.scrollTop = container.scrollHeight;
+      pinScroll(container, container.scrollHeight, programmaticScrollRef);
     }
   });
 
@@ -266,7 +283,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     if (!container) return;
     const observer = new ResizeObserver(() => {
       if (isStuckToBottomRef.current && !highlightedItemId) {
-        container.scrollTop = container.scrollHeight;
+        pinScroll(container, container.scrollHeight, programmaticScrollRef);
       }
     });
     observer.observe(container);
@@ -335,7 +352,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     const observer = new IntersectionObserver(
       entries => {
         if (entries[0]?.isIntersecting) {
-          loadMoreOlder();
+          loadMoreOlder(true);
         }
       },
       { root: containerRef.current, threshold: 0.1 }
@@ -355,7 +372,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
         isStuckToBottomRef.current = true;
         const container = containerRef.current;
         if (container) {
-          container.scrollTop = container.scrollHeight;
+          pinScroll(container, container.scrollHeight, programmaticScrollRef);
         }
       }
     }
@@ -369,7 +386,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
 
     const snap = () => {
       if (isStuckToBottomRef.current && !highlightedItemId && container) {
-        container.scrollTop = container.scrollHeight;
+        pinScroll(container, container.scrollHeight, programmaticScrollRef);
       }
     };
 
@@ -385,14 +402,22 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
+    const target = programmaticScrollRef.current;
+    programmaticScrollRef.current = null;
+    const fromProgrammatic = target !== null && Math.abs(container.scrollTop - target) < 1;
     const pendingAnchor = syncAnchorRef.current;
     if (pendingAnchor && pendingAnchor.scrollTop !== container.scrollTop) syncAnchorRef.current = null;
     const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    // Unlock stick-to-bottom only when user deliberately scrolls up past threshold and not in mid-highlight
+    // Bottom is regained by geometry; losing it takes a scroll this code did not write. A
+    // programmatic snap, a window growth or a resize cannot unpin the reader.
     if (!highlightedItemId) {
-      isStuckToBottomRef.current = distFromBottom <= 40;
+      if (distFromBottom <= 40) {
+        isStuckToBottomRef.current = true;
+      } else if (!fromProgrammatic) {
+        isStuckToBottomRef.current = false;
+      }
     }
-    setShowScrollBottom(distFromBottom > 220);
+    setShowScrollBottom(!isStuckToBottomRef.current && distFromBottom > 220);
 
     // Выгрузка только внизу: там окно прижато к новым, срезание старых не двигает
     // видимую часть. По дороге вверх окно не трогаем — иначе догрузка и выгрузка
@@ -562,7 +587,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
               <div ref={topSentinelRef} className="flex justify-center py-2 select-none">
                 <button
                   type="button"
-                  onClick={loadMoreOlder}
+                  onClick={() => loadMoreOlder(false)}
                   className="text-xs font-mono text-fg-muted hover:text-fg-tertiary transition-colors px-3 py-1 rounded-full bg-surface border border-tint-4 cursor-pointer"
                 >
                   Показать более ранние записи...
