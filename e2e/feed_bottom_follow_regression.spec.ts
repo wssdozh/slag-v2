@@ -107,8 +107,10 @@ test.describe('short window with a sentinel that becomes visible', () => {
     // for an older page while the bottom is pinned, and a normal send follows.
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.waitForTimeout(350);
-    await page.locator('main textarea').first().fill('LOCAL AFTER AUTO OLDER');
-    await page.locator('button[title*="Отправить"]').first().click();
+    await page.getByPlaceholder(/Мысль, заметка|Таска|Черновик/).fill('LOCAL AFTER AUTO OLDER');
+    await page.locator('main button[title*="Отправить"]').first().click();
+    // The send must actually land before the motion verdict is read.
+    await expect(page.locator('[data-flip-id]', { hasText: 'LOCAL AFTER AUTO OLDER' })).toBeVisible();
     await page.waitForTimeout(450);
 
     const result = await page.evaluate(() => {

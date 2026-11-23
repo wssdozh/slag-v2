@@ -21,6 +21,7 @@ import { canEnrichAttachments, enrichItemAttachments } from '../../lib/media/enr
 import { PinnedBanner } from './PinnedBanner';
 import { FeedColumnResizer } from './FeedColumnResizer';
 import { useFlipLayout } from '../../hooks/layout/useFlipLayout';
+import { prefersReducedMotion } from '../../lib/motion';
 import { usePullToSearch } from '../../hooks/gestures/usePullToSearch';
 import { FeedDropOverlay } from './list/FeedDropOverlay';
 import { FeedDateBubble } from './list/FeedDateBubble';
@@ -434,10 +435,16 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
 
   const scrollToBottom = useCallback(() => {
     isStuckToBottomRef.current = true;
-    containerRef.current?.scrollTo({
-      top: containerRef.current.scrollHeight,
-      behavior: 'smooth',
-    });
+    const container = containerRef.current;
+    if (!container) return;
+    // Reduced motion: one write, no glide. The write is marked like every other bottom snap, so
+    // its scroll event cannot unpin and the return control never appears on the way down.
+    if (prefersReducedMotion()) {
+      pinScroll(container, container.scrollHeight, programmaticScrollRef);
+      setShowScrollBottom(false);
+      return;
+    }
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, []);
 
   const handleFeedContextMenu = (e: React.MouseEvent) => {
