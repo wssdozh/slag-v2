@@ -50,6 +50,13 @@ function createDraft(field: PromptField, session: number): PromptDraft {
   return { field, session, value, initial: value, enabled, enabledInitial: enabled, saveFailed: false };
 }
 
+/** The motion tokens are CSS strings (`150ms`); WAAPI wants milliseconds. */
+function readMotionDuration(value: string, fallback: number): number {
+  const amount = parseFloat(value);
+  if (!Number.isFinite(amount)) return fallback;
+  return value.trim().endsWith('ms') ? amount : amount * 1000;
+}
+
 interface PromptDialogProps {
   field: PromptField;
   session: number;
@@ -96,12 +103,45 @@ const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onC
     }
   };
 
+  const shellRectRef = useRef<DOMRect | null>(null);
+
   const toggleWide = () => {
+    const overlay = presence.ref.current;
+    const card = overlay?.firstElementChild;
+    // FLIP reads the visual box once, before the class swap. Nothing measures layout per frame.
+    shellRectRef.current = card instanceof HTMLElement ? card.getBoundingClientRect() : null;
     setWide((previous) => {
       setPref(SIZE_KEY, previous ? '0' : '1');
       return !previous;
     });
   };
+
+  // Expand/collapse is an explicit size change: width and height settle once, in the class swap,
+  // and only the dialog shell is scaled from its old visual box to the new one (FLIP, compositor
+  // only). Text keeps its focus and its new layout; reduced motion skips the scale entirely.
+  useLayoutEffect(() => {
+    const from = shellRectRef.current;
+    shellRectRef.current = null;
+    if (!from) return;
+    const overlay = presence.ref.current;
+    const card = overlay?.firstElementChild;
+    if (!(card instanceof HTMLElement)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const to = card.getBoundingClientRect();
+    if (to.width < 1 || to.height < 1) return;
+    const scaleX = from.width / to.width;
+    const scaleY = from.height / to.height;
+    if (Math.abs(scaleX - 1) < 0.005 && Math.abs(scaleY - 1) < 0.005) return;
+    const styles = getComputedStyle(document.documentElement);
+    const duration = readMotionDuration(styles.getPropertyValue('--slag-motion-base'), 150);
+    const easing = styles.getPropertyValue('--ease-standard').trim() || 'ease';
+    const animation = card.animate(
+      [{ transform: `scale(${scaleX}, ${scaleY})` }, { transform: 'none' }],
+      { duration, easing, fill: 'none' },
+    );
+    animation.onfinish = () => animation.cancel();
+    return () => animation.cancel();
+  }, [wide, presence.ref]);
 
   const personaOff = field === 'persona' && !draft.enabled;
   const dirty = draft.value !== draft.initial
