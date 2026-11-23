@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **676**, строк: **117590**, зон: **48**.
+Модулей: **676**, строк: **117895**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 722 | 1 |
 
-## e2e (playwright) — 155 файлов, 28377 строк
+## e2e (playwright) — 155 файлов, 28679 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -463,14 +463,14 @@
 | `useItemActions.ts` | 283 | 4 | TYPE_LABELS, useItemActions | The action set behind every item menu: open, reply, pin, move, decompose, del… |
 | `useSuggestedActions.ts` | 277 | 1 | ActionHistoryEntry, useSuggestedActions | Applies, rejects and undoes the actions the assistant proposes in chat. |
 
-## src/hooks/gestures — 6 файлов, 1204 строк
+## src/hooks/gestures — 6 файлов, 1207 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useDragToScroll.ts` | 233 | 2 | DragToScrollOptions, useDragToScroll | Mouse grab-to-scroll with a click threshold and Apple-style flick momentum. |
 | `usePhotoPager.ts` | 321 | 2 | PhotoPagerOptions, usePhotoPager | One-finger deck for the full-screen viewer: pager, pinch, pan, swipe to close. |
 | `usePointerDnd.ts` | 245 | 5 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd | Pointer-based drag and drop: one live gesture, hover zones, payload on drop. |
-| `usePullToSearch.ts` | 196 | 2 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
+| `usePullToSearch.ts` | 199 | 2 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
 | `useSheetDrag.ts` | 158 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet, transforms written straight to the co… |
 | `useSwipeGesture.ts` | 51 | 3 | SwipeGestureOptions, useSwipeGesture | Left/right swipe detection with a threshold and axis lock, for phone rows. |
 

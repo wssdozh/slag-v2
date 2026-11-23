@@ -170,9 +170,12 @@ export function usePullToSearch({ onTrigger, topOnly = false }: Options) {
       schedule(0, null);
       return;
     }
-    const value = Math.min(travel * UI_GESTURES.SEARCH_PULL_DAMPING, UI_GESTURES.SEARCH_PULL_MAX_PX);
-    ownTravelRef.current = Math.max(ownTravelRef.current, value - start.startPull);
-    schedule(value, nextSide);
+    // Earned travel stays uncapped: a re-grab on a surface already near the 120 px ceiling
+    // still has to be able to prove a real pull, otherwise a strong repeated pull would be
+    // silently refused.
+    const raw = travel * UI_GESTURES.SEARCH_PULL_DAMPING;
+    ownTravelRef.current = Math.max(ownTravelRef.current, raw - start.startPull);
+    schedule(Math.min(raw, UI_GESTURES.SEARCH_PULL_MAX_PX), nextSide);
   };
 
   const onTouchEnd = () => {
