@@ -225,16 +225,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // this scan, and one second of an empty index was enough to empty every device.
     void storage
       .getCurrentVaultRead()
-      .then((ok) => {
-        if (!ok || storage.getCurrentVault().id !== currentVault.id) return;
-        // The frame after the data lands is the first one a person sees notes in.
+      .then(() => {
+        // The frame after the data lands is the first one a person sees notes in. One number, so a
+        // claim about a slow start has something to be compared with.
         requestAnimationFrame(() =>
           appLog.info('Первый кадр ленты', { fromBootMs: Math.round(performance.now()) })
         );
-        if (syncEngine.getCurrentVaultId() === currentVault.id) return syncEngine.init();
-        return syncEngine.switchVault(currentVault.id);
       })
-      .catch((error: unknown) => appLog.error('Could not start sync after local vault read', error));
+      .finally(() => void syncEngine.init());
 
     accountClient.startPolling(syncEngine.getConfig().serverUrl);
     let wasAuthenticated = accountClient.isAuthenticated();

@@ -1,7 +1,5 @@
 // The app shell: routes, lazy-loaded screens, viewport height and global overlays.
-import React, { useCallback, useState, useEffect, useSyncExternalStore, lazy, Suspense } from 'react';
-import { storage } from './lib/storage';
-import { VaultRecoveryView } from './components/Vault/VaultRecoveryView';
+import React, { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { navigatePage } from './lib/navigation';
 import { MobileShell } from './components/Mobile/MobileShell';
@@ -462,8 +460,6 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
 }
 
 export function App() {
-  const recovery = useSyncExternalStore(storage.subscribeVaultRecovery, storage.getVaultRecovery);
-  if (recovery) return <VaultRecoveryView key={recovery.vaultId} snapshot={recovery} />;
   return (
     <AppProvider>
       <AppErrorBoundary>

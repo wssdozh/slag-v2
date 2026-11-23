@@ -23,13 +23,6 @@ import { mergeRegistryDeviceWorkspace } from '../sync/notes/sharedWorkspace';
 
 const fsLog = logger.scope('FS');
 
-export interface VaultRecoverySnapshot {
-  vaultId: string;
-  items: SlagItem[];
-  error: string | null;
-  loading?: true;
-}
-
 /**
  * How many note files are read at once.
  *
@@ -56,10 +49,6 @@ export interface VaultFilesDeps {
   /** The one write path for the folder list; `external` came from the disk and writes nothing back. */
   persistFolders(folders: FolderMeta[], origin: 'local' | 'remote' | 'external'): void;
   hydrateRegistryFolders(folders: FolderMeta[]): void;
-  /** Reject before a scan can make any changes if a critical local journal is unreadable. */
-  validateRecoveryState?(vault: VaultMeta, state: Record<string, unknown> | undefined): Promise<void>;
-  onRecovery?(snapshot: VaultRecoverySnapshot): void;
-  onStateVerified?(): void;
   attachments: AttachmentStore;
 }
 
@@ -67,7 +56,6 @@ export class VaultFiles {
   private deps: VaultFilesDeps;
   private tauriInitialization: Promise<boolean> | null = null;
   private scanGeneration = 0;
-  private readonly damagedVaults = new Set<string>();
   // `state.json` has two writers now — folder metadata and the workspace — and both read before
   // they write. One queue per file keeps a slower write from putting its stale copy back.
   private stateWrite: Promise<void> = Promise.resolve();
@@ -76,12 +64,8 @@ export class VaultFiles {
     this.deps = deps;
   }
 
-  private queueStateWrite(vault: VaultMeta, write: () => Promise<void>): Promise<void> {
-    const guarded = () => {
-      if (this.damagedVaults.has(vault.id)) throw new Error('Хранилище открыто только для чтения');
-      return write();
-    };
-    this.stateWrite = this.stateWrite.then(guarded, guarded);
+  private queueStateWrite(write: () => Promise<void>): Promise<void> {
+    this.stateWrite = this.stateWrite.then(write, write);
     return this.stateWrite;
   }
 
@@ -183,15 +167,14 @@ export class VaultFiles {
     if (!isTauri()) return false;
     const startedAt = performance.now();
     const generation = ++this.scanGeneration;
-    const vault = this.vault;
-    const isCurrent = () => this.vault.id === vault.id && generation === this.scanGeneration;
-    const notesPath = this.getVaultNotesPath(vault);
-    const trashPath = this.getVaultTrashPath(vault);
-    const statePath = this.getVaultStatePath(vault);
     try {
-      const fence = await this.validateVaultState(vault);
+      const vault = this.vault;
+      const isCurrent = () => this.vault.id === vault.id && generation === this.scanGeneration;
+      const notesPath = this.getVaultNotesPath(vault);
+      const trashPath = this.getVaultTrashPath(vault);
+      const statePath = this.getVaultStatePath(vault);
+      const fence = await this.readStateSection('pendingFolderProjection', vault, true);
       if (!isCurrent()) return false;
-      this.deps.onStateVerified?.();
 
       await mkdir(trashPath, { baseDir: BaseDirectory.AppData, recursive: true });
       if (!isCurrent()) return false;
@@ -256,39 +239,11 @@ export class VaultFiles {
         sideMs: Math.round(sideMs),
         totalMs: Math.round(performance.now() - startedAt),
       });
-      if (!incomplete) this.damagedVaults.delete(vault.id);
       return !incomplete;
     } catch (err) {
-      return this.recover(vault, isCurrent, err);
+      fsLog.error(`Failed to sync vault "${this.vault.name}" in AppData:`, err);
+      return false;
     }
-  }
-
-  private async validateVaultState(vault: VaultMeta): Promise<Record<string, unknown>> {
-    await this.stateWrite.catch(() => undefined);
-    const state = await this.readStateObject(this.getVaultStatePath(vault), true);
-    if (state === undefined && this.damagedVaults.has(vault.id)) {
-      throw new Error('State file disappeared after a failed read');
-    }
-    const fence = state?.pendingFolderProjection;
-    if (fence !== undefined && (!fence || typeof fence !== 'object' || Array.isArray(fence)
-        || Object.values(fence).some(value => value !== true))) {
-      throw new Error('Invalid pending folder projection');
-    }
-    await this.deps.validateRecoveryState?.(vault, state);
-    return asStateObject(fence);
-  }
-
-  private async recover(vault: VaultMeta, isCurrent: () => boolean, error: unknown): Promise<false> {
-    if (!isCurrent()) return false;
-    fsLog.error(`Vault "${vault.name}" opened in recovery mode:`, error);
-    this.damagedVaults.add(vault.id);
-    this.deps.onRecovery?.({ vaultId: vault.id, items: [], error: null, loading: true });
-    let incomplete = false;
-    const items = await this.scanNotesDir(this.getVaultNotesPath(vault), vault, false, undefined, () => { incomplete = true; }, true);
-    if (isCurrent()) {
-      this.deps.onRecovery?.({ vaultId: vault.id, items, error: incomplete ? 'Incomplete note scan' : null });
-    }
-    return false;
   }
 
   /**
@@ -356,7 +311,7 @@ export class VaultFiles {
   public writeFolderMeta(folders: FolderMeta[], vault = this.vault, replace = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
     const statePath = this.getVaultStatePath(vault);
-    return this.queueStateWrite(vault, async () => {
+    return this.queueStateWrite(async () => {
       const state = await this.readStateObject(statePath);
       for (const folder of folders) {
         await mkdir(`${this.getVaultNotesPath(vault)}/${safeVaultRelativePath(folder.path)}`, {
@@ -400,7 +355,7 @@ export class VaultFiles {
   public writeStateSection(name: string, patch: Record<string, unknown> | ((section: Record<string, unknown>) => Record<string, unknown>), vault = this.vault, strict = false, replace = false): Promise<void> {
     if (!isTauri()) return Promise.resolve();
     const statePath = this.getVaultStatePath(vault);
-    return this.queueStateWrite(vault, async () => {
+    return this.queueStateWrite(async () => {
       try {
         const state = await this.readStateObject(statePath);
         const section = state[name];
@@ -437,9 +392,12 @@ export class VaultFiles {
   }
 
   public writeRegistryState(vault: VaultMeta, value: unknown): Promise<void> {
-    const dir = this.getVaultDir(vault);
-    const path = `${dir}/note-registry.json`;
-    return this.queueStateWrite(vault, async () => {
+    return this.writeNoteSyncJson(this.getVaultDir(vault), 'note-registry.json', value);
+  }
+
+  private writeNoteSyncJson(dir: string, name: string, value: unknown): Promise<void> {
+    const path = `${dir}/${name}`;
+    return this.queueStateWrite(async () => {
       await mkdir(dir, { baseDir: BaseDirectory.AppData, recursive: true });
       await writeJsonAtomic(path, value);
     });
@@ -452,9 +410,7 @@ export class VaultFiles {
   }
 
   /** A first run has no file. An existing unreadable file is not an empty journal. */
-  private readStateObject(statePath: string): Promise<Record<string, unknown>>;
-  private readStateObject(statePath: string, distinguishMissing: true): Promise<Record<string, unknown> | undefined>;
-  private async readStateObject(statePath: string, distinguishMissing = false): Promise<Record<string, unknown> | undefined> {
+  private async readStateObject(statePath: string): Promise<Record<string, unknown>> {
     let text: string;
     try {
       text = await readTextFile(statePath, { baseDir: BaseDirectory.AppData });
@@ -466,18 +422,26 @@ export class VaultFiles {
         try {
           await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
         } catch (legacyError) {
-          if (/\(os error [23]\)$/.test(String(legacyError))) return distinguishMissing ? undefined : {};
+          if (/\(os error [23]\)$/.test(String(legacyError))) return {};
           throw legacyError;
         }
         throw new Error('Не завершён перенос state.json в основное хранилище');
       }
-      return distinguishMissing ? undefined : {};
+      return {};
     }
     try {
       return this.parseStateStrict(text);
     } catch (err) {
-      // Preserve the unreadable file in place. Reading a failed state is never a write.
+      await this.backupBrokenState(statePath, text);
       throw new Error('state.json повреждён', { cause: err });
+    }
+  }
+
+  private async backupBrokenState(statePath: string, text: string): Promise<void> {
+    try {
+      await writeTextFile(`${statePath}.broken`, text, { baseDir: BaseDirectory.AppData });
+    } catch (err) {
+      fsLog.error('Could not keep a copy of the broken state.json:', err);
     }
   }
 
@@ -550,32 +514,8 @@ export class VaultFiles {
     if (!isTauri()) return Promise.resolve(false);
     if (!this.tauriInitialization) {
       const generation = this.scanGeneration;
-      const vault = this.vault;
-      const isCurrent = () => generation === this.scanGeneration && vault.id === this.vault.id;
-      this.tauriInitialization = (async () => {
-        try {
-          // Before a legacy move can write to main, make sure its existing state is readable.
-          // A genuinely missing state stays eligible for migration from the old root.
-          if (vault.id === 'default_vault') {
-            const legacy = await Promise.all(['notes', '.trash', 'state.json'].map(path =>
-              exists(path, { baseDir: BaseDirectory.AppData })));
-            if (legacy.some(Boolean) && isCurrent()) {
-              const dest = this.getVaultStatePath(vault);
-              if (await exists(dest, { baseDir: BaseDirectory.AppData }) || !legacy[2]) {
-                await this.validateVaultState(vault);
-              } else {
-                // Validate the legacy JSON first; only an intact snapshot is eligible to migrate.
-                const raw = await readTextFile('state.json', { baseDir: BaseDirectory.AppData });
-                await this.deps.validateRecoveryState?.(vault, this.parseStateStrict(raw));
-              }
-              if (isCurrent()) await this.migrateLegacyNotesToVaults();
-            }
-          }
-          return isCurrent() && this.syncCurrentVaultFs();
-        } catch (error) {
-          return this.recover(vault, isCurrent, error);
-        }
-      })();
+      this.tauriInitialization = this.migrateLegacyNotesToVaults()
+        .then(() => generation === this.scanGeneration && this.syncCurrentVaultFs());
     }
     return this.tauriInitialization;
   }
@@ -645,7 +585,7 @@ export class VaultFiles {
     if (await this.fileBelongsTo(path, copy.id, true)) await remove(path, { baseDir: BaseDirectory.AppData });
   }
 
-  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>, onReadError?: () => void, preserveCopies = strict): Promise<SlagItem[]> {
+  private async scanNotesDir(dirPath: string, vault = this.vault, strict = false, markers?: Map<SlagItem, string>, onReadError?: () => void): Promise<SlagItem[]> {
     const items: SlagItem[] = [];
     try {
       const entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
@@ -697,7 +637,7 @@ export class VaultFiles {
           // files. Walking into them would put deleted notes back in the feed — and the folder
           // list skips them too, so a note from there would land in a folder nothing draws.
           if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
-          const nested = await this.scanNotesDir(subPath, vault, strict, markers, onReadError, preserveCopies);
+          const nested = await this.scanNotesDir(subPath, vault, strict, markers, onReadError);
           for (const nestedItem of nested) {
             if (!firstIndexById.has(nestedItem.id)) {
               firstIndexById.set(nestedItem.id, items.length);
@@ -707,7 +647,7 @@ export class VaultFiles {
         } else if (entry.name.endsWith('.md')) {
           const parsed = parsedByName.get(entry.name);
           if (!parsed) continue;
-          if (preserveCopies) {
+          if (strict) {
             // Recovery needs physical paths, including both copies if a move stopped after write.
             parsed.folder = normalized === notesBase ? '' : folderPart;
             items.push(parsed);
@@ -896,7 +836,7 @@ export class VaultFiles {
     const vault = this.vault;
     const statePath = this.getVaultStatePath(vault);
     const workspace = this.deps.getWorkspaceState();
-    return this.queueStateWrite(vault, async () => {
+    return this.queueStateWrite(async () => {
       try {
         const state = await this.readStateObject(statePath);
         const enrolled = hasSharedRegistryEnrollment(await this.readRegistryFile(vault));

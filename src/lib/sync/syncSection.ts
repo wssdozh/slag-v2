@@ -5,7 +5,7 @@
 // carries its extension, so `node --test` reads this file as is instead of testing a copy of these
 // rules. What the values *mean* — which room a cursor belongs to, when a seed is minted — is the
 // caller's business.
-import { mergeTombstones, sanitizeTombstones, tombstonesFromState } from './tombstones.ts';
+import { mergeTombstones, tombstonesFromState } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
 import type { SyncOperation } from './entities/types.ts';
 import type { DeviceProfile, SyncConfig } from './types.ts';
@@ -49,17 +49,6 @@ export function emptySection(): SyncSectionState {
     outbox: [],
     initialSync: false,
   };
-}
-
-/** Missing ledgers are valid for older vaults; existing operations or deletions must not vanish. */
-export function assertSyncJournal(raw: Record<string, unknown>): void {
-  if (raw.tombstones !== undefined && (!isRecord(raw.tombstones)
-      || Object.keys(raw.tombstones).length !== Object.keys(sanitizeTombstones(raw.tombstones)).length)) {
-    throw new Error('Invalid deletion ledger');
-  }
-  if (raw.outbox !== undefined && (!Array.isArray(raw.outbox) || sanitizeOutbox(raw.outbox).length !== raw.outbox.length)) {
-    throw new Error('Invalid sync outbox');
-  }
 }
 
 /** A missing file, an older build and a hand-edited section all read as "nothing here yet". */

@@ -19,10 +19,7 @@ for (const failedRead of [false, true]) test(failedRead ? 'native partial scan d
       metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main' } },
       transformCallback: () => 1,
       unregisterCallback: () => {},
-      invoke: async (cmd: string, args: { path?: string; oldPath?: string; newPath?: string; relativeTarget?: string; content?: string } | Uint8Array = {}, options?: { headers: { path: string } }) => {
-        if (cmd === 'durable_atomic_write' && 'relativeTarget' in args && args.relativeTarget) {
-          data.set(args.relativeTarget, args.content ?? '');
-        }
+      invoke: async (cmd: string, args: { path?: string; oldPath?: string; newPath?: string } | Uint8Array = {}, options?: { headers: { path: string } }) => {
         const path = 'path' in args ? args.path ?? '' : '';
         const leaf = path.replaceAll('\\', '/');
         if (cmd === 'plugin:fs|exists') return data.has(leaf);

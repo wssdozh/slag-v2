@@ -147,13 +147,7 @@ test('native sync refuses a corrupt journal until it can re-read a valid one', a
           files.set(file, new TextDecoder().decode(args as Uint8Array));
           return;
         }
-        const p = args as { path: string; oldPath: string; newPath: string; relativeTarget: string; content: string };
-        if (cmd === 'durable_atomic_write') {
-          if (rejectRename) throw new Error('replacement failed');
-          if (!dirs.has(p.relativeTarget.slice(0, p.relativeTarget.lastIndexOf('/')))) throw new Error('parent missing (os error 3)');
-          files.set(p.relativeTarget, p.content);
-          return;
-        }
+        const p = args as { path: string; oldPath: string; newPath: string };
         if (cmd === 'plugin:fs|mkdir') { dirs.add(p.path); return; }
         if (cmd === 'plugin:fs|exists') return files.has(p.path);
         if (cmd === 'plugin:fs|read_text_file') {
@@ -294,8 +288,7 @@ test('two notes with one title land in two files', async ({ page }) => {
     const files = new Map<string, string>();
     const dirs = new Set<string>();
     window.__TAURI_INTERNALS__ = { invoke: async (cmd: string, args: any, options: any) => {
-      if (cmd === 'durable_atomic_write') files.set(args.relativeTarget, args.content);
-      else if (cmd === 'plugin:fs|write_text_file') files.set(decodeURIComponent(options.headers.path), new TextDecoder().decode(args));
+      if (cmd === 'plugin:fs|write_text_file') files.set(decodeURIComponent(options.headers.path), new TextDecoder().decode(args));
       else if (cmd === 'plugin:fs|mkdir') dirs.add(args.path);
       else if (cmd === 'plugin:fs|exists') return files.has(args.path) || dirs.has(args.path);
       else if (cmd === 'plugin:fs|remove') files.delete(args.path);

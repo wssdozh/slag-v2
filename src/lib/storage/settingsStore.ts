@@ -539,6 +539,7 @@ export function projectSharedSettings(store: SettingsStoreHost, body: SharedBody
 /** A window that hides, loses focus or unloads is the last moment a queued draft can land. */
 export function installDraftFlushGuards(store: SettingsStoreHost): void {
   loadedStore = store;
+  if (usesStateFile()) void hydrateSettings(store);
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   const flush = (): void => flushDraftWrites(store);
   window.addEventListener('pagehide', flush);

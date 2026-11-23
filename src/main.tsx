@@ -60,9 +60,8 @@ async function boot(): Promise<void> {
     // snapshot has to be here before the shell. On the browser build there is no file and this
     // returns at once; the old keys keep answering.
     const { storage } = await import('./lib/storage')
-    // Verify service state before mounting writes. Markdown itself can still load in parallel.
-    await storage.getStartupStateReady()
-    if (!storage.getVaultRecovery()) await hydrateSettings(storage)
+    await storage.prepareSharedWrites().catch((error: unknown) => bootLog.error('Shared registry enrollment could not be read; shared writes are blocked', error))
+    await hydrateSettings(storage)
     const { default: App } = await import('./App')
     const root = document.getElementById('root')!
     root.replaceChildren()
