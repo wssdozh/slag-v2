@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **672**, строк: **116951**, зон: **48**.
+Модулей: **672**, строк: **116905**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -20,13 +20,13 @@
 | `src/lib/storage/vaultFiles.ts` | 938 | 2 |
 | `e2e/slag/feed.spec.ts` | 919 | 0 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
-| `e2e/mobile.spec.ts` | 903 | 0 |
+| `e2e/mobile.spec.ts` | 899 | 0 |
 | `src/mcp/vault.ts` | 811 | 6 |
 | `src/context/AppContext.tsx` | 794 | 72 |
-| `src/components/Feed/ItemCard.tsx` | 763 | 1 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
+| `src/components/Feed/ItemCard.tsx` | 722 | 1 |
 
-## e2e (playwright) — 152 файлов, 27942 строк
+## e2e (playwright) — 152 файлов, 27938 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -34,7 +34,7 @@
 - `e2e/slag/views.spec.ts` — 1098
 - `e2e/slag/feed.spec.ts` — 919
 - `e2e/slag/workspace.spec.ts` — 917
-- `e2e/mobile.spec.ts` — 903
+- `e2e/mobile.spec.ts` — 899
 - `e2e/motion.spec.ts` — 570
 - `e2e/adversarial_memory_time.spec.ts` — 567
 - `e2e/assistant_memory.spec.ts` — 555
@@ -113,7 +113,7 @@
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 54 файлов, 7872 строк
+## src/components/Feed — 54 файлов, 7831 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -161,7 +161,7 @@
 | `item/ItemSubtasks.tsx` | 83 | 1 | ItemSubtasksProps, ItemSubtasks | A task's subtasks: one counter, one toggleable line each, collapsible. |
 | `item/ItemSyncDot.tsx` | 40 | 1 | ItemSyncDot |  |
 | `item/ItemVideoNotes.tsx` | 42 | 0 | ItemVideoNotesProps, ItemVideoNotes | Video circle notes on a card: plays in place, the corner opens the full viewe… |
-| `ItemCard.tsx` | 763 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
+| `ItemCard.tsx` | 722 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
 | `list/FeedDateBubble.tsx` | 22 | 2 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
 | `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay | The dashed frame over the feed while files hover: what dropping them will do. |
 | `list/FeedScrollHint.tsx` | 73 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
@@ -407,7 +407,7 @@
 | `WorkspaceShell.tsx` | 312 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 | `workspaceTaskFilterContext.ts` | 14 | 2 | WorkspaceTaskFilterContext, useWorkspaceTaskFilterContext | Shares ephemeral filter state across Dockview's stable panel components. |
 
-## src/config — 9 файлов, 472 строк
+## src/config — 9 файлов, 471 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -419,7 +419,7 @@
 | `storage.ts` | 98 | 9 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
 | `sync.ts` | 72 | 5 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
-| `ui.ts` | 64 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
+| `ui.ts` | 63 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
 ## src/context — 2 файлов, 1043 строк
 

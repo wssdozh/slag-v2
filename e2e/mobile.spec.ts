@@ -884,19 +884,15 @@ test.describe('SLAG v2 mobile feed sheet & metadata', () => {
     await page.screenshot({ path: 'test-results/screenshots/mobile_folder_tree_picker.png' });
   });
 
-  test('4. Дабл-тап копирует текст', async ({ page }) => {
+  test('4. Первый тап открывает редактор без ожидания второго', async ({ page }) => {
     await openInboxWithCards(page);
-
-    // Два клика в одном тике страницы: задержка Playwright между click() уже
-    // вылезает за окно DOUBLE_TAP_MS.
-    await cardOf(page).evaluate(el => {
-      el.click();
-      window.setTimeout(() => el.click(), 60);
-    });
-    await page.waitForTimeout(500);
-
-    const copied = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copied.trim().length).toBeGreaterThan(0);
-    await expect(page.locator('[data-testid="editor-sheet"]')).toHaveCount(0);
+    const card = cardOf(page);
+    const stopAt = (await page.evaluate(() => Date.now())) + 1000;
+    await page.clock.install();
+    await page.clock.pauseAt(stopAt);
+    // Deliver the click that follows a tap, without advancing the gesture timer.
+    await card.evaluate(el => el.click());
+    await page.clock.runFor(32);
+    await expect(page.getByTestId('editor-opening-fallback').or(page.getByTestId('editor-sheet'))).toBeAttached();
   });
 });
