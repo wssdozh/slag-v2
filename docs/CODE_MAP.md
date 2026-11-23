@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **674**, строк: **117296**, зон: **48**.
+Модулей: **676**, строк: **117590**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 722 | 1 |
 
-## e2e (playwright) — 154 файлов, 28302 строк
+## e2e (playwright) — 155 файлов, 28377 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -113,7 +113,7 @@
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 54 файлов, 7856 строк
+## src/components/Feed — 54 файлов, 7877 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -149,7 +149,7 @@
 | `composer/useComposerSubmit.ts` | 204 | 1 | UseComposerSubmitOptions, useComposerSubmit | Turning the draft into a record on submit: reply link, files, AI tags, then r… |
 | `FeedColumnResizer.tsx` | 92 | 1 | FeedColumnResizer | Drag handles that set the feed's reading width and keep it as a CSS variable. |
 | `FeedHeader.tsx` | 127 | 1 | FeedHeaderProps, FeedHeader | The feed's header: folder name and icon, filter badges, sort, materials toggl… |
-| `FeedList.tsx` | 624 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
+| `FeedList.tsx` | 662 | 2 | FeedList | The feed: render window, sentinels and the composition of cards; the edges li… |
 | `FolderSuggestionMenu.tsx` | 179 | 1 | FolderSuggestionMenu | The `@folder` autocomplete: the folder tree as branch rows, the selected one,… |
 | `FolderViewButton.tsx` | 23 | 2 | FolderViewButton |  |
 | `item/ItemAttachmentGrid.tsx` | 106 | 2 | AttachmentTile, ItemAttachmentGrid |  |
@@ -164,7 +164,7 @@
 | `ItemCard.tsx` | 722 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
 | `list/FeedDateBubble.tsx` | 22 | 2 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
 | `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay | The dashed frame over the feed while files hover: what dropping them will do. |
-| `list/FeedScrollHint.tsx` | 73 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
+| `list/FeedScrollHint.tsx` | 56 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
 | `list/FeedTaskSection.tsx` | 33 | 1 | FeedTaskSection |  |
 | `list/feedWindow.ts` | 109 | 2 | partitionFeedBySchedule, WINDOW_CHUNK, takeWindow, hasOlderItems, nextWindowSize, +4 | Pure windowing for the feed: how many cards stay mounted and when to grow the… |
 | `PinnedBanner.tsx` | 173 | 1 | PinnedBanner | The pinned strip over the feed: cycles this folder's pinned notes and jumps t… |
@@ -212,7 +212,7 @@
 | `useFolderBrowser.ts` | 91 | 1 | useFolderBrowser | Granted folders and the entries inside one, loaded only while the picker is o… |
 | `ViewerVideo.tsx` | 127 | 2 | ViewerVideoProps, ViewerVideo | A clip in the viewer: custom transport that hides with the chrome, and play m… |
 
-## src/components/Mobile — 18 файлов, 2812 строк
+## src/components/Mobile — 18 файлов, 2845 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -229,7 +229,7 @@
 | `MobileCalendarView.tsx` | 429 | 3 | MobileCalendarView | The phone calendar: agenda and three-day modes, day swipes, and a month picke… |
 | `MobileFloatingDock.tsx` | 153 | 1 | MobileFloatingDockProps, MobileFloatingDock | The floating tab dock at the bottom of the phone shell, with its capture butt… |
 | `MobileFolderInfoView.tsx` | 70 | 1 | MobileFolderInfoView | Phone folder page: the profile fills the screen and editing happens in place. |
-| `MobileFoldersView.tsx` | 353 | 1 | MobileFoldersView | The phone folder screen: header, feed/Kanban/calendar switch, and the pinned … |
+| `MobileFoldersView.tsx` | 386 | 1 | MobileFoldersView | The phone folder screen: header, feed/Kanban/calendar switch, and the pinned … |
 | `MobileScreenHeader.tsx` | 93 | 4 | MobileScreenHeaderProps, MobileScreenHeader | The phone screen's top bar: back, title slots, and the status-bar inset. |
 | `MobileSettingsView.tsx` | 150 | 1 | MobileSettingsView | The phone settings tab: grouped rows, live sync status, and the vault switche… |
 | `MobileShell.tsx` | 117 | 1 | MobileShell | The phone shell: which tab is on screen, and the edge swipe that goes back. |
@@ -328,7 +328,7 @@
 | `syncGlyph.ts` | 29 | 1 | syncGlyph | Keep the rail quiet during background traffic; comparison details belong in t… |
 | `SyncStatusButton.tsx` | 112 | 2 | SyncStatusButton |  |
 
-## src/components/UI — 38 файлов, 6803 строк
+## src/components/UI — 39 файлов, 6860 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -341,7 +341,7 @@
 | `DatePickerPopover.tsx` | 306 | 1 | DatePickerPopoverProps, DatePickerPopover | Picks a due date: month grid, quick today/tomorrow/next-week, and a clear act… |
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
 | `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
-| `icons/Icon.tsx` | 109 | 150 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
+| `icons/Icon.tsx` | 109 | 151 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
 | `icons/icons.ts` | 569 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 398 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 91 | 2 | HintBubble, InfoHintProps, InfoHint | One question mark for every explanation in the app. |
@@ -356,6 +356,7 @@
 | `NumberInput.tsx` | 98 | 1 | NumberInputProps, NumberInput | Stepper input: minus/plus buttons and a typed value, clamped to min/max on bl… |
 | `PriorityBadge.tsx` | 76 | 4 | TaskPriority, LinearSignalBarsProps, LinearSignalBars | Priority as four Linear-style signal bars, plus the matching badge for task r… |
 | `priorityTone.ts` | 47 | 4 | PriorityTone, priorityTone, PRIORITY_TONE_TEXT, PRIORITY_TONE_DOT, PRIORITY_TONE_CHIP | Maps a priority to its one colour family; text, dot and chip classes hang off… |
+| `PullSearchHint.tsx` | 57 | 2 | PullSearchHintProps, PullSearchHint | The search icon that surfaces while a list is pulled past either end. |
 | `ResponsiveSegmented.tsx` | 243 | 7 | SegmentedOption, ResponsiveSegmentedProps, ResponsiveSegmented | Segmented control that collapses into a dropdown once the row no longer fits. |
 | `segmentedVariants.ts` | 56 | 2 | SegmentedVariant, SegmentedStripClasses, SEGMENTED_STRIP_CLASSES | Class presets for the segmented strip, so mobile headers share one geometry. |
 | `Select.tsx` | 288 | 10 | SelectOption, SelectProps, Select | The app's own select: grouped options, icons, colours, a portal list and plac… |
@@ -407,7 +408,7 @@
 | `WorkspaceShell.tsx` | 312 | 1 | WorkspaceShellProps, WorkspaceShell | The desktop workspace: the dockview shell holding feed, Kanban, calendar, aud… |
 | `workspaceTaskFilterContext.ts` | 14 | 2 | WorkspaceTaskFilterContext, useWorkspaceTaskFilterContext | Shares ephemeral filter state across Dockview's stable panel components. |
 
-## src/config — 9 файлов, 471 строк
+## src/config — 9 файлов, 472 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -419,7 +420,7 @@
 | `storage.ts` | 98 | 9 | DEFAULT_INBOX_FOLDER, STORAGE_KEYS, DEFAULT_WORKSPACE_STATE, DEFAULT_FOLDERS, DEFAULT_VAULT_META, +1 | localStorage keys, the default inbox name and the workspace state a new vault… |
 | `sync.ts` | 72 | 5 | DEFAULT_SYNC_SERVER_URL, OFFICIAL_SYNC_DOMAINS, SYNC_STORAGE_KEYS, SYNC_INTERVALS, SYNC_ATTACHMENT_MAX_BYTES, +1 | Sync defaults: relay URL, storage keys, retry and debounce timings, bundle si… |
 | `typography.ts` | 82 | 3 | FontFamilyOption, FONT_FAMILY_OPTIONS, FontScaleOption, FONT_SCALE_OPTIONS, getFontScaleMultiplier, +1 | Font families and size scales the interface offers, as CSS stacks and multipl… |
-| `ui.ts` | 63 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
+| `ui.ts` | 64 | 3 | ACCENT_COLORS, UI_BREAKPOINTS, UI_LAYOUT, UI_DELAYS, UI_GESTURES | Accent presets, not a free picker: one hex repaints the whole accent family in |
 
 ## src/context — 2 файлов, 1043 строк
 
@@ -462,14 +463,14 @@
 | `useItemActions.ts` | 283 | 4 | TYPE_LABELS, useItemActions | The action set behind every item menu: open, reply, pin, move, decompose, del… |
 | `useSuggestedActions.ts` | 277 | 1 | ActionHistoryEntry, useSuggestedActions | Applies, rejects and undoes the actions the assistant proposes in chat. |
 
-## src/hooks/gestures — 6 файлов, 1097 строк
+## src/hooks/gestures — 6 файлов, 1204 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `useDragToScroll.ts` | 233 | 2 | DragToScrollOptions, useDragToScroll | Mouse grab-to-scroll with a click threshold and Apple-style flick momentum. |
 | `usePhotoPager.ts` | 321 | 2 | PhotoPagerOptions, usePhotoPager | One-finger deck for the full-screen viewer: pager, pinch, pan, swipe to close. |
 | `usePointerDnd.ts` | 245 | 5 | DragItemPayload, UsePointerDndOptions, PointerDndState, usePointerDnd | Pointer-based drag and drop: one live gesture, hover zones, payload on drop. |
-| `usePullToSearch.ts` | 89 | 1 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
+| `usePullToSearch.ts` | 196 | 2 | usePullToSearch | Pull a list past either end to open search, with rubber-band damping. |
 | `useSheetDrag.ts` | 158 | 1 | useSheetDrag | Drag-to-dismiss for a one-detent sheet, transforms written straight to the co… |
 | `useSwipeGesture.ts` | 51 | 3 | SwipeGestureOptions, useSwipeGesture | Left/right swipe detection with a threshold and axis lock, for phone rows. |
 
@@ -510,7 +511,7 @@
 | `backupService.ts` | 596 | 2 | SlagManifest, BackupService, backupService, DEFAULT_BACKUP_SETTINGS | Vault snapshots: pack a zip, list what is there, restore one, drop old ones. |
 | `commands.ts` | 279 | 3 | CommandCategory, AppCommandContext, AppCommand, isMac, formatShortcut, +3 | ponytail: central command & hotkey engine for SLAG v2 without external depend… |
 | `memory.ts` | 374 | 6 | MEMORY_LIMIT, MEMORY_PROMPT_LIMIT, MEMORY_TAG_PROMPT_LIMIT, MEMORY_KINDS, MEMORY_KIND_LABEL, +14 | The assistant's own memory: what it knows about the person, how it ages, how … |
-| `motion.ts` | 229 | 9 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +6 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
+| `motion.ts` | 229 | 11 | MotionToken, MotionEase, prefersReducedMotion, motionMs, motionEase, +6 | Reads the CSS motion tokens as numbers, so JS animation timing matches theme.… |
 | `navigation.ts` | 13 | 5 | navigatePage | Единственная точка перехода между страницами приложения (?page=…). |
 | `searchService.ts` | 311 | 4 | preloadSearchEngine, getSearchableAttachmentText, RU_ENDINGS, RU_STOPWORDS, initSearchIndex, +1 | Orama lives in its own lazy chunk (~76 kB, 25 kB gzip). On the 1000-note prob… |
 
@@ -793,5 +794,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 692 | 242 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 692 | 243 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

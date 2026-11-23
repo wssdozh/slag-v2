@@ -46,6 +46,12 @@ function pinScroll(container: HTMLElement, top: number, target: { current: numbe
   target.current = container.scrollTop;
 }
 
+// The pull translation lives on the surface inside the scroller; anchor math reads card and
+// viewport boxes through it, so strip the committed offset to keep the geometry at rest.
+function readPullOffset(container: HTMLElement) {
+  return Number(container.dataset.pullOffset ?? 0) || 0;
+}
+
 // Within this distance of the bottom the note is arriving in front of the reader:
 // settle the list in the same frame as the render, so the movement is the one FLIP
 // animation instead of a glide plus a smooth scroll racing each other.
@@ -79,7 +85,12 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
 
   // Past either end there is nothing left to scroll, so the same drag opens search.
-  const { pull, side: pullSide, handlers: pullHandlers } = usePullToSearch({
+  const {
+    pull,
+    side: pullSide,
+    offset: pullOffset,
+    handlers: pullHandlers,
+  } = usePullToSearch({
     onTrigger: () => setIsSearchOpen(true),
   });
 
@@ -189,7 +200,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     for (const card of container.querySelectorAll<HTMLElement>('[data-flip-id]')) {
       const rect = card.getBoundingClientRect();
       if (rect.bottom <= viewport.top || rect.top >= viewport.bottom) continue;
-      prependAnchorRef.current = { id: card.dataset.flipId!, top: rect.top - viewport.top, viewKey, aiFilter: aiItemFilter };
+      prependAnchorRef.current = { id: card.dataset.flipId!, top: rect.top - viewport.top - readPullOffset(container), viewKey, aiFilter: aiItemFilter };
       break;
     }
 
@@ -204,6 +215,12 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
     cards: { id: string; top: number }[];
   } | null>(null);
 
+  // Card and viewport boxes are both read through the pulled surface, so the live translation
+  // has to be taken out of every captured/restored anchor; otherwise a sync that lands mid-pull
+  // restores against a different offset and drags the feed by that delta. The offset is mirrored
+  // onto the scroller so the sync listener, which does not re-subscribe per frame, reads the
+  // committed value instead of a stale closure.
+
   // The sync event precedes React's publication of the new items. Capture the
   // live viewport, not a stale FLIP snapshot or geometry from a scroll handler.
   useLayoutEffect(() => {
@@ -212,10 +229,11 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       const container = containerRef.current;
       if (!container || highlightedItemId || isStuckToBottomRef.current || syncAnchorRef.current) return;
       const viewport = container.getBoundingClientRect();
+      const viewportOffset = readPullOffset(container);
       const cards = [...container.querySelectorAll<HTMLElement>('[data-flip-id]')].flatMap((card) => {
         const rect = card.getBoundingClientRect();
         return rect.bottom > viewport.top && rect.top < viewport.bottom
-          ? [{ id: card.dataset.flipId!, top: rect.top - viewport.top }]
+          ? [{ id: card.dataset.flipId!, top: rect.top - viewport.top - viewportOffset }]
           : [];
       });
       // Prefer the first readable top; keep partially visible cards as fallbacks.
@@ -246,7 +264,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
         for (const candidate of remote.cards) {
           const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(candidate.id)}"]`);
           if (!card) continue;
-          pinScroll(container, container.scrollTop + card.getBoundingClientRect().top - top - candidate.top, programmaticScrollRef);
+          pinScroll(container, container.scrollTop + card.getBoundingClientRect().top - top - pullOffset - candidate.top, programmaticScrollRef);
           // A whole-list glide would put the anchored card back in motion.
           skipFeedMotionRef.current = true;
           return;
@@ -258,7 +276,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       const card = container.querySelector<HTMLElement>(`[data-flip-id="${CSS.escape(anchor.id)}"]`);
       if (card) {
         // Correct only the movement that remains after any browser anchoring.
-        const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top;
+        const offset = card.getBoundingClientRect().top - container.getBoundingClientRect().top - pullOffset;
         pinScroll(container, container.scrollTop + offset - anchor.top, programmaticScrollRef);
         return;
       }
@@ -527,6 +545,7 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
       <div
         ref={containerRef}
         data-testid="feed-list-container"
+        data-pull-offset={pullOffset}
         onScroll={handleScroll}
         onContextMenu={handleFeedContextMenu}
         onDragOver={handleDragOver}
@@ -543,79 +562,91 @@ export const FeedList: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFilte
         {/* Drag & Drop Visual Dropzone Overlay */}
         <FeedDropOverlay isVisible={isDraggingOver} />
 
-        {filteredItems.length === 0 ? taskFilter ? (
-          <EmptyState icon={<Icon name="action.filter" size="lg" />} title="Нет задач по этому фильтру" />
-        ) : items.length === 0 && !isPinnedOnlyFilter ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-fg-secondary">
-            <Icon name="system.ai" size="none" tone="inherit" className="size-9" />
-            <p className="text-xs font-medium">Хранилище пустое</p>
-          </div>
-        ) : (
-          <EmptyState
-            icon={
-              isPinnedOnlyFilter ? (
-                <Icon name="action.pin" size="lg" tone="warning" className="rotate-45" />
-              ) : (
-                <Icon name="entity.inbox" size="lg" tone="inherit" />
-              )
-            }
-            title={
-              isPinnedOnlyFilter
-                ? 'Нет закрепленных записей'
-                : 'В этой папке пусто'
-            }
-            description={
-              isPinnedOnlyFilter
-                ? 'В текущей папке нет закрепленных сообщений.'
-                : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
-            }
-            action={
-              isPinnedOnlyFilter ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={togglePinnedOnlyFilter}
-                  className="gap-1.5 text-xs text-fg-soft hover:text-white"
-                >
-                  Показать все сообщения
-                </Button>
-              ) : undefined
-            }
-            className="flex-1"
-          />
-        ) : (
-          <>
-            {/* Top spacer to push items to the bottom when list doesn't fill screen (Telegram-style) */}
-            <div className="mt-auto pointer-events-none" aria-hidden="true" />
-
-            {/* Top sentinel / load earlier notes trigger */}
-            {hasMoreOlder && (
-              <div ref={topSentinelRef} className="flex justify-center py-2 select-none">
-                <button
-                  type="button"
-                  onClick={() => loadMoreOlder(false)}
-                  className="text-xs font-mono text-fg-muted hover:text-fg-tertiary transition-colors px-3 py-1 rounded-full bg-surface border border-tint-4 cursor-pointer"
-                >
-                  Показать более ранние записи...
-                </button>
+        {/* The pull translates this surface, never the scroller: a transformed child grows the
+            scrollable overflow, and `overflow-clip` here keeps scrollHeight/anchoring at rest.
+            The grid row stretches the column to the viewport height so `mt-auto` still pins a
+            short feed to the bottom. */}
+        <div className="grid min-h-full shrink-0 overflow-clip">
+          <div
+            data-testid="feed-pull-surface"
+            className="flex min-w-0 flex-col gap-6"
+            style={pullOffset ? { transform: `translate3d(0, ${pullOffset}px, 0)` } : undefined}
+          >
+            {filteredItems.length === 0 ? taskFilter ? (
+              <EmptyState icon={<Icon name="action.filter" size="lg" />} title="Нет задач по этому фильтру" />
+            ) : items.length === 0 && !isPinnedOnlyFilter ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-fg-secondary">
+                <Icon name="system.ai" size="none" tone="inherit" className="size-9" />
+                <p className="text-xs font-medium">Хранилище пустое</p>
               </div>
+            ) : (
+              <EmptyState
+                icon={
+                  isPinnedOnlyFilter ? (
+                    <Icon name="action.pin" size="lg" tone="warning" className="rotate-45" />
+                  ) : (
+                    <Icon name="entity.inbox" size="lg" tone="inherit" />
+                  )
+                }
+                title={
+                  isPinnedOnlyFilter
+                    ? 'Нет закрепленных записей'
+                    : 'В этой папке пусто'
+                }
+                description={
+                  isPinnedOnlyFilter
+                    ? 'В текущей папке нет закрепленных сообщений.'
+                    : 'Напишите сообщение в поле внизу, запишите голосовое или прикрепите файл.'
+                }
+                action={
+                  isPinnedOnlyFilter ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={togglePinnedOnlyFilter}
+                      className="gap-1.5 text-xs text-fg-soft hover:text-white"
+                    >
+                      Показать все сообщения
+                    </Button>
+                  ) : undefined
+                }
+                className="flex-1"
+              />
+            ) : (
+              <>
+                {/* Top spacer to push items to the bottom when list doesn't fill screen (Telegram-style) */}
+                <div className="mt-auto pointer-events-none" aria-hidden="true" />
+
+                {/* Top sentinel / load earlier notes trigger */}
+                {hasMoreOlder && (
+                  <div ref={topSentinelRef} className="flex justify-center py-2 select-none">
+                    <button
+                      type="button"
+                      onClick={() => loadMoreOlder(false)}
+                      className="text-xs font-mono text-fg-muted hover:text-fg-tertiary transition-colors px-3 py-1 rounded-full bg-surface border border-tint-4 cursor-pointer"
+                    >
+                      Показать более ранние записи...
+                    </button>
+                  </div>
+                )}
+
+                {grouped.map(group => (
+                  <div key={group.dateLabel} className="flex flex-col gap-2">
+                    <FeedDateBubble label={group.dateLabel} />
+
+                    {/* List of cards: the step between two notes is their own gap, not the column's */}
+                    <div className="flex flex-col">
+                      {group.items.map(({ item, gap }) => renderCard(item, gap))}
+                    </div>
+                  </div>
+                ))}
+                <FeedTaskSection key={`${filterKey}:today`} label="Сегодня" showLabel={grouped.at(-1)?.dateLabel !== 'Сегодня'} items={scheduledToday} highlightedItemId={highlightedItemId} renderCard={renderCard} />
+                <FeedTaskSection key={`${filterKey}:overdue`} label="Просрочено" items={overdue} highlightedItemId={highlightedItemId} renderCard={renderCard} />
+              </>
             )}
-
-            {grouped.map(group => (
-              <div key={group.dateLabel} className="flex flex-col gap-2">
-                <FeedDateBubble label={group.dateLabel} />
-
-                {/* List of cards: the step between two notes is their own gap, not the column's */}
-                <div className="flex flex-col">
-                  {group.items.map(({ item, gap }) => renderCard(item, gap))}
-                </div>
-              </div>
-            ))}
-            <FeedTaskSection key={`${filterKey}:today`} label="Сегодня" showLabel={grouped.at(-1)?.dateLabel !== 'Сегодня'} items={scheduledToday} highlightedItemId={highlightedItemId} renderCard={renderCard} />
-            <FeedTaskSection key={`${filterKey}:overdue`} label="Просрочено" items={overdue} highlightedItemId={highlightedItemId} renderCard={renderCard} />
-          </>
-        )}
+          </div>
+        </div>
 
       </div>
 
