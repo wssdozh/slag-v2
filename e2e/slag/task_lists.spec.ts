@@ -29,7 +29,7 @@ test('classifies by saved deadline and task status', () => {
   }
 });
 
-async function openProjects(page: Page, extras = 0) {
+async function openProjects(page: Page, extras = 0, openFolder = true) {
   await page.addInitScript(({ items, extras }) => {
     if (localStorage.getItem('slag_items_default_vault')) return;
     localStorage.setItem('slag_items_default_vault', JSON.stringify([...items, ...Array.from({ length: extras }, (_, i) => ({
@@ -40,9 +40,29 @@ async function openProjects(page: Page, extras = 0) {
   await page.goto('/', { waitUntil: 'commit' });
   const filters = page.getByTestId('task-quick-filters');
   await expect(filters).toBeVisible({ timeout: 240000 });
-  await page.locator('aside').getByText('Проекты', { exact: true }).click();
+  if (openFolder) await page.locator('aside').getByText('Проекты', { exact: true }).click();
   return filters;
 }
+
+test('Без даты includes tasks from other folders in the all-inbox view', async ({ page }) => {
+  await page.clock.setFixedTime(now);
+  const filters = await openProjects(page, 0, false);
+  const feed = page.getByTestId('feed-list-container');
+  await expect(feed.getByText('Собрать идеи', { exact: true })).toBeVisible();
+  await filters.getByRole('button', { name: 'Без даты', exact: true }).click();
+  await expect(feed.locator('[data-flip-id]')).toHaveCount(1);
+  await expect(feed.getByText('Собрать идеи', { exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/screenshots/task-filter-undated-inbox.png' });
+
+  const center = page.locator('.dv-groupview').filter({ has: feed });
+  await center.getByTitle('Добавить вкладку в эту группу').click();
+  await page.getByRole('button', { name: 'Канбан', exact: true }).click();
+  await filters.getByRole('button', { name: 'Без даты', exact: true }).click();
+  await expect(page.getByTestId('kanban-columns-container').getByText('Собрать идеи', { exact: true })).toBeVisible();
+
+  await switchToView(page, 'calendar');
+  await expect(page.getByTestId('calendar-drawer-task').getByText('Собрать идеи', { exact: true })).toBeVisible();
+});
 
 test('filters the current feed in one click without replacing it', async ({ page }) => {
   await page.clock.setFixedTime(now);

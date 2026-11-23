@@ -78,8 +78,8 @@ export const KanbanBoard: React.FC<{ taskFilter?: TaskQuickFilter }> = ({ taskFi
 
   const folderMaterials = useMemo(() => folderItems.filter(item => item.type === 'note' || item.type === 'article'), [folderItems]);
   const tasks = useMemo(() => folderItems.filter(item => taskFilter
-    ? (currentFolder !== DEFAULT_INBOX_FOLDER || item.folder === currentFolder) && matchesTaskQuickFilter(item, taskFilter)
-    : item.type === 'task'), [folderItems, currentFolder, taskFilter]);
+    ? matchesTaskQuickFilter(item, taskFilter)
+    : item.type === 'task'), [folderItems, taskFilter]);
   const layoutKey = useMemo(() => tasks.map(item => `${item.id}:${item.status ?? ''}`).join('|'), [tasks]);
   useFlipLayout(kanbanBoardRef, layoutKey);
 

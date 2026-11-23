@@ -11,10 +11,10 @@ import { TASK_QUICK_FILTER_LABELS } from '../../lib/tasks/taskQuickFilter';
 import { useWorkspaceTaskFilterContext } from '../Workspace/workspaceTaskFilterContext';
 
 const taskLinks = [
-  { id: 'today', icon: 'time.date', color: 'text-warning' },
-  { id: 'upcoming', icon: 'time.agenda', color: 'text-accent' },
-  { id: 'undated', icon: 'time.time', color: 'text-fg-secondary' },
-  { id: 'completed', icon: 'entity.taskList', color: 'text-success' },
+  { id: 'today', icon: 'time.date' },
+  { id: 'upcoming', icon: 'time.calendarDays' },
+  { id: 'undated', icon: 'status.backlog' },
+  { id: 'completed', icon: 'status.done' },
 ] as const;
 
 export const Sidebar: React.FC = () => {
@@ -52,12 +52,12 @@ export const Sidebar: React.FC = () => {
           </button>
         </nav>
         <div role="group" aria-label="Быстрые фильтры задач" data-testid="task-quick-filters">
-          {taskLinks.map(({ id, icon, color }) => {
+          {taskLinks.map(({ id, icon }) => {
             const active = filter?.id === id;
             return (
               <button key={id} type="button" onClick={() => toggleFilter?.(id)} disabled={!panelId} aria-pressed={active}
                 className={`flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs transition-colors focus-visible:bg-tint-10 disabled:opacity-50 ${active ? 'bg-tint-8 font-medium text-fg-primary' : 'text-fg-secondary hover:bg-tint-4 hover:text-fg-primary'}`}>
-                <Icon name={icon} size="md" tone="inherit" className={`shrink-0 ${color}`} />
+                <Icon name={icon} size="md" tone="inherit" className="shrink-0" />
                 <span className="min-w-0 flex-1 truncate text-start">{TASK_QUICK_FILTER_LABELS[id]}</span>
               </button>
             );

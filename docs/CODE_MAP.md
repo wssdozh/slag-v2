@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **660**, строк: **115051**, зон: **48**.
+Модулей: **660**, строк: **115122**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -17,22 +17,22 @@
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/sync/notes/replica.ts` | 1019 | 1 |
 | `src/lib/storage/settingsStore.ts` | 959 | 5 |
+| `e2e/slag/feed.spec.ts` | 944 | 0 |
 | `src/lib/storage/vaultFiles.ts` | 927 | 2 |
-| `e2e/slag/feed.spec.ts` | 919 | 0 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
 | `e2e/mobile.spec.ts` | 903 | 0 |
 | `src/mcp/vault.ts` | 811 | 6 |
 | `src/context/AppContext.tsx` | 806 | 72 |
-| `src/components/Feed/ItemCard.tsx` | 763 | 1 |
+| `src/components/Feed/ItemCard.tsx` | 761 | 1 |
 | `src/components/Feed/Composer.tsx` | 759 | 4 |
 
-## e2e (playwright) — 142 файлов, 26314 строк
+## e2e (playwright) — 142 файлов, 26359 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
 - `e2e/slag/editor.spec.ts` — 1753
 - `e2e/slag/views.spec.ts` — 1098
-- `e2e/slag/feed.spec.ts` — 919
+- `e2e/slag/feed.spec.ts` — 944
 - `e2e/slag/workspace.spec.ts` — 917
 - `e2e/mobile.spec.ts` — 903
 - `e2e/motion.spec.ts` — 570
@@ -113,7 +113,7 @@
 | `MobileEditorBar.tsx` | 328 | 1 | MobileEditorBarProps, MobileEditorBar | The phone formatting bar: style, list and AI popovers above a single save but… |
 | `useFullscreenDraft.ts` | 442 | 1 | UseFullscreenDraftOptions, UseFullscreenDraftReturn, useFullscreenDraft | The editor's draft: every editable field, dirty tracking, autosave and the sa… |
 
-## src/components/Feed — 54 файлов, 8090 строк
+## src/components/Feed — 54 файлов, 8088 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -162,7 +162,7 @@
 | `item/ItemSubtasks.tsx` | 83 | 1 | ItemSubtasksProps, ItemSubtasks | A task's subtasks: one counter, one toggleable line each, collapsible. |
 | `item/ItemSyncDot.tsx` | 40 | 1 | ItemSyncDot |  |
 | `item/ItemVideoNotes.tsx` | 42 | 0 | ItemVideoNotesProps, ItemVideoNotes | Video circle notes on a card: plays in place, the corner opens the full viewe… |
-| `ItemCard.tsx` | 763 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
+| `ItemCard.tsx` | 761 | 1 | ItemCardProps, ItemCard | One note in the feed: reply swipe, width, OCR/expansion state, and the slots … |
 | `list/FeedDateBubble.tsx` | 22 | 1 | FeedDateBubbleProps, FeedDateBubble | The day separator between feed groups: today, yesterday, or a plain date. |
 | `list/FeedDropOverlay.tsx` | 30 | 1 | FeedDropOverlayProps, FeedDropOverlay | The dashed frame over the feed while files hover: what dropping them will do. |
 | `list/FeedScrollHint.tsx` | 73 | 1 | FeedScrollHintProps, FeedScrollHint | Two floating tips at the feed edges: pull-to-search, and a jump to the newest… |
@@ -328,7 +328,7 @@
 | `syncGlyph.ts` | 29 | 1 | syncGlyph | Keep the rail quiet during background traffic; comparison details belong in t… |
 | `SyncStatusButton.tsx` | 112 | 2 | SyncStatusButton |  |
 
-## src/components/UI — 38 файлов, 6765 строк
+## src/components/UI — 38 файлов, 6794 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -342,11 +342,11 @@
 | `EmptyState.tsx` | 32 | 2 | EmptyStateProps, EmptyState | The shared blank slate: an icon, one line of why it is empty, an optional act… |
 | `IconButton.tsx` | 51 | 10 | IconButtonProps, IconButton | Square icon-only button in three sizes and three tones, for dense toolbars. |
 | `icons/Icon.tsx` | 109 | 151 | IconSize, IconVariant, IconTone, IconProps, Icon | One icon element for the whole app: the glyph comes from the config, the size… |
-| `icons/icons.ts` | 569 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
+| `icons/icons.ts` | 571 | 18 | GlyphComponent, Glyph, IconEntry, ICONS, IconName, +4 | The one icon config: a semantic name per glyph, grouped by meaning. |
 | `ImageLightbox.tsx` | 360 | 3 | ImageLightboxProps, ImageLightbox, LightboxImage | The feed's media viewer: swipeable photos and clips, keyboard nav, OCR side p… |
 | `InfoHint.tsx` | 91 | 2 | HintBubble, InfoHintProps, InfoHint | One question mark for every explanation in the app. |
 | `LightboxTextPanel.tsx` | 151 | 1 | LightboxTextPanelProps, LightboxTextPanel | OCR results beside a photo in the lightbox, with copy and retry when the pass… |
-| `MarkdownRenderer.tsx` | 389 | 4 | MarkdownAttachmentSrcs, MarkdownRenderer | Renders markdown with GFM, Obsidian [[wiki links]] as in-app jumps and ![[fil… |
+| `MarkdownRenderer.tsx` | 416 | 4 | MarkdownAttachmentSrcs, MarkdownRenderer | Renders markdown with GFM, Obsidian [[wiki links]] as in-app jumps and ![[fil… |
 | `menu/feedMenuSections.tsx` | 83 | 1 | FeedMenuSectionsProps, FeedMenuSections | Feed right-click entries: the three create actions plus folder and search jum… |
 | `menu/folderMenuSections.tsx` | 89 | 1 | FolderMenuSectionsProps, FolderMenuSections | Folder right-click entries: info, new subfolder, explorer and the guarded del… |
 | `menu/itemMenuSections.tsx` | 177 | 1 | ItemMenuSectionsProps, ItemMenuSections | Item right-click entries: reply, pin, type switch, AI split, copy and delete. |
@@ -452,11 +452,11 @@
 | `useVaults.ts` | 164 | 1 | useVaults | A vault's own writes: switch, create, delete, pick its folder and reveal it o… |
 | `useVaultWatch.ts` | 92 | 1 | UseVaultWatchOptions, useVaultWatch | Keeps the open vault honest about the disk. Files the MCP server, another edi… |
 
-## src/hooks — 5 файлов, 748 строк
+## src/hooks — 5 файлов, 747 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `useCalendarSchedule.ts` | 124 | 3 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule | Splits tasks into overdue, unscheduled and per-day buckets, expanding recurre… |
+| `useCalendarSchedule.ts` | 123 | 3 | CalendarTask, UseCalendarScheduleParams, CalendarScheduleResult, useCalendarSchedule | Splits tasks into overdue, unscheduled and per-day buckets, expanding recurre… |
 | `useDeviceAccess.ts` | 33 | 1 | useDeviceAccess | Android overlay / alarm / notification access, re-read whenever the app regai… |
 | `useItemActions.ts` | 283 | 4 | TYPE_LABELS, useItemActions | The action set behind every item menu: open, reply, pin, move, decompose, del… |
 | `useLocalDay.ts` | 31 | 1 | useLocalDay | Tracks the device's calendar date at midnight and after a suspended window wa… |

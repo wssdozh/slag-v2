@@ -53,8 +53,7 @@ export function useCalendarSchedule({
   }, [items, currentFolder, filterByFolder]);
 
   const scopedTasks = useMemo(() => taskFilter
-    ? folderTasks.filter(item => (currentFolder !== DEFAULT_INBOX_FOLDER || item.folder === currentFolder)
-      && matchesTaskQuickFilter(item, taskFilter)) : folderTasks, [folderTasks, currentFolder, taskFilter]);
+    ? folderTasks.filter(item => matchesTaskQuickFilter(item, taskFilter)) : folderTasks, [folderTasks, taskFilter]);
 
   const overdueTasks = useMemo(() => {
     return scopedTasks

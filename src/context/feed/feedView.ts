@@ -46,10 +46,10 @@ export function selectVisibleItems(items: SlagItem[], query: FeedViewQuery, task
   return items
     .filter((item) => {
       let matchesFolder = false;
-      if (aiItemFilter && !taskFilter) {
+      if (aiItemFilter) {
         matchesFolder = true;
       } else if (currentFolder === DEFAULT_INBOX_FOLDER) {
-        if (taskFilter || inboxMode === 'unsorted') {
+        if (inboxMode === 'unsorted') {
           matchesFolder = item.folder === DEFAULT_INBOX_FOLDER;
         } else if (inboxMode === 'all') {
           matchesFolder = true;
