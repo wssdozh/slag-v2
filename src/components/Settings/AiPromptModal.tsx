@@ -125,7 +125,7 @@ const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onC
     if (!from) return;
     const overlay = presence.ref.current;
     const card = overlay?.firstElementChild;
-    if (!(card instanceof HTMLElement)) return;
+    if (!(card instanceof HTMLElement) || typeof card.animate !== 'function') return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const to = card.getBoundingClientRect();
     if (to.width < 1 || to.height < 1) return;
@@ -134,6 +134,8 @@ const PromptDialog: React.FC<PromptDialogProps> = ({ field, session, isOpen, onC
     if (Math.abs(scaleX - 1) < 0.005 && Math.abs(scaleY - 1) < 0.005) return;
     const styles = getComputedStyle(document.documentElement);
     const duration = readMotionDuration(styles.getPropertyValue('--slag-motion-base'), 150);
+    if (!(duration > 0)) return;
+    // The token is already a resolved curve; a `var(...)` string would be an invalid WAAPI easing.
     const easing = styles.getPropertyValue('--ease-standard').trim() || 'ease';
     const animation = card.animate(
       [{ transform: `scale(${scaleX}, ${scaleY})` }, { transform: 'none' }],
