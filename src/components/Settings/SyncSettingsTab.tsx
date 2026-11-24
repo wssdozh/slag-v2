@@ -1,5 +1,6 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
-import React, { useEffect, useId, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
+import { InfoHint } from '../UI/InfoHint';
 import { DiffModal } from '../Modals/DiffModal';
 import { noteDifferences } from '../../lib/sync/notes/merge';
 import { isNoteItem } from '../../lib/sync/notes/wire';
@@ -28,22 +29,23 @@ const conflictReasons: Record<string, string> = {
 
 function AndroidBackgroundSyncRow() {
   const enabled = useSyncExternalStore(subscribeAndroidBackgroundSyncPreference, getAndroidBackgroundSyncEnabled);
-  const hintId = useId();
   const label = 'Фоновая синхронизация';
 
   return (
-    <SettingsRow label={label} description={
-      <span id={hintId} className="text-fg-secondary">
-        Когда выключено, SLAG догоняет изменения при открытии. Android может отложить
-        обмен в Doze даже при включённом режиме. После принудительной остановки откройте SLAG снова.
-        Настройки батареи и автозапуска находятся в Android.
+    <SettingsRow label={
+      <span className="inline-flex items-center gap-2">
+        {label}
+        <InfoHint title={label} hint="Android может отложить синхронизацию в фоне." testId="android-background-sync-help">
+          <p>Если выключено, SLAG догоняет изменения при возвращении в приложение.</p>
+          <p>Android может отложить обмен в Doze даже при включённом режиме. После принудительной остановки откройте SLAG снова.</p>
+          <p>Ограничения батареи и автозапуск, если он доступен, настраиваются в Android.</p>
+        </InfoHint>
       </span>
     } right={
       <SettingsSwitch
         checked={enabled}
         onChange={setAndroidBackgroundSyncEnabled}
         label={label}
-        descriptionId={hintId}
         testId="android-background-sync-switch"
         className="before:absolute before:-inset-x-1.5 before:-inset-y-3.5 before:rounded-md focus-visible:before:border focus-visible:before:border-fg-secondary active:opacity-80"
       />

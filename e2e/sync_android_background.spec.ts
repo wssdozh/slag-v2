@@ -32,10 +32,17 @@ test('Android app background sync defaults to on and remembers the switch across
   await page.getByTestId('mobile-settings-sync').click();
   const toggle = backgroundSwitch(page);
   await expect(toggle).toBeChecked();
-  await expect(toggle).toHaveAccessibleDescription(/Doze.*принудительной.*батареи.*автозапуск/);
   await toggle.click();
   await expect(toggle).not.toBeChecked();
   await page.screenshot({ path: 'test-results/screenshots/android-background-sync.png', animations: 'disabled' });
+  await page.getByRole('button', { name: 'Подробнее: Фоновая синхронизация' }).click();
+  const help = page.getByRole('dialog', { name: 'Фоновая синхронизация', exact: true });
+  await expect(help.getByText(/обмен в Doze/)).toBeVisible();
+  await expect(help.getByText(/ограничения батареи и автозапуск/i)).toBeVisible();
+  await page.screenshot({ path: 'test-results/screenshots/android-background-sync-help.png', animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(help).toBeHidden();
+  await expect(toggle).not.toBeChecked();
 
   await page.reload();
   await openMobileSettings(page);

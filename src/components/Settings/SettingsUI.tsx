@@ -143,7 +143,6 @@ interface SettingsSwitchProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   label: string;
-  descriptionId?: string;
   className?: string;
   testId?: string;
 }
@@ -157,7 +156,6 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
   onChange,
   disabled = false,
   label,
-  descriptionId,
   className = '',
   testId,
 }) => (
@@ -166,7 +164,6 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
     role="switch"
     aria-checked={checked}
     aria-label={label}
-    aria-describedby={descriptionId}
     data-testid={testId}
     disabled={disabled}
     onClick={() => onChange(!checked)}
