@@ -84,6 +84,27 @@ async function settle() {
 
 const change = (kind, item, id = item.id) => ({ kind, id, item });
 
+test('pause preserves local intents and resume delivers exactly once', async (t) => {
+  const server = relay();
+  let paused = false;
+  const client = device(t, server, { isRelayPaused: () => paused });
+  await client.replica.catchUp();
+  paused = true;
+  client.replica.requireCatchUp();
+  await client.replica.record([change('create', note('offline-in-background'))]);
+  await wait(100);
+  assert.equal(client.saved().pending[0].id, 'offline-in-background');
+  assert.equal(server.sends(), 0);
+  assert.deepEqual(client.errors, []);
+
+  paused = false;
+  await client.replica.catchUp();
+  await until(() => client.saved()?.cursor === 1 && client.replica.pendingCount === 0);
+  assert.equal(server.sends(), 1);
+  assert.equal(server.events.length, 1);
+  assert.equal(client.saved().confirmed['offline-in-background'].revision, 1);
+});
+
 test('cold disk edits use the last durable base, never a newer relay revision', async (t) => {
   const expectCapture = async (stale) => {
     const server = relay();
