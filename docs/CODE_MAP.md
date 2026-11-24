@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **703**, строк: **120522**, зон: **48**.
+Модулей: **703**, строк: **120620**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -13,7 +13,7 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `src/lib/sync/syncEngine.ts` | 1807 | 31 |
 | `e2e/slag/editor.spec.ts` | 1737 | 0 |
-| `src/lib/storage/index.ts` | 1575 | 52 |
+| `src/lib/storage/index.ts` | 1578 | 52 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
 | `src/lib/sync/notes/replica.ts` | 1086 | 1 |
 | `src/lib/storage/vaultFiles.ts` | 1046 | 2 |
@@ -26,7 +26,7 @@
 | `src/components/Feed/Composer.tsx` | 760 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 720 | 1 |
 
-## e2e (playwright) — 159 файлов, 29297 строк
+## e2e (playwright) — 159 файлов, 29371 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -620,7 +620,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 31 | 2 | writeJsonAtomic | Installation prefs and encrypted secret snapshots use write-then-rename. Vaul… |
 
-## src/lib/storage — 34 файлов, 8042 строк
+## src/lib/storage — 34 файлов, 8056 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -628,7 +628,7 @@
 | `attachments.ts` | 363 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
 | `folderStore.ts` | 275 | 2 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 1575 | 52 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `index.ts` | 1578 | 52 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 160 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 163 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
@@ -651,15 +651,15 @@
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
 | `vaultFiles.ts` | 1046 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultNoteMove.ts` | 304 | 1 | VAULT_NOTE_MOVE_INTENT_FILE, VAULT_NOTE_MOVE_VERSION, VaultNoteMoveIo, VaultNoteMoveRequest, VaultNoteMoveIntentV1, +4 | A local note move — rename, or a move to another folder — is two disk operati… |
-| `vaultRecovery.ts` | 125 | 4 | RECOVERY_LOCAL_ONLY, RecoveryReason, VaultRecovery, isMissingVaultFile, readVaultBytes, +2 | Recover the local vault before the normal scanner, watcher or sync engine can… |
+| `vaultRecovery.ts` | 126 | 5 | RECOVERY_LOCAL_ONLY, RecoveryReason, VaultRecovery, isMissingVaultFile, readVaultBytes, +2 | Recover the local vault before the normal scanner, watcher or sync engine can… |
 | `vaultRegistry.ts` | 180 | 3 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
 | `vaultRegistryModel.ts` | 65 | 1 | toVaultMeta, normalizeVaultRegistry, upsertVaultMeta, removeVaultMeta | The vault registry as a value: what a stored list means, and how one entry jo… |
 | `vaultTransfer.ts` | 109 | 1 | VaultSnapshot, buildVaultExportJson, VaultImportIo, VaultImportPayload, importVaultPayload, +1 | The vault interchange format: export, import and backup JSON, apart from pers… |
-| `vaultWatch.ts` | 193 | 1 | VaultWatchOptions, VaultWatch, canWatchVault, startVaultWatch | Notices .md files and folders that appeared, changed or vanished under the va… |
+| `vaultWatch.ts` | 203 | 1 | VaultWatchOptions, VaultWatch, canWatchVault, startVaultWatch | Notices .md files and folders that appeared, changed or vanished under the va… |
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 57 файлов, 12409 строк
+## src/lib/sync — 57 файлов, 12419 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -719,7 +719,7 @@
 | `transport.ts` | 291 | 2 | TransportCallbacks, TransportOptions, SendAckOptions, SyncTransport | The websocket link to the relay: connect, heartbeat, reconnect, route incomin… |
 | `types.ts` | 221 | 31 | DeviceSyncMode, DeviceProfile, SyncConnectionState, SubscriptionInfo, ManifestPeerStatus, +14 | Shared sync types: device profile, connection state, subscription and status … |
 | `vaultSharing.ts` | 88 | 4 | getLocalVaultId, shareVaultWithDevice, acceptSharedVault, installSharedVault | Hands a vault key to another device and accepts one, so the vault opens on bo… |
-| `vaultSyncFiles.ts` | 121 | 4 | folderFence, validateSyncLedger, provisionRegistryOnly, readProtectedSyncState, migrateVaultSyncFiles, +1 | The room binding and delivery ledger have separate lifetimes. Neither is a ca… |
+| `vaultSyncFiles.ts` | 131 | 4 | folderFence, validateSyncLedger, provisionRegistryOnly, inspectProtectedSyncState, readProtectedSyncState, +2 | The room binding and delivery ledger have separate lifetimes. Neither is a ca… |
 
 ## src/lib/tasks — 4 файлов, 204 строк
 

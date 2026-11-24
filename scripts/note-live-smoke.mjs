@@ -99,7 +99,7 @@ async function run() {
   const activated = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
   relay.stdin.write(`${JSON.stringify({ seed, shared: offlineOnly })}\n`);
   assert.deepEqual(await activated, ['active']);
-  async function device(i, initial, local = new Map(), onApplied, workspace = {}, offline = false) {
+  async function device(i, initial, local = new Map(), onApplied, workspace = {}, offline = false, scanHeads) {
     const controller = new AbortController();
     const signal = AbortSignal.any([stop.signal, controller.signal]);
     const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true, sharedRecords: offlineOnly,
@@ -125,7 +125,7 @@ async function run() {
     if (ws) sockets.add(ws);
     const replica = new NoteReplica({ room, generation, keys, signal, readOnly: false, atomicGroups: true, channel: {
       events: (...args) => { assert.ok(!offline); reads++; return channel.events(...args); },
-      heads: (...args) => { assert.ok(!offline); reads++; scans++; return channel.heads(...args); },
+      heads: (...args) => { assert.ok(!offline); reads++; scans++; return scanHeads ? scanHeads(channel, ...args) : channel.heads(...args); },
       send: (...args) => { assert.ok(!offline); posts++; attempts.push(args[2]); return channel.send(...args); },
     }, sendLive: (text) => {
       if (ws?.readyState !== WebSocket.OPEN) return false;
@@ -200,6 +200,11 @@ async function run() {
     await a.replica.recordShared(persona, { text: 'Original', enabled: false }, null);
     await converge(8);
     const restartJournal = (journal) => loadNoteJournal(JSON.parse(JSON.stringify({ version: 1, room, generation, journal })), room, generation);
+    async function expireHistory() {
+      const response = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
+      relay.stdin.write('expire\n');
+      return JSON.parse((await response)[0]);
+    }
     async function disconnect(edit) {
       const { local, workspace } = c;
       const journal = c.saved();
@@ -212,7 +217,7 @@ async function run() {
       assert.deepEqual(offline.stats(), { reads: 0, posts: 0, pushes: 0 });
       assert.deepEqual(offline.errors, []);
       offline.close();
-      return () => device(2, pending, local, undefined, workspace);
+      return (scanHeads) => device(2, pending, local, undefined, workspace, false, scanHeads);
     }
     const edit = (peer, item, patch, journal = peer.saved()) => {
       const { item: previous, revision } = journal.confirmed[item.id];
@@ -273,9 +278,7 @@ async function run() {
     await b.replica.recordShared(profile, { name: 'Online name' }, { name: 'Offline name' });
     await save(b, Array.from({ length: 24 }, (_, i) => note(`expired-${i}`, 'unrelated revision')));
     await online(147);
-    const expiredLine = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
-    relay.stdin.write('expire\n');
-    const expired = JSON.parse((await expiredLine)[0]);
+    const expired = await expireHistory();
     assert.equal(expired.floor, 147);
     c = await reopenExpired();
     await converge(150);
@@ -350,8 +353,50 @@ async function run() {
       [checklist.id, { ...checklist, subtasks: [step] }, ['subtasks']],
       [caption.id, { ...caption, content: newCaption }, ['attachments']],
     ]);
-    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 157,
-      equivalentEdits: 3, savedAlternatives: alternatives.length })}\n`);
+    // An unrelated offline create must wait while a second expiry invalidates the current scan.
+    const localOnly = note('during-repeated-expiry', 'offline create must survive');
+    const first = note('scan-page-first');
+    const second = note('scan-page-second');
+    const reopenDuringExpiry = await disconnect(async (off) => { await save(off, [localOnly]); });
+    await save(a, [first, second]);
+    await online(159);
+    assert.equal((await expireHistory()).floor, 159);
+    const noteIds = new Map(await Promise.all([first, second].map(async (item) => [await opaqueNoteId(keys, item.id), item.id])));
+    let repeatedExpiry = false;
+    let updatedId;
+    let deletedId;
+    const scanCalls = [];
+    c = await reopenDuringExpiry(async (channel, currentGeneration, after, since, through) => {
+      const page = await channel.heads(currentGeneration, after, since, through, 100_000);
+      scanCalls.push({ after, since, through, floor: page.floor });
+      if (!repeatedExpiry) {
+        assert.equal(through, 159);
+        assert.equal(page.heads.length, 1);
+        assert.ok(page.next, 'expire history between real pages');
+        updatedId = noteIds.get(page.next);
+        deletedId = updatedId === first.id ? second.id : first.id;
+        assert.ok(updatedId && deletedId);
+        const next = updatedId === first.id ? first : second;
+        await edit(a, next, { title: 'new head after the fetched page' });
+        await online(160);
+        await b.replica.record([{ id: deletedId, kind: 'delete', item: null }]);
+        await online(161);
+        assert.equal((await expireHistory()).floor, 161);
+        repeatedExpiry = true;
+      }
+      return page;
+    });
+    await converge(162);
+    sameProjection();
+    assert.ok(scanCalls.some(({ after, through, floor }) => after && through === 159 && floor === 161));
+    assert.ok(scanCalls.some(({ after, through }) => !after && through === 161));
+    assert.equal(c.local.get(updatedId).title, 'new head after the fetched page');
+    assert.equal(c.local.get(deletedId), null);
+    assert.ok(sameNote(c.local.get(localOnly.id), localOnly));
+    assert.equal(c.attempts.length, 1);
+    assert.deepEqual(restartJournal(c.saved()).conflicts, alternatives);
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 162,
+      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length })}\n`);
   }
 
   if (offlineOnly) return offlineScenarios();

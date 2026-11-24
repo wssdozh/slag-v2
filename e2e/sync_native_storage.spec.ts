@@ -100,10 +100,13 @@ test('cold registry hydration cannot resurrect legacy draft, memory or prompt', 
     let writes = 0;
     const reads: string[] = [];
     const ipc = { invoke: async (cmd: string, args: { path: string }) => {
+      if (cmd === 'vault_read_generation') {
+        reads.push(args.path);
+        return args.path.endsWith('/note-registry.json') ? registry : null;
+      }
       if (cmd === 'plugin:fs|read_text_file') {
         reads.push(args.path);
-        const content = args.path.endsWith('/note-registry.json') ? registry : state;
-        return [...new TextEncoder().encode(content)];
+        return [...new TextEncoder().encode(state)];
       }
       writes++;
       throw new Error(`Unexpected write: ${cmd}`);
@@ -121,7 +124,7 @@ test('cold registry hydration cannot resurrect legacy draft, memory or prompt', 
       for (const key of Object.keys(legacy)) removePref(key);
     }
   });
-  expect(result).toEqual({ draft: null, memory: [], prompt: 'from state file', writes: 0, stateReads: 5 });
+  expect(result).toEqual({ draft: null, memory: [], prompt: 'from state file', writes: 0, stateReads: 1 });
 });
 
 test('native sync refuses a corrupt journal until it can re-read a valid one', async ({ page }) => {

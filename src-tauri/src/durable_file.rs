@@ -301,6 +301,14 @@ fn read_generation(path: &Path) -> io::Result<Option<String>> {
 }
 
 fn write_generation(path: &Path, text: &str) -> io::Result<()> {
+    write_generation_with(path, text, replace)
+}
+
+fn write_generation_with(
+    path: &Path,
+    text: &str,
+    mut persist: impl FnMut(&Path, &[u8]) -> io::Result<()>,
+) -> io::Result<()> {
     let current = read_marker(path)?;
     let number = match current {
         Some(marker) => {
@@ -312,14 +320,14 @@ fn write_generation(path: &Path, text: &str) -> io::Result<()> {
         None => 1,
     };
     for replica in 0..2 {
-        replace(&payload(path, number, replica), text.as_bytes())?;
+        persist(&payload(path, number, replica), text.as_bytes())?;
     }
     let marker = Marker {
         version: 1,
         number,
         hash: hash(text.as_bytes()),
     };
-    replace(&marker_path(path), &serde_json::to_vec(&marker)?)
+    persist(&marker_path(path), &serde_json::to_vec(&marker)?)
 }
 
 async fn on_disk<T: Send + 'static>(
@@ -567,26 +575,47 @@ mod tests {
         assert!(read_generation(&path).is_err());
     }
 
+    fn fault_rng(seed: u64) -> impl FnMut() -> u64 {
+        let mut rng = if seed == 0 { u64::MAX } else { seed };
+        move || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            rng
+        }
+    }
+
+    fn fault_seeds(default_count: u64) -> Vec<u64> {
+        match std::env::var("SLAG_DISK_FAULT_SEED") {
+            Ok(seed) => vec![seed.parse::<u64>().expect("decimal SLAG_DISK_FAULT_SEED")],
+            Err(std::env::VarError::NotPresent) => (0..default_count).collect(),
+            Err(err) => panic!("invalid SLAG_DISK_FAULT_SEED: {err}"),
+        }
+    }
+
+    fn corrupt(target: &Path, mutation: u64, offset: usize, bit: u64) {
+        let mut bytes = fs::read(target).unwrap();
+        match mutation {
+            0 => fs::remove_file(target).unwrap(),
+            1 => fs::write(target, vec![0; bytes.len()]).unwrap(),
+            2 => fs::write(target, &bytes[..offset]).unwrap(),
+            _ => {
+                bytes[offset] ^= 1 << bit;
+                fs::write(target, bytes).unwrap();
+            }
+        }
+    }
+
     #[test]
     fn seeded_sync_file_faults() {
         // Replay one case with SLAG_DISK_FAULT_SEED=<decimal seed from the failure>.
-        let seeds = match std::env::var("SLAG_DISK_FAULT_SEED") {
-            Ok(seed) => vec![seed.parse::<u64>().expect("decimal SLAG_DISK_FAULT_SEED")],
-            Err(std::env::VarError::NotPresent) => (0..24).collect(),
-            Err(err) => panic!("invalid SLAG_DISK_FAULT_SEED: {err}"),
-        };
+        let seeds = fault_seeds(24);
         let names = ["note-registry.json", "sync-ledger.json", "sync-config.json"];
         const OLD: &str = r#"{"cursor":8,"pending":[]}"#;
         const CURRENT: &str = r#"{"cursor":9,"pending":["offline edit"]}"#;
         const NEXT: &str = r#"{"cursor":10,"pending":[]}"#;
         for seed in seeds {
-            let mut rng = if seed == 0 { u64::MAX } else { seed };
-            let mut next = || {
-                rng ^= rng << 13;
-                rng ^= rng >> 7;
-                rng ^= rng << 17;
-                rng
-            };
+            let mut next = fault_rng(seed);
             let fixture = Fixture::new();
             // The default seeds enumerate every target/mutation pair for each file.
             // A seed also chooses the affected byte and bit.
@@ -609,22 +638,15 @@ mod tests {
                 let mutation = (seed / 6) % 4;
                 let context = format!("seed={seed} file={name} target={} mutation={mutation}", seed % 6);
                 for target in targets {
-                    let mut bytes = fs::read(target).unwrap();
+                    let len = fs::metadata(target).unwrap().len();
                     let index = if mutation == 3 && *target == marker {
                         // Flipping a number's parity-neutral bit can leave an otherwise valid marker.
-                        bytes.len() - 66 + (next() % 64) as usize // final 64 hex bytes, then `"}`
+                        len - 66 + next() % 64 // final 64 hex bytes, then `"}`
                     } else {
-                        (next() % bytes.len() as u64) as usize
+                        next() % len
                     };
-                    match mutation {
-                        0 => fs::remove_file(target).unwrap(),
-                        1 => fs::write(target, vec![0; bytes.len()]).unwrap(),
-                        2 => fs::write(target, &bytes[..index]).unwrap(),
-                        _ => {
-                            bytes[index] ^= 1 << (next() % 8);
-                            fs::write(target, bytes).unwrap();
-                        }
-                    }
+                    let bit = if mutation == 3 { next() % 8 } else { 0 };
+                    corrupt(target, mutation, index as usize, bit);
                 }
                 let snapshot = || [&marker, &active[0], &active[1], &previous[0], &previous[1]]
                     .map(|file| read_file(file).unwrap());
@@ -642,6 +664,88 @@ mod tests {
                         assert_eq!(fs::read(payload(&path, 3, replica)).unwrap(), NEXT.as_bytes(), "{context}");
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn seeded_compound_sync_file_faults() {
+        let seeds = fault_seeds(64);
+        let mut recovered = 0;
+        let mut fenced = 0;
+        for &seed in &seeds {
+            let mut next = fault_rng(seed);
+            let fixture = Fixture::new();
+            let triplet = ["note-registry.json", "sync-ledger.json", "sync-config.json"].map(|name| {
+                let path = logical(&fixture.0, &format!("vaults/main/{name}"), true).unwrap();
+                let current = format!(r#"{{"file":"{name}","pending":["offline edit"]}}"#);
+                write_generation(&path, "old checkpoint").unwrap();
+                write_generation(&path, &current).unwrap();
+                let files = [marker_path(&path), payload(&path, 2, 0), payload(&path, 2, 1),
+                    payload(&path, 1, 0), payload(&path, 1, 1)];
+                (name, path, current, files)
+            });
+            // Damage at least one physical file per logical file, before opening any of them.
+            let masks = triplet.each_ref().map(|(_, _, _, files)| {
+                let mask = 1 + next() % 30;
+                for (i, target) in files.iter().enumerate() {
+                    if mask & (1 << i) == 0 { continue; }
+                    let len = fs::metadata(target).unwrap().len();
+                    let mutation = next() % 4;
+                    let offset = if mutation == 3 && i == 0 { len - 66 + next() % 64 } else { next() % len };
+                    corrupt(target, mutation, offset as usize, next() % 8);
+                }
+                mask
+            });
+            for ((name, path, current, files), mask) in triplet.into_iter().zip(masks) {
+                let context = format!("seed={seed} file={name} mask={mask:05b}");
+                if mask & 1 != 0 || mask & 6 == 6 {
+                    let snapshot = || files.each_ref().map(|path| read_file(path).unwrap());
+                    let remains = snapshot();
+                    assert_eq!(read_generation(&path).unwrap_err().kind(), io::ErrorKind::InvalidData, "{context}");
+                    assert_eq!(write_generation(&path, "must not reset").unwrap_err().kind(), io::ErrorKind::InvalidData, "{context}");
+                    assert_eq!(snapshot(), remains, "{context}");
+                    fenced += 1;
+                } else {
+                    assert_eq!(read_generation(&path).expect(&context).as_deref(), Some(current.as_str()), "{context}");
+                    write_generation(&path, "next checkpoint").expect(&context);
+                    assert_eq!(read_generation(&path).unwrap().as_deref(), Some("next checkpoint"), "{context}");
+                    recovered += 1;
+                }
+            }
+        }
+        if seeds.len() > 1 {
+            assert!(fenced > 0 && recovered > 0);
+        }
+        println!("{} compound cases: {recovered} recovered, {fenced} fenced", seeds.len());
+    }
+
+    #[test]
+    fn second_slot_write_failure_keeps_committed_generation_until_retry() {
+        let fixture = Fixture::new();
+        for number in [1, 2] {
+            let path = logical(&fixture.0, &format!("vaults/cut-{number}/note-registry.json"), true).unwrap();
+            if number == 2 { write_generation(&path, "confirmed").unwrap(); }
+            let marker = read_file(&marker_path(&path)).unwrap();
+            let blocked = payload(&path, number, 1);
+            let result = write_generation_with(&path, "unpublished", |target, bytes| {
+                if target == blocked {
+                    return Err(io::Error::new(io::ErrorKind::StorageFull, "injected disk full"));
+                }
+                replace(target, bytes)
+            });
+            assert_eq!(result.unwrap_err().kind(), io::ErrorKind::StorageFull);
+            assert_eq!(fs::read(payload(&path, number, 0)).unwrap(), b"unpublished");
+            assert_eq!(read_file(&marker_path(&path)).unwrap(), marker);
+            assert!(!blocked.exists());
+            if number == 1 {
+                assert!(read_generation(&path).is_err());
+                assert!(write_generation(&path, "must not reset").is_err());
+            } else {
+                assert_eq!(read_generation(&path).unwrap().as_deref(), Some("confirmed"));
+                write_generation(&path, "retried").unwrap();
+                assert_eq!(read_generation(&path).unwrap().as_deref(), Some("retried"));
+                assert_eq!(fs::read(&blocked).unwrap(), b"retried");
             }
         }
     }

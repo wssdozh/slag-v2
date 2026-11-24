@@ -1066,7 +1066,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
     // On failure the watcher may see files already written by a group whose cursor did not move.
     // Leave those IDs alone until registry replay finishes the projection.
-    const fenced = this.files.vaultRecoveryKind === 'ready' ? await this.files.readStateSection('pendingFolderProjection', vault, true) : {};
+    const kind = this.files.vaultRecoveryKind;
+    const recovery = kind === 'local-only' ? await this.files.openVault(vault) : undefined;
+    const fenced = kind === 'ready' ? await this.files.readStateSection('pendingFolderProjection', vault, true)
+      : recovery?.kind === 'local-only' ? recovery.fence ?? {} : {};
     if (vault !== this.currentVault) return { updated: 0, removed: 0 };
     if (!Object.keys(fenced).length) this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
     const current = this.getItems();

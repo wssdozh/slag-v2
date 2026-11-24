@@ -23,6 +23,52 @@ async function itemCount(page: import('@playwright/test').Page): Promise<number>
   });
 }
 
+test('locked note does not disappear from the disk watcher or look new after unlock', async ({ page }) => {
+  await page.route('**/watch-fixture.html', (route) => route.fulfill({ contentType: 'text/html', body: '<!doctype html>' }));
+  await page.goto('/watch-fixture.html');
+  const events = await page.evaluate(async () => {
+    const url = '/src/lib/storage/vaultWatch.ts';
+    const { startVaultWatch } = await import(/* @vite-ignore */ url);
+    const notesPath = 'vaults/fixture/notes';
+    const note = { isFile: true, isDirectory: false };
+    const folder = { isFile: false, isDirectory: true };
+    const changes: { sweep: number; changed: string[]; removed: string[]; foldersAdded: string[]; foldersRemoved: string[] }[] = [];
+    let sweeps = 0;
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
+    Object.assign(window, { __TAURI_INTERNALS__: { invoke: async (cmd: string, { path }: { path: string }) => {
+      const denied = () => new Error('Access denied (os error 5)');
+      if (cmd === 'plugin:fs|read_dir') {
+        if (path === notesPath) {
+          sweeps++;
+          if (sweeps === 9) finish();
+          return [{ name: 'sibling.md', ...note }, ...(sweeps < 7
+            ? [{ name: 'keep', ...folder }, { name: 'kept.md', ...note }] : [])];
+        }
+        if (path === `${notesPath}/keep`) {
+          if (sweeps >= 2 && sweeps <= 4) throw denied();
+          return [{ name: 'nested', ...folder }];
+        }
+        if (path === `${notesPath}/keep/nested`) return [{ name: 'child.md', ...note }];
+      }
+      if (cmd === 'plugin:fs|stat') {
+        if (path.endsWith('/kept.md') && sweeps >= 2 && sweeps <= 4) throw denied();
+        return { size: 9, mtime: path.endsWith('/sibling.md') && sweeps >= 3 ? 2000 : 1000, isFile: true };
+      }
+      throw new Error(`Unexpected fixture command ${cmd} ${path}`);
+    } } });
+    const watch = await startVaultWatch({ notesPath, intervalMs: 20,
+      onChanged: (change: Omit<(typeof changes)[number], 'sweep'>) => changes.push({ sweep: sweeps, ...change }),
+    });
+    try { await finished; } finally { watch.stop(); }
+    return changes;
+  });
+  expect(events).toEqual([
+    { sweep: 3, changed: ['sibling.md'], removed: [], foldersAdded: [], foldersRemoved: [] },
+    { sweep: 8, changed: [], removed: ['keep/nested/child.md', 'kept.md'], foldersAdded: [], foldersRemoved: ['keep', 'keep/nested'] },
+  ]);
+});
+
 test('damaged state opens the same 106 notes and saved changes survive two restarts', async ({ page, baseURL }) => {
   const disk = await installRecoveryFixture(page, baseURL!);
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -77,6 +123,14 @@ test('a failed native Markdown write does not clear input or confirm it', async 
   await expect(composer).toHaveValue(newNote);
   expect(disk.firstNoteWrites()).toEqual([]);
   expect(disk.attempts).toEqual([]);
+
+  disk.allowWrites();
+  await composer.press('Enter');
+  await expect(composer).toHaveValue('');
+  await expect.poll(() => disk.firstNoteWrites()).toHaveLength(1);
+  await page.reload();
+  await expect(page.getByText(newNote, { exact: true }).first()).toBeVisible();
+  await expect.poll(() => itemCount(page)).toBe(107);
 });
 
 test('healthy legacy binding migrates once without replacing the device or queue', async ({ page, baseURL }) => {
@@ -110,8 +164,12 @@ test('healthy legacy binding migrates once without replacing the device or queue
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-for (const lostFile of ['note-registry.json', 'sync-ledger.json', 'sync-config.json'] as const) {
-  test(`${lostFile}: a failed generation pauses transport but leaves local writing usable`, async ({ page, baseURL }) => {
+for (const lostFiles of [
+  ['note-registry.json'], ['sync-ledger.json'], ['sync-config.json'],
+  ['sync-config.json', 'note-registry.json'],
+] as const) {
+  const compound = lostFiles.length > 1;
+  test(`${lostFiles.join(' + ')}: a failed generation pauses transport but leaves local writing usable`, async ({ page, baseURL }) => {
     const disk = await installRecoveryFixture(page, baseURL!);
     await page.setViewportSize({ width: 1440, height: 1000 });
     const binding = { serverUrl: RECOVERY_RELAY, deviceId: 'fixture-device', enabled: true, autoSync: true, syncId: 'fixture-vault' };
@@ -119,15 +177,28 @@ for (const lostFile of ['note-registry.json', 'sync-ledger.json', 'sync-config.j
     const envelope = (value: unknown) => JSON.stringify({ version: 1, vaultId: 'default_vault', value });
     const generations = [
       [`${root}/sync-config.json.fixture-generation`, envelope(binding)],
-      [`${root}/sync-ledger.json.fixture-generation`, envelope({ registryRequired: true, outbox })],
+      [`${root}/sync-ledger.json.fixture-generation`, envelope({ registryRequired: true, outbox,
+        ...(compound && { pendingFolderProjection: { 'recovery-note-2': true } }),
+      })],
       [`${root}/note-registry.json.fixture-generation`, FIXTURE_REGISTRY],
     ] as const;
     for (const [path, value] of generations) disk.files.set(path, value);
-    disk.files.set(`${root}/state.json`, '{"protectedSync":true}');
-    disk.damageGeneration(lostFile);
+    disk.files.set(`${root}/state.json`, compound ? BROKEN_STATE : '{"protectedSync":true}');
+    for (const file of lostFiles) disk.damageGeneration(file);
 
     await page.goto('/');
     await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    if (compound) {
+      // The only physical copy can be an intermediate result; no duplicate is needed to make it unsafe.
+      await expect.poll(() => itemCount(page)).toBe(105);
+      const updated = await page.evaluate(async () => {
+        const url = '/src/lib/storage/index.ts';
+        const { storage } = await import(/* @vite-ignore */ url);
+        return storage.reloadFromDisk({ changed: ['Входящие/recovery-note-2.md'], removed: [] });
+      });
+      expect(updated).toEqual({ updated: 0, removed: 0 });
+      expect(disk.files.get(`${root}/notes/Входящие/recovery-note-2.md`)).toContain('Заметка проверки 2');
+    }
     await expect(page.getByRole('dialog')).toHaveCount(0);
     const composer = page.locator('main textarea').first();
     await composer.fill(newNote);
@@ -138,8 +209,8 @@ for (const lostFile of ['note-registry.json', 'sync-ledger.json', 'sync-config.j
 
     await page.reload();
     await expect(page.locator('[data-flip-id]').filter({ hasText: newNote }).first()).toBeVisible();
-    await expect.poll(() => itemCount(page)).toBe(107);
-    await expectPausedWithUnknownQueue(page, lostFile === 'note-registry.json');
+    await expect.poll(() => itemCount(page)).toBe(compound ? 106 : 107);
+    await expectPausedWithUnknownQueue(page, lostFiles.some((file) => file === 'note-registry.json'));
     expect(disk.files.get(`${root}/recovery-local-only.json`)).toBe('{"version":1,"reason":"registry"}');
     for (const [path, value] of generations) expect(disk.files.get(path)).toBe(value);
     expect(disk.attempts).toEqual([]);

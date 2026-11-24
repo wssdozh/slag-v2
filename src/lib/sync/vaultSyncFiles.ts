@@ -76,15 +76,25 @@ export function provisionRegistryOnly(dir: string, id: string, binding: RecordVa
   });
 }
 
+/** Startup may still use a verified projection fence when the separate room binding is lost. */
+export function inspectProtectedSyncState(dir: string, id: string) {
+  return serial(dir, () => Promise.allSettled([
+    read(dir, LEDGER, id).then((ledger) => {
+      if (ledger) {
+        folderFence(ledger.pendingFolderProjection);
+        validateSyncLedger(ledger);
+      }
+      return ledger;
+    }),
+    read(dir, CONFIG, id).then((config) => config && normalizedConfig(config)),
+  ] as const));
+}
+
 export async function readProtectedSyncState(dir: string, id: string): Promise<{ ledger?: RecordValue; config?: RecordValue }> {
-  return serial(dir, async () => {
-    const [ledger, config] = await Promise.all([read(dir, LEDGER, id), read(dir, CONFIG, id)]);
-    if (ledger) {
-      folderFence(ledger.pendingFolderProjection);
-      validateSyncLedger(ledger);
-    }
-    return { ledger, config: config && normalizedConfig(config) };
-  });
+  const [ledger, config] = await inspectProtectedSyncState(dir, id);
+  if (ledger.status === 'rejected') throw ledger.reason;
+  if (config.status === 'rejected') throw config.reason;
+  return { ledger: ledger.value, config: config.value };
 }
 
 /** Only called after existing legacy hydration and config verification, before opening transport. */
