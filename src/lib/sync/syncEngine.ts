@@ -2,12 +2,14 @@
 import { vault } from '../storage/port';
 import { openNoteSession } from './notes/session';
 import { isLegacySharedKind } from './notes/sharedBody';
+import { LEGACY_CUTOVER, LegacyCutoverBlocked, prepareLegacyCutover } from './notes/legacyCutover';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
 import { apiBase } from './apiBase';
 import {
   loadSentHashes,
+  requireOutboxFlushed,
   loadCursor,
   saveCursor,
   saveSentHashes,
@@ -365,7 +367,9 @@ export class SyncEngine {
       // and the two devices would ping-pong the same bundle forever.
       if (event.origin === 'remote' || (event.kind === 'item' && event.pendingDisk) || (isTauri() && !this.canUseVaultRelay())) return;
       if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
-      if (this.hasSharedRegistry && isLegacySharedKind(event.kind)) return;
+      // A legacy draft may finish its disk write after the registry subscribed. Only writes
+      // explicitly produced by the registry have already reached its journal.
+      if (this.hasSharedRegistry && isLegacySharedKind(event.kind) && (event.kind !== 'draft' || event.registry)) return;
       if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
         if (event.origin === 'external' && event.kind === 'item') {
           void this.noteSession.replica.recordExternal(event).catch((error: unknown) => this.reportNoteError(error));
@@ -416,11 +420,13 @@ export class SyncEngine {
   }
 
   public getNoteConflicts() {
-    const replica = this.noteSession?.replica;
-    return replica?.conflicts.map((entry) => {
-      const current = replica.confirmedValue(entry.noteId);
-      return { ...entry, currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
-    }) ?? [];
+    const session = this.noteSession;
+    if (!session) return [];
+    return session.replica.conflicts.filter(({ fields }) => !fields.includes(LEGACY_CUTOVER) || session.canReviewCutover)
+      .map((entry) => {
+        const current = session.replica.confirmedValue(entry.noteId);
+        return { ...entry, currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
+      });
   }
 
   public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string) {
@@ -1135,6 +1141,7 @@ export class SyncEngine {
       this.notify();
 
       const port = vault();
+      const localVaultId = this.currentVaultId;
       const serverUrl = apiBase(this.config.serverUrl);
       const vaultId = this.validatedSyncId ?? port.getCurrentVault().syncId;
       const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
@@ -1166,9 +1173,29 @@ export class SyncEngine {
             }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
           }
         },
-        hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => this.getOutbox().pending().some(({ kind }) =>
-           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')
-           || (sharedRecords === true && isLegacySharedKind(kind))),
+        migrateLegacy: async (replica, folderTree, sharedRecords, readOnly) => {
+          if (readOnly) return;
+          const assertScope = () => {
+            controller.signal.throwIfAborted();
+            if (this.currentVaultId !== localVaultId || port.getCurrentVault().id !== localVaultId) {
+              throw new Error('Хранилище сменилось во время переноса очереди');
+            }
+          };
+          if (sharedRecords) await port.flushLegacyDrafts?.();
+          assertScope();
+          const outbox = this.getOutbox();
+          const { alternatives, consumed } = prepareLegacyCutover(outbox.pending(), folderTree, sharedRecords);
+          if (consumed.length) {
+            await replica.preserveLegacyAlternatives(alternatives);
+            assertScope();
+            await outbox.removeTransferred(consumed);
+            assertScope();
+            syncLog.info('Legacy outbox transferred', { operations: consumed.length, alternatives: alternatives.length });
+          } else if (replica.conflicts.some(({ fields }) => fields.includes(LEGACY_CUTOVER))) {
+            // A failed removal can be invisible in memory even though the backend still has it.
+            await requireOutboxFlushed(localVaultId);
+          }
+        },
       });
       if (isTauri()) {
         const registry = await storage.readNoteRegistry();
@@ -1227,15 +1254,16 @@ export class SyncEngine {
       const roomId = this.usesAccountSync() ? await accountRoom(syncVaultId) : legacyRoomId;
       if (generation !== this.initGeneration) return;
       const noteSession = this.noteSession ?? (this.usesAccountSync() ? await openNoteSession(noteOptions(roomId, syncVaultId)) : null);
-      if (this.noteSession) {
-        if (!this.usesAccountSync() || syncVaultId !== vaultId) throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
-        await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
+      if (generation !== this.initGeneration) return;
+      if (this.noteSession && (!this.usesAccountSync() || syncVaultId !== vaultId)) {
+        throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
       }
+      this.noteSession = noteSession;
+      await noteSession?.verifyEnrollment(this.config.localSyncMode === 'receive-only');
       if (generation !== this.initGeneration) return;
       // Journal edits found on disk before the incoming feed can replace their files.
       await noteSession?.captureColdNoteEdits();
       if (generation !== this.initGeneration) return;
-      this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
@@ -1294,7 +1322,7 @@ export class SyncEngine {
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
-      this.scheduleRetry();
+      if (!(err instanceof LegacyCutoverBlocked)) this.scheduleRetry();
     }
   }
 

@@ -72,6 +72,26 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
   });
 }
 
+test('a migrated draft is labelled and compared without an automatic publish', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.getByTestId('sidebar-settings-btn').click();
+  await page.getByTestId('settings-tab-sync').click();
+  await page.evaluate(async () => {
+    const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+    syncEngine.getNoteConflicts = () => [{ intentId: 'cutover-draft', noteId: 'slag:shared:v1:composer:Inbox', kind: 'update',
+      fields: ['legacy-cutover'], currentRevision: 12, currentItem: { shared: { content: 'Версия с сервера' } },
+      item: { shared: { content: 'Сохранённая локальная версия' } } }];
+    syncEngine.notify();
+  });
+  await expect(page.getByText('Черновик', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Сравнить', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Конфликт синхронизации' });
+  await expect(dialog.getByText('Правка из старой очереди — исходная версия неизвестна')).toBeVisible();
+  await expect(dialog.getByText(/Сохранённая локальная версия/)).toBeVisible();
+  await dialog.screenshot({ path: 'test-results/screenshots/sync-legacy-cutover.png', animations: 'disabled' });
+});
+
 test('a folder conflict shows both members and submits one reviewed decision', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');

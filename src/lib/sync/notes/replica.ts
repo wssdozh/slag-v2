@@ -7,6 +7,7 @@ import { NoteChannel } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
 import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteIntentSource, NoteJournal, RegistryValue } from './journal.ts';
 import { noteDifferences, relayNote } from './merge.ts';
+import { LEGACY_CUTOVER, sameLegacyValue } from './legacyCutover.ts';
 import { candidate, confirmedBase } from './reconcile.ts';
 import type { Candidate } from './reconcile.ts';
 import { isSharedRegistryId } from './sharedBody.ts';
@@ -128,6 +129,24 @@ export class NoteReplica {
     this.host.onDeliveryChange?.();
   }
   get conflicts(): readonly NoteConflict[] { return this.state.conflicts ?? []; }
+  get canReviewCutover() { return this.ready && !this.needsFeed; }
+
+  preserveLegacyAlternatives(alternatives: NoteConflict[]): Promise<void> {
+    return this.enqueue(async () => {
+      const existing = new Set(this.conflicts.map(({ intentId }) => intentId));
+      const fresh = alternatives.filter(({ intentId }) => !existing.has(intentId));
+      if (fresh.length) await this.persist({ ...this.state, conflicts: [...this.conflicts, ...fresh] });
+    });
+  }
+
+  private async clearEquivalentLegacyAlternatives() {
+    const conflicts = this.conflicts.filter((entry) => {
+      if (!entry.fields.includes(LEGACY_CUTOVER)) return true;
+      const current = confirmedNote(this.state, entry.noteId);
+      return !current || !sameLegacyValue(current.item, entry.item);
+    });
+    if (conflicts.length !== this.conflicts.length) await this.persist({ ...this.state, conflicts });
+  }
 
   resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>): Promise<void> {
     return this.enqueue(async () => {
@@ -167,11 +186,17 @@ export class NoteReplica {
     return this.enqueue(async () => {
       const conflict = this.conflicts.find((entry) => entry.intentId === intentId);
       if (!conflict) throw new Error('Конфликт уже разобран');
+      if (conflict.fields.includes(LEGACY_CUTOVER) && !this.canReviewCutover) {
+        throw new Error('Дождитесь загрузки актуальной версии с релея');
+      }
       if (conflict.folderGroup) throw new Error('Папочную операцию нужно разобрать целиком');
       let next = this.state;
       const current = confirmedNote(next, conflict.noteId);
       if ((current?.revision ?? 0) !== reviewedRevision || next.pending.some(({ id }) => id === conflict.noteId)) {
         throw new Error('Версия изменилась или есть ожидающая правка; проверьте конфликт ещё раз');
+      }
+      if (resolution === 'keep' && conflict.fields.includes(LEGACY_CUTOVER) && (current || isSharedRegistryId(conflict.noteId))) {
+        await this.applyValue(conflict.noteId, current?.item ?? null, current?.revision ?? 0);
       }
       let retryIntentId: string | undefined;
       if (resolution === 'retry') {
@@ -358,6 +383,7 @@ export class NoteReplica {
     return this.enqueue(async () => {
       const state = this.state;
       const pending = new Set(state.pending.map(({ id }) => id));
+      for (const conflict of this.conflicts) if (conflict.fields.includes(LEGACY_CUTOVER)) pending.add(conflict.noteId);
       const live = new Map(Object.entries(state.confirmed).flatMap(([id, { item }]) =>
         isNoteItem(item) && !pending.has(id) ? [[id, item] as const] : []));
       if (!live.size) return;
@@ -651,6 +677,10 @@ export class NoteReplica {
       if (await this.applyEvents(page.events)) throw new Error('Registry page has a gap');
       if (epoch !== this.connectionEpoch) continue;
       if (this.state.cursor >= Math.max(page.head, this.observedRevision)) {
+        if (this.conflicts.some(({ fields }) => fields.includes(LEGACY_CUTOVER))) {
+          await this.enqueue(() => this.clearEquivalentLegacyAlternatives());
+          if (epoch !== this.connectionEpoch || this.needsFeed) continue;
+        }
         this.ready = true;
         this.projectionFailed = false;
         this.host.onProgress();

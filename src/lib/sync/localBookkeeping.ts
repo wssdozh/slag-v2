@@ -9,7 +9,7 @@
 // The *shape* of the section is `syncSection.ts` (pure, read by `node --test` as is); this file is
 // where it lives on a disk. Imports carry their extension so that test can read this file too.
 import { SYNC_STORAGE_KEYS } from '../../config/sync.ts';
-import { getPref, getPrefEntries, getPrefJson, removePref, setPref } from '../storage/prefs.ts';
+import { getPref, getPrefEntries, getPrefJson, removePref, requirePrefFlushed, setPref } from '../storage/prefs.ts';
 import { parseLegacyJson } from '../storage/legacyJson.ts';
 import { sanitizeTombstones } from './tombstones.ts';
 import type { TombstoneMap } from './tombstones.ts';
@@ -536,6 +536,12 @@ export function clearSyncLedgers(scope: SyncScope): void {
 export function loadOutbox(vaultId: string): SyncOperation[] {
   if (onDisk(vaultId)) return [...(section?.outbox ?? [])];
   return sanitizeOutbox(getPrefJson<unknown>(OUTBOX_PREFIX + vaultId, []));
+}
+
+export function requireOutboxFlushed(vaultId: string): Promise<void> {
+  if (!onDisk(vaultId)) return requirePrefFlushed(OUTBOX_PREFIX + vaultId);
+  if (pendingPatch) void writeSyncSection({});
+  return requireSyncSectionFlushed();
 }
 
 export function saveOutbox(vaultId: string, ops: SyncOperation[]): void {

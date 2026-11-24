@@ -112,6 +112,18 @@ export function setPref(key: string, value: string): void {
   queueFlush();
 }
 
+/** A journal handoff must not become reviewable until this key reaches the backend. */
+export async function requirePrefFlushed(key: string): Promise<void> {
+  if (!backend) throw new Error('Хранилище настроек не готово');
+  queueFlush();
+  let writing: Promise<void>;
+  do {
+    writing = writeQueue;
+    await writing;
+  } while (writing !== writeQueue);
+  if (pending.has(key)) throw new Error('Не удалось сохранить старую очередь синхронизации');
+}
+
 export function removePref(key: string): void {
   prefs.delete(key);
   // Recorded even when the key is not in memory yet: a removal before init must not be undone by

@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from 'react';
 import { DiffModal } from '../Modals/DiffModal';
 import { noteDifferences } from '../../lib/sync/notes/merge';
+import { LEGACY_CUTOVER } from '../../lib/sync/notes/legacyCutover';
+import { isSharedRegistryId, parseSharedRegistryId } from '../../lib/sync/notes/sharedBody';
 import { isNoteItem } from '../../lib/sync/notes/wire';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
@@ -22,7 +24,14 @@ const conflictReasons: Record<string, string> = {
   base: 'Не удалось подтвердить исходную версию правки',
   lifecycle: 'Не удалось подтвердить непрерывную историю заметки',
   predecessor: 'Предыдущая локальная правка не принята',
+  [LEGACY_CUTOVER]: 'Правка из старой очереди — исходная версия неизвестна',
 };
+
+function conflictLabel(noteId: string) {
+  if (!isSharedRegistryId(noteId)) return 'Запись';
+  const { type } = parseSharedRegistryId(noteId);
+  return type === 'composer' || type === 'fullscreen' ? 'Черновик' : 'Общие данные';
+}
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
@@ -154,8 +163,9 @@ export const SyncSettingsTab: React.FC = () => {
         <SettingsGroup title="Конфликты синхронизации">
           {[...sections].map(([key, entries]) => (
             <SettingsRow key={key}
-              label={entries[0].folderGroup ? 'Папочная операция' : isNoteItem(entries[0].item) ? entries[0].item.title || 'Запись' : isNoteItem(entries[0].currentItem) ? entries[0].currentItem.title || 'Запись' : 'Запись'}
-              description={entries[0].folderGroup ? `Записей и дерево: ${entries.length}` : `Локальная правка не принята · ревизия релея ${entries[0].currentRevision}`}
+              label={entries[0].folderGroup ? 'Папочная операция' : isNoteItem(entries[0].item) ? entries[0].item.title || 'Запись' : isNoteItem(entries[0].currentItem) ? entries[0].currentItem.title || 'Запись' : conflictLabel(entries[0].noteId)}
+              description={entries[0].folderGroup ? `Записей и дерево: ${entries.length}` : entries[0].fields?.includes(LEGACY_CUTOVER)
+                ? conflictReasons[LEGACY_CUTOVER] : `Локальная правка не принята · ревизия релея ${entries[0].currentRevision}`}
               right={<button type="button" className="px-3 py-2 text-xs hover:underline" onClick={() => {
                 setDecision(undefined); setReviewError(''); setReview({ key, revisions: revisions(entries) });
               }}>Сравнить</button>}
@@ -164,7 +174,7 @@ export const SyncSettingsTab: React.FC = () => {
         </SettingsGroup>
       )}
 
-      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ item, currentItem, currentRevision, folderGroup, fields }) => {
+      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ noteId, item, currentItem, currentRevision, folderGroup, fields }) => {
         const before = isNoteItem(currentItem) ? currentItem : undefined;
         const after = isNoteItem(item) ? item : undefined;
         const show = (value: unknown) => typeof value === 'string' ? value || 'Пусто' : value === undefined ? 'Не задано' : JSON.stringify(value);
@@ -180,7 +190,7 @@ export const SyncSettingsTab: React.FC = () => {
         const mismatches = (fields ?? []).filter((key) => Object.hasOwn(propertyLabels, key)).map((key) => propertyLabels[key]);
         const issue = (fields ?? []).find((key) => Object.hasOwn(conflictReasons, key));
         const reason = issue ? conflictReasons[issue] : mismatches.length ? `Не удалось объединить: ${mismatches.join(', ')}` : undefined;
-        return { title: (after ?? before)?.title || (Array.isArray(sample) ? 'Дерево папок' : sample && 'shared' in sample ? 'Общие данные' : 'Запись'), comparison: {
+        return { title: (after ?? before)?.title || (Array.isArray(sample) ? 'Дерево папок' : conflictLabel(noteId)), comparison: {
           before: before?.content ?? snapshot(currentItem), after: draft ?? after?.content ?? snapshot(item), properties,
           onEdit: after && !folderGroup && config.localSyncMode !== 'receive-only' && !reviewed[0]?.folderGroup && !resolving && !decision
             ? (value: string) => setDraft(value === after.content ? undefined : value) : undefined,

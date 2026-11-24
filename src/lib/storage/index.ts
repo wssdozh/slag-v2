@@ -64,6 +64,7 @@ import {
   writeComposerDraft,
   eraseComposerDraft,
   flushDraftWrites,
+  flushLegacyDraftWrites,
   installDraftFlushGuards,
   readFullscreenDraft,
   writeFullscreenDraft,
@@ -670,6 +671,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     flushDraftWrites(this);
   }
 
+  public flushLegacyDrafts(): Promise<void> {
+    return flushLegacyDraftWrites(this);
+  }
+
   public getDraftChannel(): BroadcastChannel | null {
     return this.crossWindowDraftChannel;
   }
@@ -1245,7 +1250,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private writeFullscreenDraftIntent(itemId: string, draft: FullscreenDraft | null, origin: 'local' | 'remote', keepAlternative = false): Promise<void> {
     const seen = this.getFullscreenDraft(itemId);
-    const write = this.captureSharedWrite(origin, () => {
+    // Unsaved notes have a temporary editor ID, not a shared record identity.
+    const write = !itemId.startsWith('draft_') && this.captureSharedWrite(origin, () => {
       const current = this.getFullscreenDraft(itemId);
       if (keepAlternative || current !== seen) {
         return [{ id: sharedRegistryId('fullscreen', itemId), previous: null, value: draft, keepAlternative: true }];

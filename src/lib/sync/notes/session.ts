@@ -17,7 +17,7 @@ export async function openNoteSession(options: {
   log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
   onStatus?: (status: import('./wire.ts').NoteStatus) => void;
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
-  hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => boolean;
+  migrateLegacy: (replica: NoteReplica, folderTree: boolean, sharedRecords: boolean, readOnly: boolean) => Promise<void>;
 }, captureOnly = false) {
   const localVaultId = options.port.getCurrentVault().id;
   const assertScope = () => {
@@ -31,6 +31,7 @@ export async function openNoteSession(options: {
   const supportsMedia = !!(readRegistryAttachment && writeAcceptedAttachment);
   const channel = new NoteChannel({ ...options, atomicGroups: supportsGroups, sharedRecords: supportsShared, registryMedia: supportsMedia });
   const status = captureOnly ? undefined : await channel.status();
+  let uncheckedStatus = status;
   assertScope();
   if (status) options.onStatus?.(status);
   if (status?.mode === 'legacy') {
@@ -72,11 +73,6 @@ export async function openNoteSession(options: {
   if (folderTree && (!applyAcceptedFolderTree || !subscribeFolderTreeIntents)) {
     throw new Error('Локальное хранилище не поддерживает реестр папок');
   }
-  // A legacy outbox has no authoritative base revision. Replaying it would silently promote a
-  // possibly stale copy; pulling over it would hide the very edit that stopped migration.
-  if (!captureOnly && !options.readOnly && options.hasPendingLegacyNotes(folderTree, sharedRecords)) {
-    throw new Error('В старой очереди остались неподтверждённые правки. Синхронизация приостановлена до их проверки');
-  }
   const save = async (journal: typeof initial) => {
     assertScope();
     await writeNoteRegistry.call(options.port, { version: 1, room: options.roomId, generation,
@@ -113,7 +109,7 @@ export async function openNoteSession(options: {
     }
     assertScope();
   }
-  let verified = !captureOnly;
+  let verified = false;
   const mediaErrors = new Set<string>();
   let applyingMedia = false;
   const requireVerified = () => {
@@ -210,6 +206,7 @@ export async function openNoteSession(options: {
       assertScope();
       options.port.rememberNoteProjection?.(note, disk);
     }),
+    get canReviewCutover() { return verified && replica.canReviewCutover; },
     get progress() {
       const progress = replica.progress;
       return { ...progress, relayHead: verified ? progress.relayHead : null,
@@ -217,16 +214,20 @@ export async function openNoteSession(options: {
           : verified && progress.application === 'current' ? 'applied-through-cursor' as const : 'waiting' as const };
     },
     verifyEnrollment: async (readOnly: boolean) => {
-    const live = await channel.status();
-    assertScope();
-    options.onStatus?.(live);
-    if (live.mode !== 'registry' || live.generation !== generation || (live.folderTree === true) !== folderTree
-        || (live.atomicGroups === true) !== atomicGroups || (live.sharedRecords === true) !== sharedRecords || (live.registryMedia === true) !== registryMedia) {
-      throw new Error('Режим или поколение реестра изменились; локальная очередь сохранена');
-    }
-    if (!readOnly && options.hasPendingLegacyNotes(folderTree, sharedRecords)) throw new Error('В старой очереди остались неподтверждённые правки');
-    replica.setReadOnly(readOnly);
-    verified = true;
-    replica.noteRelayHead(live.head);
-  } };
+      verified = false;
+      const live = uncheckedStatus ?? await channel.status();
+      uncheckedStatus = undefined;
+      assertScope();
+      options.onStatus?.(live);
+      if (live.mode !== 'registry' || live.generation !== generation || (live.folderTree === true) !== folderTree
+          || (live.atomicGroups === true) !== atomicGroups || (live.sharedRecords === true) !== sharedRecords || (live.registryMedia === true) !== registryMedia) {
+        throw new Error('Режим или поколение реестра изменились; локальная очередь сохранена');
+      }
+      replica.setReadOnly(readOnly);
+      await options.migrateLegacy(replica, folderTree, sharedRecords, readOnly);
+      assertScope();
+      verified = true;
+      replica.noteRelayHead(live.head);
+    },
+  };
 }

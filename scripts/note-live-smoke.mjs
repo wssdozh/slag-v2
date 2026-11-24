@@ -309,7 +309,7 @@ try {
     const errors = [];
     const session = await openNoteSession({ key, signal: scope, roomId: room, vaultId: vault, serverUrl: url, readOnly,
       headers: (json) => ({ Authorization: `Bearer ${tokens[i]}`, ...(json && { 'Content-Type': 'application/json' }) }),
-      hasPendingLegacyNotes: () => false, sendLive: () => false, onError: (error) => errors.push(error), onProgress: () => {}, onApplied: () => {},
+      migrateLegacy: async () => {}, sendLive: () => false, onError: (error) => errors.push(error), onProgress: () => {}, onApplied: () => {},
       port: { getCurrentVault: () => ({ id: vault }), isHydrated: () => true, readNoteRegistry: async () => stored,
         writeNoteRegistry: async (value) => { stored = value; }, subscribeNoteIntents: (listener) => { record = listener; return () => {}; },
         subscribeFolderTreeIntents: () => () => {}, applyAcceptedFolderTree: async () => {}, applyAcceptedFolderGroup: async () => {},
@@ -325,6 +325,7 @@ try {
       },
     });
     assert.equal(session.registryMedia, true);
+    await session.verifyEnrollment(readOnly);
     await session.replica.catchUp();
     return { session, record, stored: () => stored, applied: () => applied, errors };
   }
