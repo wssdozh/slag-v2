@@ -901,6 +901,38 @@ test('acceptance with lost reply survives restart and expired feed', async (t) =
   assert.equal(server.events.length, 1);
 });
 
+test('retained heads prove only direct update continuity after the feed expires', async (t) => {
+  const server = relay();
+  const a = device(t, server), offline = device(t, server);
+  await Promise.all([a.replica.catchUp(), offline.replica.catchUp()]);
+  const direct = note('direct'), missing = note('missing-edge');
+  await a.replica.record([direct, missing].map((item) => change('create', item)));
+  await until(() => offline.saved()?.cursor === 2);
+  const before = offline.saved();
+  offline.stop();
+  const local = (item) => ({ ...item, content: `offline ${item.id}` });
+  const sleeping = device(t, server, { state: before });
+  await sleeping.replica.record([direct, missing].map((item) => ({ ...change('update', local(item)), previous: item,
+    origin: { revision: before.confirmed[item.id].revision } })));
+  const pending = sleeping.saved();
+  sleeping.stop();
+  await a.replica.record([direct, missing].map((item) => change('update', { ...item, title: 'remote title' })));
+  await until(() => a.saved()?.cursor === 4);
+  await a.replica.record([change('update', { ...missing, title: 'newest title' }), change('create', note('unrelated'))]);
+  await until(() => a.saved()?.cursor === 6);
+  server.prune();
+  const back = device(t, server, { state: pending });
+  await back.replica.catchUp();
+  await until(() => !back.replica.pendingCount);
+  assert.equal(back.local.get(direct.id).title, 'remote title');
+  assert.equal(back.local.get(direct.id).content, local(direct).content);
+  assert.equal(back.local.get(missing.id).title, 'newest title');
+  assert.equal(back.local.get(missing.id).content, missing.content);
+  assert.deepEqual(back.conflicts.map(({ noteId, fields, item }) => ({ noteId, fields, item })), [
+    { noteId: missing.id, fields: ['lifecycle'], item: local(missing) },
+  ]);
+});
+
 for (const prune of [false, true]) {
   test(`a restored note rejects an older edit even after another update (pruned=${prune})`, async (t) => {
     const server = relay();

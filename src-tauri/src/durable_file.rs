@@ -438,11 +438,18 @@ mod tests {
     struct Fixture(PathBuf);
     impl Fixture {
         fn new() -> Self {
-            Self(std::env::temp_dir().join(format!(
-                "slag-durable-{}-{}",
-                std::process::id(),
-                TEMP.fetch_add(1, Ordering::Relaxed)
-            )))
+            loop {
+                let path = std::env::temp_dir().join(format!(
+                    "slag-durable-{}-{}",
+                    std::process::id(),
+                    TEMP.fetch_add(1, Ordering::Relaxed)
+                ));
+                match fs::create_dir(&path) {
+                    Ok(()) => return Self(path),
+                    Err(err) if err.kind() == io::ErrorKind::AlreadyExists => continue,
+                    Err(err) => panic!("could not create isolated fixture: {err}"),
+                }
+            }
         }
         fn journal(&self) -> PathBuf {
             self.0.join("vaults/main/note-registry.json")
@@ -558,6 +565,85 @@ mod tests {
         fs::write(payload(&path, 1, 0), b"\0\0").unwrap();
         fs::write(payload(&path, 1, 1), b"\xff\xff").unwrap();
         assert!(read_generation(&path).is_err());
+    }
+
+    #[test]
+    fn seeded_sync_file_faults() {
+        // Replay one case with SLAG_DISK_FAULT_SEED=<decimal seed from the failure>.
+        let seeds = match std::env::var("SLAG_DISK_FAULT_SEED") {
+            Ok(seed) => vec![seed.parse::<u64>().expect("decimal SLAG_DISK_FAULT_SEED")],
+            Err(std::env::VarError::NotPresent) => (0..24).collect(),
+            Err(err) => panic!("invalid SLAG_DISK_FAULT_SEED: {err}"),
+        };
+        let names = ["note-registry.json", "sync-ledger.json", "sync-config.json"];
+        const OLD: &str = r#"{"cursor":8,"pending":[]}"#;
+        const CURRENT: &str = r#"{"cursor":9,"pending":["offline edit"]}"#;
+        const NEXT: &str = r#"{"cursor":10,"pending":[]}"#;
+        for seed in seeds {
+            let mut rng = if seed == 0 { u64::MAX } else { seed };
+            let mut next = || {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                rng
+            };
+            let fixture = Fixture::new();
+            // The default seeds enumerate every target/mutation pair for each file.
+            // A seed also chooses the affected byte and bit.
+            for name in names {
+                let fault_dir = format!("vaults/fault-{seed}/{name}");
+                let path = logical(&fixture.0, &fault_dir, true).unwrap();
+                write_generation(&path, OLD).unwrap();
+                write_generation(&path, CURRENT).unwrap();
+                let marker = marker_path(&path);
+                let active = [payload(&path, 2, 0), payload(&path, 2, 1)];
+                let previous = [payload(&path, 1, 0), payload(&path, 1, 1)];
+                let targets: &[&Path] = match seed % 6 {
+                    0 => &[&active[0]],
+                    1 => &[&active[1]],
+                    2 => &[&active[0], &active[1]],
+                    3 => &[&marker],
+                    4 => &[&previous[0], &previous[1]],
+                    _ => &[&active[0], &previous[0]],
+                };
+                let mutation = (seed / 6) % 4;
+                let context = format!("seed={seed} file={name} target={} mutation={mutation}", seed % 6);
+                for target in targets {
+                    let mut bytes = fs::read(target).unwrap();
+                    let index = if mutation == 3 && *target == marker {
+                        // Flipping a number's parity-neutral bit can leave an otherwise valid marker.
+                        bytes.len() - 66 + (next() % 64) as usize // final 64 hex bytes, then `"}`
+                    } else {
+                        (next() % bytes.len() as u64) as usize
+                    };
+                    match mutation {
+                        0 => fs::remove_file(target).unwrap(),
+                        1 => fs::write(target, vec![0; bytes.len()]).unwrap(),
+                        2 => fs::write(target, &bytes[..index]).unwrap(),
+                        _ => {
+                            bytes[index] ^= 1 << (next() % 8);
+                            fs::write(target, bytes).unwrap();
+                        }
+                    }
+                }
+                let snapshot = || [&marker, &active[0], &active[1], &previous[0], &previous[1]]
+                    .map(|file| read_file(file).unwrap());
+                if matches!(seed % 6, 2 | 3) {
+                    let remaining = snapshot();
+                    assert_eq!(read_generation(&path).unwrap_err().kind(), io::ErrorKind::InvalidData, "{context}");
+                    assert_eq!(write_generation(&path, NEXT).unwrap_err().kind(), io::ErrorKind::InvalidData, "{context}");
+                    assert_eq!(snapshot(), remaining, "damaged state was changed: {context}");
+                } else {
+                    assert_eq!(read_generation(&path).expect(&context).as_deref(), Some(CURRENT), "{context}");
+                    assert_eq!(fs::read(&active[0]).unwrap(), CURRENT.as_bytes(), "{context}");
+                    write_generation(&path, NEXT).expect(&context);
+                    assert_eq!(read_generation(&path).unwrap().as_deref(), Some(NEXT), "{context}");
+                    for replica in 0..2 {
+                        assert_eq!(fs::read(payload(&path, 3, replica)).unwrap(), NEXT.as_bytes(), "{context}");
+                    }
+                }
+            }
+        }
     }
 
     /// Successful write after prior corruption does not zero any data.

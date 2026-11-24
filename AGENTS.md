@@ -118,7 +118,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | модель данных и frontmatter | `docs/project-map/02_Data_Model_Obsidian_Vault.md` |
 | ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md`, раздел 6 — память ассистента |
 | поиск Orama | `docs/project-map/05_Search_Orama_Local_First.md` |
-| синхронизация | `docs/sync-architecture.md` |
+| синхронизация | [схема синка, слияния и конфликтов](docs/sync-engine-map.md), [контракт](docs/sync-architecture.md) |
 | сборки | `BUILD.md` |
 | MCP | `docs/mcp-guide.md` |
 

@@ -20,6 +20,7 @@ export async function installRecoveryFixture(page: Page, baseURL: string) {
   const attempts: string[] = [];
   const writes: string[] = [];
   let refuseWrite: ((path: string) => boolean) | undefined;
+  const failedGenerations = new Set<string>();
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
   const normalize = (path: string) => path.replaceAll('\\', '/').replace(/\/$/, '');
@@ -106,8 +107,14 @@ export async function installRecoveryFixture(page: Page, baseURL: string) {
         return;
       }
       case 'vault_remove': files.delete(path); return;
-      case 'vault_read_generation': return files.get(`${path}.fixture-generation`) ?? null;
-      case 'vault_write_generation': ensureDir(parent(path)); put(`${path}.fixture-generation`, String(arg.text)); return;
+      case 'vault_read_generation':
+      case 'vault_write_generation': {
+        if (failedGenerations.has(path)) throw new Error('vault generation is not recoverable');
+        if (cmd === 'vault_read_generation') return files.get(`${path}.fixture-generation`) ?? null;
+        ensureDir(parent(path));
+        put(`${path}.fixture-generation`, String(arg.text));
+        return;
+      }
       case 'secret_get': return arg.key === 'vault-seed:default_vault' ? 'abandon ability able about above absent absorb abstract absurd abuse access accident' : null;
       case 'secret_set': attempts.push('secret_set'); return;
       case 'plugin:event|listen': return 1;
@@ -138,6 +145,11 @@ export async function installRecoveryFixture(page: Page, baseURL: string) {
   });
   return {
     files, attempts, noteIds, writes, firstNoteWrites,
+    damageGeneration: (file: 'note-registry.json' | 'sync-ledger.json' | 'sync-config.json') => {
+      const path = `${RECOVERY_ROOT}/${file}`;
+      if (!files.has(`${path}.fixture-generation`)) throw new Error(`No fixture generation for ${file}`);
+      failedGenerations.add(path);
+    },
     rejectWritesTo: (predicate: (path: string) => boolean) => { refuseWrite = predicate; },
     allowWrites: () => { refuseWrite = undefined; },
   };

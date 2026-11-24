@@ -1,4 +1,5 @@
-// Two actual replicas and an authenticated Python relay, on loopback with temporary SQLite.
+// Registry smoke with an authenticated Python relay on loopback and temporary SQLite.
+// --offline adds a three-device restart, retained/expired history, and shared profile records.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -10,9 +11,18 @@ import { NoteChannel } from '../src/lib/sync/notes/channel.ts';
 import { openNoteSession } from '../src/lib/sync/notes/session.ts';
 import { sealRegistryMedia } from '../src/lib/sync/notes/mediaWire.ts';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
+import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
+import { sameNote } from '../src/lib/sync/notes/merge.ts';
+import { parseSharedRegistryId, sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
+import { sharedWorkspacePatch } from '../src/lib/sync/notes/sharedWorkspace.ts';
 import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 
-const relay = spawn('python', ['-u', '-c', `import asyncio, json, sys
+const offlineOnly = process.argv.includes('--offline');
+const relayPath = process.argv.slice(2).find((arg) => arg !== '--offline') ?? '../slag-relay/.worktrees/note-registry';
+const rttMs = Number(process.env.SLAG_SMOKE_RTT_MS ?? 0);
+assert.ok(Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 100);
+
+const relay = spawn('python', ['-u', '-c', `import asyncio, json, sys, time
 from test_note_registry import TestNoteRegistry, ROOM, VAULT, QUOTA
 async def main():
     test = TestNoteRegistry()
@@ -29,21 +39,26 @@ async def main():
         test.generation = test.db.freeze_note_room(ROOM)
         tokens = [owner, laptop, phone]
         print(json.dumps(dict(url=test.base, room=ROOM, vault=VAULT, generation=test.generation, tokens=tokens)), flush=True)
-        seed = json.loads(await asyncio.to_thread(sys.stdin.readline))
-        test.db.activate_note_room(ROOM, test.generation, [seed], identity['accountId'], QUOTA, seed['noteId'], atomic_groups=True, registry_media=True)
+        setup = json.loads(await asyncio.to_thread(sys.stdin.readline))
+        seed = setup['seed']
+        test.db.activate_note_room(ROOM, test.generation, [seed], identity['accountId'], QUOTA, seed['noteId'], atomic_groups=True, registry_media=True, shared_records=setup['shared'])
         print('active', flush=True)
-        await asyncio.to_thread(sys.stdin.readline)
+        while line := await asyncio.to_thread(sys.stdin.readline):
+            assert line.strip() == 'expire'
+            with test.db.conn:
+                test.db.conn.execute('UPDATE note_versions SET expires_at = ? WHERE room_id = ?', (time.time() - 1, ROOM))
+            test.db.cleanup_expired()
+            print(json.dumps(test.db.note_status(ROOM)), flush=True)
     finally:
         await test.asyncTearDown()
-asyncio.run(main())`], { cwd: resolve(process.argv[2] ?? '../slag-relay/.worktrees/note-registry'), stdio: ['pipe', 'pipe', 'inherit'] });
-const rttMs = Number(process.env.SLAG_SMOKE_RTT_MS ?? 0);
-assert.ok(Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 100);
+asyncio.run(main())`], { cwd: resolve(relayPath), stdio: ['pipe', 'pipe', 'inherit'],
+  env: { ...process.env, SLAG_TG_BOT_TOKEN: '' } });
 const sockets = new Set();
 const proxyConnections = new Set();
 let proxy;
 const stop = new AbortController();
 const exit = once(relay, 'exit');
-try {
+async function run() {
   const lines = createInterface({ input: relay.stdout });
   const [text] = await once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
   const { url: upstream, room, vault, generation, tokens } = JSON.parse(text);
@@ -82,31 +97,38 @@ try {
   const seed = await sealFolderTree(keys, room, generation, { opId: crypto.randomUUID(),
     noteId: await opaqueNoteId(keys, FOLDER_TREE_ID), baseRevision: 0, kind: 'create' }, tree);
   const activated = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
-  relay.stdin.write(`${JSON.stringify(seed)}\n`);
+  relay.stdin.write(`${JSON.stringify({ seed, shared: offlineOnly })}\n`);
   assert.deepEqual(await activated, ['active']);
-  async function device(i, initial, local = new Map(), onApplied) {
+  async function device(i, initial, local = new Map(), onApplied, workspace = {}, offline = false) {
     const controller = new AbortController();
     const signal = AbortSignal.any([stop.signal, controller.signal]);
-    const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true,
+    const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true, sharedRecords: offlineOnly,
       headers: (json) => ({ Authorization: `Bearer ${tokens[i]}`, ...(json && { 'Content-Type': 'application/json' }) }) });
     let reads = 0;
+    let scans = 0;
     let posts = 0;
     let pushes = 0;
     let ignoreReply = false;
     let interceptPush;
     const attempts = [];
-    let saved;
+    let saved = initial;
     const errors = [];
-    assert.equal((await channel.status()).atomicGroups, true);
+    if (offline) assert.ok(initial, 'an offline restart needs a saved journal');
+    else {
+      const status = await channel.status();
+      assert.equal(status.atomicGroups, true);
+      if (offlineOnly) assert.equal(status.sharedRecords, true);
+    }
     let folders = initial?.confirmed[FOLDER_TREE_ID]?.item;
     const groups = [];
-    const ws = new WebSocket(`${url.replace('http:', 'ws:')}/ws/${room}?${new URLSearchParams({ vault, token: tokens[i], device: `device-${i + 1}`, noteGeneration: generation, backlog: 'http', folderTree: '1', atomicGroups: '1', registryMedia: '1' })}`);
-    sockets.add(ws);
+    const ws = offline ? undefined : new WebSocket(`${url.replace('http:', 'ws:')}/ws/${room}?${new URLSearchParams({ vault, token: tokens[i], device: `device-${i + 1}`, noteGeneration: generation, backlog: 'http', folderTree: '1', atomicGroups: '1', registryMedia: '1', ...(offlineOnly && { sharedRecords: '1' }) })}`);
+    if (ws) sockets.add(ws);
     const replica = new NoteReplica({ room, generation, keys, signal, readOnly: false, atomicGroups: true, channel: {
-      events: (...args) => { reads++; return channel.events(...args); }, heads: (...args) => { reads++; return channel.heads(...args); },
-      send: (...args) => { posts++; attempts.push(args[2]); return channel.send(...args); },
+      events: (...args) => { assert.ok(!offline); reads++; return channel.events(...args); },
+      heads: (...args) => { assert.ok(!offline); reads++; scans++; return channel.heads(...args); },
+      send: (...args) => { assert.ok(!offline); posts++; attempts.push(args[2]); return channel.send(...args); },
     }, sendLive: (text) => {
-      if (ws.readyState !== WebSocket.OPEN) return false;
+      if (ws?.readyState !== WebSocket.OPEN) return false;
       pushes++;
       attempts.push(JSON.parse(text).ops);
       if (interceptPush) {
@@ -116,7 +138,12 @@ try {
       } else ws.send(text);
       return true;
     },
-    isLiveOpen: () => ws.readyState === WebSocket.OPEN,
+    isLiveOpen: () => ws?.readyState === WebSocket.OPEN,
+    ...(offlineOnly && { applyShared: async ({ id, shared }) => {
+      const { type, key } = parseSharedRegistryId(id);
+      assert.equal(type, 'workspace');
+      Object.assign(workspace, sharedWorkspacePatch(key, shared, workspace));
+    } }),
     apply: async ({ id, item }) => {
       local.set(id, item);
       onApplied?.(id);
@@ -129,16 +156,18 @@ try {
     },
     save: async (state) => { saved = structuredClone(state); },
     onProgress() {}, onError: (error) => errors.push(error.message) }, initial);
-    ws.addEventListener('message', ({ data }) => {
-      const message = JSON.parse(data);
-      if (!ignoreReply && (message.type === 'note_events' || message.type === 'note_results')) replica.handleMessage(message);
-    });
-    await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
-    await replica.catchUp();
-    return { replica, local, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
+    if (ws) {
+      ws.addEventListener('message', ({ data }) => {
+        const message = JSON.parse(data);
+        if (!ignoreReply && (message.type === 'note_events' || message.type === 'note_results')) replica.handleMessage(message);
+      });
+      await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
+      await replica.catchUp();
+    }
+    return { replica, local, workspace, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
       holdNextPush: () => new Promise((resolve) => { interceptPush = resolve; }),
-      folders: () => folders, groups, stats: () => ({ reads, posts, pushes }), saved: () => saved,
-      close: () => { controller.abort(); ws.close(); } };
+      folders: () => folders, groups, scans: () => scans, stats: () => ({ reads, posts, pushes }), saved: () => saved,
+      close: () => { controller.abort(); ws?.close(); } };
   }
   async function until(matches) {
     const deadline = performance.now() + 5000;
@@ -149,6 +178,134 @@ try {
   }
   const note = (id, content = 'x'.repeat(64 * 1024)) => ({ id, type: 'note', title: id, content, folder: 'Inbox', attachments: [], tags: [], createdAt: 1, updatedAt: 1 });
   const save = (device, items) => device.replica.record(items.map((item) => ({ id: item.id, kind: 'create', item })));
+  const update = (peer, item, previous, baseRevision) => peer.replica.record([
+    { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
+  ]);
+  async function offlineScenarios() {
+    const a = await device(0), b = await device(1);
+    let c = await device(2, undefined, undefined, undefined, { currentFolder: 'phone-only' });
+    const peers = () => [a, b, c];
+    const converge = (cursor) => until(() => peers().every((peer) =>
+      peer.saved()?.cursor === cursor && !peer.replica.pendingCount));
+    const online = (cursor) => until(() => [a, b].every((peer) => peer.saved()?.cursor === cursor && !peer.replica.pendingCount));
+    const workspaceId = (field) => sharedRegistryId('workspace', field);
+    const profile = workspaceId('profile'), prompt = workspaceId('aiPrompt'), persona = workspaceId('aiPersona');
+    const baseNote = note('offline-note', 'base text');
+    const task = { ...note('offline-task', 'task'), type: 'task', status: 'todo', priority: 'low', dueDate: '2026-12-01' };
+    const lost = note('offline-missing-edge', 'base paragraph');
+    const removed = note('offline-tombstone', 'will be deleted');
+    await save(a, [baseNote, task, lost, removed]);
+    await a.replica.recordShared(profile, { name: 'Original' }, null);
+    await a.replica.recordShared(prompt, 'original prompt', null);
+    await a.replica.recordShared(persona, { text: 'Original', enabled: false }, null);
+    await converge(8);
+    const restartJournal = (journal) => loadNoteJournal(JSON.parse(JSON.stringify({ version: 1, room, generation, journal })), room, generation);
+    async function disconnect(edit) {
+      const { local, workspace } = c;
+      const journal = c.saved();
+      c.close();
+      const offline = await device(2, journal, local, undefined, workspace, true);
+      await edit(offline, journal);
+      const pending = restartJournal(offline.saved());
+      assert.ok(pending.pending.length);
+      assert.equal(pending.cursor, journal.cursor);
+      assert.deepEqual(offline.stats(), { reads: 0, posts: 0, pushes: 0 });
+      assert.deepEqual(offline.errors, []);
+      offline.close();
+      return () => device(2, pending, local, undefined, workspace);
+    }
+    const edit = (peer, item, patch, journal = peer.saved()) => {
+      const { item: previous, revision } = journal.confirmed[item.id];
+      return update(peer, { ...previous, ...patch }, previous, revision);
+    };
+    const sameProjection = () => {
+      for (const peer of peers()) {
+        assert.deepEqual(peer.local, a.local);
+        assert.deepEqual(peer.folders(), a.folders());
+        for (const field of ['profile', 'aiPrompt', 'aiPersona', 'aiPersonaEnabled']) {
+          assert.deepEqual(peer.workspace[field], a.workspace[field]);
+        }
+        assert.deepEqual(peer.errors, []);
+      }
+      assert.equal(c.workspace.currentFolder, 'phone-only');
+    };
+    const reopenRetained = await disconnect(async (off, journal) => {
+      await edit(off, baseNote, { content: 'offline text' }, journal);
+      await edit(off, task, { priority: 'high' }, journal);
+      await off.replica.recordShared(profile, { name: 'Offline name' }, { name: 'Original' });
+    });
+    await edit(a, baseNote, { title: 'online title' });
+    await edit(a, task, { dueDate: '2026-12-10' });
+    await online(10);
+    await edit(b, baseNote, { tags: ['other device'] });
+    await edit(b, task, { status: 'in_progress' });
+    await b.replica.recordShared(prompt, 'online prompt', 'original prompt');
+    const addedTree = [...tree, { path: 'Offline test', name: 'Offline test', description: '' }];
+    await b.replica.recordFolderTree(addedTree, tree);
+    await online(14);
+    await save(a, Array.from({ length: 101 }, (_, i) => note(`retained-${i}`, 'unrelated revision')));
+    await online(115);
+    c = await reopenRetained();
+    await converge(118);
+    assert.equal(c.scans(), 0, 'retained feed must not require a head scan');
+    sameProjection();
+    assert.ok(sameNote(a.local.get(baseNote.id), { ...baseNote, title: 'online title', content: 'offline text', tags: ['other device'] }));
+    assert.ok(sameNote(a.local.get(task.id), { ...task, dueDate: '2026-12-10', priority: 'high', status: 'in_progress' }));
+    assert.deepEqual(a.folders(), addedTree);
+    assert.deepEqual(c.workspace.profile, { name: 'Offline name' });
+    assert.equal(c.workspace.aiPrompt, 'online prompt');
+    for (const peer of peers()) assert.deepEqual(peer.replica.conflicts, []);
+
+    const archive = { path: 'Offline folder', name: 'Offline folder', description: '' };
+    // A direct update survives compaction as a proof; an omitted edge or a tombstone does not.
+    const reopenExpired = await disconnect(async (off, journal) => {
+      await edit(off, baseNote, { content: 'second offline text' }, journal);
+      await edit(off, lost, { content: 'keep this offline alternative' }, journal);
+      await edit(off, removed, { content: 'not an implicit restore' }, journal);
+      await off.replica.recordFolderTree([...addedTree, archive], addedTree);
+      await off.replica.recordShared(persona, { text: 'Offline persona', enabled: true }, { text: 'Original', enabled: false });
+    });
+    await edit(a, baseNote, { title: 'after the direct update' });
+    await edit(a, lost, { title: 'first update' });
+    await a.replica.record([{ id: removed.id, kind: 'delete', item: null }]);
+    await online(121);
+    await edit(b, lost, { title: 'second update' });
+    await b.replica.recordShared(profile, { name: 'Online name' }, { name: 'Offline name' });
+    await save(b, Array.from({ length: 24 }, (_, i) => note(`expired-${i}`, 'unrelated revision')));
+    await online(147);
+    const expiredLine = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
+    relay.stdin.write('expire\n');
+    const expired = JSON.parse((await expiredLine)[0]);
+    assert.equal(expired.floor, 147);
+    c = await reopenExpired();
+    await converge(150);
+    assert.ok(c.scans() > 0, 'expired feed must scan retained heads');
+    sameProjection();
+    assert.equal(c.local.get(baseNote.id).title, 'after the direct update');
+    assert.equal(c.local.get(baseNote.id).content, 'second offline text');
+    assert.equal(c.local.get(lost.id).content, 'base paragraph');
+    assert.equal(c.local.get(lost.id).title, 'second update');
+    assert.equal(c.local.get(removed.id), null);
+    assert.deepEqual(c.folders(), [...addedTree, archive]);
+    assert.deepEqual(c.workspace.profile, { name: 'Online name' });
+    assert.equal(c.workspace.aiPersona, 'Offline persona');
+    assert.deepEqual(c.replica.conflicts.map(({ noteId, item, fields }) => [noteId, item.content, fields]), [
+      [lost.id, 'keep this offline alternative', ['lifecycle']],
+      [removed.id, 'not an implicit restore', ['update']],
+    ]);
+    assert.deepEqual(a.replica.conflicts, []);
+    assert.deepEqual(b.replica.conflicts, []);
+    const journal = restartJournal(c.saved());
+    c.close();
+    c = await device(2, journal, c.local, undefined, c.workspace);
+    await converge(150);
+    assert.deepEqual(c.replica.conflicts, journal.conflicts);
+    assert.deepEqual(c.attempts, []);
+    sameProjection();
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, final: 150, savedAlternatives: c.replica.conflicts.length })}\n`);
+  }
+
+  if (offlineOnly) return offlineScenarios();
   const appliedAt = new Map();
   const author = await device(0);
   let reader = await device(1, undefined, undefined, (id) => appliedAt.set(id, performance.now()));
@@ -226,9 +383,6 @@ try {
   const beforeMerge = (await phoneChannel.status()).head;
   const parallelTitle = { ...shared, title: 'title from first writer' };
   const parallelContent = { ...shared, content: 'first paragraph\n\nlast paragraph' };
-  const update = (peer, item, previous, baseRevision) => peer.replica.record([
-    { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
-  ]);
   await Promise.all([update(author, parallelTitle, shared, revision), update(reader, parallelContent, shared, revision)]);
   const combined = { ...parallelTitle, content: parallelContent.content };
   await until(() => [author, reader].every((peer) => peer.replica.pendingCount === 0 && peer.saved().cursor === beforeMerge + 2));
@@ -435,6 +589,10 @@ try {
   const settled = stats(timings);
   assert.ok(settled.p95Ms <= 1000, `loopback p95 ${settled.p95Ms}ms`);
   process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true, roundTripWithReview: { outboundMs, inboundMs } })}\n`);
+}
+
+try {
+  await run();
 } finally {
   stop.abort();
   for (const ws of sockets) ws.close();

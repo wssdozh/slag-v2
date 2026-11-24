@@ -543,7 +543,7 @@ export class NoteReplica {
     else log();
   }
 
-  private async accept(head: NoteHead, applyKnown = false, recovered = false) {
+  private async accept(head: NoteHead, applyKnown = false) {
     // Recovery can see surviving heads of an expired group, not the original event batch.
     if (head.group && !this.host.applyFolderGroup) throw new Error('Atomic folder groups are not supported by this session');
     const body = await openAnyRegistryBody(this.host.keys, this.host.room, this.host.generation, head);
@@ -552,7 +552,9 @@ export class NoteReplica {
     const { id } = body;
     const item = 'folders' in body ? body.folders : 'shared' in body ? (body.shared === null ? null : { shared: body.shared }) : body.item;
     const own = this.state.pending.find((intent) => intent.attempt?.op.opId === head.opId);
-    const base = confirmedBase(recovered ? undefined : confirmedNote(this.state, id), head, item, own?.intentId);
+    // Even in a heads scan, an authenticated update's direct CAS edge proves continuity.
+    // A skipped revision of this item or delete/restore still breaks the chain.
+    const base = confirmedBase(confirmedNote(this.state, id), head, item, own?.intentId);
     // A heads scan can recover a surviving member, but only a complete receipt settles the group.
     if (own && !own.folderGroup) {
       await this.settle(own, base, own.attempt?.conflicts ?? []);
@@ -659,7 +661,7 @@ export class NoteReplica {
         let previous = after;
         for (const head of page.heads) {
           if (head.noteId <= previous || head.revision <= since || head.revision > through) throw new Error('Invalid registry scan order');
-          await this.accept(head, since === 0, true);
+          await this.accept(head, since === 0);
           previous = head.noteId;
         }
         if (page.next !== null && (page.next <= after || page.next !== previous)) throw new Error('Registry scan did not advance');

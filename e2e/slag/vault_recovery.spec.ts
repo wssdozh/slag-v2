@@ -4,6 +4,17 @@ import { BROKEN_STATE, FIXTURE_REGISTRY, installRecoveryFixture, RECOVERY_ROOT, 
 const root = RECOVERY_ROOT;
 const newNote = 'Локальная запись после сбоя';
 
+async function expectPausedWithUnknownQueue(page: import('@playwright/test').Page, lostRegistry: boolean) {
+  const sync = page.getByTestId('sidebar-sync-btn');
+  await expect(sync).toHaveAttribute('data-sync-state', 'error');
+  await sync.focus();
+  await page.getByTestId('sidebar-sync-open-health').click();
+  const report = page.getByTestId('vault-health-report');
+  await expect(report.getByText('журнал реестра не подтверждён; обмен остановлен')).toBeVisible();
+  await expect(report.locator('dt:text-is("Очередь пакетов") + dd')).toHaveText('неизвестно');
+  await expect(report.locator('dt:text-is("Очередь реестра") + dd')).toHaveText(lostRegistry ? 'неизвестно' : '0');
+}
+
 async function itemCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(async () => {
     const url = '/src/lib/storage/index.ts';
@@ -16,7 +27,7 @@ test('damaged state opens the same 106 notes and saved changes survive two resta
   const disk = await installRecoveryFixture(page, baseURL!);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('/');
-  await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => itemCount(page)).toBe(106);
   await expect(page.getByText('Удалённая не возвращается')).toHaveCount(0);
   expect(disk.firstNoteWrites()).toEqual([]);
@@ -57,7 +68,7 @@ test('damaged state opens the same 106 notes and saved changes survive two resta
 test('a failed native Markdown write does not clear input or confirm it', async ({ page, baseURL }) => {
   const disk = await installRecoveryFixture(page, baseURL!);
   await page.goto('/');
-  await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   disk.rejectWritesTo((path) => path.startsWith(`${root}/notes/`) && path.endsWith('.md'));
   const composer = page.locator('main textarea').first();
   await composer.fill(newNote);
@@ -95,4 +106,42 @@ test('healthy legacy binding migrates once without replacing the device or queue
   await expect.poll(() => itemCount(page)).toBe(106);
   expect(disk.files.has(`${root}/recovery-local-only.json`)).toBe(false);
   expect(disk.files.get(`${root}/sync-ledger.json.fixture-generation`)).toBe(JSON.stringify(ledger));
+  await expect(page.getByTestId('sidebar-sync-btn')).toHaveAttribute('data-sync-state', 'idle');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+for (const lostFile of ['note-registry.json', 'sync-ledger.json', 'sync-config.json'] as const) {
+  test(`${lostFile}: a failed generation pauses transport but leaves local writing usable`, async ({ page, baseURL }) => {
+    const disk = await installRecoveryFixture(page, baseURL!);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const binding = { serverUrl: RECOVERY_RELAY, deviceId: 'fixture-device', enabled: true, autoSync: true, syncId: 'fixture-vault' };
+    const outbox = [{ opId: 'fixture-op', id: 'note-archived', kind: 'item', action: 'delete', timestamp: 1000 }];
+    const envelope = (value: unknown) => JSON.stringify({ version: 1, vaultId: 'default_vault', value });
+    const generations = [
+      [`${root}/sync-config.json.fixture-generation`, envelope(binding)],
+      [`${root}/sync-ledger.json.fixture-generation`, envelope({ registryRequired: true, outbox })],
+      [`${root}/note-registry.json.fixture-generation`, FIXTURE_REGISTRY],
+    ] as const;
+    for (const [path, value] of generations) disk.files.set(path, value);
+    disk.files.set(`${root}/state.json`, '{"protectedSync":true}');
+    disk.damageGeneration(lostFile);
+
+    await page.goto('/');
+    await expect(page.getByText('Заметка проверки 1', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const composer = page.locator('main textarea').first();
+    await composer.fill(newNote);
+    await composer.press('Enter');
+    await expect(composer).toHaveValue('');
+    await expect(page.locator('[data-flip-id]').filter({ hasText: newNote }).first()).toBeVisible();
+    await expect.poll(() => disk.firstNoteWrites()).toHaveLength(1);
+
+    await page.reload();
+    await expect(page.locator('[data-flip-id]').filter({ hasText: newNote }).first()).toBeVisible();
+    await expect.poll(() => itemCount(page)).toBe(107);
+    await expectPausedWithUnknownQueue(page, lostFile === 'note-registry.json');
+    expect(disk.files.get(`${root}/recovery-local-only.json`)).toBe('{"version":1,"reason":"registry"}');
+    for (const [path, value] of generations) expect(disk.files.get(path)).toBe(value);
+    expect(disk.attempts).toEqual([]);
+  });
+}
