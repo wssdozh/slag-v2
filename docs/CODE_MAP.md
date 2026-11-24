@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **703**, строк: **120395**, зон: **48**.
+Модулей: **703**, строк: **120397**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -15,7 +15,7 @@
 | `e2e/slag/editor.spec.ts` | 1737 | 0 |
 | `src/lib/storage/index.ts` | 1575 | 52 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/sync/notes/replica.ts` | 1082 | 1 |
+| `src/lib/sync/notes/replica.ts` | 1084 | 1 |
 | `src/lib/storage/vaultFiles.ts` | 1046 | 2 |
 | `src/lib/storage/settingsStore.ts` | 966 | 5 |
 | `e2e/slag/feed.spec.ts` | 945 | 0 |
@@ -659,7 +659,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 57 файлов, 12343 строк
+## src/lib/sync — 57 файлов, 12345 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -698,7 +698,7 @@
 | `notes/persistence.ts` | 156 | 5 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
 | `notes/reconcile.ts` | 46 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
 | `notes/recoveryJournal.ts` | 53 | 2 | readRecoveryRegistry, planRecoveredJournal | Rehydrate an empty disk from the relay; import local intentions, not the old … |
-| `notes/replica.ts` | 1082 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/replica.ts` | 1084 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/review.ts` | 45 | 5 | RECOVERED_DISK, needsReviewedHead, noteReviewKind, selectableNoteFields, applyReviewedFields |  |
 | `notes/session.ts` | 235 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/sharedBody.ts` | 60 | 20 | SharedKind, SharedValue, isLegacySharedKind, SharedBody, SharedMutation, +4 |  |

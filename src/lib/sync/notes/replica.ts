@@ -621,6 +621,8 @@ export class NoteReplica {
           start = end;
         }
       }
+      // A complete live frame can satisfy a saved review without any HTTP catch-up.
+      if (this.ready && !gap && !this.needsFeed) await this.clearEquivalentLegacyAlternatives();
     });
     return gap;
   }

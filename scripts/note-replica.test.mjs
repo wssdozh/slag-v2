@@ -1291,6 +1291,26 @@ test('saved legacy review does not block independent delivery or repaint health'
   assert.notEqual(peer.replica.syncHealth, 'error', 'health must not be error after selecting fields on retry');
 });
 
+test('an accepted folder deletion clears the matching recovered review on live delivery without a pull', async (t) => {
+  const server = relay();
+  const folders = [{ path: 'Inbox', name: 'Inbox', description: '' }, { path: 'Archive', name: 'Archive', description: '' }];
+  const author = device(t, server, { applyFolderTree: async () => {} });
+  const reader = device(t, server, { applyFolderTree: async () => {} });
+  await Promise.all([author.replica.catchUp(), reader.replica.catchUp()]);
+  await author.replica.recordFolderTree(folders, []);
+  await until(() => reader.saved()?.cursor === 1 && author.saved()?.cursor === 1);
+  const expected = folders.slice(0, 1);
+  const review = { intentId: 'old-delete', noteId: FOLDER_TREE_ID, kind: 'update', revision: 1, item: expected, fields: ['recovered-disk'], at: 1 };
+  const different = { ...review, intentId: 'different-tree', item: [...expected, { path: 'Other', name: 'Other', description: '' }] };
+  for (const client of [author, reader]) await client.replica.preserveLegacyAlternatives([review, different]);
+  await author.replica.recordFolderTree(expected, folders);
+  await until(() => reader.saved()?.cursor === 2 && author.saved()?.cursor === 2);
+  for (const client of [author, reader]) {
+    assert.deepEqual(client.saved().confirmed[FOLDER_TREE_ID].item, expected);
+    assert.deepEqual(client.saved().conflicts.map(({ intentId }) => intentId), ['different-tree']);
+  }
+});
+
 test('empty selectedFields without content is rejected', async (t) => {
   const server = relay();
   const base = note('empty-fields-test');
