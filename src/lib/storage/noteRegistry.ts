@@ -11,6 +11,8 @@ export interface NoteMutation {
   item: SlagItem | null;
   /** Snapshot visible at the mutation, even when a remote write is finishing on disk. */
   previous?: SlagItem;
+  /** An automatic rollover, never set by the editor or the disk watcher. */
+  rollover?: true;
 }
 
 export interface AcceptedNote {

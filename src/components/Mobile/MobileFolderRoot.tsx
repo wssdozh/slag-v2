@@ -64,7 +64,7 @@ export const MobileFolderRoot: React.FC = () => {
             <Icon name="nav.down" size="sm" tone="muted" className={`transition-transform duration-150 ${isVaultMenuOpen ? 'rotate-180 text-fg-tertiary' : ''}`} />
           </button>
         }
-        leadingAction={<SyncStatusButton mobile onSettings={() => openSettingsModal('sync')} />}
+        leadingAction={<SyncStatusButton mobile onSettings={() => openSettingsModal('sync')} onHealth={() => openSettingsModal('vault', 'integrity')} />}
         rightSlot={
           <>
             <button

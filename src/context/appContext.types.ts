@@ -139,7 +139,8 @@ export interface AppContextType {
   setIsSettingsOpen: (open: boolean) => void;
   settingsTab: SettingsTabId;
   setSettingsTab: (tab: SettingsTabId) => void;
-  openSettingsModal: (tab?: SettingsTabId) => void;
+  requestedVaultHealth: number;
+  openSettingsModal: (tab?: SettingsTabId, integrity?: 'integrity') => void;
   setIsLogViewerOpen: (open: boolean) => void;
   openCreateFolderModal: (parentPath?: string) => void;
   closeFolderModal: () => void;

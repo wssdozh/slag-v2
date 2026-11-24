@@ -4,6 +4,9 @@ import { test } from 'node:test';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
+import { noteReviewKind } from '../src/lib/sync/notes/review.ts';
+import { LEGACY_CUTOVER } from '../src/lib/sync/notes/legacyCutover.ts';
+import { noteDiskProjection } from '../src/lib/storage/noteDiskProjection.ts';
 
 const room = 'test-room';
 const generation = 1;
@@ -168,6 +171,39 @@ test('cold capture distinguishes an uncheckpointed projection from a changed or 
   const restored = device(t, server, { state: after });
   await restored.replica.captureColdNoteEdits(async () => [{ item, marker }]);
   assert.equal(restored.saved().pending[0].item.content, 'intermediate');
+});
+
+test('cold capture preserves edited YAML fields without publishing metadata from an uncheckpointed newer file', async (t) => {
+  const server = relay();
+  const source = device(t, server);
+  const projections = new Map();
+  const receiver = device(t, server, { trackDiskProjection: true, apply: async (value) => { projections.set(value.id, value); } });
+  const task = note('cold-task-properties', { type: 'task', status: 'todo', priority: 'low', dueDate: '2026-11-20', recurrence: { freq: 'daily' } });
+  const article = note('cold-article-properties', { type: 'article', summary: 'Original summary', readingTimeMinutes: 2 });
+  await Promise.all([source.replica.catchUp(), receiver.replica.catchUp()]);
+  await source.replica.record([change('create', task), change('create', article)]);
+  await until(() => receiver.saved()?.cursor === 2);
+  const before = receiver.saved();
+  const taskProjection = projections.get(task.id);
+  const taskEdit = { ...noteDiskProjection(taskProjection.item), dueDate: '2026-11-23', priority: 'high', title: 'Edited on disk' };
+  const articleHead = { ...article, summary: 'Accepted remote summary', isPinned: true };
+  await source.replica.record([change('update', articleHead)]);
+  await until(() => receiver.saved()?.cursor === 3);
+  const articleProjection = projections.get(article.id);
+  const reader = device(t, server, { state: before });
+  await reader.replica.captureColdNoteEdits(async () => [
+    { item: taskEdit, marker: taskProjection.registryBodyMarker },
+    { item: noteDiskProjection(articleProjection.item), marker: articleProjection.registryBodyMarker },
+  ]);
+  assert.deepEqual(reader.saved()?.pending.map(({ item }) => [item.id, item.title, item.priority, item.dueDate]),
+    [[task.id, taskEdit.title, 'high', '2026-11-23']]);
+  assert.deepEqual(reader.saved().pending[0].item.recurrence, task.recurrence);
+  await reader.replica.catchUp();
+  await until(() => reader.saved()?.cursor === 4 && !reader.replica.pendingCount);
+  assert.equal(reader.conflicts.length, 0);
+  assert.equal(reader.local.get(article.id).summary, articleHead.summary);
+  assert.equal(reader.local.get(task.id).dueDate, '2026-11-23');
+  assert.equal(server.events.length, 4);
 });
 
 test('an external attachment-only edit creates one revision on both replicas', async (t) => {
@@ -682,6 +718,44 @@ test('folder tree shares the journal, survives restart, and never overwrites a c
   assert.equal(a.local.size + b.local.size + resumed.local.size, 0);
 });
 
+test('identical offline folder and profile updates settle without a review or a second revision', async (t) => {
+  const { sharedRegistryId } = await import('../src/lib/sync/notes/sharedBody.ts');
+  const server = relay();
+  const profile = sharedRegistryId('workspace', 'profile');
+  const previous = { name: 'Before' }, next = { name: 'After' };
+  const inbox = [{ path: 'Inbox', name: 'Inbox', description: '' }];
+  const tree = [...inbox, { path: 'Trip', name: 'Trip', description: '' }];
+  const projection = () => {
+    const values = {};
+    return { values, applyShared: async ({ shared }) => { values.profile = shared; },
+      applyFolderTree: async (folders) => { values.folders = folders; } };
+  };
+  const a = device(t, server, projection());
+  const c = device(t, server, projection());
+  await Promise.all([a.replica.catchUp(), c.replica.catchUp()]);
+  await a.replica.recordFolderTree(inbox, []);
+  await a.replica.recordShared(profile, previous, null);
+  await until(() => c.saved()?.cursor === 2 && !a.replica.pendingCount);
+  const b = device(t, server, { ...projection(), state: c.saved() });
+  await b.replica.recordFolderTree(tree, inbox);
+  await b.replica.recordShared(profile, next, previous);
+  const envelope = JSON.parse(JSON.stringify({ version: 1, room, generation, journal: b.saved() }));
+  b.stop();
+  await a.replica.recordFolderTree(tree, inbox);
+  await a.replica.recordShared(profile, next, previous);
+  await until(() => c.saved()?.cursor === 4 && !a.replica.pendingCount);
+  const sends = server.sends();
+  const disk = projection();
+  const back = device(t, server, { ...disk, state: loadNoteJournal(envelope, room, generation) });
+  await back.replica.catchUp();
+  await until(() => !back.replica.pendingCount);
+  assert.deepEqual(back.conflicts, []);
+  assert.deepEqual(back.saved().pending, []);
+  assert.deepEqual(disk.values, { folders: tree, profile: next });
+  assert.equal(server.sends(), sends);
+  assert.equal(server.events.length, 4);
+});
+
 test('batches immediate edits and catches up without further requests when idle', async (t) => {
   const server = relay();
   const a = device(t, server);
@@ -918,6 +992,38 @@ test('acceptance with lost reply survives restart and expired feed', async (t) =
   assert.equal(b.replica.pendingCount, 0);
   assert.equal(b.local.get('persist').content, 'base');
   assert.equal(server.events.length, 1);
+});
+
+test('retained heads prove only direct update continuity after the feed expires', async (t) => {
+  const server = relay();
+  const a = device(t, server), offline = device(t, server);
+  await Promise.all([a.replica.catchUp(), offline.replica.catchUp()]);
+  const direct = note('direct'), missing = note('missing-edge');
+  await a.replica.record([direct, missing].map((item) => change('create', item)));
+  await until(() => offline.saved()?.cursor === 2);
+  const before = offline.saved();
+  offline.stop();
+  const local = (item) => ({ ...item, content: `offline ${item.id}` });
+  const sleeping = device(t, server, { state: before });
+  await sleeping.replica.record([direct, missing].map((item) => ({ ...change('update', local(item)), previous: item,
+    origin: { revision: before.confirmed[item.id].revision } })));
+  const pending = sleeping.saved();
+  sleeping.stop();
+  await a.replica.record([direct, missing].map((item) => change('update', { ...item, title: 'remote title' })));
+  await until(() => a.saved()?.cursor === 4);
+  await a.replica.record([change('update', { ...missing, title: 'newest title' }), change('create', note('unrelated'))]);
+  await until(() => a.saved()?.cursor === 6);
+  server.prune();
+  const back = device(t, server, { state: pending });
+  await back.replica.catchUp();
+  await until(() => !back.replica.pendingCount);
+  assert.equal(back.local.get(direct.id).title, 'remote title');
+  assert.equal(back.local.get(direct.id).content, local(direct).content);
+  assert.equal(back.local.get(missing.id).title, 'newest title');
+  assert.equal(back.local.get(missing.id).content, missing.content);
+  assert.deepEqual(back.conflicts.map(({ noteId, fields, item }) => ({ noteId, fields, item })), [
+    { noteId: missing.id, fields: ['lifecycle'], item: local(missing) },
+  ]);
 });
 
 for (const prune of [false, true]) {
@@ -1178,4 +1284,333 @@ test('a failed send keeps its saved attempt and only retries after the backoff',
   assert.equal(transmitted.length, 2);
   assert.equal(transmitted[1][0].opId, attempt.op.opId);
   assert.deepEqual(d.errors.map(String), ['Error: offline']);
+});
+
+// --- noteReviewKind tests ---
+
+test('noteReviewKind classifies per contract: legacy only on marker, others by proof level', () => {
+  // Only LEGACY_CUTOVER marker → legacy
+  assert.equal(noteReviewKind([LEGACY_CUTOVER]), 'legacy');
+  assert.equal(noteReviewKind([LEGACY_CUTOVER, 'update']), 'legacy');
+  // No-proof fields → review (not proven conflict)
+  assert.equal(noteReviewKind(['base']), 'review');
+  assert.equal(noteReviewKind(['predecessor']), 'review');
+  assert.equal(noteReviewKind(['lifecycle']), 'review');
+  assert.equal(noteReviewKind(['recovered-disk']), 'review');
+  // Structural markers → conflict
+  assert.equal(noteReviewKind(['folder']), 'conflict');
+  assert.equal(noteReviewKind(['folders']), 'conflict');
+  assert.equal(noteReviewKind(['delete']), 'conflict');
+  // Ordinary data fields → conflict (real overlapping edits)
+  assert.equal(noteReviewKind(['dueDate', 'content']), 'conflict');
+  assert.equal(noteReviewKind(['tags']), 'conflict');
+  // Empty or bare 'update' without evidence → review
+  assert.equal(noteReviewKind([]), 'review');
+  assert.equal(noteReviewKind(['update']), 'review');
+});
+
+// --- resolveConflict with selectedFields tests ---
+
+test('selecting dueDate does not overwrite unrelated tag and priority on retry', async (t) => {
+  const server = relay();
+  // Local has dueDate changed from head; tags/priority differ too but we select only dueDate
+  const base = note('conflict-due', { type: 'task', content: 'keep this', folder: 'Inbox', tags: ['red'], priority: 'high' });
+  const local = { ...base, dueDate: '2026-06-06', tags: ['green'] };
+  const head = { ...base, dueDate: '2025-01-01', tags: ['blue'], priority: 'low' };
+  const conflictEntry = { intentId: 'pick-due', noteId: base.id, kind: 'update', revision: 1,
+    item: local, fields: ['dueDate', 'tags'], at: Date.now() };
+  // Skip catchUp; test resolveConflict directly against the prepared state like existing tests do
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { peer.savedState = state; },
+  });
+  peer.savedState = undefined;
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['dueDate']);
+  assert.ok(peer.savedState);
+  assert.equal(peer.savedState.pending.length, 1);
+  const retryItem = peer.savedState.pending[0].item;
+  assert.ok(retryItem && typeof retryItem === 'object' && !Array.isArray(retryItem));
+  // Chosen field carries our value; other differing fields come from head
+  assert.equal(retryItem.dueDate, '2026-06-06');
+  assert.deepEqual(retryItem.tags, ['blue'], 'relay tags preserved — not selected');
+  assert.equal(retryItem.priority, 'low', 'relay priority preserved — not selected');
+  assert.equal(peer.errors.length, 0);
+});
+
+test('stale reviewedRevision is rejected when using selectedFields', async (t) => {
+  const server = relay();
+  const base = note('stale-fields', { content: 'local' });
+  const head = { ...base, content: 'head', title: 'head-title' };
+  const conflictEntry = { intentId: 'stale-sel', noteId: base.id, kind: 'update', revision: 1,
+    item: base, fields: ['content'], at: Date.now() };
+  // Server has head at revision 2, but we try to resolve against revision 1
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  // current.revision is 1 matches reviewedRevision 1 — should work
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['content']);
+  assert.equal(peer.errors.length, 0);
+  // Now test with mismatched revision: head was updated to revision 2 outside
+  const staleConflict = { intentId: 'stale-sel-2', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, content: 'old local' }, fields: ['content'], at: Date.now() };
+  const stalePeer = device(t, server, {
+    state: { cursor: 2, confirmed: { [base.id]: { revision: 2, item: { ...base, title: 'newer' } } }, pending: [], conflicts: [staleConflict] },
+    save: async () => {},
+  });
+  await assert.rejects(stalePeer.replica.resolveConflict(staleConflict.intentId, 'retry', 1, undefined, ['content']), /Версия изменилась/);
+  assert.equal(stalePeer.replica.conflicts.length, 1, 'conflict must remain unresolved');
+});
+
+test('invalid linkedItemIds values are not committed via selectedFields', async (t) => {
+  const server = relay();
+  // Local tried a different content + linking; head has different content too
+  const base = note('bad-links', { content: 'local text' });
+  const head = { ...base, content: 'remote text', tags: ['shared'] };
+  const conflictEntry = { intentId: 'bad-link-id', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base }, fields: ['content'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  // linkedItemIds wasn't changed in local → not applicable → rejected
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['linkedItemIds']), /Неприменимые поля/);
+  assert.equal(savedJournal?.pendingCount ?? savedJournal?.pending?.length ?? 0, 0);
+  // Select content — it IS a diff between local and head, so it applies
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['content']);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.pending.length, 1);
+  const mergedItem = savedJournal.pending[0].item;
+  assert.ok(mergedItem && typeof mergedItem === 'object' && !Array.isArray(mergedItem));
+  assert.equal(mergedItem.content, 'local text');
+});
+
+test('saved legacy review does not block independent delivery or repaint health', async (t) => {
+  const server = relay();
+  const base = note('health-test', { type: 'task', content: 'initial', tags: ['a'], priority: 'medium' });
+  // Head has different dueDate — making it the differing field for the retry
+  const head = { ...base, content: 'head-text', tags: ['b'], priority: 'low' };
+  // Conflict entry: local tried to update with a dueDate
+  const conflictEntry = { intentId: 'legacy-inv', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, dueDate: '2025-12-31' }, fields: ['update'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  savedJournal = undefined;
+  // Resolve the conflict — no longer causes syncHealth to report 'error' just from conflicts.length
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['dueDate']);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.conflicts.length, 0);
+  assert.equal(savedJournal.pending.length, 1);
+  const resultItem = savedJournal.pending[0].item;
+  assert.ok(resultItem && typeof resultItem === 'object' && !Array.isArray(resultItem));
+  assert.equal(resultItem.dueDate, '2025-12-31');
+  // Tags and priority from head should survive since we only selected dueDate
+  assert.deepEqual(resultItem.tags, ['b']);
+  assert.equal(resultItem.priority, 'low');
+  // Health must not be 'error' — conflicts.length alone doesn't trigger error anymore.
+  // With pending retry it's 'syncing'; without journal/projection/failedIntents it cannot be 'error'.
+  assert.notEqual(peer.replica.syncHealth, 'error', 'health must not be error after selecting fields on retry');
+});
+
+test('an accepted folder deletion clears the matching recovered review on live delivery without a pull', async (t) => {
+  const server = relay();
+  const folders = [{ path: 'Inbox', name: 'Inbox', description: '' }, { path: 'Archive', name: 'Archive', description: '' }];
+  const author = device(t, server, { applyFolderTree: async () => {} });
+  const reader = device(t, server, { applyFolderTree: async () => {} });
+  await Promise.all([author.replica.catchUp(), reader.replica.catchUp()]);
+  await author.replica.recordFolderTree(folders, []);
+  await until(() => reader.saved()?.cursor === 1 && author.saved()?.cursor === 1);
+  const expected = folders.slice(0, 1);
+  const review = { intentId: 'old-delete', noteId: FOLDER_TREE_ID, kind: 'update', revision: 1, item: expected, fields: ['recovered-disk'], at: 1 };
+  const different = { ...review, intentId: 'different-tree', item: [...expected, { path: 'Other', name: 'Other', description: '' }] };
+  for (const client of [author, reader]) await client.replica.preserveLegacyAlternatives([review, different]);
+  await author.replica.recordFolderTree(expected, folders);
+  await until(() => reader.saved()?.cursor === 2 && author.saved()?.cursor === 2);
+  for (const client of [author, reader]) {
+    assert.deepEqual(client.saved().confirmed[FOLDER_TREE_ID].item, expected);
+    assert.deepEqual(client.saved().conflicts.map(({ intentId }) => intentId), ['different-tree']);
+  }
+});
+
+test('a legacy snapshot of a superseded daily deadline closes after catch-up without a send', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 24, 12) });
+  const server = relay();
+  const author = device(t, server);
+  const base = note('legacy-daily', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily', interval: 1, resetSubtasks: true } });
+  const old = { ...base, dueDate: '2026-11-23', updatedAt: Date.parse('2026-11-23T09:00:00Z') };
+  const current = { ...base, dueDate: '2026-11-24', updatedAt: Date.parse('2026-11-24T09:00:00Z') };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const saved = author.saved();
+  const review = { intentId: 'old-rollover', noteId: base.id, kind: 'update', revision: 0, item: old, fields: [LEGACY_CUTOVER], at: old.updatedAt };
+  const controls = [
+    { ...review, intentId: 'different-body', item: { ...old, content: 'independent edit' } },
+    { ...review, intentId: 'different-reminder', item: { ...old, reminder: '09:00' } },
+    { ...review, intentId: 'pre-edit-timestamp', at: old.updatedAt - 1 },
+    { ...review, intentId: 'newer-manual', at: current.updatedAt + 1 },
+    { ...review, intentId: 'different-rule', item: { ...old, recurrence: { ...old.recurrence, interval: 2 } } },
+    { ...review, intentId: 'future-deadline', item: { ...old, dueDate: '2026-11-25' } },
+    { ...review, intentId: 'recovered-from-disk', fields: ['recovered-disk'] },
+  ];
+  const peer = device(t, server, { state: saved });
+  await peer.replica.preserveLegacyAlternatives([review, ...controls]);
+  assert.equal(peer.conflicts.length, 1 + controls.length, 'do not discard on an unverified cached head');
+  await author.replica.record([change('update', current)]);
+  await until(() => author.saved().cursor === 2);
+  await peer.replica.catchUp();
+  assert.deepEqual(peer.conflicts.map(({ intentId }) => intentId), controls.map(({ intentId }) => intentId));
+  const journal = loadNoteJournal({ version: 1, room, generation, journal: peer.saved() }, room, generation);
+  assert.equal(journal.confirmed[base.id].item.dueDate, current.dueDate);
+  assert.equal(journal.pending.length, 0);
+  assert.equal(server.sends(), 2);
+});
+
+test('recorded overdue rollovers are not conflicting manual deadline edits after restart', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('daily-rollover', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily' } });
+  const manual = { ...base, id: 'manual-deadline' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base), change('create', manual)]);
+  await until(() => author.saved()?.cursor === 2);
+  const offline = device(t, server, { state: author.saved() });
+  const yesterday = '2026-11-23', today = '2026-11-24';
+  await offline.replica.record([
+    { ...change('update', { ...base, dueDate: yesterday }), previous: base, rollover: true },
+    { ...change('update', { ...manual, dueDate: yesterday }), previous: manual, origin: { revision: 2 } },
+  ]);
+  const journal = loadNoteJournal(JSON.parse(JSON.stringify({ version: 1, room, generation, journal: offline.saved() })), room, generation);
+  assert.deepEqual(journal.pending.map(({ rollover }) => rollover), [true, undefined]);
+  assert.equal(journal.pending[0].provenBase, true, 'a cold snapshot exactly matching the journal is a valid rollover base');
+  offline.stop();
+  await author.replica.record([
+    change('update', { ...base, dueDate: today, content: 'independent online edit' }),
+    change('update', { ...manual, dueDate: today }),
+  ]);
+  await until(() => author.saved()?.cursor === 4);
+  server.prune();
+  const peer = device(t, server, { state: journal });
+  await peer.replica.catchUp();
+  await until(() => !peer.replica.pendingCount);
+  assert.deepEqual(peer.conflicts.map(({ noteId, fields }) => [noteId, fields]), [[manual.id, ['dueDate']]]);
+  assert.equal(peer.local.get(base.id).dueDate, today);
+  assert.equal(peer.local.get(base.id).content, 'independent online edit');
+  assert.equal(server.events.length, 4);
+});
+
+test('a user edit queued behind a rollover still merges after the relay advances the deadline', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('rollover-with-edit', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily' } });
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const offline = device(t, server, { state: author.saved() });
+  const rolled = { ...base, dueDate: '2026-11-23' };
+  await offline.replica.record([
+    { ...change('update', rolled), intentId: 'rollover', previous: base, rollover: true },
+    { ...change('update', { ...rolled, title: 'my independent edit' }), previous: rolled, origin: { intentId: 'rollover' } },
+  ]);
+  const journal = offline.saved();
+  offline.stop();
+  await author.replica.record([change('update', { ...base, dueDate: '2026-11-24', tags: ['other device'] })]);
+  await until(() => author.saved().cursor === 2);
+  const receiver = device(t, server, { state: journal });
+  await receiver.replica.catchUp();
+  await until(() => !receiver.replica.pendingCount && receiver.saved()?.cursor === 3);
+  assert.deepEqual(receiver.conflicts, []);
+  assert.equal(receiver.local.get(base.id).dueDate, '2026-11-24');
+  assert.equal(receiver.local.get(base.id).title, 'my independent edit');
+  assert.deepEqual(receiver.local.get(base.id).tags, ['other device']);
+});
+
+test('a cold disk edit already present at a continuous relay head does not archive a duplicate', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('cold-same');
+  const edited = { ...base, content: 'already present on both devices' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const reader = device(t, server, { state: author.saved() });
+  await reader.replica.captureColdNoteEdits(async () => [{ item: edited }]);
+  assert.equal(reader.saved().pending[0].source, 'cold-recovery');
+  await author.replica.record([change('update', edited)]);
+  await until(() => author.saved().cursor === 2);
+  await reader.replica.catchUp();
+  await until(() => !reader.replica.pendingCount);
+  assert.deepEqual(reader.conflicts, []);
+  assert.equal(reader.local.get(base.id).content, edited.content);
+  assert.equal(server.sends(), 2);
+});
+
+test('a restored identical note does not clear an older cold disk intent', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('cold-restored');
+  const edited = { ...base, content: 'same text in a different lifecycle' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const reader = device(t, server, { state: author.saved() });
+  await reader.replica.captureColdNoteEdits(async () => [{ item: edited }]);
+  await author.replica.record([{ id: base.id, kind: 'delete', item: null }]);
+  await until(() => author.saved().cursor === 2);
+  await author.replica.record([change('restore', edited)]);
+  await until(() => author.saved().cursor === 3);
+  await reader.replica.catchUp();
+  await until(() => !reader.replica.pendingCount);
+  assert.deepEqual(reader.conflicts.map(({ item, fields }) => [item.content, fields]), [[edited.content, ['update']]]);
+  assert.equal(server.sends(), 3);
+});
+
+test('empty selectedFields without content is rejected', async (t) => {
+  const server = relay();
+  const base = note('empty-fields-test');
+  const conflictEntry = { intentId: 'emp', noteId: base.id, kind: 'create', revision: 0,
+    item: base, fields: ['update'], at: Date.now() };
+  const peer = device(t, server, {
+    state: { cursor: 0, confirmed: {}, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 0, undefined, []), /нельзя выбрать отдельные поля/);
+});
+
+test('selectedFields with explicit content and empty array works', async (t) => {
+  const server = relay();
+  const base = note('content-plus');
+  const head = { ...base, content: 'relay text' };
+  const conflictEntry = { intentId: 'cp', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, title: 'local title' }, fields: ['title', 'content'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  // Empty fields + content — content replaces, no field-level merge needed
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, 'my new text', []);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.pending.length, 1);
+  const item = savedJournal.pending[0].item;
+  assert.ok(item && typeof item === 'object' && !Array.isArray(item));
+  assert.equal(item.content, 'my new text');
+});
+
+test('structurally blocked field (type) requires full item replacement', async (t) => {
+  const server = relay();
+  const base = note('type-block');
+  const head = { ...base, type: 'article' };
+  const conflictEntry = { intentId: 'type-blk', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, type: 'task' }, fields: ['type'], at: Date.now() };
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  // Type is in rejectable set — can't change type via selectedFields alone
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['type']), /Неприменимые поля/);
 });

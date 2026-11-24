@@ -202,7 +202,7 @@ export class VaultFiles {
           if (move.status === 'blocked') {
             fsLog.warn('Could not complete interrupted note move', { reason: move.reason });
             await durableVaultReplace(`${dir}/recovery-local-only.json`, '{"version":1,"reason":"note-move"}');
-            result = { kind: 'local-only', state: result.state, fence: result.fence };
+            result = { kind: 'local-only', state: result.state, reason: 'note-move', fence: result.fence };
           }
         }
         return result;
@@ -654,6 +654,10 @@ export class VaultFiles {
 
   public async readProjectionCopies(vault: VaultMeta, ids: Set<string>): Promise<SlagItem[]> {
     return (await this.scanNotesDir(this.getVaultNotesPath(vault), vault, true)).filter(({ id }) => ids.has(id));
+  }
+
+  public readRecoveryNoteCopies(vault: VaultMeta): Promise<SlagItem[]> {
+    return this.scanNotesDir(this.getVaultNotesPath(vault), vault, true, new Map());
   }
 
   public async readRegistryNoteCopies(vault: VaultMeta, ids: Set<string>) {

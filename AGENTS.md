@@ -71,8 +71,10 @@ docs/project-map/  база знаний проекта, 15 документов
 
 | задача | начинать с |
 |---|---|
-| синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
+| синхронизация: соединение и доставка | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
 | Android: настройка синхронизации в фоне и диагностика догона | `src/lib/sync/androidBackgroundPreference.ts`, `src/components/Settings/SyncSettingsTab.tsx`, [замеры на телефоне](docs/android-background-sync.md), [изолированный APK и релей](docs/note-registry-staging.md#изолированная-проверка-android) |
+| разбор правок и конфликтов | `src/lib/sync/notes/review.ts` — выбор и проверка свойств; `src/components/Settings/sync/` — список и сравнение |
+| отчёт синка этого устройства | `src/lib/sync/diagnostics.ts` и `src/components/Settings/vault/integrity/VaultHealthReport.tsx` |
 | эталон заметок: операции, квитанции, слияние и восстановление | `src/lib/sync/notes/`: `session.ts` — режим комнаты, `replica.ts` — доставка, `journal.ts` — намерения, `reconcile.ts` — решение CAS и проверка непрерывности, `merge.ts` и `mergeValidation.ts` — слияние и проверка результата, `bootstrap.ts` — миграция |
 | эхо записи на диск и семантика Markdown | `src/lib/storage/noteDiskProjection.ts`, `src/lib/vault/noteSemantics.ts`, `src/lib/vault/markdownSerializer.ts`; построчное слияние — `src/lib/text/mergeMarkdown.ts` |
 | загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
@@ -90,6 +92,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | папка: создать, переименовать, описать, удалить | `src/context/hooks/useFolderAdmin.ts`, `src/lib/storage/folderStore.ts` |
 | хранилище: переключить, создать, удалить | `src/context/hooks/useVaults.ts`, `src/lib/storage/vaultRegistry.ts` |
 | самовосстановление при открытии, незавершённый перенос, фиксация на диске | `src/lib/storage/vaultRecovery.ts`, `vaultNoteMove.ts`, `src/lib/platform/durableVaultFile.ts`, `src-tauri/src/durable_file.rs` |
+| новая копия той же комнаты после потери старой очереди | `src/lib/sync/recoveredVault.ts`, `notes/recoveryJournal.ts`, `vaultSyncFiles.ts` |
 | корзина | `src/lib/storage/trashStore.ts` |
 | проверка и чистка хранилища: манифест, находки, ремонт | `src/lib/vault/integrity/`, `src/lib/storage/integrityService.ts`, `scripts/vault-doctor.mjs`, `src/components/Settings/vault/integrity/` |
 | первое открытие редактора и черновики | `src/App.tsx` загружает модуль по запросу; `src/components/Editor/FullscreenEditor.tsx`, `useFullscreenDraft.ts`; замер `scripts/bench/startup-input.mjs` |
@@ -116,7 +119,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | модель данных и frontmatter | `docs/project-map/02_Data_Model_Obsidian_Vault.md` |
 | ИИ, теги, триаж | `docs/project-map/03_AI_Engine_Zero_Slop_Gemini.md`, раздел 6 — память ассистента |
 | поиск Orama | `docs/project-map/05_Search_Orama_Local_First.md` |
-| синхронизация | `docs/sync-architecture.md` |
+| синхронизация | [схема синка, слияния и конфликтов](docs/sync-engine-map.md), [контракт](docs/sync-architecture.md) |
 | сборки | `BUILD.md` |
 | MCP | `docs/mcp-guide.md` |
 

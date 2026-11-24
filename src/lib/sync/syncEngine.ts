@@ -1,13 +1,18 @@
 // Owns sync: config, push of local changes, apply of incoming bundles, status reporting.
 import { vault } from '../storage/port';
 import { openNoteSession } from './notes/session';
+import { readRecoveryRegistry } from './notes/recoveryJournal';
+import { reviewCounts } from './syncReviewCounts';
+import { needsReviewedHead, noteReviewKind } from './notes/review';
 import { isLegacySharedKind } from './notes/sharedBody';
+import { LEGACY_CUTOVER, LegacyCutoverBlocked, prepareLegacyCutover } from './notes/legacyCutover';
 import { persistIncomingBundle } from './applyBundle';
 import { pushLocalChanges } from './pushBundle';
 import { attachmentSignature } from './attachmentSignature';
 import { apiBase } from './apiBase';
 import {
   loadSentHashes,
+  requireOutboxFlushed,
   loadCursor,
   saveCursor,
   saveSentHashes,
@@ -60,9 +65,9 @@ import {
   setVaultSeedPhrase,
 } from './syncConfig';
 import {
-  computeHash,
   deriveVaultKey,
   deriveRoomId,
+  deriveAccountRoomId,
   generateMnemonic,
 } from './crypto';
 import type {
@@ -123,6 +128,12 @@ export class SyncEngine {
   private noteAbort?: AbortController;
   private noteSession: Awaited<ReturnType<typeof openNoteSession>> = null;
   private noteRoomStatus?: import('./notes/wire').NoteStatus;
+  private registryOnly = false;
+  private lastRelayResponseAt: string | null = null;
+  private recovery: NonNullable<SyncStatus['diagnostics']>['recovery'] = null;
+  private checkedRegistry: (ReturnType<typeof reviewCounts> & { cursor: number }) | null = null;
+
+  public get usesLegacyBundles() { return !this.registryOnly; }
 
   getNoteRoomStatus() { return this.noteRoomStatus; }
   private noteError: string | null = null;
@@ -292,6 +303,7 @@ export class SyncEngine {
         this.wsSupportsBinary = supported;
       },
       onPing: (pingMs) => {
+        this.lastRelayResponseAt = new Date().toISOString();
         this.status.pingMs = pingMs;
         this.notify();
       },
@@ -299,7 +311,10 @@ export class SyncEngine {
         const pending = this.pendingPushes.get(bundleId);
         if (pending && this.canUseVaultRelay()) this.commitPush(pending);
       },
-      onNoteMessage: (message) => this.noteSession?.replica.handleMessage(message),
+      onNoteMessage: (message) => {
+        this.lastRelayResponseAt = new Date().toISOString();
+        this.noteSession?.replica.handleMessage(message);
+      },
       onRoomModeChanged: () => {
         if (this.isRelayPaused) this.recheckRoomMode = true;
         else void this.init();
@@ -380,7 +395,9 @@ export class SyncEngine {
       // and the two devices would ping-pong the same bundle forever.
       if (event.origin === 'remote' || (event.kind === 'item' && event.pendingDisk) || (isTauri() && !this.canUseVaultRelay())) return;
       if (this.hasFolderTreeRegistry && event.kind === 'folder') return;
-      if (this.hasSharedRegistry && isLegacySharedKind(event.kind)) return;
+      // A legacy draft may finish its disk write after the registry subscribed. Only writes
+      // explicitly produced by the registry have already reached its journal.
+      if (this.hasSharedRegistry && isLegacySharedKind(event.kind) && (event.kind !== 'draft' || event.registry)) return;
       if (this.noteSession && (event.kind === 'item' || event.kind === 'trash')) {
         if (event.origin === 'external' && event.kind === 'item') {
           void this.noteSession.replica.recordExternal(event).catch((error: unknown) => this.reportNoteError(error));
@@ -389,12 +406,12 @@ export class SyncEngine {
         }
         return;
       }
-      if (event.origin === 'external') return;
+      if (event.origin === 'external' || !this.usesLegacyBundles) return;
       const op = createSyncOpFromStorageEvent(event);
       if (op) {
         syncLog.info(`Enqueued outbox op: [${op.kind}:${op.id}] action=${op.action}`);
         this.getOutbox().enqueue(op);
-        if (op.kind === 'item' || op.kind === 'trash') this.notify();
+        this.notify();
         // A draft changes on every keystroke; only notes/folders/workspace drive the fast path.
         const isDraft = op.kind === 'draft';
         this.scheduleDebouncedPush(
@@ -431,17 +448,19 @@ export class SyncEngine {
   }
 
   public getNoteConflicts() {
-    const replica = this.noteSession?.replica;
-    return replica?.conflicts.map((entry) => {
-      const current = replica.confirmedValue(entry.noteId);
-      return { ...entry, currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
-    }) ?? [];
+    const session = this.noteSession;
+    if (!session) return [];
+    return session.replica.conflicts.filter(({ fields }) => !needsReviewedHead(fields) || session.canReviewCutover)
+      .map((entry) => {
+        const current = session.replica.confirmedValue(entry.noteId);
+        return { ...entry, reviewKind: noteReviewKind(entry.fields), currentRevision: current?.revision ?? 0, currentItem: current?.item ?? null };
+      });
   }
 
-  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string) {
+  public async resolveNoteConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string, selectedFields?: readonly string[]) {
     const replica = this.noteSession?.replica;
     if (!replica) throw new Error('Реестр синхронизации недоступен');
-    await replica.resolveConflict(intentId, resolution, reviewedRevision, content);
+    await replica.resolveConflict(intentId, resolution, reviewedRevision, content, selectedFields);
   }
 
   public async resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>) {
@@ -453,19 +472,34 @@ export class SyncEngine {
   public getStatus(): SyncStatus {
     const manifest = this.status.manifest;
     const registry = this.noteSession?.replica;
-    const pendingCount = registry ? registry.pendingCount + this.getOutbox().pending().length : this.status.pendingCount;
+    const legacyPending = this.canUseVaultRelay() && this.usesLegacyBundles ? this.getOutbox().pending().length : null;
+    const pendingCount = registry ? registry.pendingCount + (legacyPending ?? 0) : this.status.pendingCount;
     const error = this.status.error ?? this.noteError;
     const state = registry && this.status.state === 'connected'
       ? registry.syncHealth === 'error' || error ? 'error'
         : !this.activeRoomId || !this.transport.isOpenFor(this.activeRoomId) ? 'offline'
         : registry.syncHealth !== 'current' || pendingCount || this.pendingPushes.size ? 'syncing' : 'connected'
       : this.status.state;
+    const counts = registry ? reviewCounts(registry) : this.checkedRegistry;
+    const registryProgress = this.noteSession?.progress;
     return {
       ...this.status,
       state,
       error,
       pendingCount,
-      registry: this.noteSession?.progress,
+      diagnostics: {
+        lastRelayResponseAt: this.lastRelayResponseAt,
+        legacyPending,
+        registryPending: counts?.registryPending ?? null,
+        legacyReviews: counts?.legacyReviews ?? null,
+        reviews: counts?.reviews ?? null,
+        conflicts: counts?.conflicts ?? null,
+        recovery: this.recovery,
+        relayHead: registryProgress?.relayHead ?? null,
+        appliedThrough: registryProgress?.appliedThrough ?? this.checkedRegistry?.cursor ?? null,
+        registryOnly: this.registryOnly,
+      },
+      registry: registryProgress,
       initialSync: { ...this.status.initialSync },
       subscription: computeSubscription(this),
       // Copied like the fields above: the panel holds this object, and a status the engine keeps
@@ -1008,6 +1042,8 @@ export class SyncEngine {
         if (meta.id !== vaultId) return false;
         const existing = await readProtectedSyncState(dir, vaultId);
         protectedBinding = !!existing.ledger && !!existing.config;
+        this.registryOnly = existing.config?.registryOnly === true;
+        if (this.registryOnly && !protectedBinding) throw new Error('Не завершено подключение восстановленного реестра');
         syncId = typeof existing.config?.syncId === 'string' ? existing.config.syncId : meta.syncId;
         if (existing.config?.syncId && meta.syncId && existing.config.syncId !== meta.syncId) throw new Error('Изменилась привязка хранилища');
         syncStore = this.syncSectionStore(vaultId);
@@ -1182,9 +1218,16 @@ export class SyncEngine {
     const generation = this.initGeneration;
     const startedAt = performance.now();
     const read = isTauri() ? storage.getCurrentVaultRead() : undefined;
-    const recovery = isTauri() ? await storage.getCurrentVaultRecovery() : { kind: 'ready', fresh: false };
+    const recovery = isTauri() ? await storage.getCurrentVaultRecovery() : { kind: 'ready' as const, fresh: false };
     if (generation !== this.initGeneration || (read && (storage.getCurrentVaultRead() !== read || storage.getCurrentVault().id !== this.currentVaultId))) return;
+    this.recovery = recovery.kind === 'local-only' ? recovery.reason : recovery.kind;
     if (recovery.kind !== 'ready') {
+      this.checkedRegistry = recovery.kind === 'local-only' ? await storage.readNoteRegistry().then((stored) => {
+        if (!stored || typeof stored !== 'object' || !('room' in stored) || typeof stored.room !== 'string') return null;
+        const { journal } = readRecoveryRegistry(stored as Record<string, unknown>, stored.room);
+        return { ...reviewCounts(journal), cursor: journal.cursor };
+      }).catch(() => null) : null;
+      if (generation !== this.initGeneration) return;
       this.status.initialSync = { vaultId: this.currentVaultId, state: 'idle', processed: 0, rejected: 0 };
       this.status.state = 'error';
       this.status.error = 'Синхронизация приостановлена: состояние очереди не подтверждено.';
@@ -1218,12 +1261,12 @@ export class SyncEngine {
       this.notify();
 
       const port = vault();
+      const localVaultId = this.currentVaultId;
       const serverUrl = apiBase(this.config.serverUrl);
       const vaultId = this.validatedSyncId ?? port.getCurrentVault().syncId;
       const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
       if (generation !== this.initGeneration || !this.canUseVaultRelay()) return;
-      const accountRoom = async (id: string) =>
-        `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', id, legacyRoomId]))).slice(0, 32)}`;
+      const accountRoom = (id: string) => deriveAccountRoomId(id, legacyRoomId);
       const controller = this.noteAbort = new AbortController();
       const current = () => generation === this.initGeneration && this.canUseVaultRelay();
       this.transport.setPaused(this.isRelayPaused);
@@ -1242,8 +1285,14 @@ export class SyncEngine {
         isLiveOpen: () => this.transport.isOpenFor(roomId),
         isRelayPaused: () => this.isRelayPaused,
         onDeliveryChange: () => this.notify(),
-        onStatus: (status) => { if (generation === this.initGeneration) { this.noteRoomStatus = status; this.notify(); } },
+        onStatus: (status) => {
+          if (generation !== this.initGeneration) return;
+          this.noteRoomStatus = status;
+          if (status.mode !== 'legacy') this.lastRelayResponseAt = new Date().toISOString();
+          this.notify();
+        },
         log: (event, data, warning) => warning ? syncLog.warn(event, data) : syncLog.debug(event, data),
+        onRelayResponse: () => { if (generation === this.initGeneration) this.lastRelayResponseAt = new Date().toISOString(); },
         onError: (error: unknown) => this.reportNoteError(error), onProgress: () => {
           if (controller.signal.aborted) return;
           if (this.noteSession?.replica.syncHealth === 'current') this.noteError = null;
@@ -1260,9 +1309,29 @@ export class SyncEngine {
             }).catch((error: unknown) => syncLog.warn('Registry attachment lookup failed', error));
           }
         },
-        hasPendingLegacyNotes: (folderTree: boolean, sharedRecords?: boolean) => this.getOutbox().pending().some(({ kind }) =>
-           kind === 'item' || kind === 'trash' || (folderTree && kind === 'folder')
-           || (sharedRecords === true && isLegacySharedKind(kind))),
+        migrateLegacy: async (replica, folderTree, sharedRecords, readOnly) => {
+          if (readOnly || !this.usesLegacyBundles) return;
+          const assertScope = () => {
+            controller.signal.throwIfAborted();
+            if (this.currentVaultId !== localVaultId || port.getCurrentVault().id !== localVaultId) {
+              throw new Error('Хранилище сменилось во время переноса очереди');
+            }
+          };
+          if (sharedRecords) await port.flushLegacyDrafts?.();
+          assertScope();
+          const outbox = this.getOutbox();
+          const { alternatives, consumed } = prepareLegacyCutover(outbox.pending(), folderTree, sharedRecords);
+          if (consumed.length) {
+            await replica.preserveLegacyAlternatives(alternatives);
+            assertScope();
+            await outbox.removeTransferred(consumed);
+            assertScope();
+            syncLog.info('Legacy outbox transferred', { operations: consumed.length, alternatives: alternatives.length });
+          } else if (replica.conflicts.some(({ fields }) => fields.includes(LEGACY_CUTOVER))) {
+            // A failed removal can be invisible in memory even though the backend still has it.
+            await requireOutboxFlushed(localVaultId);
+          }
+        },
       });
       if (isTauri()) {
         const registry = await storage.readNoteRegistry();
@@ -1325,15 +1394,19 @@ export class SyncEngine {
       if (this.isRelayPaused && !await waitForRelay()) return;
       const noteSession = this.noteSession ?? (this.usesAccountSync() ? await openNoteSession(noteOptions(roomId, syncVaultId)) : null);
       if (!current()) return;
-      if (this.noteSession) {
-        if (!this.usesAccountSync() || syncVaultId !== vaultId) throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
-        await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
+      if (this.noteSession && (!this.usesAccountSync() || syncVaultId !== vaultId)) {
+        throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
       }
+      if (this.registryOnly && (!noteSession?.registryMedia || !noteSession.folderTree)) {
+        throw new Error('Для восстановленной копии нужен подтверждённый реестр заметок, папок и вложений');
+      }
+      this.noteSession = noteSession;
+      if (this.isRelayPaused && !await waitForRelay()) return;
+      await noteSession?.verifyEnrollment(this.config.localSyncMode === 'receive-only');
       if (!current()) return;
       // Journal edits found on disk before the incoming feed can replace their files.
       await noteSession?.captureColdNoteEdits();
       if (!current()) return;
-      this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
       this.status.currentRoomId = roomId;
@@ -1398,7 +1471,7 @@ export class SyncEngine {
       this.status.state = 'error';
       this.status.error = msg;
       this.notify();
-      this.scheduleRetry();
+      if (!(err instanceof LegacyCutoverBlocked)) this.scheduleRetry();
     } finally {
       initializing = false;
     }
@@ -1413,6 +1486,7 @@ export class SyncEngine {
   }
 
   public async updateSeedPhrase(newPhrase: string): Promise<void> {
+    if (this.registryOnly) throw new Error('Нельзя менять ключ восстановленной копии');
     if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     if (newPhrase !== this.config.seedPhrase) {
       // A new phrase is a new room: the checkpoints of the old one mean nothing there, and a stale
@@ -1426,6 +1500,7 @@ export class SyncEngine {
   }
 
   public async updateServerUrl(url: string): Promise<void> {
+    if (this.registryOnly) throw new Error('Нельзя менять релей восстановленной копии');
     if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     this.saveConfig({ serverUrl: url });
     clearSyncLedgers(this.bookkeeping);
@@ -1455,6 +1530,7 @@ export class SyncEngine {
   private incomingQueue: Promise<void> = Promise.resolve();
 
   private applyIncomingBundle(bundlePayload: unknown): Promise<void> {
+    if (!this.usesLegacyBundles) return Promise.resolve();
     const generation = this.initGeneration;
     const applying = this.incomingQueue.then(async () => {
       if (generation === this.initGeneration && this.canUseVaultRelay()) await persistIncomingBundle(this, bundlePayload);
@@ -1484,6 +1560,7 @@ export class SyncEngine {
       pending.fallbackTimer = null;
     }
     this.pendingPushes.delete(pending.bundleId);
+    this.lastRelayResponseAt = new Date().toISOString();
 
     for (const [key, hash] of Object.entries(pending.packedHashes)) {
       if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
@@ -1623,7 +1700,7 @@ export class SyncEngine {
   }
 
   public fetchPendingBundlesHttp(): Promise<void> {
-    if (this.isRelayPaused || !this.canUseVaultRelay() || !this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
+    if (this.isRelayPaused || !this.usesLegacyBundles || !this.canUseVaultRelay() || !this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
     const generation = this.initGeneration;
     if (this.pendingPull && this.pendingPull.generation === generation) return this.pendingPull.promise;
     const promise = this.pullPendingBundles(generation)
@@ -1672,6 +1749,7 @@ export class SyncEngine {
       const data = await res.json();
       if (generation !== this.initGeneration || !this.canUseVaultRelay()) return null;
       if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
+      this.lastRelayResponseAt = new Date().toISOString();
       return {
         bundles: data.bundles,
         head: typeof data.head === 'number' ? data.head : null,
@@ -1765,6 +1843,12 @@ export class SyncEngine {
     this.noteSession = null;
     this.noteRoomStatus = undefined;
     this.noteError = null;
+    this.registryOnly = false;
+    this.recovery = null;
+    this.checkedRegistry = null;
+    this.lastRelayResponseAt = null;
+    this.status.pingMs = null;
+    this.status.error = null;
     // A retry belongs to the session it was armed in; a vault switch must not inherit it.
     this.clearRetryTimer();
     this.clearPushDebounce();
@@ -1813,6 +1897,7 @@ export class SyncEngine {
   public setDeviceSyncMode(deviceId: string, mode: DeviceSyncMode): void { setDeviceSyncMode(this, deviceId, mode); }
 
   public async rotateVaultKey(): Promise<string> {
+    if (this.registryOnly) throw new Error('Нельзя менять ключ восстановленной копии');
     if (!this.canUseVaultRelay()) throw new Error('Привязка хранилища не проверена');
     if (this.usesAccountSync()) {
       const response = await fetch(`${apiBase(this.config.serverUrl)}/api/vaults/${encodeURIComponent(this.getSyncVaultId())}/rotate`, {

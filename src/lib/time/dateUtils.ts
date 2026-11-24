@@ -3,7 +3,7 @@
  *
  * Что означает `reminder` и как его записать — в `./reminder`, чтобы разбор часа был один.
  */
-import { reminderClock, reminderClockLabel, reminderDay } from './reminder';
+import { reminderClock, reminderClockLabel, reminderDay } from './reminder.ts';
 
 export const RUSSIAN_MONTHS = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',

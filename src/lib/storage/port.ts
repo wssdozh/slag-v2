@@ -66,6 +66,7 @@ export interface VaultPort extends Partial<NoteRegistryStorage> {
   saveFullscreenDraft(itemId: string, draft: FullscreenDraft, origin?: ChangeOrigin): void;
   clearFullscreenDraft(itemId: string, origin?: ChangeOrigin): void;
 
+  flushLegacyDrafts?(): Promise<void>;
   applyAcceptedShared?(body: SharedBody): Promise<void>;
   subscribeSharedIntents?(listener: (changes: () => SharedMutation[], applyLocal: () => Promise<void>) => Promise<void>): () => void;
 

@@ -4,6 +4,7 @@
 import React from 'react';
 import { useIntegrity } from '../../../../hooks/ui/useIntegrity';
 import { IntegrityPanel } from './IntegrityPanel';
+import { VaultHealthReport } from './VaultHealthReport';
 
 export const IntegritySection: React.FC = () => {
   const {
@@ -12,6 +13,7 @@ export const IntegritySection: React.FC = () => {
   } = useIntegrity();
   return (
     <div className="flex flex-col gap-2">
+      <VaultHealthReport diskFindings={status ? findings.length : null} />
       <IntegrityPanel
         status={status}
         findings={findings}

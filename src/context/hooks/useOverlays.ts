@@ -56,9 +56,11 @@ export function useOverlays(initialWorkspace: WorkspaceState) {
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('account');
+  const [requestedVaultHealth, requestVaultHealth] = useState(0);
 
-  const openSettingsModal = useCallback((tab?: SettingsTabId) => {
+  const openSettingsModal = useCallback((tab?: SettingsTabId, integrity?: 'integrity') => {
     if (tab) setSettingsTab(tab);
+    if (tab === 'vault' && integrity) requestVaultHealth((previous) => previous + 1);
     setIsSettingsOpen(true);
   }, []);
 
@@ -183,6 +185,7 @@ export function useOverlays(initialWorkspace: WorkspaceState) {
     settingsTab,
     setSettingsTab,
     openSettingsModal,
+    requestedVaultHealth,
     isLogViewerOpen,
     setIsLogViewerOpen,
     isFolderModalOpen,

@@ -107,6 +107,7 @@ export function loadNoteJournal(value: unknown, room: string, generation: number
         || (kind !== 'create' && kind !== 'update' && kind !== 'delete' && kind !== 'restore')
         || !validItem(item, id) || (kind === 'delete') !== (item === null)
         || (entry.source !== undefined && (typeof entry.source !== 'string' || !['app', 'disk-watch', 'cold-recovery', 'retry'].includes(entry.source)))
+        || (entry.rollover !== undefined && (entry.rollover !== true || kind !== 'update' || entry.source !== 'app' || folderGroup !== undefined))
         || (predecessorConflict !== undefined && (predecessorConflict !== true || predecessor !== undefined || entry.attempt !== undefined))
         || [entry.provenBase, entry.provenPredecessor, entry.unverifiedBase].some((flag) => flag !== undefined && flag !== true)
         || (entry.provenBase !== undefined && entry.base === undefined)

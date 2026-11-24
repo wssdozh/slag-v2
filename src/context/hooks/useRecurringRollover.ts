@@ -25,7 +25,7 @@ export function useRecurringRollover(
       try {
         const { changedItems } = evaluateRecurringTasks(storage.getItems());
         if (changedItems.length) {
-          storage.saveItems(changedItems);
+          storage.saveItems(changedItems, 'local', { rollover: true });
           appLog.info('Recurring tasks rolled over', { changedCount: changedItems.length });
         }
         setReadyRead(read);

@@ -11,6 +11,9 @@ test('two browser vaults receive accepted notes through the registry, not legacy
   let holdHealth = false;
   let releaseHealth = () => {};
   const pendingHealth = new Promise<void>((resolve) => { releaseHealth = resolve; });
+  const cutoverStatus = Promise.withResolvers<void>();
+  const allowCutover = Promise.withResolvers<void>();
+  let holdStatus = false;
   try {
     for (const view of [page, second]) {
       await view.route(`${serverUrl}/**`, async (route) => {
@@ -18,6 +21,10 @@ test('two browser vaults receive accepted notes through the registry, not legacy
         const headers = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
         if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers });
         if (view === page && url.pathname === '/health' && holdHealth) await pendingHealth;
+        if (view === page && holdStatus && url.pathname.endsWith('/note-status')) {
+          cutoverStatus.resolve();
+          await allowCutover.promise;
+        }
         if (url.pathname.endsWith('/note-status')) return route.fulfill({ headers, json: {
           mode: registryActive ? 'registry' : 'legacy', generation: Number(registryActive), head: events.length, floor: 0,
         } });
@@ -66,6 +73,8 @@ test('two browser vaults receive accepted notes through the registry, not legacy
       await view.evaluate(async ({ i, serverUrl }) => {
         const { initSecretStore } = await import(/* @vite-ignore */ '/src/lib/platform/secretStore.ts');
         await initSecretStore();
+        const { initPrefs } = await import(/* @vite-ignore */ '/src/lib/storage/prefs.ts');
+        await initPrefs();
         const { syncEngine, storage, accountClient } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
         const vault = storage.getCurrentVault();
         vault.syncId = 'registry-e2e-vault';
@@ -98,10 +107,34 @@ test('two browser vaults receive accepted notes through the registry, not legacy
           const afterShared = pending();
           await storage.saveWorkspaceState({ sortOrder: 'asc' });
           if (pending() !== afterShared) throw new Error('Device-only write replaced a pending shared intent');
-          outbox.clear(); // This fixture explicitly discards its synthetic edit before cutover.
-          await syncEngine.retrySync();
-          if (syncEngine.noteGeneration !== 1) throw new Error(syncEngine.getStatus().error ?? 'refresh did not renegotiate registry');
+          outbox.clear(); // Workspace remains on the bundle protocol in this fixture.
         });
+        holdStatus = true;
+        const refreshing = page.evaluate(async () => {
+          const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+          await syncEngine.retrySync();
+          if (syncEngine.noteGeneration !== 1 || syncEngine.getStatus().error) throw new Error(syncEngine.getStatus().error ?? 'refresh did not renegotiate registry');
+        });
+        try {
+          await cutoverStatus.promise;
+          await page.evaluate(async () => {
+            const { syncEngine, storage } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+            storage.saveItem({ id: 'during-cutover', type: 'note', title: 'During cutover', content: 'local only',
+              folder: 'Входящие', createdAt: 1, updatedAt: 1, tags: [], attachments: [] });
+            if (!syncEngine.getOutbox().pending().some(({ id }) => id === 'during-cutover')) {
+              throw new Error('a write while protocol is unknown must stay durable');
+            }
+          });
+        } finally {
+          holdStatus = false;
+          allowCutover.resolve();
+        }
+        await refreshing;
+        expect(await page.evaluate(async () => {
+          const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
+          return { outbox: syncEngine.getOutbox().pending(), review: syncEngine.getNoteConflicts().map(({ noteId, fields }) => ({ noteId, fields })) };
+        })).toEqual({ outbox: [], review: [{ noteId: 'during-cutover', fields: ['legacy-cutover'] }] });
+        expect(events).toHaveLength(0);
         expect(upgrades).toBe(1);
       }
     }
