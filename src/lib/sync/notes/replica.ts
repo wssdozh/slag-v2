@@ -114,7 +114,7 @@ export class NoteReplica {
   noteRelayHead(revision: number) { this.observe(revision); }
 
   get syncHealth(): 'error' | 'syncing' | 'current' {
-    if (this.journalFailed || this.projectionFailed || this.failedIntents.size || this.conflicts.length) return 'error';
+    if (this.journalFailed || this.projectionFailed || this.failedIntents.size) return 'error';
     return this.ready && !this.needsFeed && !this.pendingCount ? 'current' : 'syncing';
   }
 
@@ -182,7 +182,16 @@ export class NoteReplica {
     });
   }
 
-  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string): Promise<void> {
+  /**
+   * Resolve a single-note conflict with optional field-level granularity.
+   * When `selectedFields` is provided (may be [] only if `content` is also given),
+   * apply ONLY the chosen differing writable properties to the confirmed head,
+   * preserving unrelated fields that changed on the relay side.
+   */
+  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number,
+    content?: string, selectedFields?: readonly string[]): Promise<void>;
+  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number,
+    content?: string, selectedFields?: readonly string[]): Promise<void> {
     return this.enqueue(async () => {
       const conflict = this.conflicts.find((entry) => entry.intentId === intentId);
       if (!conflict) throw new Error('Конфликт уже разобран');
@@ -203,15 +212,68 @@ export class NoteReplica {
         if (this.host.readOnly) throw new Error('На этом устройстве запись отключена');
         const kind = conflict.item === null ? (current?.item ? 'delete' : null)
           : !current ? 'create' : current.item === null ? 'restore' : 'update';
-        let item = conflict.item;
-        if (content !== undefined) {
-          if (!isNoteItem(item)) throw new Error('У этого конфликта нельзя изменить текст');
-          item = { ...item, content };
+        // Field-level selective merge — apply only chosen properties to the confirmed head
+        if (selectedFields !== undefined) {
+          // selectedFields may be [] only when content is explicitly provided
+          if (!selectedFields.length && content === undefined) {
+            throw new Error('Полная замена без содержимого недопустима');
+          }
+          if (!isNoteItem(conflict.item)) throw new Error('У этого конфликта нельзя выбрать поля');
+          // Determine which of the selected fields actually differ between local and head
+          const diffs = noteDifferences(conflict.item, (current?.item ?? { id: conflict.noteId, type: 'note', title: '', content: '',
+            folder: '', attachments: [], tags: [] as string[], createdAt: 0, updatedAt: 0 }) as SlagItem);
+          const applicable = new Set(diffs);
+          // Reject fields that were not changed locally or are transport-only / structural
+          const rejectable = new Set(['id', 'type', 'folder', 'attachments']);
+          const rejected: string[] = [];
+          for (const field of selectedFields) {
+            if (!applicable.has(field)) {
+              rejected.push(field);
+            } else if (rejectable.has(field) && !content) {
+              // Structural fields require the full item or explicit content replacement
+              rejected.push(field);
+            }
+          }
+          if (rejected.length) {
+            throw new Error(`Неприменимые поля исключены из применения: ${rejected.join(', ')}`);
+          }
+          // Build merged item: start from head so all its properties survive, then overlay
+          // only the validated differing properties from the local conflict item
+          const headItem = current?.item as SlagItem;
+          if (!headItem || Array.isArray(headItem) || 'shared' in headItem) {
+            throw new Error('Head must be a note item for field-level merge');
+          }
+          const merged = { ...headItem };
+          for (const field of selectedFields) {
+            if (applicable.has(field)) {
+              const iVal = (conflict.item as unknown as Record<string, unknown>)[field];
+              if (iVal !== undefined) {
+                (merged as unknown as Record<string, unknown>)[field] = iVal;
+              } else {
+                const hVal = (headItem as unknown as Record<string, unknown>)[field];
+                if (hVal !== undefined) {
+                  (merged as unknown as Record<string, unknown>)[field] = hVal;
+                }
+              }
+            }
+          }
+          if (content !== undefined) {
+            (merged as unknown as Record<string, unknown>).content = content;
+          }
+          next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind: kind!, item: merged, source: 'retry' });
+        } else {
+          if (content !== undefined) {
+            // Legacy path without selectedFields — existing behavior
+            if (!isNoteItem(conflict.item)) throw new Error('У этого конфликта нельзя изменить текст');
+            const item = { ...conflict.item, content };
+            if (kind) next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind, item, source: 'retry' });
+          } else {
+            if (kind) next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind, item: conflict.item, source: 'retry' });
+          }
         }
-        if (kind) next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind, item, source: 'retry' });
       }
       await this.persist({ ...next, conflicts: this.conflicts.filter((entry) => entry !== conflict) });
-      this.host.log?.('Note conflict resolved', { generation: this.host.generation, intentId, revision: reviewedRevision, resolution, retryIntentId });
+      this.host.log?.('Note conflict resolved', { generation: this.host.generation, intentId, revision: reviewedRevision, resolution, retryIntentId, selectedFields });
       this.schedule();
     });
   }

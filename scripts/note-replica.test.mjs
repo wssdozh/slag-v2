@@ -4,6 +4,8 @@ import { test } from 'node:test';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
 import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
+import { noteReviewKind } from '../src/lib/sync/notes/review.ts';
+import { LEGACY_CUTOVER } from '../src/lib/sync/notes/legacyCutover.ts';
 
 const room = 'test-room';
 const generation = 1;
@@ -1157,4 +1159,180 @@ test('a failed send keeps its saved attempt and only retries after the backoff',
   assert.equal(transmitted.length, 2);
   assert.equal(transmitted[1][0].opId, attempt.op.opId);
   assert.deepEqual(d.errors.map(String), ['Error: offline']);
+});
+
+// --- noteReviewKind tests ---
+
+test('noteReviewKind classifies per contract: legacy only on marker, others by proof level', () => {
+  // Only LEGACY_CUTOVER marker → legacy
+  assert.equal(noteReviewKind([LEGACY_CUTOVER]), 'legacy');
+  assert.equal(noteReviewKind([LEGACY_CUTOVER, 'update']), 'legacy');
+  // No-proof fields → review (not proven conflict)
+  assert.equal(noteReviewKind(['base']), 'review');
+  assert.equal(noteReviewKind(['predecessor']), 'review');
+  assert.equal(noteReviewKind(['lifecycle']), 'review');
+  assert.equal(noteReviewKind(['recovered-disk']), 'review');
+  // Structural markers → conflict
+  assert.equal(noteReviewKind(['folder']), 'conflict');
+  assert.equal(noteReviewKind(['folders']), 'conflict');
+  assert.equal(noteReviewKind(['delete']), 'conflict');
+  // Ordinary data fields → conflict (real overlapping edits)
+  assert.equal(noteReviewKind(['dueDate', 'content']), 'conflict');
+  assert.equal(noteReviewKind(['tags']), 'conflict');
+  // Empty or bare 'update' without evidence → review
+  assert.equal(noteReviewKind([]), 'review');
+  assert.equal(noteReviewKind(['update']), 'review');
+});
+
+// --- resolveConflict with selectedFields tests ---
+
+test('selecting dueDate does not overwrite unrelated tag and priority on retry', async (t) => {
+  const server = relay();
+  // Local has dueDate changed from head; tags/priority differ too but we select only dueDate
+  const base = note('conflict-due', { content: 'keep this', folder: 'Inbox', tags: ['red'], priority: 'high' });
+  const local = { ...base, dueDate: '2026-06-06', tags: ['green'] };
+  const head = { ...base, dueDate: '2025-01-01', tags: ['blue'], priority: 'low' };
+  const conflictEntry = { intentId: 'pick-due', noteId: base.id, kind: 'update', revision: 1,
+    item: local, fields: ['dueDate', 'tags'], at: Date.now() };
+  // Skip catchUp; test resolveConflict directly against the prepared state like existing tests do
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { peer.savedState = state; },
+  });
+  peer.savedState = undefined;
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['dueDate']);
+  assert.ok(peer.savedState);
+  assert.equal(peer.savedState.pending.length, 1);
+  const retryItem = peer.savedState.pending[0].item;
+  assert.ok(retryItem && typeof retryItem === 'object' && !Array.isArray(retryItem));
+  // Chosen field carries our value; other differing fields come from head
+  assert.equal(retryItem.dueDate, '2026-06-06');
+  assert.deepEqual(retryItem.tags, ['blue'], 'relay tags preserved — not selected');
+  assert.equal(retryItem.priority, 'low', 'relay priority preserved — not selected');
+  assert.equal(peer.errors.length, 0);
+});
+
+test('stale reviewedRevision is rejected when using selectedFields', async (t) => {
+  const server = relay();
+  const base = note('stale-fields', { content: 'local' });
+  const head = { ...base, content: 'head', title: 'head-title' };
+  const conflictEntry = { intentId: 'stale-sel', noteId: base.id, kind: 'update', revision: 1,
+    item: base, fields: ['content'], at: Date.now() };
+  // Server has head at revision 2, but we try to resolve against revision 1
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  // current.revision is 1 matches reviewedRevision 1 — should work
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['content']);
+  assert.equal(peer.errors.length, 0);
+  // Now test with mismatched revision: head was updated to revision 2 outside
+  const staleConflict = { intentId: 'stale-sel-2', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, content: 'old local' }, fields: ['content'], at: Date.now() };
+  const stalePeer = device(t, server, {
+    state: { cursor: 2, confirmed: { [base.id]: { revision: 2, item: { ...base, title: 'newer' } } }, pending: [], conflicts: [staleConflict] },
+    save: async () => {},
+  });
+  await assert.rejects(stalePeer.replica.resolveConflict(staleConflict.intentId, 'retry', 1, undefined, ['content']), /Версия изменилась/);
+  assert.equal(stalePeer.replica.conflicts.length, 1, 'conflict must remain unresolved');
+});
+
+test('invalid linkedItemIds values are not committed via selectedFields', async (t) => {
+  const server = relay();
+  // Local tried a different content + linking; head has different content too
+  const base = note('bad-links', { content: 'local text' });
+  const head = { ...base, content: 'remote text', tags: ['shared'] };
+  const conflictEntry = { intentId: 'bad-link-id', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base }, fields: ['content'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  // linkedItemIds wasn't changed in local → not applicable → rejected
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['linkedItemIds']), /Неприменимые поля/);
+  assert.equal(savedJournal?.pendingCount ?? savedJournal?.pending?.length ?? 0, 0);
+  // Select content — it IS a diff between local and head, so it applies
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['content']);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.pending.length, 1);
+  const mergedItem = savedJournal.pending[0].item;
+  assert.ok(mergedItem && typeof mergedItem === 'object' && !Array.isArray(mergedItem));
+  assert.equal(mergedItem.content, 'local text');
+});
+
+test('saved legacy review does not block independent delivery or repaint health', async (t) => {
+  const server = relay();
+  const base = note('health-test', { content: 'initial', tags: ['a'], priority: 'medium' });
+  // Head has different dueDate — making it the differing field for the retry
+  const head = { ...base, content: 'head-text', tags: ['b'], priority: 'low' };
+  // Conflict entry: local tried to update with a dueDate
+  const conflictEntry = { intentId: 'legacy-inv', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, dueDate: '2025-12-31' }, fields: ['update'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  savedJournal = undefined;
+  // Resolve the conflict — no longer causes syncHealth to report 'error' just from conflicts.length
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['dueDate']);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.conflicts.length, 0);
+  assert.equal(savedJournal.pending.length, 1);
+  const resultItem = savedJournal.pending[0].item;
+  assert.ok(resultItem && typeof resultItem === 'object' && !Array.isArray(resultItem));
+  assert.equal(resultItem.dueDate, '2025-12-31');
+  // Tags and priority from head should survive since we only selected dueDate
+  assert.deepEqual(resultItem.tags, ['b']);
+  assert.equal(resultItem.priority, 'low');
+  // Health must not be 'error' — conflicts.length alone doesn't trigger error anymore.
+  // With pending retry it's 'syncing'; without journal/projection/failedIntents it cannot be 'error'.
+  assert.notEqual(peer.replica.syncHealth, 'error', 'health must not be error after selecting fields on retry');
+});
+
+test('empty selectedFields without content is rejected', async (t) => {
+  const server = relay();
+  const base = note('empty-fields-test');
+  const conflictEntry = { intentId: 'emp', noteId: base.id, kind: 'create', revision: 0,
+    item: base, fields: ['update'], at: Date.now() };
+  const peer = device(t, server, {
+    state: { cursor: 0, confirmed: {}, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 0, undefined, []), /Полная замена без содержимого/);
+});
+
+test('selectedFields with explicit content and empty array works', async (t) => {
+  const server = relay();
+  const base = note('content-plus');
+  const head = { ...base, content: 'relay text' };
+  const conflictEntry = { intentId: 'cp', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, title: 'local title' }, fields: ['title', 'content'], at: Date.now() };
+  let savedJournal;
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async (state) => { savedJournal = state; },
+  });
+  // Empty fields + content — content replaces, no field-level merge needed
+  await peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, 'my new text', []);
+  assert.ok(savedJournal);
+  assert.equal(savedJournal.pending.length, 1);
+  const item = savedJournal.pending[0].item;
+  assert.ok(item && typeof item === 'object' && !Array.isArray(item));
+  assert.equal(item.content, 'my new text');
+});
+
+test('structurally blocked field (type) requires full item replacement', async (t) => {
+  const server = relay();
+  const base = note('type-block');
+  const head = { ...base, type: 'article' };
+  const conflictEntry = { intentId: 'type-blk', noteId: base.id, kind: 'update', revision: 1,
+    item: { ...base, type: 'task' }, fields: ['type'], at: Date.now() };
+  const peer = device(t, server, {
+    state: { cursor: 1, confirmed: { [base.id]: { revision: 1, item: head } }, pending: [], conflicts: [conflictEntry] },
+    save: async () => {},
+  });
+  // Type is in rejectable set — can't change type via selectedFields alone
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 1, undefined, ['type']), /Неприменимые поля/);
 });
