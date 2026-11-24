@@ -231,18 +231,18 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await expect(logViewer.locator('text=KB').first()).toBeVisible();
 
     // 4. Verify system initialization logs are present
-    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+    await expect(logViewer.locator('text=Первый кадр после чтения хранилища').first()).toBeVisible();
 
     // 5. Test search filter in log viewer
     const searchInput = logViewer.locator('input[placeholder*="Поиск по логам"]');
-    await searchInput.fill('initialized');
-    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+    await searchInput.fill('Первый кадр');
+    await expect(logViewer.locator('text=Первый кадр после чтения хранилища').first()).toBeVisible();
     await searchInput.clear();
 
     // 6. Test scope filter
     const appScopeBtn = logViewer.locator('button', { hasText: 'APP' }).first();
     await appScopeBtn.click();
-    await expect(logViewer.locator('text=SLAG v2 application initialized').first()).toBeVisible();
+    await expect(logViewer.locator('text=Первый кадр после чтения хранилища').first()).toBeVisible();
 
     // Reset scope filter
     const allScopeBtn = logViewer.locator('button', { hasText: 'ALL' }).nth(1);
