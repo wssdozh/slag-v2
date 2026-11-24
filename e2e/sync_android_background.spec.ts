@@ -1,4 +1,4 @@
-import { devices, type Page } from '@playwright/test';
+import { devices, type Page, type WebSocketRoute } from '@playwright/test';
 import { test, expect, serverUrl } from './support/selfhostFixture';
 
 const { defaultBrowserType: _browser, ...android } = devices['Pixel 7'];
@@ -78,9 +78,16 @@ test('Android pauses automatic relay traffic when disabled in background and cat
   let socketFrames = 0;
   let roomRequests = 0;
   let pulls = 0;
+  let relaySocket: WebSocketRoute | undefined;
+  const assistantFrames: string[] = [];
   await page.routeWebSocket(/127\.0\.0\.1:18321\/ws\//, (socket) => {
+    relaySocket = socket;
     connections++;
-    socket.onMessage(() => { socketFrames++; });
+    socket.onMessage((frame) => {
+      const data = JSON.parse(frame.toString());
+      if (data.id === 'test-telegram') assistantFrames.push(data.type);
+      else socketFrames++;
+    });
     socket.send(JSON.stringify({ type: 'welcome', connectedDevices: 1 }));
   });
   await page.route(`${serverUrl}/api/rooms/**`, (route) => {
@@ -107,6 +114,8 @@ test('Android pauses automatic relay traffic when disabled in background and cat
     Object.assign(window, { isTauri: true });
     await engine.init();
     const key = engine.activeVaultKey;
+    engine.setAssistantReadyProvider(() => true);
+    engine.setAssistantHandler((_requestId, _question, _mode, reportStage) => reportStage?.('thinking'));
     Object.assign(window, {
       androidSyncProbe: {
         snapshot: () => ({ room: engine.activeRoomId, generation: engine.initGeneration, hasSameKey: key !== null && key === engine.activeVaultKey }),
@@ -149,6 +158,10 @@ test('Android pauses automatic relay traffic when disabled in background and cat
   });
   await page.clock.runFor(60_000);
   expect(outgoing()).toEqual(beforePause);
+  expect(relaySocket).toBeDefined();
+  relaySocket?.send(JSON.stringify({ type: 'assistant_probe', id: 'test-telegram' }));
+  relaySocket?.send(JSON.stringify({ type: 'assistant_question', id: 'test-telegram', question: 'test' }));
+  await expect.poll(() => assistantFrames).toEqual(['assistant_probe_ack', 'assistant_stage']);
   expect(await page.evaluate(() => (window as ProbeWindow).androidSyncProbe.snapshot())).toEqual(session);
 
   const beforeResume = pulls;
