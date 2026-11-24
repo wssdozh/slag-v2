@@ -97,6 +97,9 @@ import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } f
 import { equal, sameNote } from '../sync/notes/merge';
 import { editFromDisk, noteDiskProjection } from './noteDiskProjection';
 import { reconcileSyncedVault } from './syncReconcile';
+import { applyTaskCompletion } from '../tasks/taskCompletion';
+import type { TaskMailboxReceipt } from './taskMailbox';
+import { isRequestExpired } from './taskMailbox';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -143,7 +146,7 @@ type SharedListener = Parameters<NonNullable<VaultPort['subscribeSharedIntents']
 export class StorageService {
   public currentVault: VaultMeta;
   private changeListeners: Set<StorageChangeListener> = new Set();
-  private noteIntentListeners = new Set<(changes: NoteMutation[]) => Promise<void>>();
+  private noteIntentListeners = new Map<(changes: NoteMutation[]) => Promise<void>, () => boolean>();
   private folderTreeListeners = new Map<string, { tree: FolderTreeListener; group?: FolderGroupListener }>();
   private registryAtomicFolderVaults = new Set<string>();
   private registryFolderVaults = new Set<string>();
@@ -152,6 +155,7 @@ export class StorageService {
   private checkedSharedEnrollment = new Set<string>();
   private noteFileWrite: Promise<void> = Promise.resolve();
   private noteCommits = new WeakMap<SlagItem, Promise<void>>();
+  private mailboxBusy = false;
 
   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
@@ -289,8 +293,9 @@ export class StorageService {
     return () => this.changeListeners.delete(listener);
   }
 
-  public subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void {
-    this.noteIntentListeners.add(listener);
+  public subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>, canWrite = () => true): () => void {
+    const vault = this.currentVault;
+    this.noteIntentListeners.set(listener, () => this.currentVault === vault && canWrite());
     return () => {
       this.noteIntentListeners.delete(listener);
       if (!this.noteIntentListeners.size) {
@@ -302,7 +307,7 @@ export class StorageService {
 
   public persistNoteIntents(changes: NoteMutation[]): Promise<void> | undefined {
     if (!changes.length || !this.noteIntentListeners.size || (isTauri() && this.files.vaultRecoveryKind !== 'ready')) return;
-    return Promise.all([...this.noteIntentListeners].map((listener) => listener(changes))).then(() => undefined);
+    return Promise.all([...this.noteIntentListeners.keys()].map((listener) => listener(changes))).then(() => undefined);
   }
 
   private serializeNoteWrite(write: () => Promise<void>): Promise<void> {
@@ -634,6 +639,57 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.hydrated;
   }
 
+  private hasWritableMailboxJournal(): boolean {
+    // Only the webview that owns the current writable journal should claim a request.
+    return this.files.vaultRecoveryKind === 'ready' && this.noteIntentListeners.size === 1
+      && [...this.noteIntentListeners.values()].some((canWrite) => canWrite());
+  }
+
+  private async processMailboxQueue(): Promise<void> {
+    if (this.mailboxBusy || !this.hasWritableMailboxJournal()) return;
+    this.mailboxBusy = true;
+    const vault = this.currentVault;
+    const ready = this.currentVaultRead;
+    const isCurrent = () => this.currentVault === vault && this.currentVaultRead === ready && this.hasWritableMailboxJournal();
+    try {
+      if (!(await ready) || !isCurrent()) return;
+      const request = await this.files.claimMailboxRequest(vault);
+      if (!request) return;
+      const { requestId, noteId, targetStatus } = request;
+      let receipt: TaskMailboxReceipt = { requestId, noteId, state: 'rejected_unknown' };
+      try {
+        const previous = this.getItemById(noteId);
+        if (!isCurrent()) {
+          receipt.error = 'Хранилище или доступ к журналу изменились.';
+        } else if (isRequestExpired(request)) {
+          receipt = { ...receipt, state: 'rejected_expired' };
+        } else if (previous?.type !== 'task') {
+          receipt.error = 'Задача не найдена в активном хранилище.';
+        } else {
+          if (previous.status !== targetStatus) {
+            const updated = applyTaskCompletion(previous, { ...previous, status: targetStatus });
+            const { durable } = this.saveNoteEdit(updated, { editedFrom: previous, requireJournal: true });
+            if (!durable) throw new Error('Проекция задачи на диск не подтверждена.');
+            await durable;
+          }
+          // MCP independently re-reads the exact task on disk, including for a no-op.
+          if (!isCurrent()) throw new Error('Хранилище или доступ к журналу изменились.');
+          receipt = { requestId, noteId, state: 'projected', newStatus: targetStatus };
+        }
+      } catch (error) {
+        fsLog.error('Could not project MCP task status', error);
+        receipt.error = 'Исход неизвестен: проверьте статус задачи в SLAG.';
+      }
+      try {
+        await this.files.writeMailboxReceipt(vault, receipt);
+      } finally {
+        await this.files.removeMailboxClaim(vault, requestId);
+      }
+    } finally {
+      this.mailboxBusy = false;
+    }
+  }
+
   constructor() {
     this.currentVault = initCurrentVault(this);
     this.seedBrowserVault();
@@ -641,6 +697,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     installDraftFlushGuards(this);
     if (isTauri()) {
       this.currentVaultRead = this.initTauriFs();
+      setInterval(() => {
+        void this.processMailboxQueue().catch((error: unknown) => fsLog.warn('Task mailbox poll failed', error));
+      }, 500);
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
       const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
@@ -892,8 +951,9 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.noteCommits.get(item) ?? Promise.resolve();
   }
 
-  public saveNoteEdit(item: SlagItem, options: { origin?: 'local' | 'remote'; restoring?: boolean; editedFrom?: SlagItem | null } = {}): { item: SlagItem; durable?: Promise<void> } {
-    const { origin = 'local', restoring = false, editedFrom } = options;
+  public saveNoteEdit(item: SlagItem, options: { origin?: 'local' | 'remote'; restoring?: boolean; editedFrom?: SlagItem | null; requireJournal?: boolean } = {}): { item: SlagItem; durable?: Promise<void> } {
+    const { origin = 'local', restoring = false, editedFrom, requireJournal } = options;
+    if (requireJournal && (!isTauri() || origin !== 'local' || !this.hasWritableMailboxJournal())) throw new Error('No writable note journal');
     const items = this.getItems();
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
@@ -908,14 +968,6 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       updatedAt: Date.now(),
     };
 
-    if (existingIndex >= 0) {
-      items[existingIndex] = updatedItem;
-      fsLog.info(`Updated [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
-    } else {
-      items.unshift(updatedItem);
-      fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
-    }
-
     const base = previous && this.noteOrigins.get(previous);
     const realUpdate = origin === 'local' && !restoring && !!(oldItem || editedFrom !== undefined);
     const intentId = this.noteIntentListeners.size && origin === 'local' ? crypto.randomUUID() : undefined;
@@ -923,6 +975,14 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       id: updatedItem.id, kind: restoring ? 'restore' : realUpdate ? 'update' : 'create', item: updatedItem, previous, intentId,
       origin: base ?? (editedFrom !== undefined && editedFrom !== oldItem ? null : undefined),
     }]) : undefined;
+    if (requireJournal && !before) throw new Error('Note intent was not captured');
+    if (existingIndex >= 0) {
+      items[existingIndex] = updatedItem;
+      fsLog.info(`Updated [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
+    } else {
+      items.unshift(updatedItem);
+      fsLog.info(`Created [${updatedItem.type}] "${updatedItem.title || 'untitled'}" (${updatedItem.id}) in "${updatedItem.folder}"`);
+    }
     if (intentId) {
       if (base && previous && sameNote(previous, updatedItem)) this.noteOrigins.set(updatedItem, base);
       else this.noteOrigins.set(updatedItem, { intentId });
@@ -936,6 +996,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const oldFilename = oldItem?.filename || (oldItem ? getSafeNoteFilename(oldItem.title, oldItem.id) : undefined);
       durable = this.queueNoteFileWrite(async () => {
         await this.files.assertLocalWrite(vault, item.id);
+        if (requireJournal && !this.hasWritableMailboxJournal()) throw new Error('No writable note journal');
         if (before && !this.isCurrentNoteWrite(vault, updatedItem)) throw new Error('Заметка изменилась до записи');
         if (restoring) await this.files.restoreItemOnDisk(updatedItem, vault, true);
         else if (origin === 'local' && !before && oldItem && oldFilename) await this.flushGuarded(updatedItem, oldItem, oldFilename, vault);

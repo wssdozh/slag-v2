@@ -38,6 +38,10 @@ export async function exists(): Promise<boolean> {
   return false;
 }
 
+export async function lstat(): Promise<never> {
+  throw new Error('Tauri filesystem metadata is unavailable on the node');
+}
+
 export async function readTextFile(): Promise<string> {
   return '';
 }

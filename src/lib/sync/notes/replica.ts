@@ -207,6 +207,8 @@ export class NoteReplica {
 
   setReadOnly(readOnly: boolean) { this.host.readOnly = readOnly; }
 
+  canRecordNoteIntents(): boolean { return !this.host.readOnly && !this.host.signal.aborted; }
+
   private enqueue(task: () => Promise<void>): Promise<void> {
     const run = this.chain.then(async () => {
       this.host.signal.throwIfAborted();

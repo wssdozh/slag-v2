@@ -35,5 +35,5 @@ export interface NoteRegistryStorage {
   readNoteRegistry(): Promise<unknown>;
   writeNoteRegistry(value: unknown): Promise<void>;
   applyAcceptedNote(note: AcceptedNote): Promise<void>;
-  subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void;
+  subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>, canWrite?: () => boolean): () => void;
 }
