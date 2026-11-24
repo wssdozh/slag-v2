@@ -184,7 +184,8 @@ export async function openNoteSession(options: {
       if (!options.signal.aborted) options.onApplied(note);
     },
   }, initial);
-  const unsubscribe = subscribeNoteIntents.call(options.port, (changes) => replica.record(changes));
+  const unsubscribe = subscribeNoteIntents.call(options.port, (changes) => replica.record(changes),
+    () => !options.signal.aborted && options.port.getCurrentVault().id === localVaultId && replica.canRecordNoteIntents());
   const unsubscribeFolders = folderTree && subscribeFolderTreeIntents
     ? subscribeFolderTreeIntents.call(options.port, (folders, previous) => replica.recordFolderTree(folders, previous),
       atomicGroups ? (changes, folders, previous) => replica.recordFolderGroup(changes, folders, previous) : undefined) : undefined;

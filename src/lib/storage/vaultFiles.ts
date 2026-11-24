@@ -11,6 +11,7 @@ import {
   BaseDirectory,
   writeTextFile,
   rename,
+  lstat,
 } from '@tauri-apps/plugin-fs';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -21,7 +22,7 @@ import { isFolderColor } from '../vault/folderColor';
 import type { AttachmentStore } from './attachments';
 import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
 import { mergeRegistryDeviceWorkspace } from '../sync/notes/sharedWorkspace';
-import { buildPendingDir, buildProcessingDir, buildReceiptDir, buildPendingPath, buildProcessingPath, buildReceiptPath, isValidRequestFilename, isValidRequest } from './taskMailbox';
+import { buildPendingDir, buildProcessingDir, buildReceiptDir, buildPendingPath, buildProcessingPath, buildReceiptPath, isValidRequestFilename, isValidRequest, MAX_MAILBOX_BYTES, MAILBOX_DIR_NAME } from './taskMailbox';
 import type { TaskMailboxRequest, TaskMailboxReceipt } from './taskMailbox';
 
 const fsLog = logger.scope('FS');
@@ -904,87 +905,59 @@ export class VaultFiles {
     }
   }
 
-  /** Atomically claim one pending mailbox request via rename pending/ → processing/. Returns null if none. */
   public async claimMailboxRequest(vault: VaultMeta): Promise<TaskMailboxRequest | null> {
     if (!isTauri()) return null;
     const root = this.getVaultDir(vault);
-    const pendingDir = buildPendingDir(root);
-    const processingDir = buildProcessingDir(root);
-
-    try { await mkdir(processingDir, { baseDir: BaseDirectory.AppData, recursive: true }); } catch {}
-
-    let entries: { name: string; isDirectory: boolean }[];
-    try {
-      entries = await readDir(pendingDir, { baseDir: BaseDirectory.AppData });
-    } catch {
-      return null;
-    }
-
-    const candidates = entries.filter(e => !e.isDirectory && isValidRequestFilename(e.name));
-    for (const candidate of candidates) {
-      const stem = candidate.name.slice(0, -'.json'.length);
-      const reqPath = buildPendingPath(root, stem);
-      const procPath = buildProcessingPath(root, stem);
-
-      let text: string;
+    const opts = { baseDir: BaseDirectory.AppData };
+    const pending = buildPendingDir(root);
+    if (!(await exists(pending, opts))) return null;
+    const marker = `${root}/note-registry.json`;
+    if (!(await exists(marker, opts)) || !(await lstat(marker, opts)).isFile) return null;
+    if (!(await lstat(`${root}/${MAILBOX_DIR_NAME}`, opts)).isDirectory || !(await lstat(pending, opts)).isDirectory) return null;
+    const processing = buildProcessingDir(root);
+    await mkdir(processing, { ...opts, recursive: true });
+    if (!(await lstat(processing, opts)).isDirectory) return null;
+    for (const entry of await readDir(pending, opts)) {
+      if (!entry.isFile || !isValidRequestFilename(entry.name)) continue;
+      const id = entry.name.slice(0, -'.json'.length);
+      const from = buildPendingPath(root, id);
+      const to = buildProcessingPath(root, id);
+      if (await exists(to, opts)) continue;
       try {
-        text = await readTextFile(reqPath, { baseDir: BaseDirectory.AppData });
-      } catch {
-        continue;
+        await rename(from, to, { oldPathBaseDir: opts.baseDir, newPathBaseDir: opts.baseDir });
+      } catch (error) {
+        if (await exists(from, opts)) throw error;
+        continue; // Another webview claimed it.
       }
-
-      let parsed: unknown;
       try {
-        parsed = JSON.parse(text);
-      } catch {
-        continue;
+        const info = await lstat(to, opts);
+        if (info.isFile && info.size <= MAX_MAILBOX_BYTES) {
+          const text = await readTextFile(to, opts);
+          if (new TextEncoder().encode(text).length <= MAX_MAILBOX_BYTES) {
+            const request: unknown = JSON.parse(text);
+            if (isValidRequest(request) && request.requestId === id) return request;
+          }
+        }
+      } catch (error) {
+        fsLog.warn('Invalid task mailbox request', { id, error });
       }
-
-      if (!isValidRequest(parsed)) continue;
-
-      try {
-        await rename(reqPath, procPath, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData });
-        return parsed as TaskMailboxRequest;
-      } catch {
-        continue;
-      }
+      await this.removeMailboxClaim(vault, id);
     }
     return null;
   }
 
-  /** Write a receipt for a processed request. */
   public async writeMailboxReceipt(vault: VaultMeta, receipt: TaskMailboxReceipt): Promise<void> {
-    if (!isTauri()) return;
     const root = this.getVaultDir(vault);
-    const receiptDir = buildReceiptDir(root);
-
-    try { await mkdir(receiptDir, { baseDir: BaseDirectory.AppData, recursive: true }); } catch {}
-
-    const filePath = buildReceiptPath(root, receipt.requestId);
-    const tmp = `${filePath}.${crypto.randomUUID()}.tmp`;
-    await writeTextFile(tmp, JSON.stringify(receipt, null, 2), { baseDir: BaseDirectory.AppData });
-    try {
-      await rename(tmp, filePath, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData });
-    } catch (err) {
-      await remove(tmp, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
-      throw err;
-    }
+    const opts = { baseDir: BaseDirectory.AppData };
+    const receipts = buildReceiptDir(root);
+    if (!(await lstat(`${root}/${MAILBOX_DIR_NAME}`, opts)).isDirectory) throw new Error('Invalid task mailbox directory');
+    await mkdir(receipts, { ...opts, recursive: true });
+    if (!(await lstat(receipts, opts)).isDirectory) throw new Error('Invalid task mailbox receipt directory');
+    await writeJsonAtomic(buildReceiptPath(root, receipt.requestId), receipt);
   }
 
-  /** Clean up own artifacts: remove processing files (stale claims). */
-  public async cleanupMailboxArtifacts(vault: VaultMeta): Promise<void> {
-    if (!isTauri()) return;
-    const root = this.getVaultDir(vault);
-    const processingDir = buildProcessingDir(root);
-
-    try {
-      const entries = await readDir(processingDir, { baseDir: BaseDirectory.AppData });
-      for (const entry of entries) {
-        if (!entry.isDirectory && isValidRequestFilename(entry.name)) {
-          await remove(`${processingDir}/${entry.name}`, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
-        }
-      }
-    } catch {}
+  public removeMailboxClaim(vault: VaultMeta, requestId: string): Promise<void> {
+    return remove(buildProcessingPath(this.getVaultDir(vault), requestId), { baseDir: BaseDirectory.AppData });
   }
 
 }

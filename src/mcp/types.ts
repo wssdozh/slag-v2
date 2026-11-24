@@ -16,10 +16,6 @@ export interface McpVaultConfig {
   notesDir: string;  // Absolute path to notes/
   trashDir: string;  // Absolute path to .trash/
   statePath: string; // Absolute path to state.json
-  /** Root directory where note-registry.json lives and mailbox directories reside. */
-  mailboxRoot?: string;
-  /** Full path to the task-mailbox base (.task-mailbox/) under mailboxRoot. */
-  mailboxDir?: string;
 }
 
 export interface VaultStateData {
