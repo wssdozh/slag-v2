@@ -34,9 +34,9 @@ function AndroidBackgroundSyncRow() {
   return (
     <SettingsRow label={label} description={
       <span id={hintId} className="text-fg-secondary">
-        Android может отложить синхронизацию в режиме ожидания (Doze). После принудительной
-        остановки откройте SLAG снова. Ограничения батареи и автозапуск (если доступен)
-        настраиваются в системе Android.
+        Когда выключено, SLAG догоняет изменения при открытии. Android может отложить
+        обмен в Doze даже при включённом режиме. После принудительной остановки откройте SLAG снова.
+        Настройки батареи и автозапуска находятся в Android.
       </span>
     } right={
       <SettingsSwitch
@@ -170,7 +170,7 @@ export const SyncSettingsTab: React.FC = () => {
         <SettingsDivider />
         <SettingsRow label="Синхронизировать при сохранении" right={<SettingsSwitch checked={config.autoSync} onChange={(checked) => { syncEngine.saveConfig({ autoSync: checked }); setConfig(syncEngine.getConfig()); }} label="Синхронизировать при сохранении" />} />
         <SettingsDivider />
-        <SettingsSelect label="Частота синхронизации" testId="sync-interval-select" value={String(config.bgSyncIntervalMinutes ?? 0)} onChange={(next) => { syncEngine.setBgSyncInterval(Number(next) as 0 | 10 | 30); setConfig(syncEngine.getConfig()); }} options={[
+        <SettingsSelect label={isAndroidApp() ? 'Резервный опрос' : 'Частота синхронизации'} testId="sync-interval-select" value={String(config.bgSyncIntervalMinutes ?? 0)} onChange={(next) => { syncEngine.setBgSyncInterval(Number(next) as 0 | 10 | 30); setConfig(syncEngine.getConfig()); }} options={[
           { value: '0', label: 'Мгновенно', testId: 'sync-interval-0' },
           { value: '10', label: '10 мин', testId: 'sync-interval-10' },
           { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
