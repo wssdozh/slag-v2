@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { SlagAttachment, SlagItem, FolderMeta } from '../types';
+import type { SlagAttachment, SlagItem, FolderMeta, SlagItemStatus } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
@@ -22,10 +22,18 @@ import {
   isTextAttachment,
   resolveAttachmentPath,
 } from './attachments';
+import { randomUUID } from 'node:crypto';
 
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
+// Mailbox helpers imported from shared module (paths, filename validation).
+import { buildPendingDir, buildProcessingDir, buildReceiptDir, buildPendingPath, buildReceiptPath, isValidRequestFilename, REQUEST_FILE_SUFFIX } from '../lib/storage/taskMailbox';
+
+/** Local copy of the mailbox request shape — mirrors src/lib/storage/taskMailbox.ts for MCP use. */
+type McpTaskRequest = { requestId: string; noteId: string; targetStatus: SlagItemStatus; createdAt: number };
+/** Result returned to MCP after the processor finishes. Mirrors src/lib/storage/taskMailbox.ts */
+type McpTaskReceipt = { requestId: string; state: 'journal_durable' | 'projected' | 'rejected_unknown' | 'rejected_expired'; noteId: string; newStatus?: string; error?: string };
 
 /** What came out of one attachment: text, raw bytes, or a reason there is nothing to give. */
 export type AttachmentPayload =
@@ -62,12 +70,14 @@ export function resolveVaultConfig(customPath?: string): McpVaultConfig {
   const notesDir = existsSync(candidateNotesDir) ? candidateNotesDir : resolved;
   const trashDir = path.join(resolved, '.trash');
   const statePath = path.join(resolved, 'state.json');
+  const mailboxDir = path.join(resolved, '.task-mailbox');
 
   return {
     vaultPath: resolved,
     notesDir,
     trashDir,
     statePath,
+    mailboxDir,
   };
 }
 
@@ -466,6 +476,97 @@ export class McpVault {
     return resolveAttachmentByName(item.attachments, basename);
   }
 
+  // ── Task mailbox bridge for status changes in registry vaults ────────
+
+  /** Write a status request to the pending queue, atomic write+rename. */
+  private async enqueueStatusRequest(request: McpTaskRequest): Promise<void> {
+    const mailboxDir = this.config.mailboxDir;
+    if (!mailboxDir) throw new Error('Mailbox directory not configured');
+    const pendingDir = buildPendingDir(mailboxDir);
+
+    await fs.mkdir(pendingDir, { recursive: true });
+    await fs.mkdir(buildProcessingDir(mailboxDir), { recursive: true });
+    await fs.mkdir(buildReceiptDir(mailboxDir), { recursive: true });
+
+    const tmpPath = `${buildPendingPath(mailboxDir, request.requestId)}.tmp`;
+    const targetPath = buildPendingPath(mailboxDir, request.requestId);
+    await fs.writeFile(tmpPath, JSON.stringify(request), 'utf-8');
+    await fs.rename(tmpPath, targetPath);
+  }
+
+  /** Read a receipt file by requestId. Returns parsed content or null if missing. */
+  private async readReceipt(requestId: string): Promise<McpTaskReceipt | null> {
+    if (!this.config.mailboxDir) return null;
+    try {
+      const raw = await fs.readFile(buildReceiptPath(this.config.mailboxDir, requestId), 'utf-8');
+      return JSON.parse(raw) as McpTaskReceipt;
+    } catch {
+      return null;
+    }
+  }
+
+  /** List filenames currently in the pending queue. */
+  public async listPendingRequests(): Promise<string[]> {
+    if (!this.config.mailboxDir) return [];
+    try {
+      const entries = await fs.readdir(buildPendingDir(this.config.mailboxDir));
+      return entries.filter(e => isValidRequestFilename(e)).map(e => e.slice(0, -REQUEST_FILE_SUFFIX.length));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Queue a pure status update through the mailbox.
+   * Only called when save_note arrives with exactly { id, status } — no other meaningful fields.
+   */
+  public async queueStatusChange(noteId: string, targetStatus: SlagItemStatus): Promise<{
+    ok: true; requestId: string;
+  } | {
+    ok: false; reason: string;
+  }> {
+    if (!this.config.mailboxDir) return { ok: false, reason: 'Mailbox not configured' };
+    const req: McpTaskRequest = {
+      requestId: randomUUID(),
+      noteId,
+      targetStatus,
+      createdAt: Date.now(),
+    };
+    try {
+      await this.enqueueStatusRequest(req);
+      return { ok: true, requestId: req.requestId };
+    } catch (err) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  /**
+   * Poll for the receipt matching a queued request, up to `timeoutMs`.
+   * Returns success when state !== rejected_*.
+   */
+  public async waitForStatusReceipt(requestId: string, timeoutMs = 8000): Promise<{
+    ok: true; status: string;
+  } | {
+    ok: false; reason: string;
+  }> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const receipt = await this.readReceipt(requestId);
+      if (receipt && !receipt.state.startsWith('rejected')) {
+        return { ok: true, status: receipt.newStatus ?? receipt.state };
+      }
+      if (receipt) {
+        // Explicitly rejected — stop early instead of waiting for timeout
+        return { ok: false, reason: receipt.error || `Rejected: ${receipt.state}` };
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    return { ok: false, reason: 'Timeout waiting for mailbox processor' };
+  }
+
+  // ── End of mailbox bridge ────────────────────────────────────────────
+
+
   public async saveNote(params: {
     id?: string;
     title?: string;
@@ -482,6 +583,26 @@ export class McpVault {
     recurrence?: SlagItem['recurrence'] | null;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
+    // Detect pure status update (only id + status, nothing else meaningful)
+    if (params.id && params.status !== undefined) {
+      const otherKeys = Object.keys(params).filter(k => k !== 'id' && k !== 'status' && params[k as keyof typeof params] !== undefined);
+      if (otherKeys.length === 0) {
+        const result = await this.queueStatusChange(params.id, params.status);
+        if (!result.ok) {
+          throw new Error(`Mailbox queue failed: ${result.reason}`);
+        }
+        const receipt = await this.waitForStatusReceipt(result.requestId);
+        if (!receipt.ok) {
+          throw new Error(`Status change failed: ${receipt.reason}`);
+        }
+        return {
+          item: { id: params.id, status: params.status ?? null, type: 'task', title: '', folder: DEFAULT_INBOX_FOLDER,
+            content: '', tags: [], createdAt: Date.now(), updatedAt: Date.now() } as unknown as SlagItem,
+          created: false,
+          path: `${params.id}.md`,
+        };
+      }
+    }
     await this.assertLegacyWritable();
     let existingMatch: NoteMatch | null = null;
 
@@ -617,6 +738,20 @@ export class McpVault {
   }
 
   public async toggleTask(idOrTitle: string, subtaskId?: string, explicitStatus?: 'todo' | 'done'): Promise<SlagItem> {
+    // Explicit status change without subtask → mailbox bridge
+    if (explicitStatus && !subtaskId) {
+      const match = await this.findNote(idOrTitle);
+      if (!match) throw new Error(`Задача «${idOrTitle}» не найдена.`);
+      const result = await this.queueStatusChange(match.item.id, explicitStatus as SlagItemStatus);
+      if (!result.ok) {
+        throw new Error(`Mailbox queue failed: ${result.reason}`);
+      }
+      const receipt = await this.waitForStatusReceipt(result.requestId);
+      if (!receipt.ok) {
+        throw new Error(`Status change failed: ${receipt.reason}`);
+      }
+      return { ...match.item, status: explicitStatus, updatedAt: Date.now() };
+    }
     await this.assertLegacyWritable();
     const match = await this.findNote(idOrTitle);
     if (!match) {

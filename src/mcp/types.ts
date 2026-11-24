@@ -16,6 +16,8 @@ export interface McpVaultConfig {
   notesDir: string;  // Absolute path to notes/
   trashDir: string;  // Absolute path to .trash/
   statePath: string; // Absolute path to state.json
+  /** Base directory for the task-mailbox: <vaultRoot>/.task-mailbox */
+  mailboxDir?: string;
 }
 
 export interface VaultStateData {

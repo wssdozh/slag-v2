@@ -47,16 +47,21 @@ export function registerMcpTools(server: McpServer, vault: McpVault): void {
     async (args) => {
       try {
         const res = await vault.saveNote(args);
-        const actionWord = res.created ? 'создана' : 'обновлена';
+        // Check if this was a status-only update (mailbox path): only id and status were sent.
+        const isStatusOnly = args.status !== undefined && args.id !== undefined &&
+          Object.keys(args).length === 2;
         const typeWord = res.item.type === 'task' ? 'Задача' : (res.item.type === 'article' ? 'Статья' : 'Заметка');
         const dueInfo = res.item.dueDate ? `, срок: ${res.item.dueDate}` : '';
         const priorityInfo = res.item.priority && res.item.priority !== 'none' ? `, приоритет: ${res.item.priority.toUpperCase()}` : '';
+        const statusInfo = res.item.status ? ` | статус: ${res.item.status}` : '';
 
         return {
           content: [
             {
               type: 'text',
-              text: `${typeWord} «${res.item.title}» успешно ${actionWord}.\nID: ${res.item.id}\nПапка: ${res.item.folder}\nФайл: ${res.path}${dueInfo}${priorityInfo}${taskSchedule(res.item)}`,
+              text: isStatusOnly
+                ? `Статус задачи «${res.item.title}» обновлён.\nID: ${res.item.id}\nНовый статус: ${res.item.status}`
+                : `${typeWord} «${res.item.title}» успешно обновлена.\nID: ${res.item.id}\nПапка: ${res.item.folder}\nФайл: ${res.path}${dueInfo}${priorityInfo}${statusInfo}`,
             },
           ],
         };
