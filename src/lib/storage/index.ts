@@ -97,6 +97,9 @@ import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } f
 import { equal, sameNote } from '../sync/notes/merge';
 import { editFromDisk, noteDiskProjection } from './noteDiskProjection';
 import { reconcileSyncedVault } from './syncReconcile';
+import { applyTaskCompletion } from '../tasks/taskCompletion';
+import type { TaskMailboxRequest } from './taskMailbox';
+import { isRequestExpired } from './taskMailbox';
 import {
   DEFAULT_INBOX_FOLDER,
   STORAGE_KEYS,
@@ -151,8 +154,11 @@ export class StorageService {
   private sharedEnrollmentReads = new Map<string, Promise<void>>();
   private checkedSharedEnrollment = new Set<string>();
   private noteFileWrite: Promise<void> = Promise.resolve();
+   // Mailbox processor state — cleared on vault switch.
+   private _mailboxIntervalId: ReturnType<typeof setInterval> | null = null;
+   private _mailboxRunning = false;
 
-  /** Set once the disk scan settles; see `isHydrated()`. */
+   /** Set once the disk scan settles; see `isHydrated()`. */
   private hydrated = false;
   private currentVaultRead: Promise<boolean> = Promise.resolve(true);
   public instanceId: string = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
@@ -619,6 +625,163 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.hydrated;
   }
 
+  /** Check whether the current vault has active journal listeners (registry-enabled). */
+  public hasActiveJournalListener(): boolean {
+    return this.noteIntentListeners.size > 0;
+  }
+
+  // ── Task mailbox processor ────────────────────────────────────────
+
+  /** Single-flight loop: claim one request, validate, apply mutation, write receipt. */
+  private async processMailboxQueue(): Promise<void> {
+    if (!this._mailboxRunning) return;
+    const snapshot = this.currentVault.id;
+
+    // 1. Claim one pending request atomically via rename.
+    let req: TaskMailboxRequest | null;
+    try {
+      req = await this.files.claimMailboxRequest(this.currentVault);
+    } catch (err) {
+      fsLog.warn('Mailbox claim failed', err);
+      this._mailboxRunning = false;
+      return;
+    }
+    if (!req) { this._mailboxRunning = false; return; } // No work — stop polling.
+
+    // Scope guard: verify vault unchanged after await.
+    if (this.currentVault.id !== snapshot) { this._mailboxRunning = false; return; }
+
+    // 2. Validate TTL.
+    if (isRequestExpired(req)) {
+      await this.files.writeMailboxReceipt(this.currentVault, {
+        requestId: req.requestId, noteId: req.noteId,
+        state: 'rejected_expired', error: 'request expired',
+      }).catch((err) => fsLog.warn('Could not write rejected_expired receipt', err));
+      await this.removeProcessingFile(snapshot, req.requestId).catch(() => {});
+      this._mailboxRunning = false; return;
+    }
+
+    // 3. Scope: noteId must belong to the current vault.
+    // We determine scope by checking if the item exists in the current vault's index.
+    const previousItem = this.getItemById(req.noteId);
+    if (!previousItem) {
+      await this.files.writeMailboxReceipt(this.currentVault, {
+        requestId: req.requestId, noteId: req.noteId,
+        state: 'rejected_unknown', error: 'note not found in current vault',
+      }).catch((err) => fsLog.warn('Could not write rejected_unknown receipt', err));
+      await this.removeProcessingFile(snapshot, req.requestId).catch(() => {});
+      this._mailboxRunning = false; return;
+    }
+
+    // Idempotent: same status already applied — skip mutation but write receipt.
+    if (previousItem.status === req.targetStatus) {
+      fsLog.info('Mailbox request skipped — status already applied', {
+        requestId: req.requestId, noteId: req.noteId, status: req.targetStatus,
+      });
+      await this.files.writeMailboxReceipt(this.currentVault, {
+        requestId: req.requestId, noteId: req.noteId,
+        state: 'journal_durable', newStatus: req.targetStatus,
+      }).catch((err) => fsLog.warn('Could not write journal_durable receipt', err));
+      await this.removeProcessingFile(snapshot, req.requestId).catch(() => {});
+      this._mailboxRunning = false; return;
+    }
+
+    // 4. Create next item: copy previous with target status.
+    const nextItem: SlagItem = { ...previousItem, status: req.targetStatus };
+
+    // 5. Apply task completion logic.
+    const updatedItem = applyTaskCompletion(previousItem, nextItem);
+
+    // 6. Determine routing path: synchronous journal vs markdown-write fallback.
+    if (!this.hasActiveJournalListener()) {
+      await this.files.writeMailboxReceipt(this.currentVault, {
+        requestId: req.requestId, noteId: req.noteId,
+        state: 'rejected_unknown', error: 'no active journal for registry vault',
+      }).catch((err) => fsLog.warn('Could not write rejected_unknown receipt', err));
+      await this.removeProcessingFile(snapshot, req.requestId).catch(() => {});
+      this._mailboxRunning = false; return;
+    }
+
+    // 7. Persist through saveNoteEdit with local origin (app-side mutation).
+    const { item, durable } = this.saveNoteEdit(updatedItem, {
+      origin: 'local', editedFrom: previousItem,
+    });
+
+    // Check vault again after saveNoteEdit (may have awaited internally).
+    if (this.currentVault.id !== snapshot) { this._mailboxRunning = false; return; }
+
+    // 8. Write receipt with appropriate state.
+    // When journal listener is active: journal path is used — report 'journal_durable' when durable resolves.
+    // When no journal: fallthrough to markdown write — report 'projected' after disk change confirmed.
+    const vaultRef = this.currentVault;
+    const requestId = req.requestId;
+    const noteIdReq = req.noteId;
+
+    if (durable) {
+      durable.then(() => {
+        if (vaultRef.id !== snapshot) return;
+        void this.files.writeMailboxReceipt(vaultRef, {
+          requestId, noteId: noteIdReq,
+          state: 'journal_durable', newStatus: req.targetStatus,
+        }).catch((err) => fsLog.warn('Could not write journal_durable receipt', err));
+      });
+    } else {
+      // Fallback path: saveNoteEdit had no journal → project to markdown write.
+      // Wait for projection, then write receipt.
+      void this.queueNoteFileWrite(async () => {
+        if (!this.hasActiveJournalListener()) {
+          await this.files.flushItemToDisk(item, item.folder, item.filename || getSafeNoteFilename(item.title, item.id), vaultRef, false);
+        }
+      }).then(() => {
+        if (vaultRef.id !== snapshot) return;
+        void this.files.writeMailboxReceipt(vaultRef, {
+          requestId, noteId: noteIdReq,
+          state: 'projected', newStatus: req.targetStatus,
+        }).catch((err) => fsLog.warn('Could not write projected receipt', err));
+      });
+    }
+
+    // Cleanup: remove processing file after initiating receipt write.
+    await this.removeProcessingFile(snapshot, req.requestId).catch(() => {});
+
+    this._mailboxRunning = false;
+  }
+
+  /** Remove a processing-file left by MCP or another consumer. Safe no-op if absent. */
+  private async removeProcessingFile(vaultId: string, requestId: string): Promise<void> {
+    // Map vault ID to directory name for the cleanup path.
+    const dirName = vaultId === 'default_vault' ? 'main' : vaultId;
+    const procPath = `vaults/${dirName}/.task-mailbox/processing/${requestId}.json`;
+    try {
+      const { remove } = await import('@tauri-apps/plugin-fs');
+      await remove(procPath, { baseDir: BaseDirectory.AppData });
+    } catch {
+      // Processing file may have been cleaned up already — silent ignore.
+    }
+  }
+
+  /** Start interval-based polling for mailbox requests (~500 ms cycle). */
+  public startMailboxProcessor(): void {
+    if (this._mailboxIntervalId !== null) return; // Already running.
+    this._mailboxRunning = true;
+    this._mailboxIntervalId = setInterval(async () => {
+      if (!this._mailboxRunning) return;
+      await this.processMailboxQueue().catch((err) => {
+        fsLog.error('Mailbox queue processing failed', err);
+        this._mailboxRunning = false;
+      });
+    }, 500);
+  }
+
+  /** Stop polling and cancel any in-progress work. Call on vault switch. */
+  private stopMailboxProcessor(): void {
+    if (this._mailboxIntervalId !== null) {
+      clearInterval(this._mailboxIntervalId);
+      this._mailboxIntervalId = null;
+    }
+    this._mailboxRunning = false;
+  }
+
   constructor() {
     this.currentVault = initCurrentVault(this);
     this.seedBrowserVault();
@@ -626,6 +789,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     installDraftFlushGuards(this);
     if (isTauri()) {
       this.currentVaultRead = this.initTauriFs();
+      // Start polling for MCP status changes as soon as the disk is ready.
+      this.startMailboxProcessor();
     } else {
       // No disk to wait for: a browser build's index is whatever the store already holds.
       const folders = localStorage.getItem(`slag_registry_folders_${this.currentVault.id}`);
@@ -694,7 +859,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
   }
 
   public switchVault(vaultId: string): VaultMeta {
-    return switchVault(this, vaultId);
+    const result = switchVault(this, vaultId);
+    // Cancel in-progress mailbox work when vault changes; scope validation prevents stale mutations.
+    this.stopMailboxProcessor();
+    return result;
   }
 
   public createVault(
@@ -734,6 +902,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       if (!isTauri()) localStorage.removeItem(`slag_registry_folders_${vaultId}`);
       this.itemsIndex.delete(`${ITEMS_STORAGE_PREFIX}${vaultId}`);
       this.itemsIndex.delete(`${STORAGE_KEYS.TRASH_PREFIX}${vaultId}`);
+      // Mailbox processor may hold state tied to this vault.
+      this._mailboxRunning = false;
     }
     return deleted;
   }

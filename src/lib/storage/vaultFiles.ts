@@ -10,6 +10,7 @@ import {
   exists,
   BaseDirectory,
   writeTextFile,
+  rename,
 } from '@tauri-apps/plugin-fs';
 import { serializeItemToMarkdown, parseMarkdownToItem } from '../vault/markdownSerializer';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
@@ -20,6 +21,8 @@ import { isFolderColor } from '../vault/folderColor';
 import type { AttachmentStore } from './attachments';
 import { hasSharedRegistryEnrollment } from '../sync/notes/persistence';
 import { mergeRegistryDeviceWorkspace } from '../sync/notes/sharedWorkspace';
+import { buildPendingDir, buildProcessingDir, buildReceiptDir, buildPendingPath, buildProcessingPath, buildReceiptPath, isValidRequestFilename, isValidRequest } from './taskMailbox';
+import type { TaskMailboxRequest, TaskMailboxReceipt } from './taskMailbox';
 
 const fsLog = logger.scope('FS');
 
@@ -899,6 +902,89 @@ export class VaultFiles {
     } catch (err) {
       fsLog.warn(`Failed to remove folder directory ${folderPath} from disk:`, err);
     }
+  }
+
+  /** Atomically claim one pending mailbox request via rename pending/ → processing/. Returns null if none. */
+  public async claimMailboxRequest(vault: VaultMeta): Promise<TaskMailboxRequest | null> {
+    if (!isTauri()) return null;
+    const root = this.getVaultDir(vault);
+    const pendingDir = buildPendingDir(root);
+    const processingDir = buildProcessingDir(root);
+
+    try { await mkdir(processingDir, { baseDir: BaseDirectory.AppData, recursive: true }); } catch {}
+
+    let entries: { name: string; isDirectory: boolean }[];
+    try {
+      entries = await readDir(pendingDir, { baseDir: BaseDirectory.AppData });
+    } catch {
+      return null;
+    }
+
+    const candidates = entries.filter(e => !e.isDirectory && isValidRequestFilename(e.name));
+    for (const candidate of candidates) {
+      const stem = candidate.name.slice(0, -'.json'.length);
+      const reqPath = buildPendingPath(root, stem);
+      const procPath = buildProcessingPath(root, stem);
+
+      let text: string;
+      try {
+        text = await readTextFile(reqPath, { baseDir: BaseDirectory.AppData });
+      } catch {
+        continue;
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        continue;
+      }
+
+      if (!isValidRequest(parsed)) continue;
+
+      try {
+        await rename(reqPath, procPath, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData });
+        return parsed as TaskMailboxRequest;
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  /** Write a receipt for a processed request. */
+  public async writeMailboxReceipt(vault: VaultMeta, receipt: TaskMailboxReceipt): Promise<void> {
+    if (!isTauri()) return;
+    const root = this.getVaultDir(vault);
+    const receiptDir = buildReceiptDir(root);
+
+    try { await mkdir(receiptDir, { baseDir: BaseDirectory.AppData, recursive: true }); } catch {}
+
+    const filePath = buildReceiptPath(root, receipt.requestId);
+    const tmp = `${filePath}.${crypto.randomUUID()}.tmp`;
+    await writeTextFile(tmp, JSON.stringify(receipt, null, 2), { baseDir: BaseDirectory.AppData });
+    try {
+      await rename(tmp, filePath, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData });
+    } catch (err) {
+      await remove(tmp, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  /** Clean up own artifacts: remove processing files (stale claims). */
+  public async cleanupMailboxArtifacts(vault: VaultMeta): Promise<void> {
+    if (!isTauri()) return;
+    const root = this.getVaultDir(vault);
+    const processingDir = buildProcessingDir(root);
+
+    try {
+      const entries = await readDir(processingDir, { baseDir: BaseDirectory.AppData });
+      for (const entry of entries) {
+        if (!entry.isDirectory && isValidRequestFilename(entry.name)) {
+          await remove(`${processingDir}/${entry.name}`, { baseDir: BaseDirectory.AppData }).catch(() => undefined);
+        }
+      }
+    } catch {}
   }
 
 }
