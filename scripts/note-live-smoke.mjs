@@ -409,6 +409,24 @@ try {
   assert.equal(author.local.get(measured.id).dueDate, measured.dueDate);
   assert.ok(author.replica.conflicts.some(({ intentId }) => intentId === alternatives[0].intentId));
   assert.equal(author.replica.syncHealth, 'current');
+
+  // Real relay regression: an already saved proposal must close on the receiving WS,
+  // without a manual sync or a reconnect. Keep a different proposal untouched.
+  const beforeTree = author.folders();
+  const probeFolder = { path: 'Live review probe', name: 'Live review probe', description: '' };
+  const withProbe = [...beforeTree, probeFolder];
+  await author.replica.recordFolderTree(withProbe, beforeTree);
+  await until(() => reader.folders().some(({ path }) => path === probeFolder.path) && author.replica.pendingCount === 0);
+  const proposal = { intentId: 'recovered-folder-delete', noteId: FOLDER_TREE_ID, kind: 'update',
+    revision: reader.saved().confirmed[FOLDER_TREE_ID].revision, item: beforeTree, fields: ['recovered-disk'], at: 1 };
+  const different = { ...proposal, intentId: 'unrelated-tree-proposal', item: [...beforeTree, { ...probeFolder, path: 'Other probe', name: 'Other probe' }] };
+  await reader.replica.preserveLegacyAlternatives([proposal, different]);
+  const readsBeforeDeletion = reader.stats().reads;
+  await author.replica.recordFolderTree(beforeTree, withProbe);
+  await until(() => !reader.folders().some(({ path }) => path === probeFolder.path)
+    && !reader.saved().conflicts?.some(({ intentId }) => intentId === proposal.intentId));
+  assert.ok(reader.saved().conflicts.some(({ intentId }) => intentId === different.intentId));
+  assert.equal(reader.stats().reads, readsBeforeDeletion, 'live deletion must not need an HTTP catch-up to clear the review');
   const stats = (values) => {
     const sorted = values.toSorted((a, b) => a - b);
     const at = (p) => Math.round(sorted[Math.ceil(sorted.length * p) - 1]);
