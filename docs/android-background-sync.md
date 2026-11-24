@@ -14,6 +14,8 @@ APK скачан и проверен локально: `com.slag.notes.staging.r
 
 Проверка подготовки без телефона: `node scripts/note-live-smoke.mjs <worktree релея feat/note-registry>` прошла на `06e6be7` с временной SQLite и тестовыми клиентами. Скрипт подтвердил догон после обрыва и HTTP-повтор без дубля; это не измерение Android, WebView или записи Android на диск. `npm run check` и веб-сборка `npm run build` прошли.
 
+Отдельно проверен адрес, зашитый в APK: релей `06e6be7` запущен на `127.0.0.1:18320` с новой SQLite, `SLAG_REQUIRE_ACCOUNT_AUTH=true` и отключённым ботом; `/health` ответил `status=ok`, `authRequired=true`, `activeRooms=0`. После проверки процесс остановлен. Для прогона на телефоне создавать новую тестовую БД, а при моделировании обрыва повторно запускать релей с той же БД прогона.
+
 На Windows ADB лежит в проектном SDK:
 
 ```powershell
