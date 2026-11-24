@@ -1,11 +1,13 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState, useSyncExternalStore } from 'react';
 import { DiffModal } from '../Modals/DiffModal';
 import { noteDifferences } from '../../lib/sync/notes/merge';
 import { isNoteItem } from '../../lib/sync/notes/wire';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
+import { isAndroidApp } from '../../lib/platform/deviceAccess';
 import { accountClient } from '../../lib/sync/account';
+import { getAndroidBackgroundSyncEnabled, setAndroidBackgroundSyncEnabled, subscribeAndroidBackgroundSyncPreference } from '../../lib/sync/androidBackgroundPreference';
 import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
 import { IconButton } from '../UI/IconButton';
@@ -23,6 +25,31 @@ const conflictReasons: Record<string, string> = {
   lifecycle: 'Не удалось подтвердить непрерывную историю заметки',
   predecessor: 'Предыдущая локальная правка не принята',
 };
+
+function AndroidBackgroundSyncRow() {
+  const enabled = useSyncExternalStore(subscribeAndroidBackgroundSyncPreference, getAndroidBackgroundSyncEnabled);
+  const hintId = useId();
+  const label = 'Фоновая синхронизация';
+
+  return (
+    <SettingsRow label={label} description={
+      <span id={hintId} className="text-fg-secondary">
+        Android может отложить синхронизацию в режиме ожидания (Doze). После принудительной
+        остановки откройте SLAG снова. Ограничения батареи и автозапуск (если доступен)
+        настраиваются в системе Android.
+      </span>
+    } right={
+      <SettingsSwitch
+        checked={enabled}
+        onChange={setAndroidBackgroundSyncEnabled}
+        label={label}
+        descriptionId={hintId}
+        testId="android-background-sync-switch"
+        className="before:absolute before:-inset-x-1.5 before:-inset-y-3.5 before:rounded-md focus-visible:before:border focus-visible:before:border-fg-secondary active:opacity-80"
+      />
+    } />
+  );
+}
 
 /** Канал: состояние, адрес сервера и когда гнать. Аккаунт и устройства — соседние разделы. */
 export const SyncSettingsTab: React.FC = () => {
@@ -148,6 +175,7 @@ export const SyncSettingsTab: React.FC = () => {
           { value: '10', label: '10 мин', testId: 'sync-interval-10' },
           { value: '30', label: '30 мин (эко)', testId: 'sync-interval-30' },
         ]} />
+        {isAndroidApp() && <AndroidBackgroundSyncRow />}
       </SettingsGroup>
 
       {conflicts.length > 0 && (
