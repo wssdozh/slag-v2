@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **708**, строк: **121243**, зон: **48**.
+Модулей: **710**, строк: **122075**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -13,20 +13,20 @@
 | `src/lib/sync/bip39Words.ts` | 2052 | 1 |
 | `src/lib/sync/syncEngine.ts` | 1925 | 31 |
 | `e2e/slag/editor.spec.ts` | 1737 | 0 |
-| `src/lib/storage/index.ts` | 1580 | 52 |
-| `src/lib/sync/notes/replica.ts` | 1110 | 1 |
+| `src/lib/storage/index.ts` | 1641 | 56 |
+| `src/lib/sync/notes/replica.ts` | 1112 | 1 |
+| `src/lib/storage/vaultFiles.ts` | 1105 | 2 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/storage/vaultFiles.ts` | 1046 | 2 |
 | `src/lib/storage/settingsStore.ts` | 966 | 5 |
 | `e2e/slag/feed.spec.ts` | 945 | 0 |
 | `e2e/slag/workspace.spec.ts` | 917 | 0 |
+| `src/mcp/vault.ts` | 877 | 7 |
 | `e2e/mobile.spec.ts` | 837 | 0 |
-| `src/mcp/vault.ts` | 801 | 6 |
 | `src/context/AppContext.tsx` | 776 | 73 |
 | `src/components/Feed/Composer.tsx` | 760 | 4 |
 | `src/components/Feed/ItemCard.tsx` | 720 | 1 |
 
-## e2e (playwright) — 161 файлов, 29606 строк
+## e2e (playwright) — 162 файлов, 30122 строк
 
 Таблицу не строю: спеки ничего не экспортируют. Крупнейшие:
 
@@ -38,8 +38,8 @@
 - `e2e/motion.spec.ts` — 570
 - `e2e/adversarial_memory_time.spec.ts` — 567
 - `e2e/assistant_memory.spec.ts` — 555
+- `e2e/slag/mcp_status_mailbox.spec.ts` — 516
 - `e2e/admin_panel.spec.ts` — 493
-- `e2e/adversarial_memory_contradictions.spec.ts` — 429
 
 ## src — 2 файлов, 579 строк
 
@@ -620,7 +620,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 31 | 2 | writeJsonAtomic | Installation prefs and encrypted secret snapshots use write-then-rename. Vaul… |
 
-## src/lib/storage — 34 файлов, 8060 строк
+## src/lib/storage — 35 файлов, 8293 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -628,7 +628,7 @@
 | `attachments.ts` | 363 | 4 | AttachmentStore | Stores attachment bytes on disk and in IndexedDB, handing the UI blob URLs in… |
 | `folderSource.ts` | 52 | 3 | folderMetaFor, diffFolderPaths | A folder exists because its directory does. This module turns the paths found… |
 | `folderStore.ts` | 275 | 2 | FolderStoreHost, readFolders, rememberFolders, forgetVaultFolders, writeFolder, +5 | Writing folders: save, rename with the note cascade, move by drag, describe, … |
-| `index.ts` | 1580 | 52 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
+| `index.ts` | 1641 | 56 | StorageOrigin, StorageChangeEvent, StorageChangeListener, VaultDiskChange, StorageService, +6 | The one door to the vault: notes, cache and change events, and delegation to … |
 | `indexedDb.ts` | 160 | 2 | idbSaveAttachment, idbGetAttachment, idbGetAllAttachments, StoredSnapshotRecord, idbSaveSnapshot, +3 | IndexedDB blob store for attachment bytes and backup snapshots, keyed by id. |
 | `integrityReader.ts` | 97 | 1 | tauriVaultReader | The wall between the integrity scans and the disk: the app reads its vault th… |
 | `integrityService.ts` | 163 | 1 | IntegrityRun, RepairOutcome, runIntegrityCheck, applyIntegrityRepair, describePlan, +1 | What the storage panel calls: run the scans over the live vault and, when ask… |
@@ -646,10 +646,11 @@
 | `sharedProjection.ts` | 68 | 2 | workspaceSharedMutations, memorySharedMutations, draftSharedMutation, sharedSettingsProjection |  |
 | `stateSections.ts` | 491 | 6 | STATE_SECTIONS, ComposerDraftMap, FullscreenDraftMap, TelegramThreadEntry, DraftsSection, +24 | The shape of what a vault's `state.json` keeps for `settingsStore`: drafts, t… |
 | `syncReconcile.ts` | 165 | 1 | SyncedVaultSnapshot, StagedSyncImport, ReconciledSyncImport, reconcileSyncedVault | A bundle is written from a snapshot: the user keeps typing while it travels t… |
+| `taskMailbox.ts` | 113 | 8 | TaskMailboxRequest, TaskMailboxReceipt, MAILBOX_DIR_NAME, REQUEST_TTL_MS, MAX_MAILBOX_BYTES, +9 | Task mailbox — atomic bridge for status changes from MCP in registry-enabled … |
 | `trashStore.ts` | 94 | 2 | TrashStoreHost, trashStorageKey, readTrash, trashItem, recoverFromTrash | Keeps deleted notes in a per-vault trash, so restore happens before sync. The… |
 | `usage.ts` | 402 | 2 | MediaKind, LocalUsageGroup, LocalUsage, MediaTypeUsage, HeavyAttachment, +16 | What the store actually occupies: the settings file, the vault's state and fi… |
 | `vaultDiscovery.ts` | 28 | 1 | mergeDiscoveredVaults | The vault list lives in localStorage only, and a native webview profile can b… |
-| `vaultFiles.ts` | 1046 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
+| `vaultFiles.ts` | 1105 | 2 | VaultFilesDeps, VaultFiles | The vault as files on disk: where they live, how a name is claimed, how a not… |
 | `vaultNoteMove.ts` | 304 | 1 | VAULT_NOTE_MOVE_INTENT_FILE, VAULT_NOTE_MOVE_VERSION, VaultNoteMoveIo, VaultNoteMoveRequest, VaultNoteMoveIntentV1, +4 | A local note move — rename, or a move to another folder — is two disk operati… |
 | `vaultRecovery.ts` | 126 | 5 | RECOVERY_LOCAL_ONLY, RecoveryReason, VaultRecovery, isMissingVaultFile, readVaultBytes, +2 | Recover the local vault before the normal scanner, watcher or sync engine can… |
 | `vaultRegistry.ts` | 180 | 3 | VaultRegistryHost, initCurrentVault, getVaults, saveVaultMeta, discoverVaults, +5 | Which vault the app is looking at: the registry kept in `prefs` (`settings.js… |
@@ -659,7 +660,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 60 файлов, 12740 строк
+## src/lib/sync — 60 файлов, 12743 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -691,19 +692,19 @@
 | `manifest/sync.ts` | 119 | 3 | getManifest, syncManifest | Compare peer snapshots for diagnostics. A snapshot cannot authorize vault wri… |
 | `notes/bootstrap.ts` | 127 | 0 | BootstrapCopy, BootstrapDecision, planBootstrap, sealBootstrap, sealFolderRegistrySeed | Runs on a trusted client (or local migration tool), never at the relay with d… |
 | `notes/channel.ts` | 111 | 3 | RelayPaused, NoteHttpError, NoteChannel | HTTP catch-up and fallback share the room's existing account authorization. |
-| `notes/journal.ts` | 178 | 12 | JournalKind, RegistryValue, NoteBase, sameRegistryValue, JournalAttempt, +12 | Pure transitions for an ordered queue of local intentions; disk and network s… |
+| `notes/journal.ts` | 178 | 13 | JournalKind, RegistryValue, NoteBase, sameRegistryValue, JournalAttempt, +12 | Pure transitions for an ordered queue of local intentions; disk and network s… |
 | `notes/legacyCutover.ts` | 75 | 4 | LEGACY_CUTOVER, sameLegacyValue, LegacyCutoverBlocked, prepareLegacyCutover |  |
 | `notes/mediaWire.ts` | 49 | 1 | REGISTRY_MEDIA_MAX_BYTES, sealRegistryMedia, openRegistryMedia |  |
 | `notes/merge.ts` | 157 | 14 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
 | `notes/mergeValidation.ts` | 78 | 2 | noteMergeViolations | Reject combinations whose individual property edits do not compose safely. |
 | `notes/migrationExport.ts` | 84 | 1 | exportMigrationSnapshot, canExportMigrationSnapshot | Local-only evidence: preserve physical copies, including duplicate IDs and tr… |
-| `notes/persistence.ts` | 157 | 5 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
+| `notes/persistence.ts` | 157 | 6 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
 | `notes/reconcile.ts` | 57 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
 | `notes/recoveryJournal.ts` | 53 | 2 | readRecoveryRegistry, planRecoveredJournal | Rehydrate an empty disk from the relay; import local intentions, not the old … |
-| `notes/replica.ts` | 1110 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/replica.ts` | 1112 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/review.ts` | 54 | 5 | RECOVERED_DISK, needsReviewedHead, noteReviewKind, selectableNoteFields, applyReviewedFields |  |
 | `notes/rollover.ts` | 35 | 2 | isOverdueRollover, supersededRollover, expiredLegacyDeadline | Prove that the saved change does no more than running the app's overdue rollo… |
-| `notes/session.ts` | 236 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
+| `notes/session.ts` | 237 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/sharedBody.ts` | 60 | 20 | SharedKind, SharedValue, isLegacySharedKind, SharedBody, SharedMutation, +4 |  |
 | `notes/sharedWorkspace.ts` | 109 | 5 | SharedWorkspaceField, SharedWorkspace, SharedWorkspaceValue, isSharedWorkspaceField, selectSharedWorkspace, +3 |  |
 | `notes/wire.ts` | 331 | 24 | FOLDER_TREE_ID, RegistryBody, NoteKind, NoteMode, NoteStatus, +33 | The authenticated relay sees routing metadata, never the note's identity or b… |
@@ -728,7 +729,7 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `taskCompletion.ts` | 57 | 1 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
+| `taskCompletion.ts` | 57 | 2 | applyTaskCompletion | keep every local status entry point consistent, without applying transitions … |
 | `taskQuickFilter.ts` | 25 | 11 | TASK_QUICK_FILTER_LABELS, TaskQuickFilterId, TaskQuickFilter, matchesTaskQuickFilter | Classifies existing tasks by their saved local deadline, not their reminder. |
 | `taskSchedule.ts` | 13 | 4 | classifyDueDate, classifyTaskSchedule | A local calendar comparison, independent of reminder time and task recurrence. |
 | `taskUtils.ts` | 109 | 20 | baseTaskId, parseSubtasksFromContent, toggleCheckboxInContent, setAllCheckboxesInContent, migrateLegacySubtasksToContent, +1 | The calendar projects a recurring task into every occurrence as |
@@ -780,7 +781,7 @@
 | `stats.ts` | 67 | 2 | VaultStats, collectExistingTags, computeVaultStats | Read-only counters and tag tallies, with the inbox treated as the whole vault. |
 | `vaultDisplay.ts` | 24 | 5 | getVaultDisplayName | Names a vault for the UI, adding a short id suffix only when two names collid… |
 
-## src/mcp — 11 файлов, 2183 строк
+## src/mcp — 11 файлов, 2259 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -794,7 +795,7 @@
 | `serverInfo.ts` | 16 | 1 | SERVER_INFO | What a host shows beside the tools: a name and a version alone leave the serv… |
 | `tools.ts` | 480 | 3 | registerMcpTools | MCP tools that read and write notes, tasks, folders and attachments in a vaul… |
 | `types.ts` | 101 | 3 | McpVaultConfig, VaultStateData, NoteMatch, SaveNoteSchema, GetNoteSchema, +7 | Zod schemas and vault shapes the MCP tools accept, with their user-facing des… |
-| `vault.ts` | 801 | 6 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
+| `vault.ts` | 877 | 7 | AttachmentPayload, AttachmentRead, resolveVaultConfig, McpVault | The vault as the MCP server sees it: files on disk, frontmatter, attachments … |
 
 ## src/node — 7 файлов, 1085 строк
 
@@ -808,17 +809,17 @@
 | `vaultGuard.ts` | 87 | 2 | isEnrolledMarkerName, guardRoots, enrolledMarkerSync, enrolledMarker | What a second writer owes the app's own storage: do not mutate a vault the SL… |
 | `vaultPort.ts` | 360 | 1 | NodeVault | The vault as the headless node sees it: notes are files under `notes/`, every… |
 
-## src/node/stubs — 3 файлов, 89 строк
+## src/node/stubs — 3 файлов, 93 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `storageSingleton.ts` | 8 | 0 | storage | `syncEngine` re-exports the browser store for the e2e specs. The headless bui… |
 | `tauri.ts` | 29 | 0 | isTauri, getCurrentWindow, getCurrentWebviewWindow, listen, addPluginListener, +1 | Stubs for the tauri API, swapped in by the headless build. `isTauri()` must a… |
-| `tauriFs.ts` | 52 | 0 | BaseDirectory, mkdir, writeTextFile, rename, readDir, +5 | Logs on disk go through plugin-fs in the browser build. A server writes them … |
+| `tauriFs.ts` | 56 | 0 | BaseDirectory, mkdir, writeTextFile, rename, readDir, +6 | Logs on disk go through plugin-fs in the browser build. A server writes them … |
 
 ## src/types — 2 файлов, 859 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 692 | 250 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 692 | 251 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |
