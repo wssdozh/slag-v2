@@ -72,6 +72,7 @@ docs/project-map/  база знаний проекта, 15 документов
 | задача | начинать с |
 |---|---|
 | синхронизация: соединение, очередь, конфликты | `src/lib/sync/syncEngine.ts`, `transport.ts`, `applyBundle.ts`, `pushBundle.ts` |
+| Android: задержка синхронизации в фоне и после возврата | [протокол диагностики](docs/android-background-sync.md), [изолированный APK и релей](docs/note-registry-staging.md#изолированная-проверка-android) |
 | эталон заметок: операции, квитанции, слияние и восстановление | `src/lib/sync/notes/`: `session.ts` — режим комнаты, `replica.ts` — доставка, `journal.ts` — намерения, `reconcile.ts` — решение CAS и проверка непрерывности, `merge.ts` и `mergeValidation.ts` — слияние и проверка результата, `bootstrap.ts` — миграция |
 | эхо записи на диск и семантика Markdown | `src/lib/storage/noteDiskProjection.ts`, `src/lib/vault/noteSemantics.ts`, `src/lib/vault/markdownSerializer.ts`; построчное слияние — `src/lib/text/mergeMarkdown.ts` |
 | загрузка бэклога: бюджет страницы, дедлайн, курсор | `src/lib/sync/pullPage.ts`, `SyncEngine.fetchPendingBundlesHttp()`, `docs/sync-architecture.md` |
