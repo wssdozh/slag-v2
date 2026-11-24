@@ -19,7 +19,7 @@ const syncLog = logger.scope('SYNC');
  * it must read, but the packing rules are not the transport's business.
  */
 export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
-    if (!engine.canUseVaultRelay() || (engine.status.authRequired && !accountClient.getToken(engine.config.serverUrl))) return;
+    if (engine.isRelayPaused || !engine.canUseVaultRelay() || (engine.status.authRequired && !accountClient.getToken(engine.config.serverUrl))) return;
     if (engine.isProcessingSync || !engine.activeVaultKey || !engine.activeRoomId) {
       // An edit landing mid-push must not be dropped: repush right after this bundle.
       if (engine.isProcessingSync) engine.pushDirty = true;
@@ -45,6 +45,7 @@ export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
 
     engine.isProcessingSync = true;
     const generation = engine.initGeneration;
+    const current = () => generation === engine.initGeneration && engine.canUseVaultRelay();
     const vaultKey = engine.activeVaultKey;
 
     try {
@@ -273,6 +274,7 @@ export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
         }
       }
 
+      if (!current() || engine.isRelayPaused) return;
       if (changes.length === 0) {
         // Only outbox noise that changed nothing on disk: nothing to send.
         syncLog.debug('Push skipped: no entity changed since the last bundle');
@@ -304,6 +306,7 @@ export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
         opIds: pendingOps.map((o) => o.opId),
         changes: changes.length,
         settled: false,
+        attachmentRequestId: attachmentRequest?.attachmentId,
         fallbackTimer: null,
       };
 
@@ -311,14 +314,10 @@ export async function pushLocalChanges(engine: SyncEngine): Promise<void> {
         `Queued bundle ${pending.bundleId} (${changes.length} changes, ${encrypted.ciphertext.length} B) -> room ${engine.activeRoomId.slice(0, 10)}...`
       );
 
-      if (generation !== engine.initGeneration) return;
+      if (!current() || engine.isRelayPaused) return;
       await requireSyncSectionFlushed();
-      if (generation !== engine.initGeneration) return;
+      if (!current() || engine.isRelayPaused) return;
       engine.pendingPushes.set(pending.bundleId, pending);
-      if (attachmentRequest) {
-        // Stamped at the send, not at the enqueue: a request that never left must retry freely.
-        engine.markAttachmentRequestSent(attachmentRequest.attachmentId);
-      }
       if (engine.hasPendingAttachmentRequests()) {
         // One request per bundle: every further file waits for its own small push.
         engine.scheduleDebouncedPush(0);

@@ -13,6 +13,7 @@ export async function openNoteSession(options: {
   port: VaultPort; headers: (json: boolean) => Record<string, string>; readOnly: boolean;
   sendLive: (message: string) => boolean; onProgress: () => void; onError: (error: unknown) => void;
   isLiveOpen?: () => boolean;
+  isRelayPaused?: () => boolean;
   onDeliveryChange?: () => void;
   log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
   onStatus?: (status: import('./wire.ts').NoteStatus) => void;

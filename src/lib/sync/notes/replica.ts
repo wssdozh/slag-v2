@@ -3,7 +3,7 @@ import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.
 import type { AcceptedNote, NoteMutation, NoteOrigin } from '../../storage/noteRegistry';
 import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
-import { NoteChannel } from './channel.ts';
+import { NoteChannel, RelayPaused } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
 import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteIntentSource, NoteJournal, RegistryValue } from './journal.ts';
 import { noteDifferences, relayNote } from './merge.ts';
@@ -26,6 +26,7 @@ interface NoteReplicaHost {
   sendLive: (data: string) => boolean;
   /** The confirmed socket is open right now, so a first note need not wait for it. */
   isLiveOpen?: () => boolean;
+  isRelayPaused?: () => boolean;
   save: (state: NoteJournal) => Promise<void>;
   apply: (note: AcceptedNote) => Promise<void>;
   applyFolderTree?: (folders: FolderMeta[]) => Promise<void>;
@@ -421,7 +422,7 @@ export class NoteReplica {
   }
 
   private schedule(delay = PUSH_DELAY_MS) {
-    if (!this.ready || this.host.readOnly || this.host.signal.aborted || this.sending || this.timer || !this.pendingCount) return;
+    if (!this.ready || this.host.readOnly || this.host.signal.aborted || this.host.isRelayPaused?.() || this.sending || this.timer || !this.pendingCount) return;
     this.timer = setTimeout(() => {
       this.timer = undefined;
       // The queue at scheduling time is not a licence to send: a reconnect, read-only
@@ -590,19 +591,31 @@ export class NoteReplica {
   }
 
   private retryPull() {
-    if (this.pullRetry || this.host.signal.aborted) return;
+    if (this.pullRetry || this.host.signal.aborted || this.host.isRelayPaused?.()) return;
     this.pullRetry = setTimeout(() => {
       this.pullRetry = undefined;
       void this.catchUp().catch((error: unknown) => this.error(error));
     }, RETRY_MS);
   }
 
+  async catchUpAfterPause(): Promise<void> {
+    // A pre-pause pull may finish without reading another page. Join it first, but only
+    // reuse it if it confirmed the new connection epoch (see requireCatchUp and pull).
+    if (this.pulling) {
+      await this.pulling.catch(() => undefined);
+      if (this.ready) return;
+    }
+    await this.catchUp();
+  }
+
   catchUp(manual = false): Promise<void> {
     if (this.pulling) return manual ? this.pulling.then(() => this.catchUp(true)) : this.pulling;
+    if (this.host.isRelayPaused?.()) return Promise.resolve();
     this.pulling = this.pull(manual).then(() => {
       clearTimeout(this.pullRetry);
       this.pullRetry = undefined;
     }, (error: unknown) => {
+      if (error instanceof RelayPaused) return;
       this.projectionFailed = true;
       this.error(error);
       this.retryPull();
@@ -753,6 +766,7 @@ export class NoteReplica {
             });
             break;
           } catch (err) {
+            if (err instanceof RelayPaused) break;
             members.forEach(({ intentId }) => this.failedIntents.add(intentId));
             firstError ??= err;
             continue;
@@ -791,6 +805,7 @@ export class NoteReplica {
           bytes += size;
           if (planned.length === NOTE_BATCH_COUNT || (this.host.atomicGroups && intent.id === FOLDER_TREE_ID)) break;
         } catch (err) {
+          if (err instanceof RelayPaused) break;
           this.failedIntents.add(intent.intentId);
           firstError ??= err;
         }
@@ -817,6 +832,7 @@ export class NoteReplica {
       if (live) this.host.log?.('Sending note operations', { ...meta, transport: 'ws' });
       let response = live ? await socketResult : null;
       if (!response) {
+        if (this.host.isRelayPaused?.()) throw new RelayPaused();
         this.host.log?.('Sending note operations', { ...meta, transport: 'http', fallback: live });
         response = await this.host.channel.send(data.generation, requestId, ops, observedHead);
       }
@@ -978,13 +994,14 @@ export class NoteReplica {
   }
 
   private async flush() {
-    if (this.sending || this.host.signal.aborted) return;
+    if (this.sending || this.host.signal.aborted || this.host.isRelayPaused?.()) return;
     this.sending = true;
     let delay = PUSH_DELAY_MS;
     let dispatched: ReadonlySet<string> = this.sendingIntents;
     try {
       const pendingBefore = this.pendingCount;
       const { ops, observedHead } = await this.prepare();
+      if (this.host.isRelayPaused?.()) return;
       if (ops.length) {
         const ids = new Set(ops.map(({ opId }) => opId));
         const intents = this.state.pending.filter(({ attempt }) => attempt && ids.has(attempt.op.opId));
@@ -1019,6 +1036,7 @@ export class NoteReplica {
         delay = RETRY_MS;
       }
     } catch (error) {
+      if (error instanceof RelayPaused) return; // The immutable attempt stays in the journal.
       const pending = new Set(this.state.pending.map(({ intentId }) => intentId));
       for (const id of dispatched) if (pending.has(id)) this.failedIntents.add(id);
       this.host.log?.('Note flush failed', { generation: this.host.generation,

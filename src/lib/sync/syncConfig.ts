@@ -149,17 +149,19 @@ export function authHeaders(store: SyncConfigHost, includeJson = false): Record<
   return headers;
 }
 
-export async function refreshServerAuth(store: SyncConfigHost): Promise<boolean> {
+export async function refreshServerAuth(store: SyncConfigHost, isCurrent = () => true): Promise<boolean> {
+  let authRequired: boolean;
   try {
     const cleanUrl = apiBase(store.config.serverUrl);
     const response = await fetch(`${cleanUrl}/health`, { signal: AbortSignal.timeout(SYNC_INTERVALS.HEALTH_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`Health check failed: HTTP ${response.status}`);
     const health = await response.json();
-    store.status.authRequired = Boolean(health.authRequired);
+    authRequired = Boolean(health.authRequired);
   } catch {
-    const isOfficial = OFFICIAL_SYNC_DOMAINS.some((domain) => store.config.serverUrl.includes(domain));
-    store.status.authRequired = isOfficial;
+    authRequired = OFFICIAL_SYNC_DOMAINS.some((domain) => store.config.serverUrl.includes(domain));
   }
+  if (!isCurrent()) return false;
+  store.status.authRequired = authRequired;
   store.status.isAuthenticated = accountClient.getToken(store.config.serverUrl) !== null;
   store.notify();
   return !store.status.authRequired || store.status.isAuthenticated;

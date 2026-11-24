@@ -56,12 +56,12 @@ export async function syncManifest(
     syncLog.debug('Манифест не построен', { error: String(error) });
     return;
   }
-  if (generation !== engine.initGeneration) return;
+  if (engine.isRelayPaused || generation !== engine.initGeneration) return;
 
   // Read the peers BEFORE publishing: a POST first leaves this device reading its own row back.
   const observedPeers = await readPeerManifests(engine);
   const peers = observedPeers ?? [];
-  if (generation !== engine.initGeneration) return;
+  if (engine.isRelayPaused || generation !== engine.initGeneration) return;
 
   const wire = toWire(local);
   const decision = decideManifest(local, peers);

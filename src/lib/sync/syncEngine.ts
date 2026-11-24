@@ -37,6 +37,7 @@ import { createSyncOpFromStorageEvent } from './entities/registry';
 import { syncErrorText } from './errorText';
 import { isPageTimeout, nextPullStep, pullDeadlineMs, shrinkPullBudget } from './pullPage';
 import { SyncTransport } from './transport';
+import { isAndroidRelayPaused, waitForAndroidSync, watchAndroidSync } from './androidSyncLifecycle';
 import * as manifestSchedule from './manifest/schedule';
 import * as manifestSync from './manifest/sync';
 import { connectSocket, handleIncoming, acknowledgeBundle } from './syncSocket';
@@ -99,6 +100,8 @@ export interface PendingPush {
   opIds: string[];
   changes: number;
   settled: boolean;
+  httpInFlight?: boolean;
+  attachmentRequestId?: string;
   fallbackTimer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -159,6 +162,10 @@ export class SyncEngine {
   public initGeneration = 0;
   private relayRead: Promise<boolean> | undefined;
   private validatedSyncId: string | undefined;
+  private androidPauseEpoch = 0;
+  private androidResume?: Promise<void>;
+  private androidResumeSocketReady?: () => void;
+  private recheckRoomMode = false;
   private pendingPull: { generation: number; promise: Promise<void> } | null = null;
   public currentVaultId: string = 'default_vault';
   private pushDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -290,10 +297,13 @@ export class SyncEngine {
       },
       onServerAck: (bundleId) => {
         const pending = this.pendingPushes.get(bundleId);
-        if (pending) this.commitPush(pending);
+        if (pending && this.canUseVaultRelay()) this.commitPush(pending);
       },
       onNoteMessage: (message) => this.noteSession?.replica.handleMessage(message),
-      onRoomModeChanged: () => { void this.init(); },
+      onRoomModeChanged: () => {
+        if (this.isRelayPaused) this.recheckRoomMode = true;
+        else void this.init();
+      },
       onBundle: async (bundle) => {
         await this.applyIncomingBundle(bundle);
       },
@@ -308,7 +318,12 @@ export class SyncEngine {
       onAssistantAction: (requestId, action) => {
         return this.assistantActionHandler?.(requestId, action);
       },
-      onCatchUpPull: () => {
+      onCatchUpPull: (reason) => {
+        if (this.isRelayPaused || !this.canUseVaultRelay()) return;
+        if (this.androidResume) {
+          if (reason === 'welcome') this.androidResumeSocketReady?.();
+          return;
+        }
         void this.noteSession?.replica.catchUp().catch((error: unknown) => this.reportNoteError(error));
         void this.fetchPendingBundlesHttp().catch((error) => syncLog.warn('Catch-up pull failed:', error));
         // A dropped socket takes the debounce timer with it; asks that survived the reconnect
@@ -494,7 +509,71 @@ export class SyncEngine {
     this.listeners.forEach((fn) => fn(current));
   }
 
+  public get isRelayPaused(): boolean { return isAndroidRelayPaused(); }
+
+  private pauseAndroidSync(): void {
+    this.androidPauseEpoch++;
+    this.androidResumeSocketReady?.();
+    this.transport.setPaused(true);
+    this.noteSession?.replica.requireCatchUp();
+    this.clearRetryTimer();
+    this.clearPushDebounce();
+    manifestSchedule.clearManifestCheck();
+  }
+
+  private resumeAndroidSync(wasPaused: boolean): void {
+    if (!this.config.enabled || !this.activeRoomId || !this.canUseVaultRelay()) return;
+    const socketUnavailable = !this.transport.isOpenFor(this.activeRoomId) && this.ws?.readyState !== WebSocket.CONNECTING;
+    if (this.recheckRoomMode) { void this.init(); return; }
+    if (!wasPaused && (!socketUnavailable || this.androidResume)) return;
+    const generation = this.initGeneration;
+    const pauseEpoch = this.androidPauseEpoch;
+    const current = () => generation === this.initGeneration && pauseEpoch === this.androidPauseEpoch
+      && !this.isRelayPaused && this.canUseVaultRelay();
+    // Coalesce a reconnect's welcome with this pass, but fall back to HTTP even if no
+    // socket can be established. An unresponsive transport must not hold the outbox.
+    const socketReady = socketUnavailable ? new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, SYNC_INTERVALS.RECONNECT_BASE_MS);
+      this.androidResumeSocketReady = () => { clearTimeout(timer); resolve(); };
+    }) : Promise.resolve();
+    const resume = socketReady.then(() => this.catchUpAfterAndroidResume(current, wasPaused))
+      .catch((error: unknown) => syncLog.warn('Resume sync failed:', error))
+      .finally(() => {
+        if (this.androidResume !== resume) return;
+        this.androidResume = undefined;
+        this.androidResumeSocketReady = undefined;
+      });
+    this.androidResume = resume;
+    if (socketUnavailable) this.connectWebSocket();
+  }
+
+  private async catchUpAfterAndroidResume(current: () => boolean, wasPaused: boolean): Promise<void> {
+    // Wait out a request that started before the pause: it may hold an older snapshot.
+    if (wasPaused && this.pendingPull) await this.pendingPull.promise.catch(() => undefined);
+    if (!current()) return;
+    try {
+      await Promise.all([this.fetchPendingBundlesHttp(), this.noteSession?.replica.catchUpAfterPause()]);
+    } catch (error) {
+      if (current() && error instanceof Error && error.message === 'note_upgrade_required') await this.init();
+      else if (current()) this.reportNoteError(error);
+    }
+    if (!current()) return;
+    await Promise.all([...this.pendingPushes.values()].filter((pending) => pending.fallbackTimer === null)
+      .map((pending) => this.deliverPushOverHttp(pending)));
+    if (!current()) return;
+    this.scheduleAttachmentPass();
+    this.scheduleDebouncedPush(0);
+  }
+
+  private clearPushDebounce(): void {
+    if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
+    this.pushDebounceTimer = null;
+    this.pushDebounceDeadline = 0;
+    this.pushDebounceTrailing = false;
+  }
+
   public scheduleDebouncedPush(delayMs: number = SYNC_INTERVALS.PUSH_DEBOUNCE_MS, trailing = false): void {
+    if (this.isRelayPaused) return;
     const deadline = Date.now() + delayMs;
     if (this.pushDebounceTimer) {
       // A note never waits for a slow draft timer: the faster pending push wins.
@@ -530,12 +609,12 @@ export class SyncEngine {
     delayMs: number = SYNC_INTERVALS.MANIFEST_CHECK_DEBOUNCE_MS,
     trigger: ManifestTrigger = 'push',
   ): void {
-    if (!this.noteGeneration) manifestSchedule.scheduleManifestCheck(this, delayMs, trigger);
+    if (!this.isRelayPaused && !this.noteGeneration) manifestSchedule.scheduleManifestCheck(this, delayMs, trigger);
   }
 
   /** The panel's «сверить сейчас»: one check, now, with the latch out of the way. */
   public requestManifestCheck(): void {
-    if (!this.canUseVaultRelay()) return;
+    if (this.isRelayPaused || !this.canUseVaultRelay()) return;
     if (this.noteSession) {
       // The offline capture session exists before disk edits are safe from inbound projection.
       if (this.activeRoomId) void this.noteSession.replica.catchUp(true).catch((error: unknown) => this.reportNoteError(error));
@@ -566,7 +645,7 @@ export class SyncEngine {
       syncLog.debug('Attachment pass skipped: relay refused the plan quota for this session');
       return;
     }
-    const pending = this.countPendingAttachments();
+    const pending = [...this.forcedAttachmentIds].some((id) => !this.isAttachmentInFlight(id)) ? 1 : this.countPendingAttachments();
     if (pending === 0) {
       syncLog.debug('Attachment pass skipped: nothing left to deliver');
       return;
@@ -576,13 +655,17 @@ export class SyncEngine {
     this.scheduleDebouncedPush(0);
   }
 
+  private isAttachmentInFlight(id: string): boolean {
+    return [...this.pendingPushes.values()].some(({ packedHashes }) => Object.hasOwn(packedHashes, `att:${id}`));
+  }
+
   /** Signature comparison only: no bytes are read to answer "is anything left to send". */
   private countPendingAttachments(): number {
     const sent = loadSentHashes(this.bookkeeping);
     let pending = 0;
     for (const item of vault().getItems()) {
       for (const att of item.attachments ?? []) {
-        if (this.unreadableAttachments.has(att.id)) continue;
+        if (this.unreadableAttachments.has(att.id) || this.isAttachmentInFlight(att.id)) continue;
         const seen = sent[`att:${att.id}`];
         if (seen !== attachmentSignature(att) && seen !== `skip:${attachmentSignature(att)}`) pending++;
       }
@@ -605,17 +688,9 @@ export class SyncEngine {
     for (const att of attachments) {
       if (!this.forcedAttachmentIds.has(att.id)) continue;
       attempted.add(att.id);
-      const outcome = await this.packAttachmentBytes(att, changes, sentHashes, packedHashes, true);
-      if (outcome === 'packed') {
-        this.forcedAttachmentIds.delete(att.id);
-        // One file per bundle, so the rest of the answers need their own push; without this the
-        // device that was asked for three files sends one and goes quiet.
-        if (this.forcedAttachmentIds.size > 0) {
-          this.attachmentPass = true;
-          this.scheduleDebouncedPush(0);
-        }
-        return true;
-      }
+      if (this.isAttachmentInFlight(att.id)) continue;
+      if (await this.packAttachmentBytes(att, changes, sentHashes, packedHashes, true) === 'packed') return true;
+      this.forcedAttachmentIds.delete(att.id);
     }
     for (const att of attachments) {
       if (attempted.has(att.id)) continue;
@@ -636,6 +711,7 @@ export class SyncEngine {
     forced: boolean
   ): Promise<'packed' | 'skipped'> {
     const key = `att:${att.id}`;
+    if (this.isAttachmentInFlight(att.id)) return 'skipped';
     const sig = attachmentSignature(att);
     const seen = sentHashes[key];
     if (seen === `skip:${sig}`) {
@@ -726,8 +802,10 @@ export class SyncEngine {
   /** At most one request per bundle: the answer is a whole file, not a diff. */
   public nextAttachmentRequest(): AttachmentRequestPayload | null {
     if (this.hasRegistryMedia) return null;
-    const next = this.pendingRequests.values().next();
-    return next.done ? null : next.value;
+    if (this.pendingRequests.size === 0) return null;
+    const inFlight = new Set([...this.pendingPushes.values()].map(({ attachmentRequestId }) => attachmentRequestId));
+    for (const request of this.pendingRequests.values()) if (!inFlight.has(request.attachmentId)) return request;
+    return null;
   }
 
   /** Bytes arrived from whichever device answered first: drop the ask that has not left yet. */
@@ -736,7 +814,7 @@ export class SyncEngine {
   }
 
   public hasPendingAttachmentRequests(): boolean {
-    return !this.hasRegistryMedia && this.pendingRequests.size > 0;
+    return this.nextAttachmentRequest() !== null;
   }
 
   public markAttachmentRequestSent(attachmentId: string): void {
@@ -1026,7 +1104,7 @@ export class SyncEngine {
    * so a single timer per engine is all the deduplication this needs.
    */
   public scheduleRetry(): void {
-    if (this.retryTimer || !this.config.enabled) return;
+    if (this.retryTimer || !this.config.enabled || this.isRelayPaused) return;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       void this.retrySync();
@@ -1040,6 +1118,7 @@ export class SyncEngine {
    */
   public async retrySync(): Promise<void> {
     this.clearRetryTimer();
+    if (this.isRelayPaused) return;
     if (!this.activeRoomId) {
       await this.init();
       return;
@@ -1058,15 +1137,18 @@ export class SyncEngine {
       await this.init();
       return;
     }
+    const generation = this.initGeneration;
     try {
       this.status.state = 'syncing';
       this.notify();
       await Promise.all([this.fetchPendingBundlesHttp(), this.noteSession?.replica.catchUp()]);
+      if (generation !== this.initGeneration || this.isRelayPaused) return;
       // The pull answered, so the red dot is a lie even before the push below decides anything.
       this.status.state = this.ws && this.ws.readyState === WebSocket.OPEN ? 'connected' : 'idle';
       this.notify();
       await pushLocalChanges(this);
     } catch (error) {
+      if (generation !== this.initGeneration || this.isRelayPaused) return;
       if (error instanceof Error && error.message === 'note_upgrade_required') {
         await this.init();
         return;
@@ -1130,6 +1212,7 @@ export class SyncEngine {
       return;
     }
 
+    let initializing = true;
     try {
       this.status.state = 'syncing';
       this.notify();
@@ -1138,15 +1221,26 @@ export class SyncEngine {
       const serverUrl = apiBase(this.config.serverUrl);
       const vaultId = this.validatedSyncId ?? port.getCurrentVault().syncId;
       const [vaultKey, legacyRoomId] = await Promise.all([deriveVaultKey(seedPhrase), deriveRoomId(seedPhrase)]);
-      if (generation !== this.initGeneration) return;
+      if (generation !== this.initGeneration || !this.canUseVaultRelay()) return;
       const accountRoom = async (id: string) =>
         `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', id, legacyRoomId]))).slice(0, 32)}`;
       const controller = this.noteAbort = new AbortController();
+      const current = () => generation === this.initGeneration && this.canUseVaultRelay();
+      this.transport.setPaused(this.isRelayPaused);
+      watchAndroidSync(controller.signal, () => this.pauseAndroidSync(), (wasPaused) => {
+        this.transport.setPaused(false);
+        if (!initializing) this.resumeAndroidSync(wasPaused);
+      });
+      const waitForRelay = async () => {
+        while (current() && this.isRelayPaused) await waitForAndroidSync(controller.signal);
+        return current();
+      };
       const noteOptions = (roomId: string, syncVaultId: string): Parameters<typeof openNoteSession>[0] => ({
         serverUrl, roomId, vaultId: syncVaultId, key: vaultKey,
         signal: controller.signal, port, headers: (json: boolean) => authHeaders(this, json),
         readOnly: this.config.localSyncMode === 'receive-only', sendLive: (message: string) => this.transport.send(message),
         isLiveOpen: () => this.transport.isOpenFor(roomId),
+        isRelayPaused: () => this.isRelayPaused,
         onDeliveryChange: () => this.notify(),
         onStatus: (status) => { if (generation === this.initGeneration) { this.noteRoomStatus = status; this.notify(); } },
         log: (event, data, warning) => warning ? syncLog.warn(event, data) : syncLog.debug(event, data),
@@ -1182,14 +1276,15 @@ export class SyncEngine {
       }
       if (vaultId && accountClient.getToken(this.config.serverUrl) !== null) {
         const roomId = await accountRoom(vaultId);
-        if (generation !== this.initGeneration) return;
+        if (!current()) return;
         const capture = await openNoteSession(noteOptions(roomId, vaultId), true);
-        if (generation !== this.initGeneration) return;
+        if (!current()) return;
         this.noteSession = capture;
         if (capture) this.notify();
       }
-      const canSync = await refreshServerAuth(this);
-      if (generation !== this.initGeneration) return;
+      if (this.isRelayPaused && !await waitForRelay()) return;
+      const canSync = await refreshServerAuth(this, current);
+      if (!current()) return;
       if (!canSync) {
         this.status.state = 'idle';
         this.status.error = initial ? 'Войдите в аккаунт для загрузки хранилища' : null;
@@ -1202,8 +1297,9 @@ export class SyncEngine {
       }
 
       if (this.usesAccountSync()) {
+        if (this.isRelayPaused && !await waitForRelay()) return;
         await accountClient.refresh();
-        if (generation !== this.initGeneration) return;
+        if (!current()) return;
         const accountState = accountClient.getState();
         const vault = accountState.vaults.find((entry) => entry.id === this.getSyncVaultId());
         const grant = vault && vault.grants.find((entry) => entry.deviceId === this.config.deviceId);
@@ -1225,16 +1321,18 @@ export class SyncEngine {
 
       const syncVaultId = this.usesAccountSync() ? this.getSyncVaultId() : this.currentVaultId;
       const roomId = this.usesAccountSync() ? await accountRoom(syncVaultId) : legacyRoomId;
-      if (generation !== this.initGeneration) return;
+      if (!current()) return;
+      if (this.isRelayPaused && !await waitForRelay()) return;
       const noteSession = this.noteSession ?? (this.usesAccountSync() ? await openNoteSession(noteOptions(roomId, syncVaultId)) : null);
+      if (!current()) return;
       if (this.noteSession) {
         if (!this.usesAccountSync() || syncVaultId !== vaultId) throw new Error('Область синхронизации изменилась; локальная очередь сохранена');
         await this.noteSession.verifyEnrollment(this.config.localSyncMode === 'receive-only');
       }
-      if (generation !== this.initGeneration) return;
+      if (!current()) return;
       // Journal edits found on disk before the incoming feed can replace their files.
       await noteSession?.captureColdNoteEdits();
-      if (generation !== this.initGeneration) return;
+      if (!current()) return;
       this.noteSession = noteSession;
       this.activeVaultKey = vaultKey;
       this.activeRoomId = roomId;
@@ -1253,14 +1351,20 @@ export class SyncEngine {
       // can fall into.
       // Through the public method on purpose: the e2e harness replaces it to keep a synthetic
       // socket, and init used to call it that way before the socket moved to its own module.
-      if (!this.transport.isOpenFor(roomId)) this.connectWebSocket();
-      this.startIntervals();
-
       this.batchUpdating = initial;
-      await Promise.all([this.fetchPendingBundlesHttp(), noteSession?.replica.catchUp()]);
-      if (generation !== this.initGeneration) return;
+      let pauseEpoch: number;
+      do {
+        if (this.isRelayPaused && !await waitForRelay()) return;
+        pauseEpoch = this.androidPauseEpoch;
+        if (!this.transport.isOpenFor(roomId) && this.ws?.readyState !== WebSocket.CONNECTING) this.connectWebSocket();
+        this.startIntervals();
+        await Promise.all([this.fetchPendingBundlesHttp(), noteSession?.replica.catchUp()]);
+        if (!current()) return;
+      } while (this.isRelayPaused || pauseEpoch !== this.androidPauseEpoch);
+      initializing = false;
       this.batchUpdating = false;
       await this.flushStagedImport();
+      if (!current()) return;
       if (initial) {
         setInitialSyncPending(this.currentVaultId, false);
         this.status.initialSync.state = 'ready';
@@ -1295,6 +1399,8 @@ export class SyncEngine {
       this.status.error = msg;
       this.notify();
       this.scheduleRetry();
+    } finally {
+      initializing = false;
     }
   }
 
@@ -1337,7 +1443,7 @@ export class SyncEngine {
   }
 
   public connectWebSocket(): void {
-    if (!this.canUseVaultRelay()) return;
+    if (this.isRelayPaused || !this.canUseVaultRelay()) return;
     connectSocket(this);
   }
 
@@ -1351,7 +1457,7 @@ export class SyncEngine {
   private applyIncomingBundle(bundlePayload: unknown): Promise<void> {
     const generation = this.initGeneration;
     const applying = this.incomingQueue.then(async () => {
-      if (generation === this.initGeneration) await persistIncomingBundle(this, bundlePayload);
+      if (generation === this.initGeneration && this.canUseVaultRelay()) await persistIncomingBundle(this, bundlePayload);
     });
     this.incomingQueue = applying.catch((error) => {
       syncLog.warn('Incoming bundle queue paused after failure:', error);
@@ -1381,7 +1487,9 @@ export class SyncEngine {
 
     for (const [key, hash] of Object.entries(pending.packedHashes)) {
       if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
+      if (key.startsWith('att:')) this.forcedAttachmentIds.delete(key.slice(4));
     }
+    if (pending.attachmentRequestId) this.markAttachmentRequestSent(pending.attachmentRequestId);
     saveStateHash(this.bookkeeping, pending.stateHash);
     saveSentHashes(this.bookkeeping, { ...loadSentHashes(this.bookkeeping), ...pending.packedHashes });
     this.getOutbox().markSynced(pending.opIds);
@@ -1397,11 +1505,13 @@ export class SyncEngine {
   }
 
   public async deliverPushOverHttp(pending: PendingPush): Promise<void> {
-    if (pending.settled) return;
+    if (pending.settled || pending.httpInFlight || !this.canUseVaultRelay()) return;
     if (pending.fallbackTimer) {
       clearTimeout(pending.fallbackTimer);
       pending.fallbackTimer = null;
     }
+    if (this.isRelayPaused) return; // Resume replays this same bundle ID if the socket never ACKs.
+    pending.httpInFlight = true;
     // A refusal from the relay is an answer, not a failure to repeat: only a lost connection or a
     // timeout is worth another pass, and those schedule one below.
     let retryable = true;
@@ -1409,6 +1519,7 @@ export class SyncEngine {
       if (this.failedItemHashes.get(key) === hash) this.failedItemHashes.delete(key);
     }
     const generation = this.initGeneration;
+    const current = () => generation === this.initGeneration && this.canUseVaultRelay();
     // The deadline is bytes-shaped, not flat. A 7 MB attachment over a home uplink is a legitimate
     // push that needs more than thirty seconds: the fixed deadline cut it off mid-transfer, the pull
     // put that file back in the queue, and the machine sat in a push → timeout → retry loop where
@@ -1426,17 +1537,21 @@ export class SyncEngine {
         // forever, so the sidebar shows a spinner that never resolves.
         signal: AbortSignal.timeout(timeoutMs),
       });
+      if (!current()) return;
       if (!response.ok) {
         if (response.status === 409) {
           const receipt: unknown = await response.json().catch(() => null);
           // Only an explicit replay receipt acknowledges delivery. Freeze and upgrade are refusals.
+          if (!current()) return;
           if (!receipt || typeof receipt !== 'object' || !('error' in receipt) || receipt.error !== 'bundle_replay') {
             throw new Error('Sync push failed: HTTP 409');
           }
         } else if (response.status === 401 || response.status === 403) {
-          retryable = false;
           this.disconnect();
-          throw new Error(response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете');
+          this.status.state = 'error';
+          this.status.error = response.status === 401 ? 'Сессия недействительна. Войдите в личный кабинет' : 'Сервер запретил обмен. Проверьте доступ к хранилищу в личном кабинете';
+          this.notify();
+          return;
         } else if (response.status === 413) {
           // The plan's cache quota is counted in bundle bytes. Retrying the same ten-megabyte
           // attachment would hammer the relay forever, so attachments rest until a restart.
@@ -1447,14 +1562,12 @@ export class SyncEngine {
           throw new Error(`Sync push failed: HTTP ${response.status}`);
         }
       }
-      this.commitPush(pending);
+      if (current()) this.commitPush(pending);
     } catch (err: unknown) {
-      if (pending.settled) return;
+      if (pending.settled || !current()) return;
       this.pendingPushes.delete(pending.bundleId);
-      if (generation === this.initGeneration) {
-        for (const [key, hash] of Object.entries(pending.packedHashes)) {
-          if (key.startsWith('item:')) this.failedItemHashes.set(key, hash);
-        }
+      for (const [key, hash] of Object.entries(pending.packedHashes)) {
+        if (key.startsWith('item:')) this.failedItemHashes.set(key, hash);
       }
       const msg = syncErrorText(err, timeoutMs);
       syncLog.error(`Failed to push bundle ${pending.bundleId}:`, msg);
@@ -1462,6 +1575,8 @@ export class SyncEngine {
       this.status.error = msg;
       this.notify();
       if (retryable) this.scheduleRetry();
+    } finally {
+      pending.httpInFlight = false;
     }
   }
 
@@ -1472,10 +1587,9 @@ export class SyncEngine {
 
     // Heartbeat ping: this is the only traffic an idle session should produce.
     this.pingInterval = setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-        const ts = Math.floor(Date.now() / 1000);
-        this.ws.send(JSON.stringify({ type: 'ping', ts }));
-      }
+      if (this.isRelayPaused || !this.canUseVaultRelay()) return;
+      const ts = Math.floor(Date.now() / 1000);
+      this.transport.send(JSON.stringify({ type: 'ping', ts }));
     }, SYNC_INTERVALS.WS_PING_INTERVAL_MS);
 
     // A device that edits nothing still has to notice a peer that fell behind. One look at the
@@ -1494,6 +1608,7 @@ export class SyncEngine {
         : 15000;
 
       this.autoSyncInterval = setInterval(() => {
+        if (this.isRelayPaused) return;
         const wsOpen = this.ws !== null && this.ws.readyState === WebSocket.OPEN;
         // A live socket delivers remote bundles and drains the outbox, so an idle tick
         // must not wake the radio for an HTTP poll: that was 5.7k requests a day.
@@ -1508,7 +1623,7 @@ export class SyncEngine {
   }
 
   public fetchPendingBundlesHttp(): Promise<void> {
-    if (!this.canUseVaultRelay() || !this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
+    if (this.isRelayPaused || !this.canUseVaultRelay() || !this.activeRoomId || !this.activeVaultKey) return Promise.resolve();
     const generation = this.initGeneration;
     if (this.pendingPull && this.pendingPull.generation === generation) return this.pendingPull.promise;
     const promise = this.pullPendingBundles(generation)
@@ -1538,11 +1653,11 @@ export class SyncEngine {
         headers: authHeaders(this),
         signal: controller.signal,
       });
-      if (generation !== this.initGeneration) return null;
+      if (generation !== this.initGeneration || !this.canUseVaultRelay()) return null;
       if (!res.ok) {
         if (res.status === 409 && this.usesAccountSync()) {
           const body: unknown = await res.json().catch(() => null);
-          if (generation !== this.initGeneration) return null;
+          if (generation !== this.initGeneration || !this.canUseVaultRelay()) return null;
           if (body && typeof body === 'object' && 'error' in body && body.error === 'note_upgrade_required') {
             throw new Error('note_upgrade_required');
           }
@@ -1555,7 +1670,7 @@ export class SyncEngine {
       const bytes = Number.isSafeInteger(length) && length > 0 ? length : this.pullPageBytes;
       timer = setTimeout(abort, pullDeadlineMs(bytes, this.pullTimeoutMs));
       const data = await res.json();
-      if (generation !== this.initGeneration) return null;
+      if (generation !== this.initGeneration || !this.canUseVaultRelay()) return null;
       if (!Array.isArray(data.bundles)) throw new Error('Invalid sync bundles response');
       return {
         bundles: data.bundles,
@@ -1571,7 +1686,7 @@ export class SyncEngine {
     try {
       // A full first sync is tens of megabytes; a pull that dies halfway must not start over.
       let cursor = loadCursor(this.bookkeeping);
-      while (generation === this.initGeneration) {
+      while (generation === this.initGeneration && this.canUseVaultRelay() && !this.isRelayPaused) {
         const previousCursor = cursor;
         let page: PullPage | null;
         try {
@@ -1599,7 +1714,7 @@ export class SyncEngine {
           await this.applyIncomingBundle(item.payload);
           if (typeof item.syncId === 'number' && item.syncId > cursor) cursor = item.syncId;
         }
-        if (generation !== this.initGeneration) return;
+        if (generation !== this.initGeneration || !this.canUseVaultRelay()) return;
         saveCursor(this.bookkeeping, cursor);
         const step = nextPullStep({
           previousCursor,
@@ -1637,6 +1752,11 @@ export class SyncEngine {
 
   public disconnect(): void {
     ++this.initGeneration;
+    this.androidPauseEpoch = 0;
+    this.androidResumeSocketReady?.();
+    this.androidResumeSocketReady = undefined;
+    this.androidResume = undefined;
+    this.recheckRoomMode = false;
     this.relayRead = undefined;
     this.validatedSyncId = undefined;
     this.failedItemHashes.clear();
@@ -1647,10 +1767,7 @@ export class SyncEngine {
     this.noteError = null;
     // A retry belongs to the session it was armed in; a vault switch must not inherit it.
     this.clearRetryTimer();
-    if (this.pushDebounceTimer) clearTimeout(this.pushDebounceTimer);
-    this.pushDebounceTimer = null;
-    this.pushDebounceDeadline = 0;
-    this.pushDebounceTrailing = false;
+    this.clearPushDebounce();
     if (this.manifestHeartbeatInterval) clearInterval(this.manifestHeartbeatInterval);
     this.manifestHeartbeatInterval = null;
     manifestSchedule.clearManifestCheck();
@@ -1675,6 +1792,7 @@ export class SyncEngine {
     if (this.pingInterval) clearInterval(this.pingInterval);
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
     this.transport.disconnect();
+    this.transport.setPaused(false);
     this.activeVaultKey = null;
     this.activeRoomId = null;
     this.status.currentRoomId = null;
