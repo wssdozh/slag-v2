@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { openNoteSession } from '../src/lib/sync/notes/session.ts';
 
-import { deriveNoteKeys, opaqueNoteId, sealNote } from '../src/lib/sync/notes/wire.ts';
+import { deriveNoteKeys, opaqueNoteId, sealNote, sealSharedRecord } from '../src/lib/sync/notes/wire.ts';
+import { prepareLegacyCutover } from '../src/lib/sync/notes/legacyCutover.ts';
+import { sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
 import { sealRegistryMedia } from '../src/lib/sync/notes/mediaWire.ts';
 
 const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
@@ -38,7 +40,7 @@ test('media enrollment enables ordered local read, upload and CAS, then forbids 
   const done = Promise.withResolvers();
   const options = { key, signal: controller.signal, roomId: room, vaultId: 'vault', serverUrl: 'http://127.0.0.1',
     readOnly: false, headers: () => ({}), onProgress: () => {}, onError: done.resolve,
-    hasPendingLegacyNotes: () => false, sendLive: () => false,
+    migrateLegacy: async () => {}, sendLive: () => false,
     port: { getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true, readNoteRegistry: async () => saved,
       writeNoteRegistry: async (value) => { saved = value; }, subscribeNoteIntents: (listener) => { record = listener; return () => {}; },
       readRegistryAttachment: async () => { steps.push('read'); return Uint8Array.of(4); },
@@ -46,6 +48,7 @@ test('media enrollment enables ordered local read, upload and CAS, then forbids 
     },
   };
   const session = await openNoteSession(options);
+  await session.verifyEnrollment(false);
   assert.equal(saved.registryMedia, true);
   await session.replica.catchUp();
   const item = { id: 'note', type: 'note', title: '', content: '', folder: 'Inbox', createdAt: 1, updatedAt: 1, tags: [],
@@ -82,7 +85,7 @@ test('accepted attachment write failure blocks note projection and the cursor un
   });
   const session = await openNoteSession({ key, signal: controller.signal, roomId: 'room', vaultId: 'vault',
     serverUrl: 'http://127.0.0.1', headers: () => ({}), readOnly: true,
-    onProgress: () => {}, onError: () => {}, onApplied: () => {},
+    onProgress: () => {}, onError: () => {}, onApplied: () => {}, migrateLegacy: async () => {},
     port: { getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true, readNoteRegistry: async () => saved,
       writeNoteRegistry: async (value) => { saved = value; }, subscribeNoteIntents: () => () => {},
       readRegistryAttachment: async () => assert.fail('read-only client must not upload'),
@@ -95,6 +98,7 @@ test('accepted attachment write failure blocks note projection and the cursor un
       }, applyAcceptedNote: async () => { steps.push('note'); },
     },
   });
+  await session.verifyEnrollment(true);
   assert.deepEqual(session.progress, { relayHead: 1, appliedThrough: 0, application: 'catching-up', media: 'waiting' });
   await assert.rejects(session.replica.catchUp(), /disk full/);
   assert.deepEqual(session.progress, { relayHead: 1, appliedThrough: 0, application: 'error', media: 'error' });
@@ -107,34 +111,103 @@ test('accepted attachment write failure blocks note projection and the cursor un
   assert.equal(saved.journal.cursor, 1);
 });
 
-test('registry startup refuses an unreviewed legacy note queue before installing a replica', async (t) => {
-  t.mock.method(globalThis, 'fetch', async (url) => {
-    assert.ok(url.includes('/note-status?'));
-    return Response.json({ mode: 'registry', generation: 1, head: 25, floor: 25 });
-  });
-  const controller = new AbortController();
-  let subscribed = false;
-  let dirty = true;
+test('cutover keeps a legacy note and draft across journal failure and restart, before pulling', async (t) => {
+  const remote = { id: 'note', type: 'note', title: '', content: 'relay', folder: 'Inbox', createdAt: 1, updatedAt: 1, tags: [], attachments: [] };
+  const draft = { content: 'same draft', updatedAt: 1 };
+  const draftId = sharedRegistryId('composer', 'Inbox');
+  const keys = await deriveNoteKeys(key, 'room');
+  const baseFor = async (id) => ({ noteId: await opaqueNoteId(keys, id), opId: crypto.randomUUID(), kind: 'create', baseRevision: 0 });
+  const noteHead = await sealNote(keys, 'room', 1, await baseFor(remote.id), remote.id, remote);
+  const draftHead = await sealSharedRecord(keys, 'room', 1, await baseFor(draftId), draftId, draft);
   let saved;
+  let changeSubscribed = false;
+  let failWrite = false;
+  let failRemoval = false;
+  let queue = [
+    { opId: 'legacy-note', id: remote.id, kind: 'item', action: 'upsert', timestamp: 5, payload: { ...remote, content: 'local' } },
+    { opId: 'legacy-draft', id: 'composer:Inbox', kind: 'draft', action: 'upsert', timestamp: 6, payload: { ...draft, updatedAt: 6 } },
+  ];
+  const applied = [];
+  const pulls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    const parsed = new URL(url);
+    if (parsed.pathname.endsWith('/note-status')) return Response.json({ mode: 'registry', generation: 1, head: 2, floor: 0, sharedRecords: true });
+    assert.ok(parsed.pathname.endsWith('/note-events'), 'migration must not send an operation');
+    assert.deepEqual(queue, []);
+    assert.equal(saved.journal.conflicts.length, 2);
+    pulls.push(url);
+    return Response.json({ generation: 1, head: 2, floor: 0, events: [{ ...noteHead, revision: 1 }, { ...draftHead, revision: 2 }] });
+  });
   const options = {
-    key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault',
-    readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => dirty,
+    key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault', readOnly: false, headers: () => ({}),
+    onProgress: () => {}, onDeliveryChange: () => {}, onApplied: () => {}, onError: () => {},
+    migrateLegacy: async (replica, folderTree, sharedRecords, readOnly) => {
+      assert.ok(changeSubscribed);
+      if (readOnly) return;
+      const { alternatives, consumed } = prepareLegacyCutover(queue, folderTree, sharedRecords);
+      await replica.preserveLegacyAlternatives(alternatives);
+      if (failRemoval) throw new Error('interrupted handoff');
+      queue = queue.filter(({ opId }) => !consumed.includes(opId));
+    },
     port: {
-      getCurrentVault: () => ({ id: 'local-vault' }),
-      isHydrated: () => true, readNoteRegistry: async () => saved,
-      writeNoteRegistry: async (value) => { saved = value; },
-      applyAcceptedNote: async () => assert.fail('negotiation must not overwrite local files'),
-      subscribeNoteIntents: () => { subscribed = true; return () => { subscribed = false; }; },
+      getCurrentVault: () => ({ id: 'local-vault' }), isHydrated: () => true, readNoteRegistry: async () => saved,
+      writeNoteRegistry: async (value) => { if (failWrite) throw new Error('disk full'); saved = structuredClone(value); },
+      applyAcceptedNote: async ({ item }) => { applied.push(item.content); },
+      applyAcceptedShared: async ({ shared }) => { applied.push(shared.content); },
+      subscribeNoteIntents: () => { changeSubscribed = true; return () => { changeSubscribed = false; }; },
+      subscribeSharedIntents: () => () => {},
     },
   };
-  await assert.rejects(openNoteSession(options), /старой очереди остались неподтверждённые правки/);
-  assert.equal(subscribed, false);
-  assert.equal(saved, undefined);
-  dirty = false;
-  assert.equal((await openNoteSession(options)).generation, 1);
-  assert.equal(subscribed, true);
-  controller.abort();
-  assert.equal(subscribed, false);
+  const start = async (offline = false) => {
+    const controller = new AbortController();
+    t.after(() => controller.abort());
+    return [await openNoteSession({ ...options, signal: controller.signal }, offline), controller];
+  };
+  const [first, stop] = await start();
+  const unsupported = { opId: 'trash', id: 'another', kind: 'trash', action: 'restore', timestamp: 7 };
+  queue.push(unsupported);
+  await first.verifyEnrollment(true);
+  assert.equal(queue.length, 3);
+  assert.equal(saved.journal.conflicts, undefined);
+  await assert.rejects(first.verifyEnrollment(false), /ручной проверки.*trash\/restore/);
+  assert.deepEqual(queue.pop(), unsupported);
+  assert.equal(saved.journal.conflicts, undefined);
+  failWrite = true;
+  await assert.rejects(first.verifyEnrollment(false), /disk full/);
+  assert.equal(queue.length, 2);
+  failWrite = false;
+  failRemoval = true;
+  await assert.rejects(first.verifyEnrollment(false), /interrupted handoff/);
+  assert.equal(queue.length, 2);
+  assert.equal(saved.journal.conflicts.length, 2);
+  assert.equal(pulls.length, 0);
+  stop.abort();
+  const [restarted] = await start(true);
+  failRemoval = false;
+  await restarted.verifyEnrollment(false);
+  assert.deepEqual(queue, []);
+  await assert.rejects(restarted.replica.resolveConflict('legacy-note', 'retry', 0), /Дождитесь загрузки/);
+  await restarted.replica.catchUp();
+  assert.deepEqual(applied, ['relay', 'same draft']);
+  assert.deepEqual(restarted.replica.conflicts.map(({ intentId, item }) => [intentId, item.content]), [['legacy-note', 'local']]);
+  assert.equal(restarted.replica.pendingCount, 0);
+  await assert.rejects(restarted.replica.resolveConflict('legacy-note', 'retry', 0), /проверьте конфликт ещё раз/);
+  await restarted.replica.resolveConflict('legacy-note', 'retry', 1, 'reviewed');
+  assert.equal(saved.journal.pending[0].base.revision, 1);
+  assert.equal(saved.journal.pending[0].item.content, 'reviewed');
+});
+
+test('legacy drafts stay on the bundle protocol without shared records; local-only drafts never become conflicts', () => {
+  const ops = [
+    { opId: 'local', id: 'fullscreen:draft_unsaved', kind: 'draft', action: 'upsert', timestamp: 4 },
+    { opId: 'delete', id: 'composer:Inbox', kind: 'draft', action: 'delete', timestamp: 5 },
+  ];
+  assert.deepEqual(prepareLegacyCutover(ops, false, false), { alternatives: [], consumed: [] });
+  const { alternatives, consumed } = prepareLegacyCutover(ops, false, true);
+  assert.deepEqual(consumed, ['local', 'delete']);
+  assert.deepEqual(alternatives.map(({ intentId, item }) => [intentId, item]), [['delete', null]]);
+  const malformed = { ...ops[1], action: 'upsert', payload: { content: 'text', attachments: ['truncated'] } };
+  assert.throws(() => prepareLegacyCutover([malformed], false, true), /ручной проверки.*draft\/upsert/);
 });
 
 test('an enrolled registry never falls back to legacy if the relay loses its enrollment', async (t) => {
@@ -160,7 +233,7 @@ test('shared enrollment requires both storage hooks and preserves the queue on c
   const options = {
     key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault', headers: () => ({}),
     readOnly: false, onError: () => {}, onProgress: () => {},
-    hasPendingLegacyNotes: (_, shared) => { assert.equal(shared, true); return false; },
+    migrateLegacy: async (_replica, _folders, shared) => { assert.equal(shared, true); },
     port: {
       getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true,
       readNoteRegistry: async () => stored, writeNoteRegistry: async (value) => {
@@ -248,7 +321,7 @@ test('a room bound to the former vault cannot write into the new vault', async (
   let writes = 0;
   const session = await openNoteSession({
     key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault',
-    readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => false, onError: () => {},
+    readOnly: false, headers: () => ({}), migrateLegacy: async () => {}, onError: () => {},
     port: {
       getCurrentVault: () => ({ id: currentId }),
       isHydrated: () => true, readNoteRegistry: async () => undefined,
@@ -279,7 +352,7 @@ test('folder writes are captured only after enrollment and on cold offline resta
   const projections = [];
   const options = {
     key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault', readOnly: false,
-    headers: () => ({}), hasPendingLegacyNotes: () => false, onError: (error) => { throw error; },
+    headers: () => ({}), migrateLegacy: async () => {}, onError: (error) => { throw error; },
     port: {
       getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true,
       readNoteRegistry: async () => saved, writeNoteRegistry: async (value) => { saved = value; },
@@ -330,7 +403,7 @@ test('atomic enrollment restores capture offline and never projects a pending ca
   const projections = [];
   const options = {
     key, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'vault', readOnly: false,
-    headers: () => ({}), hasPendingLegacyNotes: () => false, onError: (error) => { throw error; },
+    headers: () => ({}), migrateLegacy: async () => {}, onError: (error) => { throw error; },
     port: {
       getCurrentVault: () => ({ id: 'local' }), isHydrated: () => true,
       readNoteRegistry: async () => saved, writeNoteRegistry: async (value) => { saved = value; },
@@ -375,7 +448,7 @@ test('cold offline capture persists an edit without talking to the relay', async
   let record;
   const options = {
     key, signal: controller.signal, serverUrl: 'http://127.0.0.1', roomId: 'room', vaultId: 'remote-vault',
-    readOnly: false, headers: () => ({}), hasPendingLegacyNotes: () => false, onError: () => {},
+    readOnly: false, headers: () => ({}), migrateLegacy: async () => {}, onError: () => {},
     port: {
       getCurrentVault: () => ({ id: 'local' }),
       isHydrated: () => true, readNoteRegistry: async () => saved,

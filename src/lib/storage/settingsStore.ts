@@ -373,6 +373,13 @@ export function flushDraftWrites(store: SettingsStoreHost): void {
   void flushWrites(store);
 }
 
+export function flushLegacyDraftWrites(store: SettingsStoreHost): Promise<void> {
+  return serializeSettingsWrite(store, async () => {
+    await flushQueuedSections(store);
+    if (writeQueue(store).dirty.has('drafts')) throw new Error('Не удалось сохранить черновики перед запуском реестра');
+  });
+}
+
 const settingsWrites = new WeakMap<SettingsStoreHost, Promise<void>>();
 
 function serializeSettingsWrite(store: SettingsStoreHost, write: () => Promise<void>): Promise<void> {

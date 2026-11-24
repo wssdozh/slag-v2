@@ -5,7 +5,7 @@
 // ledger, and the section writes are coalesced — a keystroke that enqueues one draft op is not a
 // file write of its own, it joins whatever write is already on its way.
 import type { SyncOperation } from '../entities/types';
-import { loadOutbox, loadTombstones, saveOutbox, saveTombstones } from '../localBookkeeping';
+import { loadOutbox, loadTombstones, requireOutboxFlushed, saveOutbox, saveTombstones } from '../localBookkeeping';
 import type { SyncScope } from '../localBookkeeping';
 
 export class Outbox {
@@ -65,6 +65,13 @@ export class Outbox {
     }
     if (changed) saveTombstones(this.scope, tombstones);
     saveOutbox(this.scope.vaultId, remaining);
+  }
+
+  public async removeTransferred(opIds: string[]): Promise<void> {
+    // A handoff is not an ACK from the legacy relay. Do not update its tombstone ledger.
+    const transferred = new Set(opIds);
+    saveOutbox(this.scope.vaultId, this.pending().filter(({ opId }) => !transferred.has(opId)));
+    await requireOutboxFlushed(this.scope.vaultId);
   }
 
   public clear(): void {

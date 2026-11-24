@@ -1,9 +1,6 @@
 // The sync channel: status, server address, schedule; account and devices sit nearby.
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { InfoHint } from '../UI/InfoHint';
-import { DiffModal } from '../Modals/DiffModal';
-import { noteDifferences } from '../../lib/sync/notes/merge';
-import { isNoteItem } from '../../lib/sync/notes/wire';
 import { Icon } from '../UI/icons/Icon';
 import { useApp } from '../../context/AppContext';
 import { isAndroidApp } from '../../lib/platform/deviceAccess';
@@ -13,19 +10,12 @@ import { syncEngine } from '../../lib/sync/syncEngine';
 import type { SyncConfig, SyncStatus } from '../../lib/sync/types';
 import { IconButton } from '../UI/IconButton';
 import { SettingsDivider, SettingsGroup, SettingsRow, SettingsSelect, SettingsSwitch } from './SettingsUI';
+import { useSyncConflicts } from './sync/useSyncConflicts';
+import { SyncConflictReview } from './sync/SyncConflictReview';
+import { SyncConflictSection } from './sync/SyncConflictSection';
 
-const propertyLabels: Record<string, string> = {
-  title: 'Заголовок', type: 'Тип', folder: 'Папка', tags: 'Теги', attachments: 'Вложения', status: 'Статус',
-  priority: 'Приоритет', dueDate: 'Срок', reminder: 'Напоминание', duration: 'Длительность', recurrence: 'Повтор',
-  subtasks: 'Подзадачи', isPinned: 'Закрепление', isArchived: 'Архив', linkedItemIds: 'Связанные записи',
-  content: 'Текст', customProps: 'Свойства Markdown', kanbanColumn: 'Колонка', summary: 'Краткое описание',
-};
-
-const conflictReasons: Record<string, string> = {
-  base: 'Не удалось подтвердить исходную версию правки',
-  lifecycle: 'Не удалось подтвердить непрерывную историю заметки',
-  predecessor: 'Предыдущая локальная правка не принята',
-};
+const reviewSections = [['legacy', 'Старые правки на проверку'], ['review', 'Правки на проверку'],
+  ['conflict', 'Конфликты синхронизации']] as const;
 
 function AndroidBackgroundSyncRow() {
   const enabled = useSyncExternalStore(subscribeAndroidBackgroundSyncPreference, getAndroidBackgroundSyncEnabled);
@@ -57,44 +47,7 @@ function AndroidBackgroundSyncRow() {
 export const SyncSettingsTab: React.FC = () => {
   const { addToast, confirmAction } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
-  const conflicts = syncEngine.getNoteConflicts();
-  const sections = new Map<string, typeof conflicts>();
-  for (const entry of conflicts) {
-    const key = entry.folderGroup?.id ?? entry.intentId;
-    const entries = sections.get(key);
-    if (entries) entries.push(entry);
-    else sections.set(key, [entry]);
-  }
-  const [review, setReview] = useState<{ key: string; revisions: Record<string, number> }>();
-  const [decision, setDecision] = useState<'keep' | 'retry' | 'close'>();
-  const [draft, setDraft] = useState<string>();
-  const [reviewError, setReviewError] = useState('');
-  const [resolving, setResolving] = useState(false);
-  const reviewed = review ? sections.get(review.key) ?? [] : [];
-  const revisions = (entries: typeof conflicts) => Object.fromEntries(entries.map(({ noteId, currentRevision }) => [noteId, currentRevision]));
-  const changed = review && reviewed.some(({ noteId, currentRevision }) => review.revisions[noteId] !== currentRevision);
-  const dismissReview = () => { setDraft(undefined); setReview(undefined); setDecision(undefined); setReviewError(''); };
-  const closeReview = () => {
-    if (resolving) return;
-    if (draft !== undefined) setDecision('close');
-    else dismissReview();
-  };
-  const resolveConflict = async () => {
-    if (decision === 'close') { dismissReview(); return; }
-    if (!review || !decision || resolving || changed || !reviewed.length) return;
-    const [entry] = reviewed;
-    setResolving(true);
-    try {
-      if (entry.folderGroup) await syncEngine.resolveFolderConflict(entry.folderGroup.id, decision, review.revisions);
-      else await syncEngine.resolveNoteConflict(entry.intentId, decision, review.revisions[entry.noteId], decision === 'retry' ? draft : undefined);
-      dismissReview();
-    } catch (error) {
-      setReviewError(error instanceof Error ? error.message : String(error));
-      setDecision(undefined);
-    } finally {
-      setResolving(false);
-    }
-  };
+  const review = useSyncConflicts();
   const [config, setConfig] = useState<SyncConfig>(syncEngine.getConfig());
   const [serverUrlInput, setServerUrlInput] = useState(config.serverUrl);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -180,62 +133,9 @@ export const SyncSettingsTab: React.FC = () => {
         {isAndroidApp() && <AndroidBackgroundSyncRow />}
       </SettingsGroup>
 
-      {conflicts.length > 0 && (
-        <SettingsGroup title="Конфликты синхронизации">
-          {[...sections].map(([key, entries]) => (
-            <SettingsRow key={key}
-              label={entries[0].folderGroup ? 'Папочная операция' : isNoteItem(entries[0].item) ? entries[0].item.title || 'Запись' : isNoteItem(entries[0].currentItem) ? entries[0].currentItem.title || 'Запись' : 'Запись'}
-              description={entries[0].folderGroup ? `Записей и дерево: ${entries.length}` : `Локальная правка не принята · ревизия релея ${entries[0].currentRevision}`}
-              right={<button type="button" className="px-3 py-2 text-xs hover:underline" onClick={() => {
-                setDecision(undefined); setReviewError(''); setReview({ key, revisions: revisions(entries) });
-              }}>Сравнить</button>}
-            />
-          ))}
-        </SettingsGroup>
-      )}
-
-      <DiffModal isOpen={reviewed.length > 0} onClose={closeReview} title="Конфликт синхронизации" items={reviewed.map(({ item, currentItem, currentRevision, folderGroup, fields }) => {
-        const before = isNoteItem(currentItem) ? currentItem : undefined;
-        const after = isNoteItem(item) ? item : undefined;
-        const show = (value: unknown) => typeof value === 'string' ? value || 'Пусто' : value === undefined ? 'Не задано' : JSON.stringify(value);
-        const properties = before && after ? noteDifferences(before, after).filter((key) => key !== 'content').map((key) => ({
-          label: propertyLabels[key] ?? key,
-          oldValue: show((before as unknown as Record<string, unknown>)[key]),
-          newValue: show((after as unknown as Record<string, unknown>)[key]),
-        })) : [];
-        const snapshot = (value: typeof item) => Array.isArray(value)
-          ? value.map((folder) => JSON.stringify(folder)).join('\n')
-          : value && 'shared' in value ? JSON.stringify(value.shared, null, 2) : '';
-        const sample = item ?? currentItem;
-        const mismatches = (fields ?? []).filter((key) => Object.hasOwn(propertyLabels, key)).map((key) => propertyLabels[key]);
-        const issue = (fields ?? []).find((key) => Object.hasOwn(conflictReasons, key));
-        const reason = issue ? conflictReasons[issue] : mismatches.length ? `Не удалось объединить: ${mismatches.join(', ')}` : undefined;
-        return { title: (after ?? before)?.title || (Array.isArray(sample) ? 'Дерево папок' : sample && 'shared' in sample ? 'Общие данные' : 'Запись'), comparison: {
-          before: before?.content ?? snapshot(currentItem), after: draft ?? after?.content ?? snapshot(item), properties,
-          onEdit: after && !folderGroup && config.localSyncMode !== 'receive-only' && !reviewed[0]?.folderGroup && !resolving && !decision
-            ? (value: string) => setDraft(value === after.content ? undefined : value) : undefined,
-          message: !currentItem ? currentRevision ? 'Запись удалена на релее' : 'Версия релея недоступна' : !item ? 'Локальная операция: удалить запись' : reason,
-        } };
-      })} actions={(
-        <div className="flex flex-wrap items-center gap-2 border-b border-subtle px-4 py-2 text-xs">
-          {changed && decision !== 'close' ? <>
-            <span role="status">Версия изменилась. Сравнение обновлено.</span>
-            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" onClick={() => {
-              if (review) setReview({ ...review, revisions: revisions(reviewed) });
-              setDecision(undefined); setReviewError('');
-            }}>Проверить новую версию</button>
-          </> : decision ? <>
-            <span>{decision === 'close' ? 'Закрыть без изменений? Несохранённый текст пропадёт.' : decision === 'keep' ? 'Удалить отклонённую правку из списка?' : 'Отправить правку поверх просмотренной версии?'}</span>
-            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" disabled={resolving} onClick={() => void resolveConflict()}>Подтвердить</button>
-            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" disabled={resolving} onClick={() => setDecision(undefined)}>Отмена</button>
-          </> : <>
-            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover" onClick={() => setDecision('keep')}>Оставить версию релея</button>
-            <button type="button" className="min-h-9 rounded-md px-2 hover:bg-surface-hover disabled:opacity-40" disabled={config.localSyncMode === 'receive-only' || (!!reviewed[0]?.folderGroup && reviewed.some(({ currentItem }) => currentItem === null))}
-              onClick={() => setDecision('retry')}>{reviewed[0]?.folderGroup ? 'Повторить всю операцию' : 'Отправить мою правку'}</button>
-          </>}
-          {reviewError && <span role="alert" className="text-danger">{reviewError}</span>}
-        </div>
-      )} />
+      {reviewSections.map(([kind, title]) => <SyncConflictSection key={kind} title={title}
+        groups={review.groups.filter(([entry]) => (entry.folderGroup ? 'conflict' : entry.reviewKind) === kind)} onCompare={review.start} />)}
+      <SyncConflictReview model={review} readOnly={config.localSyncMode === 'receive-only'} />
 
       <SettingsGroup title="Безопасность">
         <SettingsRow label="Смена ключа хранилища" danger right={

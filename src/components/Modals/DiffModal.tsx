@@ -166,6 +166,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
 
   const comparison = currentEntry.comparison;
   const oldText = comparison?.before ?? oldItem?.content ?? '';
+  const propertiesOnly = Boolean(comparison?.properties.length && comparison.before === comparison.after);
   const currentProposedText = comparison?.after ?? (rawUpdates?.content !== undefined
     ? rawUpdates.content
     : rawUpdates?.appendContent
@@ -251,7 +252,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
                   +{diffResult.addedCount}
                 </span>
               )}
-              {diffResult.removedCount === 0 && diffResult.addedCount === 0 && (
+              {!propertiesOnly && diffResult.removedCount === 0 && diffResult.addedCount === 0 && (
                 <span className="text-fg-muted text-2xs hidden sm:inline">{comparison ? 'Текст не изменился' : 'Без изменений'}</span>
               )}
             </div>
@@ -345,7 +346,7 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
         </div>
       )}
 
-      {comparison && (
+      {comparison && (!propertiesOnly || showText) && (
         <>
           {!showText && <div className="hidden shrink-0 border-b border-subtle px-8 md:flex">
             <button type="button" className="min-h-11 rounded-md px-3 text-xs hover:bg-surface-hover" onClick={() => setShowText(true)}>
@@ -356,7 +357,12 @@ const FullscreenDiffEditor: React.FC<FullscreenDiffEditorProps> = ({
             onBack={showText ? () => setShowText(false) : undefined} />
         </>
       )}
-      <div className={showText ? 'hidden' : comparison ? 'hidden min-h-0 flex-1 flex-col md:flex' : 'flex min-h-0 flex-1 flex-col'}>
+      {propertiesOnly && !showText && <div className="px-4 pt-2 md:px-8">
+        <button type="button" className="min-h-11 rounded-md px-3 text-xs hover:bg-surface-hover focus-visible:bg-tint-8" onClick={() => setShowText(true)}>
+          Открыть текст
+        </button>
+      </div>}
+      <div className={showText || propertiesOnly ? 'hidden' : comparison ? 'hidden min-h-0 flex-1 flex-col md:flex' : 'flex min-h-0 flex-1 flex-col'}>
       {/* Editor Subheaders: Flat single plane with hairline divider */}
       <div className="border-b border-tint-6 bg-panel shrink-0 select-none">
         <div className="max-w-6xl mx-auto w-full px-4 md:px-8">

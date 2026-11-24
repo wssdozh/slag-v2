@@ -64,6 +64,7 @@ import {
   writeComposerDraft,
   eraseComposerDraft,
   flushDraftWrites,
+  flushLegacyDraftWrites,
   installDraftFlushGuards,
   readFullscreenDraft,
   writeFullscreenDraft,
@@ -96,6 +97,7 @@ import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } 
 import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
 import { equal, sameNote } from '../sync/notes/merge';
 import { editFromDisk, noteDiskProjection } from './noteDiskProjection';
+import { projectItemKind } from '../vault/noteSemantics';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -600,7 +602,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.currentVaultRead;
   }
 
-  public async getCurrentVaultRecovery(): Promise<{ kind: 'ready' | 'local-only' | 'unavailable'; fresh?: boolean }> {
+  public async getCurrentVaultRecovery(): Promise<{ kind: 'ready'; fresh?: boolean }
+    | { kind: 'local-only'; reason: import('./vaultRecovery').RecoveryReason } | { kind: 'unavailable' }> {
     if (!isTauri()) return { kind: 'ready' };
     const vault = this.currentVault;
     const read = this.currentVaultRead;
@@ -668,6 +671,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
    */
   public flushDrafts(): void {
     flushDraftWrites(this);
+  }
+
+  public flushLegacyDrafts(): Promise<void> {
+    return flushLegacyDraftWrites(this);
   }
 
   public getDraftChannel(): BroadcastChannel | null {
@@ -898,6 +905,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
     const previous = editedFrom === undefined ? oldItem : editedFrom ?? undefined;
+    if (origin === 'local' && !restoring && previous && previous.type !== item.type) item = projectItemKind(item);
     if (this.noteIntentListeners.size && origin === 'local' && !restoring && oldItem && previous && sameNote(previous, item)) {
       return { item: oldItem };
     }
@@ -991,7 +999,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     await this.files.flushItemToDisk(item, previous.folder, previousFilename, vault, true);
   }
 
-  public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
+  public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local', options?: { rollover: true }): void {
     if (itemsToSave.length === 0) return;
     const items = this.getItems();
     const oldItemsMap = new Map(items.map(i => [i.id, i]));
@@ -1010,7 +1018,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const base = previous && this.noteOrigins.get(previous);
       const intentId = this.noteIntentListeners.size ? crypto.randomUUID() : undefined;
       if (intentId) this.noteOrigins.set(item, previous && base && sameNote(previous, item) ? base : { intentId });
-      return { id: item.id, kind: previous ? 'update' : 'create', item, previous, intentId, origin: base };
+      return { id: item.id, kind: previous ? 'update' : 'create', item, previous, intentId, origin: base, rollover: options?.rollover };
     })) : undefined;
     const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);
@@ -1060,7 +1068,10 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     if (vault.id !== this.currentVault.id) return { updated: 0, removed: 0 };
     // On failure the watcher may see files already written by a group whose cursor did not move.
     // Leave those IDs alone until registry replay finishes the projection.
-    const fenced = this.files.vaultRecoveryKind === 'ready' ? await this.files.readStateSection('pendingFolderProjection', vault, true) : {};
+    const kind = this.files.vaultRecoveryKind;
+    const recovery = kind === 'local-only' ? await this.files.openVault(vault) : undefined;
+    const fenced = kind === 'ready' ? await this.files.readStateSection('pendingFolderProjection', vault, true)
+      : recovery?.kind === 'local-only' ? recovery.fence ?? {} : {};
     if (vault !== this.currentVault) return { updated: 0, removed: 0 };
     if (!Object.keys(fenced).length) this.mergeDiskFolders(change.foldersAdded ?? [], change.foldersRemoved ?? []);
     const current = this.getItems();
@@ -1245,7 +1256,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
 
   private writeFullscreenDraftIntent(itemId: string, draft: FullscreenDraft | null, origin: 'local' | 'remote', keepAlternative = false): Promise<void> {
     const seen = this.getFullscreenDraft(itemId);
-    const write = this.captureSharedWrite(origin, () => {
+    // Unsaved notes have a temporary editor ID, not a shared record identity.
+    const write = !itemId.startsWith('draft_') && this.captureSharedWrite(origin, () => {
       const current = this.getFullscreenDraft(itemId);
       if (keepAlternative || current !== seen) {
         return [{ id: sharedRegistryId('fullscreen', itemId), previous: null, value: draft, keepAlternative: true }];

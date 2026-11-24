@@ -123,7 +123,7 @@ export const Sidebar: React.FC = () => {
           getAnchor={getVaultAnchor}
         />
 
-        <SyncStatusButton onSettings={() => openSettingsModal('sync')} />
+        <SyncStatusButton onSettings={() => openSettingsModal('sync')} onHealth={() => openSettingsModal('vault', 'integrity')} />
 
         {/* Logs HUD button */}
         <button

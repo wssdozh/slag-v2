@@ -1,4 +1,5 @@
-// Two actual replicas and an authenticated Python relay, on loopback with temporary SQLite.
+// Registry smoke with an authenticated Python relay on loopback and temporary SQLite.
+// --offline adds a three-device restart, retained/expired history, and shared profile records.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -10,9 +11,18 @@ import { NoteChannel } from '../src/lib/sync/notes/channel.ts';
 import { openNoteSession } from '../src/lib/sync/notes/session.ts';
 import { sealRegistryMedia } from '../src/lib/sync/notes/mediaWire.ts';
 import { NoteReplica } from '../src/lib/sync/notes/replica.ts';
+import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
+import { sameNote } from '../src/lib/sync/notes/merge.ts';
+import { parseSharedRegistryId, sharedRegistryId } from '../src/lib/sync/notes/sharedBody.ts';
+import { sharedWorkspacePatch } from '../src/lib/sync/notes/sharedWorkspace.ts';
 import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote } from '../src/lib/sync/notes/wire.ts';
 
-const relay = spawn('python', ['-u', '-c', `import asyncio, json, sys
+const offlineOnly = process.argv.includes('--offline');
+const relayPath = process.argv.slice(2).find((arg) => arg !== '--offline') ?? '../slag-relay/.worktrees/note-registry';
+const rttMs = Number(process.env.SLAG_SMOKE_RTT_MS ?? 0);
+assert.ok(Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 100);
+
+const relay = spawn('python', ['-u', '-c', `import asyncio, json, sys, time
 from test_note_registry import TestNoteRegistry, ROOM, VAULT, QUOTA
 async def main():
     test = TestNoteRegistry()
@@ -29,21 +39,26 @@ async def main():
         test.generation = test.db.freeze_note_room(ROOM)
         tokens = [owner, laptop, phone]
         print(json.dumps(dict(url=test.base, room=ROOM, vault=VAULT, generation=test.generation, tokens=tokens)), flush=True)
-        seed = json.loads(await asyncio.to_thread(sys.stdin.readline))
-        test.db.activate_note_room(ROOM, test.generation, [seed], identity['accountId'], QUOTA, seed['noteId'], atomic_groups=True, registry_media=True)
+        setup = json.loads(await asyncio.to_thread(sys.stdin.readline))
+        seed = setup['seed']
+        test.db.activate_note_room(ROOM, test.generation, [seed], identity['accountId'], QUOTA, seed['noteId'], atomic_groups=True, registry_media=True, shared_records=setup['shared'])
         print('active', flush=True)
-        await asyncio.to_thread(sys.stdin.readline)
+        while line := await asyncio.to_thread(sys.stdin.readline):
+            assert line.strip() == 'expire'
+            with test.db.conn:
+                test.db.conn.execute('UPDATE note_versions SET expires_at = ? WHERE room_id = ?', (time.time() - 1, ROOM))
+            test.db.cleanup_expired()
+            print(json.dumps(test.db.note_status(ROOM)), flush=True)
     finally:
         await test.asyncTearDown()
-asyncio.run(main())`], { cwd: resolve(process.argv[2] ?? '../slag-relay/.worktrees/note-registry'), stdio: ['pipe', 'pipe', 'inherit'] });
-const rttMs = Number(process.env.SLAG_SMOKE_RTT_MS ?? 0);
-assert.ok(Number.isInteger(rttMs) && rttMs >= 0 && rttMs <= 100);
+asyncio.run(main())`], { cwd: resolve(relayPath), stdio: ['pipe', 'pipe', 'inherit'],
+  env: { ...process.env, SLAG_TG_BOT_TOKEN: '' } });
 const sockets = new Set();
 const proxyConnections = new Set();
 let proxy;
 const stop = new AbortController();
 const exit = once(relay, 'exit');
-try {
+async function run() {
   const lines = createInterface({ input: relay.stdout });
   const [text] = await once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
   const { url: upstream, room, vault, generation, tokens } = JSON.parse(text);
@@ -82,31 +97,38 @@ try {
   const seed = await sealFolderTree(keys, room, generation, { opId: crypto.randomUUID(),
     noteId: await opaqueNoteId(keys, FOLDER_TREE_ID), baseRevision: 0, kind: 'create' }, tree);
   const activated = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
-  relay.stdin.write(`${JSON.stringify(seed)}\n`);
+  relay.stdin.write(`${JSON.stringify({ seed, shared: offlineOnly })}\n`);
   assert.deepEqual(await activated, ['active']);
-  async function device(i, initial, local = new Map(), onApplied) {
+  async function device(i, initial, local = new Map(), onApplied, workspace = {}, offline = false, scanHeads) {
     const controller = new AbortController();
     const signal = AbortSignal.any([stop.signal, controller.signal]);
-    const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true,
+    const channel = new NoteChannel({ serverUrl: url, roomId: room, vaultId: vault, signal, atomicGroups: true, registryMedia: true, sharedRecords: offlineOnly,
       headers: (json) => ({ Authorization: `Bearer ${tokens[i]}`, ...(json && { 'Content-Type': 'application/json' }) }) });
     let reads = 0;
+    let scans = 0;
     let posts = 0;
     let pushes = 0;
     let ignoreReply = false;
     let interceptPush;
     const attempts = [];
-    let saved;
+    let saved = initial;
     const errors = [];
-    assert.equal((await channel.status()).atomicGroups, true);
+    if (offline) assert.ok(initial, 'an offline restart needs a saved journal');
+    else {
+      const status = await channel.status();
+      assert.equal(status.atomicGroups, true);
+      if (offlineOnly) assert.equal(status.sharedRecords, true);
+    }
     let folders = initial?.confirmed[FOLDER_TREE_ID]?.item;
     const groups = [];
-    const ws = new WebSocket(`${url.replace('http:', 'ws:')}/ws/${room}?${new URLSearchParams({ vault, token: tokens[i], device: `device-${i + 1}`, noteGeneration: generation, backlog: 'http', folderTree: '1', atomicGroups: '1', registryMedia: '1' })}`);
-    sockets.add(ws);
+    const ws = offline ? undefined : new WebSocket(`${url.replace('http:', 'ws:')}/ws/${room}?${new URLSearchParams({ vault, token: tokens[i], device: `device-${i + 1}`, noteGeneration: generation, backlog: 'http', folderTree: '1', atomicGroups: '1', registryMedia: '1', ...(offlineOnly && { sharedRecords: '1' }) })}`);
+    if (ws) sockets.add(ws);
     const replica = new NoteReplica({ room, generation, keys, signal, readOnly: false, atomicGroups: true, channel: {
-      events: (...args) => { reads++; return channel.events(...args); }, heads: (...args) => { reads++; return channel.heads(...args); },
-      send: (...args) => { posts++; attempts.push(args[2]); return channel.send(...args); },
+      events: (...args) => { assert.ok(!offline); reads++; return channel.events(...args); },
+      heads: (...args) => { assert.ok(!offline); reads++; scans++; return scanHeads ? scanHeads(channel, ...args) : channel.heads(...args); },
+      send: (...args) => { assert.ok(!offline); posts++; attempts.push(args[2]); return channel.send(...args); },
     }, sendLive: (text) => {
-      if (ws.readyState !== WebSocket.OPEN) return false;
+      if (ws?.readyState !== WebSocket.OPEN) return false;
       pushes++;
       attempts.push(JSON.parse(text).ops);
       if (interceptPush) {
@@ -116,7 +138,12 @@ try {
       } else ws.send(text);
       return true;
     },
-    isLiveOpen: () => ws.readyState === WebSocket.OPEN,
+    isLiveOpen: () => ws?.readyState === WebSocket.OPEN,
+    ...(offlineOnly && { applyShared: async ({ id, shared }) => {
+      const { type, key } = parseSharedRegistryId(id);
+      assert.equal(type, 'workspace');
+      Object.assign(workspace, sharedWorkspacePatch(key, shared, workspace));
+    } }),
     apply: async ({ id, item }) => {
       local.set(id, item);
       onApplied?.(id);
@@ -129,16 +156,18 @@ try {
     },
     save: async (state) => { saved = structuredClone(state); },
     onProgress() {}, onError: (error) => errors.push(error.message) }, initial);
-    ws.addEventListener('message', ({ data }) => {
-      const message = JSON.parse(data);
-      if (!ignoreReply && (message.type === 'note_events' || message.type === 'note_results')) replica.handleMessage(message);
-    });
-    await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
-    await replica.catchUp();
-    return { replica, local, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
+    if (ws) {
+      ws.addEventListener('message', ({ data }) => {
+        const message = JSON.parse(data);
+        if (!ignoreReply && (message.type === 'note_events' || message.type === 'note_results')) replica.handleMessage(message);
+      });
+      await once(ws, 'open', { signal: AbortSignal.timeout(5_000) });
+      await replica.catchUp();
+    }
+    return { replica, local, workspace, errors, attempts, ignoreReply: (value = true) => { ignoreReply = value; },
       holdNextPush: () => new Promise((resolve) => { interceptPush = resolve; }),
-      folders: () => folders, groups, stats: () => ({ reads, posts, pushes }), saved: () => saved,
-      close: () => { controller.abort(); ws.close(); } };
+      folders: () => folders, groups, scans: () => scans, stats: () => ({ reads, posts, pushes }), saved: () => saved,
+      close: () => { controller.abort(); ws?.close(); } };
   }
   async function until(matches) {
     const deadline = performance.now() + 5000;
@@ -149,6 +178,289 @@ try {
   }
   const note = (id, content = 'x'.repeat(64 * 1024)) => ({ id, type: 'note', title: id, content, folder: 'Inbox', attachments: [], tags: [], createdAt: 1, updatedAt: 1 });
   const save = (device, items) => device.replica.record(items.map((item) => ({ id: item.id, kind: 'create', item })));
+  const update = (peer, item, previous, baseRevision) => peer.replica.record([
+    { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
+  ]);
+  async function offlineScenarios() {
+    const a = await device(0), b = await device(1);
+    let c = await device(2, undefined, undefined, undefined, { currentFolder: 'phone-only' });
+    const peers = () => [a, b, c];
+    const converge = (cursor) => until(() => peers().every((peer) =>
+      peer.saved()?.cursor === cursor && !peer.replica.pendingCount));
+    const online = (cursor) => until(() => [a, b].every((peer) => peer.saved()?.cursor === cursor && !peer.replica.pendingCount));
+    const workspaceId = (field) => sharedRegistryId('workspace', field);
+    const profile = workspaceId('profile'), prompt = workspaceId('aiPrompt'), persona = workspaceId('aiPersona');
+    const baseNote = note('offline-note', 'base text');
+    const task = { ...note('offline-task', 'task'), type: 'task', status: 'todo', priority: 'low', dueDate: '2026-12-01' };
+    const lost = note('offline-missing-edge', 'base paragraph');
+    const removed = note('offline-tombstone', 'will be deleted');
+    await save(a, [baseNote, task, lost, removed]);
+    await a.replica.recordShared(profile, { name: 'Original' }, null);
+    await a.replica.recordShared(prompt, 'original prompt', null);
+    await a.replica.recordShared(persona, { text: 'Original', enabled: false }, null);
+    await converge(8);
+    const restartJournal = (journal) => loadNoteJournal(JSON.parse(JSON.stringify({ version: 1, room, generation, journal })), room, generation);
+    async function expireHistory() {
+      const response = once(lines, 'line', { signal: AbortSignal.timeout(10_000) });
+      relay.stdin.write('expire\n');
+      return JSON.parse((await response)[0]);
+    }
+    async function disconnect(edit) {
+      const { local, workspace } = c;
+      const journal = c.saved();
+      c.close();
+      const offline = await device(2, journal, local, undefined, workspace, true);
+      await edit(offline, journal);
+      const pending = restartJournal(offline.saved());
+      assert.ok(pending.pending.length);
+      assert.equal(pending.cursor, journal.cursor);
+      assert.deepEqual(offline.stats(), { reads: 0, posts: 0, pushes: 0 });
+      assert.deepEqual(offline.errors, []);
+      offline.close();
+      return (scanHeads) => device(2, pending, local, undefined, workspace, false, scanHeads);
+    }
+    const edit = (peer, item, patch, journal = peer.saved()) => {
+      const { item: previous, revision } = journal.confirmed[item.id];
+      return update(peer, { ...previous, ...patch }, previous, revision);
+    };
+    const sameProjection = () => {
+      for (const peer of peers()) {
+        assert.deepEqual(peer.local, a.local);
+        assert.deepEqual(peer.folders(), a.folders());
+        for (const field of ['profile', 'aiPrompt', 'aiPersona', 'aiPersonaEnabled']) {
+          assert.deepEqual(peer.workspace[field], a.workspace[field]);
+        }
+        assert.deepEqual(peer.errors, []);
+      }
+      assert.equal(c.workspace.currentFolder, 'phone-only');
+    };
+    const reopenRetained = await disconnect(async (off, journal) => {
+      await edit(off, baseNote, { content: 'offline text' }, journal);
+      await edit(off, task, { priority: 'high' }, journal);
+      await off.replica.recordShared(profile, { name: 'Offline name' }, { name: 'Original' });
+    });
+    await edit(a, baseNote, { title: 'online title' });
+    await edit(a, task, { dueDate: '2026-12-10' });
+    await online(10);
+    await edit(b, baseNote, { tags: ['other device'] });
+    await edit(b, task, { status: 'in_progress' });
+    await b.replica.recordShared(prompt, 'online prompt', 'original prompt');
+    const addedTree = [...tree, { path: 'Offline test', name: 'Offline test', description: '' }];
+    await b.replica.recordFolderTree(addedTree, tree);
+    await online(14);
+    await save(a, Array.from({ length: 101 }, (_, i) => note(`retained-${i}`, 'unrelated revision')));
+    await online(115);
+    c = await reopenRetained();
+    await converge(118);
+    assert.equal(c.scans(), 0, 'retained feed must not require a head scan');
+    sameProjection();
+    assert.ok(sameNote(a.local.get(baseNote.id), { ...baseNote, title: 'online title', content: 'offline text', tags: ['other device'] }));
+    assert.ok(sameNote(a.local.get(task.id), { ...task, dueDate: '2026-12-10', priority: 'high', status: 'in_progress' }));
+    assert.deepEqual(a.folders(), addedTree);
+    assert.deepEqual(c.workspace.profile, { name: 'Offline name' });
+    assert.equal(c.workspace.aiPrompt, 'online prompt');
+    for (const peer of peers()) assert.deepEqual(peer.replica.conflicts, []);
+
+    const archive = { path: 'Offline folder', name: 'Offline folder', description: '' };
+    // A direct update survives compaction as a proof; an omitted edge or a tombstone does not.
+    const reopenExpired = await disconnect(async (off, journal) => {
+      await edit(off, baseNote, { content: 'second offline text' }, journal);
+      await edit(off, lost, { content: 'keep this offline alternative' }, journal);
+      await edit(off, removed, { content: 'not an implicit restore' }, journal);
+      await off.replica.recordFolderTree([...addedTree, archive], addedTree);
+      await off.replica.recordShared(persona, { text: 'Offline persona', enabled: true }, { text: 'Original', enabled: false });
+    });
+    await edit(a, baseNote, { title: 'after the direct update' });
+    await edit(a, lost, { title: 'first update' });
+    await a.replica.record([{ id: removed.id, kind: 'delete', item: null }]);
+    await online(121);
+    await edit(b, lost, { title: 'second update' });
+    await b.replica.recordShared(profile, { name: 'Online name' }, { name: 'Offline name' });
+    await save(b, Array.from({ length: 24 }, (_, i) => note(`expired-${i}`, 'unrelated revision')));
+    await online(147);
+    const expired = await expireHistory();
+    assert.equal(expired.floor, 147);
+    c = await reopenExpired();
+    await converge(150);
+    assert.ok(c.scans() > 0, 'expired feed must scan retained heads');
+    sameProjection();
+    assert.equal(c.local.get(baseNote.id).title, 'after the direct update');
+    assert.equal(c.local.get(baseNote.id).content, 'second offline text');
+    assert.equal(c.local.get(lost.id).content, 'base paragraph');
+    assert.equal(c.local.get(lost.id).title, 'second update');
+    assert.equal(c.local.get(removed.id), null);
+    assert.deepEqual(c.folders(), [...addedTree, archive]);
+    assert.deepEqual(c.workspace.profile, { name: 'Online name' });
+    assert.equal(c.workspace.aiPersona, 'Offline persona');
+    assert.deepEqual(c.replica.conflicts.map(({ noteId, item, fields }) => [noteId, item.content, fields]), [
+      [lost.id, 'keep this offline alternative', ['lifecycle']],
+      [removed.id, 'not an implicit restore', ['update']],
+    ]);
+    assert.deepEqual(a.replica.conflicts, []);
+    assert.deepEqual(b.replica.conflicts, []);
+    const journal = restartJournal(c.saved());
+    c.close();
+    c = await device(2, journal, c.local, undefined, c.workspace);
+    await converge(150);
+    assert.deepEqual(c.replica.conflicts, journal.conflicts);
+    assert.deepEqual(c.attempts, []);
+    sameProjection();
+
+    // The disconnected device and an online peer independently reach the same snapshots.
+    const afterTree = [...c.folders(), { path: 'Same folder', name: 'Same folder', description: '' }];
+    const sameProfile = { name: 'Same name' };
+    const sameReminder = '2026-12-10T07:00:00Z';
+    const reopenEqual = await disconnect(async (off, snapshot) => {
+      await off.replica.recordFolderTree(afterTree, c.folders());
+      await off.replica.recordShared(profile, sameProfile, c.workspace.profile);
+      await edit(off, task, { reminder: '2026-12-10T10:00:00+03:00' }, snapshot);
+    });
+    await a.replica.recordFolderTree(afterTree, a.folders());
+    await b.replica.recordShared(profile, sameProfile, b.workspace.profile);
+    await edit(a, task, { reminder: sameReminder });
+    await online(153);
+    c = await reopenEqual();
+    await converge(153);
+    sameProjection();
+    assert.deepEqual(c.folders(), afterTree);
+    assert.deepEqual(c.workspace.profile, sameProfile);
+    assert.equal(c.local.get(task.id).reminder, sameReminder);
+    assert.deepEqual(c.replica.conflicts, journal.conflicts);
+    assert.deepEqual(c.attempts, []);
+
+    const checklist = { ...note('checklist-sources', 'First\n\nLast'), type: 'task' };
+    const step = { id: 'legacy-step', title: 'Keep this step', completed: true };
+    const file = (id) => ({ id, type: 'file', name: 'sheet.pdf', mimeType: 'application/pdf', size: 4, relativePath: `.attachments/${id}` });
+    const caption = { ...note('embed-binding', '![[sheet.pdf|Original caption]]'), attachments: [file('first'), file('second')] };
+    const newCaption = '![[sheet.pdf|Offline caption]]';
+    await save(a, [checklist, caption]);
+    await converge(155);
+    const reopenConflicts = await disconnect(async (off, snapshot) => {
+      await edit(off, checklist, { subtasks: [step] }, snapshot);
+      await edit(off, caption, { content: newCaption }, snapshot);
+    });
+    await edit(a, checklist, { content: `${checklist.content}\n\n- [ ] Markdown step` });
+    await edit(b, caption, { attachments: caption.attachments.toReversed() });
+    await online(157);
+    c = await reopenConflicts();
+    await converge(157);
+    sameProjection();
+    assert.deepEqual(c.attempts, []);
+    assert.equal(c.local.get(caption.id).content, caption.content);
+    const alternatives = restartJournal(c.saved()).conflicts;
+    assert.deepEqual(alternatives.slice(0, 2), journal.conflicts);
+    assert.deepEqual(alternatives.slice(2).map(({ noteId, item, fields }) => [noteId, item, fields]), [
+      [checklist.id, { ...checklist, subtasks: [step] }, ['subtasks']],
+      [caption.id, { ...caption, content: newCaption }, ['attachments']],
+    ]);
+    // An unrelated offline create must wait while a second expiry invalidates the current scan.
+    const localOnly = note('during-repeated-expiry', 'offline create must survive');
+    const first = note('scan-page-first');
+    const second = note('scan-page-second');
+    const reopenDuringExpiry = await disconnect(async (off) => { await save(off, [localOnly]); });
+    await save(a, [first, second]);
+    await online(159);
+    assert.equal((await expireHistory()).floor, 159);
+    const noteIds = new Map(await Promise.all([first, second].map(async (item) => [await opaqueNoteId(keys, item.id), item.id])));
+    let repeatedExpiry = false;
+    let updatedId;
+    let deletedId;
+    const scanCalls = [];
+    c = await reopenDuringExpiry(async (channel, currentGeneration, after, since, through) => {
+      const page = await channel.heads(currentGeneration, after, since, through, 100_000);
+      scanCalls.push({ after, since, through, floor: page.floor });
+      if (!repeatedExpiry) {
+        assert.equal(through, 159);
+        assert.equal(page.heads.length, 1);
+        assert.ok(page.next, 'expire history between real pages');
+        updatedId = noteIds.get(page.next);
+        deletedId = updatedId === first.id ? second.id : first.id;
+        assert.ok(updatedId && deletedId);
+        const next = updatedId === first.id ? first : second;
+        await edit(a, next, { title: 'new head after the fetched page' });
+        await online(160);
+        await b.replica.record([{ id: deletedId, kind: 'delete', item: null }]);
+        await online(161);
+        assert.equal((await expireHistory()).floor, 161);
+        repeatedExpiry = true;
+      }
+      return page;
+    });
+    await converge(162);
+    sameProjection();
+    assert.ok(scanCalls.some(({ after, through, floor }) => after && through === 159 && floor === 161));
+    assert.ok(scanCalls.some(({ after, through }) => !after && through === 161));
+    assert.equal(c.local.get(updatedId).title, 'new head after the fetched page');
+    assert.equal(c.local.get(deletedId), null);
+    assert.ok(sameNote(c.local.get(localOnly.id), localOnly));
+    assert.equal(c.attempts.length, 1);
+    assert.deepEqual(restartJournal(c.saved()).conflicts, alternatives);
+    const daily = { ...note('offline-daily-rollover'), type: 'task', status: 'todo', dueDate: '2026-11-20',
+      recurrence: { freq: 'daily', interval: 1, resetSubtasks: true }, streak: 0 };
+    const oldDay = '2026-11-23', newDay = '2026-11-24';
+    const late = { ...daily, dueDate: oldDay };
+    await save(a, [daily]);
+    await converge(163);
+    const reopenRollover = await disconnect(async (off, snapshot) => {
+      const { revision, item: previous } = snapshot.confirmed[daily.id];
+      await off.replica.record([
+        { id: daily.id, kind: 'update', item: late, previous, origin: { revision }, intentId: 'offline-rollover', rollover: true },
+        { id: daily.id, kind: 'update', item: { ...late, title: 'independent offline title' }, previous: late, origin: { intentId: 'offline-rollover' } },
+      ]);
+    });
+    await edit(b, daily, { dueDate: newDay, tags: ['independent online tag'] });
+    await online(164);
+    assert.equal((await expireHistory()).floor, 164);
+    c = await reopenRollover();
+    await converge(165);
+    sameProjection();
+    assert.deepEqual(c.replica.conflicts, alternatives);
+    assert.equal(c.attempts.length, 1, 'only the independent edit is sent');
+    assert.equal(c.local.get(daily.id).dueDate, newDay);
+    assert.equal(c.local.get(daily.id).title, 'independent offline title');
+    assert.deepEqual(c.local.get(daily.id).tags, ['independent online tag']);
+    const examples = [
+      { ...note('property-note', 'note body'), isPinned: true, isArchived: true, tags: ['свойство'], replyToId: baseNote.id,
+        linkedItemIds: [task.id], customProps: { flag: false, nested: { value: null } } },
+      { ...note('property-task', 'task body'), type: 'task', status: 'done', priority: 'high', dueDate: '2026-12-10',
+        reminder: '2026-12-10T08:30:00+03:00', duration: 45, recurrence: { freq: 'weekly', interval: 2, weekdays: [1, 3], resetSubtasks: false },
+        streak: 2, history: ['2026-12-09', '2026-12-10'], lastCompletedDate: '2026-12-10', kanbanColumn: 'custom',
+        subtasks: [{ id: 'legacy', title: 'step', completed: true }] },
+      { ...note('property-article', 'article body'), type: 'article', readingTimeMinutes: 6, summary: 'Article summary' },
+    ];
+    await save(a, examples);
+    await converge(168);
+    for (const peer of peers()) for (const sample of examples) assert.ok(sameNote(peer.local.get(sample.id), sample));
+    const reopenProperties = await disconnect(async (off, snapshot) => {
+      await edit(off, examples[0], { isPinned: false, isArchived: false, replyToId: undefined, linkedItemIds: [], customProps: { flag: true } }, snapshot);
+      await edit(off, examples[1], { status: 'todo', priority: 'none', dueDate: undefined, reminder: undefined, duration: undefined,
+        recurrence: undefined, streak: undefined, history: [], lastCompletedDate: undefined, subtasks: [], kanbanColumn: undefined }, snapshot);
+      await edit(off, examples[2], { summary: undefined, readingTimeMinutes: 1 }, snapshot);
+    });
+    await Promise.all(examples.map((sample) => edit(b, sample, { title: `Updated ${sample.id}` })));
+    await online(171);
+    c = await reopenProperties();
+    await converge(174);
+    sameProjection();
+    for (const peer of peers()) {
+      const [n, t, art] = examples.map(({ id }) => peer.local.get(id));
+      assert.ok(sameNote(n, { ...examples[0], title: 'Updated property-note', isPinned: false, isArchived: false, replyToId: undefined,
+        linkedItemIds: [], customProps: { flag: true } }));
+      assert.ok(sameNote(t, { ...note('property-task', 'task body'), type: 'task', title: 'Updated property-task', status: 'todo', priority: 'none' }));
+      assert.ok(sameNote(art, { ...note('property-article', 'article body'), type: 'article', title: 'Updated property-article', readingTimeMinutes: 1 }));
+    }
+    assert.deepEqual(c.replica.conflicts, alternatives);
+    c.close();
+    c = await device(2, restartJournal(c.saved()), c.local, undefined, c.workspace);
+    await converge(174);
+    sameProjection();
+    assert.deepEqual(c.attempts, []);
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 174,
+      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length, skippedRollover: true,
+      propertyKinds: examples.map(({ type }) => type) })}\n`);
+  }
+
+  if (offlineOnly) return offlineScenarios();
   const appliedAt = new Map();
   const author = await device(0);
   let reader = await device(1, undefined, undefined, (id) => appliedAt.set(id, performance.now()));
@@ -226,9 +538,6 @@ try {
   const beforeMerge = (await phoneChannel.status()).head;
   const parallelTitle = { ...shared, title: 'title from first writer' };
   const parallelContent = { ...shared, content: 'first paragraph\n\nlast paragraph' };
-  const update = (peer, item, previous, baseRevision) => peer.replica.record([
-    { id: item.id, kind: 'update', item, previous, origin: { revision: baseRevision } },
-  ]);
   await Promise.all([update(author, parallelTitle, shared, revision), update(reader, parallelContent, shared, revision)]);
   const combined = { ...parallelTitle, content: parallelContent.content };
   await until(() => [author, reader].every((peer) => peer.replica.pendingCount === 0 && peer.saved().cursor === beforeMerge + 2));
@@ -309,7 +618,7 @@ try {
     const errors = [];
     const session = await openNoteSession({ key, signal: scope, roomId: room, vaultId: vault, serverUrl: url, readOnly,
       headers: (json) => ({ Authorization: `Bearer ${tokens[i]}`, ...(json && { 'Content-Type': 'application/json' }) }),
-      hasPendingLegacyNotes: () => false, sendLive: () => false, onError: (error) => errors.push(error), onProgress: () => {}, onApplied: () => {},
+      migrateLegacy: async () => {}, sendLive: () => false, onError: (error) => errors.push(error), onProgress: () => {}, onApplied: () => {},
       port: { getCurrentVault: () => ({ id: vault }), isHydrated: () => true, readNoteRegistry: async () => stored,
         writeNoteRegistry: async (value) => { stored = value; }, subscribeNoteIntents: (listener) => { record = listener; return () => {}; },
         subscribeFolderTreeIntents: () => () => {}, applyAcceptedFolderTree: async () => {}, applyAcceptedFolderGroup: async () => {},
@@ -325,6 +634,7 @@ try {
       },
     });
     assert.equal(session.registryMedia, true);
+    await session.verifyEnrollment(readOnly);
     await session.replica.catchUp();
     return { session, record, stored: () => stored, applied: () => applied, errors };
   }
@@ -389,6 +699,43 @@ try {
   const replay = cascadeWon ? await authorChannel.send(generation, 'race-replay', cascade, raceHead)
     : await phoneChannel.send(generation, 'race-replay', [create], raceHead);
   assert.deepEqual(replay.results, winner.results);
+  await Promise.all([author.replica.catchUp(), reader.replica.catchUp()]);
+  const alternatives = [{ intentId: 'legacy-review-measured', noteId: id, kind: 'update', revision: 0,
+    item: { ...author.local.get(id), title: 'Legacy snapshot for review' }, fields: ['legacy-cutover'], at: 1 }];
+  await author.replica.preserveLegacyAlternatives(alternatives);
+  assert.equal(author.replica.syncHealth, 'current');
+  const measured = { ...note('roundtrip-with-review', 'delivery probe'), type: 'task', dueDate: '2026-11-24', priority: 'low' };
+  const firstAt = performance.now();
+  await save(author, [measured]);
+  await until(() => reader.saved()?.confirmed[measured.id]?.item?.dueDate === measured.dueDate && author.replica.pendingCount === 0);
+  const outboundMs = Math.round(performance.now() - firstAt);
+  const measuredBase = reader.saved().confirmed[measured.id];
+  const backAt = performance.now();
+  await reader.replica.record([{ id: measured.id, kind: 'update', previous: measuredBase.item, origin: { revision: measuredBase.revision },
+    item: { ...measuredBase.item, priority: 'high' } }]);
+  await until(() => author.saved()?.confirmed[measured.id]?.item?.priority === 'high' && reader.replica.pendingCount === 0);
+  const inboundMs = Math.round(performance.now() - backAt);
+  assert.equal(author.local.get(measured.id).dueDate, measured.dueDate);
+  assert.ok(author.replica.conflicts.some(({ intentId }) => intentId === alternatives[0].intentId));
+  assert.equal(author.replica.syncHealth, 'current');
+
+  // Real relay regression: an already saved proposal must close on the receiving WS,
+  // without a manual sync or a reconnect. Keep a different proposal untouched.
+  const beforeTree = author.folders();
+  const probeFolder = { path: 'Live review probe', name: 'Live review probe', description: '' };
+  const withProbe = [...beforeTree, probeFolder];
+  await author.replica.recordFolderTree(withProbe, beforeTree);
+  await until(() => reader.folders().some(({ path }) => path === probeFolder.path) && author.replica.pendingCount === 0);
+  const proposal = { intentId: 'recovered-folder-delete', noteId: FOLDER_TREE_ID, kind: 'update',
+    revision: reader.saved().confirmed[FOLDER_TREE_ID].revision, item: beforeTree, fields: ['recovered-disk'], at: 1 };
+  const different = { ...proposal, intentId: 'unrelated-tree-proposal', item: [...beforeTree, { ...probeFolder, path: 'Other probe', name: 'Other probe' }] };
+  await reader.replica.preserveLegacyAlternatives([proposal, different]);
+  const readsBeforeDeletion = reader.stats().reads;
+  await author.replica.recordFolderTree(beforeTree, withProbe);
+  await until(() => !reader.folders().some(({ path }) => path === probeFolder.path)
+    && !reader.saved().conflicts?.some(({ intentId }) => intentId === proposal.intentId));
+  assert.ok(reader.saved().conflicts.some(({ intentId }) => intentId === different.intentId));
+  assert.equal(reader.stats().reads, readsBeforeDeletion, 'live deletion must not need an HTTP catch-up to clear the review');
   const stats = (values) => {
     const sorted = values.toSorted((a, b) => a - b);
     const at = (p) => Math.round(sorted[Math.ceil(sorted.length * p) - 1]);
@@ -396,7 +743,11 @@ try {
   };
   const settled = stats(timings);
   assert.ok(settled.p95Ms <= 1000, `loopback p95 ${settled.p95Ms}ms`);
-  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true, roundTripWithReview: { outboundMs, inboundMs } })}\n`);
+}
+
+try {
+  await run();
 } finally {
   stop.abort();
   for (const ws of sockets) ws.close();

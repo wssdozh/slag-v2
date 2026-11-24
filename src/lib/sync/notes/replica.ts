@@ -1,13 +1,17 @@
 // Serializes local intents and canonical application, not the network. I/O is owned by the host.
 import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
 import type { AcceptedNote, NoteMutation, NoteOrigin } from '../../storage/noteRegistry';
+import { editFromDisk } from '../../storage/noteDiskProjection.ts';
 import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
 import { NoteChannel, RelayPaused } from './channel.ts';
 import { confirmedNote, emptyJournal, firstPerNote, recordFolderGroup, recordNote, sameRegistryValue, setConfirmed, settleNote } from './journal.ts';
 import type { JournalAttempt, NoteBase, NoteConflict, NoteIntent, NoteIntentSource, NoteJournal, RegistryValue } from './journal.ts';
 import { noteDifferences, relayNote } from './merge.ts';
+import { LEGACY_CUTOVER, sameLegacyValue } from './legacyCutover.ts';
+import { applyReviewedFields, needsReviewedHead, RECOVERED_DISK } from './review.ts';
 import { candidate, confirmedBase } from './reconcile.ts';
+import { expiredLegacyDeadline } from './rollover.ts';
 import type { Candidate } from './reconcile.ts';
 import { isSharedRegistryId } from './sharedBody.ts';
 import type { SharedBody, SharedMutation } from './sharedBody.ts';
@@ -114,7 +118,7 @@ export class NoteReplica {
   noteRelayHead(revision: number) { this.observe(revision); }
 
   get syncHealth(): 'error' | 'syncing' | 'current' {
-    if (this.journalFailed || this.projectionFailed || this.failedIntents.size || this.conflicts.length) return 'error';
+    if (this.journalFailed || this.projectionFailed || this.failedIntents.size) return 'error';
     return this.ready && !this.needsFeed && !this.pendingCount ? 'current' : 'syncing';
   }
 
@@ -129,6 +133,27 @@ export class NoteReplica {
     this.host.onDeliveryChange?.();
   }
   get conflicts(): readonly NoteConflict[] { return this.state.conflicts ?? []; }
+  get canReviewCutover() { return this.ready && !this.needsFeed; }
+
+  preserveLegacyAlternatives(alternatives: NoteConflict[]): Promise<void> {
+    return this.enqueue(async () => {
+      const existing = new Set(this.conflicts.map(({ intentId }) => intentId));
+      const fresh = alternatives.filter(({ intentId }) => !existing.has(intentId));
+      if (fresh.length) await this.persist({ ...this.state, conflicts: [...this.conflicts, ...fresh] });
+    });
+  }
+
+  private async clearSatisfiedLegacyAlternatives() {
+    const conflicts = this.conflicts.filter((entry) => {
+      if (!needsReviewedHead(entry.fields)) return true;
+      const current = confirmedNote(this.state, entry.noteId);
+      if (!current || current.revision > this.durableCursor) return true;
+      if (sameLegacyValue(current.item, entry.item)) return false;
+      return !(current.since !== undefined && entry.kind === 'update' && !entry.folderGroup && entry.fields.length === 1 && entry.fields[0] === LEGACY_CUTOVER
+        && isNoteItem(entry.item) && isNoteItem(current.item) && expiredLegacyDeadline(entry.item, current.item, entry.at));
+    });
+    if (conflicts.length !== this.conflicts.length) await this.persist({ ...this.state, conflicts });
+  }
 
   resolveFolderConflict(groupId: string, resolution: 'keep' | 'retry', reviewed: Readonly<Record<string, number>>): Promise<void> {
     return this.enqueue(async () => {
@@ -164,15 +189,22 @@ export class NoteReplica {
     });
   }
 
-  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number, content?: string): Promise<void> {
+  resolveConflict(intentId: string, resolution: 'keep' | 'retry', reviewedRevision: number,
+    content?: string, selectedFields?: readonly string[]): Promise<void> {
     return this.enqueue(async () => {
       const conflict = this.conflicts.find((entry) => entry.intentId === intentId);
       if (!conflict) throw new Error('Конфликт уже разобран');
+      if (needsReviewedHead(conflict.fields) && !this.canReviewCutover) {
+        throw new Error('Дождитесь загрузки актуальной версии с релея');
+      }
       if (conflict.folderGroup) throw new Error('Папочную операцию нужно разобрать целиком');
       let next = this.state;
       const current = confirmedNote(next, conflict.noteId);
       if ((current?.revision ?? 0) !== reviewedRevision || next.pending.some(({ id }) => id === conflict.noteId)) {
         throw new Error('Версия изменилась или есть ожидающая правка; проверьте конфликт ещё раз');
+      }
+      if (resolution === 'keep' && conflict.fields.includes(LEGACY_CUTOVER) && (current || isSharedRegistryId(conflict.noteId))) {
+        await this.applyValue(conflict.noteId, current?.item ?? null, current?.revision ?? 0);
       }
       let retryIntentId: string | undefined;
       if (resolution === 'retry') {
@@ -180,14 +212,22 @@ export class NoteReplica {
         const kind = conflict.item === null ? (current?.item ? 'delete' : null)
           : !current ? 'create' : current.item === null ? 'restore' : 'update';
         let item = conflict.item;
-        if (content !== undefined) {
-          if (!isNoteItem(item)) throw new Error('У этого конфликта нельзя изменить текст');
+        if (conflict.noteId === FOLDER_TREE_ID && conflict.fields.includes(RECOVERED_DISK)) {
+          throw new Error('Удаление папки из старой копии нельзя повторить; выполните его в актуальном дереве');
+        }
+        if (selectedFields !== undefined) {
+          if (kind !== 'update' || !isNoteItem(current?.item) || !isNoteItem(item)) {
+            throw new Error('У этой операции нельзя выбрать отдельные поля');
+          }
+          item = applyReviewedFields(current.item, item, selectedFields, content);
+        } else if (content !== undefined) {
+          if (!isNoteItem(item)) throw new Error('У этой операции нельзя изменить текст');
           item = { ...item, content };
         }
         if (kind) next = recordNote(next, { id: conflict.noteId, intentId: retryIntentId = crypto.randomUUID(), kind, item, source: 'retry' });
       }
       await this.persist({ ...next, conflicts: this.conflicts.filter((entry) => entry !== conflict) });
-      this.host.log?.('Note conflict resolved', { generation: this.host.generation, intentId, revision: reviewedRevision, resolution, retryIntentId });
+      this.host.log?.('Note conflict resolved', { generation: this.host.generation, intentId, revision: reviewedRevision, resolution, retryIntentId, selectedFields });
       this.schedule();
     });
   }
@@ -359,6 +399,7 @@ export class NoteReplica {
     return this.enqueue(async () => {
       const state = this.state;
       const pending = new Set(state.pending.map(({ id }) => id));
+      for (const conflict of this.conflicts) if (needsReviewedHead(conflict.fields)) pending.add(conflict.noteId);
       const live = new Map(Object.entries(state.confirmed).flatMap(([id, { item }]) =>
         isNoteItem(item) && !pending.has(id) ? [[id, item] as const] : []));
       if (!live.size) return;
@@ -369,23 +410,24 @@ export class NoteReplica {
       let next = state;
       for (const { item: copy, marker } of copies) {
         const previous = live.get(copy.id);
-        if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder
-            || previous.title !== copy.title || previous.type !== copy.type) continue;
+        if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder) continue;
         const revision = state.confirmed[copy.id].revision;
-        if (normalizeDiskBody(previous.content) === normalizeDiskBody(copy.content)) {
-          if (remember && marker && marker === await this.registryBodyMarker(copy.id, revision, previous.content)) {
-            remember({ id: copy.id, revision, item: previous, registryBodyMarker: marker }, copy);
-          }
-          continue;
-        }
-        // The Markdown and its provenance were replaced together. A replayable projection
-        // ahead of this journal is not a local edit, even if the relay has since advanced again.
+        // A known projection of a newer revision can carry new YAML as well as new text.
+        // Never capture those differences as local. The body-only marker proves nothing
+        // about metadata from a different revision or an unmarked backup.
         const projected = marker ? Number(marker.split(':', 1)[0]) : 0;
-        if (Number.isSafeInteger(projected) && projected > state.confirmed[copy.id].revision
+        if (Number.isSafeInteger(projected) && projected > revision
             && marker === await this.registryBodyMarker(copy.id, projected, copy.content)) continue;
+        let item: SlagItem | undefined;
+        if (marker && marker === await this.registryBodyMarker(copy.id, revision, previous.content)) {
+          item = editFromDisk(previous, copy);
+          if (!item) remember?.({ id: copy.id, revision, item: previous, registryBodyMarker: marker }, copy);
+        } else if (previous.title === copy.title && previous.type === copy.type
+            && normalizeDiskBody(previous.content) !== normalizeDiskBody(copy.content)) {
+          item = { ...previous, content: copy.content };
+        }
         // Keep the confirmed base. A newer remote revision must conflict, not rebase this edit.
-        next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous, source: 'cold-recovery',
-          item: { ...previous, content: copy.content } });
+        if (item) next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous, source: 'cold-recovery', item });
       }
       await this.persist(next);
       for (const intent of next.pending) if (!state.pending.includes(intent)) this.logIntent('Note intent recorded', intent);
@@ -508,7 +550,7 @@ export class NoteReplica {
     else log();
   }
 
-  private async accept(head: NoteHead, applyKnown = false, recovered = false) {
+  private async accept(head: NoteHead, applyKnown = false) {
     // Recovery can see surviving heads of an expired group, not the original event batch.
     if (head.group && !this.host.applyFolderGroup) throw new Error('Atomic folder groups are not supported by this session');
     const body = await openAnyRegistryBody(this.host.keys, this.host.room, this.host.generation, head);
@@ -517,7 +559,9 @@ export class NoteReplica {
     const { id } = body;
     const item = 'folders' in body ? body.folders : 'shared' in body ? (body.shared === null ? null : { shared: body.shared }) : body.item;
     const own = this.state.pending.find((intent) => intent.attempt?.op.opId === head.opId);
-    const base = confirmedBase(recovered ? undefined : confirmedNote(this.state, id), head, item, own?.intentId);
+    // Even in a heads scan, an authenticated update's direct CAS edge proves continuity.
+    // A skipped revision of this item or delete/restore still breaks the chain.
+    const base = confirmedBase(confirmedNote(this.state, id), head, item, own?.intentId);
     // A heads scan can recover a surviving member, but only a complete receipt settles the group.
     if (own && !own.folderGroup) {
       await this.settle(own, base, own.attempt?.conflicts ?? []);
@@ -586,6 +630,8 @@ export class NoteReplica {
           start = end;
         }
       }
+      // A complete live frame can satisfy a saved review without any HTTP catch-up.
+      if (this.ready && !gap && !this.needsFeed) await this.clearSatisfiedLegacyAlternatives();
     });
     return gap;
   }
@@ -634,7 +680,7 @@ export class NoteReplica {
         let previous = after;
         for (const head of page.heads) {
           if (head.noteId <= previous || head.revision <= since || head.revision > through) throw new Error('Invalid registry scan order');
-          await this.accept(head, since === 0, true);
+          await this.accept(head, since === 0);
           previous = head.noteId;
         }
         if (page.next !== null && (page.next <= after || page.next !== previous)) throw new Error('Registry scan did not advance');
@@ -664,6 +710,10 @@ export class NoteReplica {
       if (await this.applyEvents(page.events)) throw new Error('Registry page has a gap');
       if (epoch !== this.connectionEpoch) continue;
       if (this.state.cursor >= Math.max(page.head, this.observedRevision)) {
+        if (this.conflicts.some(({ fields }) => needsReviewedHead(fields))) {
+          await this.enqueue(() => this.clearSatisfiedLegacyAlternatives());
+          if (epoch !== this.connectionEpoch || this.needsFeed) continue;
+        }
         this.ready = true;
         this.projectionFailed = false;
         this.host.onProgress();

@@ -53,6 +53,10 @@ export async function deriveVaultKey(mnemonic: string): Promise<CryptoKey> {
   );
 }
 
+export async function deriveAccountRoomId(vaultId: string, legacyRoomId: string): Promise<string> {
+  return `room_${(await computeHash(JSON.stringify(['slag-account-room-v1', vaultId, legacyRoomId]))).slice(0, 32)}`;
+}
+
 /** Derives a blind room ID for relay routing without exposing the vault key */
 export async function deriveRoomId(mnemonic: string): Promise<string> {
   const enc = new TextEncoder();
