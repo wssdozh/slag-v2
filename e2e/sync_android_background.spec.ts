@@ -133,6 +133,13 @@ test('Android pauses automatic relay traffic when disabled in background and cat
   await page.clock.runFor(26_000);
   await expect.poll(() => socketFrames).toBeGreaterThan(0);
 
+  // Returning with a healthy socket does not make an extra pull.
+  const healthy = pulls;
+  await setVisibility(false);
+  await page.clock.runFor(1_000);
+  expect(pulls).toBe(healthy);
+  await setVisibility(true);
+
   // Turn it off in the background with a retry already armed; none of the automatic work may escape.
   const beforePause = outgoing();
   await page.evaluate(() => {
