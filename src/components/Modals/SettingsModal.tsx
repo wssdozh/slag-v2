@@ -53,6 +53,7 @@ export const SettingsModal: React.FC = () => {
     setIsSettingsOpen,
     settingsTab: activeTab,
     setSettingsTab: setActiveTab,
+    requestedVaultHealth,
     isMobile,
   } = useApp();
 
@@ -60,7 +61,9 @@ export const SettingsModal: React.FC = () => {
   const { ref: presenceRef, phase: presencePhase, isPresent: isSettingsPresent, onTransitionEnd: onSettingsTransitionEnd } = presence;
 
   // Which vault block the rail has open. Kept here, not in the tab, so it survives a detour.
-  const [vaultSection, setVaultSection] = useState<VaultSection>('storage');
+  const [vaultSelection, setVaultSelection] = useState<{ request: number; section: VaultSection }>({ request: 0, section: 'storage' });
+  const requestedHealth = requestedVaultHealth !== vaultSelection.request;
+  const vaultSection = requestedHealth ? 'integrity' : vaultSelection.section;
 
   // Держим активную вкладку видимой: при возврате в настройки полоса оставалась
   // на прежней позиции, и выбранный раздел оказывался за правым краем.
@@ -108,7 +111,7 @@ export const SettingsModal: React.FC = () => {
                   key={child.id}
                   isActive={vaultSection === child.id}
                   depth={1}
-                  onClick={() => setVaultSection(child.id)}
+                  onClick={() => setVaultSelection({ request: requestedVaultHealth, section: child.id })}
                   testId={`vault-subtab-${child.id}`}
                   dataSubTab={child.id}
                 >
@@ -133,7 +136,7 @@ export const SettingsModal: React.FC = () => {
       )}
 
       {activeTab === 'vault' && (
-        <VaultSettingsTab section={isMobile ? undefined : vaultSection} />
+        <VaultSettingsTab section={isMobile && !requestedHealth ? undefined : vaultSection} />
       )}
 
       {activeTab === 'devices' && (

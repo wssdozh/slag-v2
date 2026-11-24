@@ -1,39 +1,44 @@
-// Classify a conflict or pending intent by whether the user has reviewed it.
+import type { SlagItem } from '../../../types/index.ts';
 import { LEGACY_CUTOVER } from './legacyCutover.ts';
+import { noteDifferences } from './merge.ts';
+import { noteMergeViolations } from './mergeValidation.ts';
+import { parseSubtasksFromContent } from '../../tasks/taskUtils.ts';
 
-const reviewFields = ['base', 'predecessor', 'lifecycle', 'recovered-disk'];
-// Everything else (including folder/folders/delete, ordinary data fields) → conflict.
-const allWritableFields = ['id', 'title', 'type', 'content', 'folder', 'tags', 'attachments', 'status', 'priority',
-  'dueDate', 'reminder', 'duration', 'recurrence', 'subtasks', 'kanbanColumn', 'isPinned', 'isArchived',
-  'replyToId', 'linkedItemIds', 'streak', 'history', 'lastCompletedDate', 'summary', 'readingTimeMinutes', 'customProps'];
+export const RECOVERED_DISK = 'recovered-disk';
+export const needsReviewedHead = (fields: readonly string[]) => fields.includes(LEGACY_CUTOVER) || fields.includes(RECOVERED_DISK);
 
-/**
- * Classify a field set per contract:
- * - 'legacy' — ONLY when the LEGACY_CUTOVER marker is present
- * - 'review' — no-proof fields (base/predecessor/lifecycle), empty list, or bare 'update' without evidence
- * - 'conflict' — structural markers (folder/folders/delete) or ordinary data fields (dueDate, content, etc.)
- */
 export function noteReviewKind(fields: readonly string[]): 'legacy' | 'review' | 'conflict' {
-  // Only the explicit LEGACY_CUTOVER marker classifies as legacy.
   if (fields.includes(LEGACY_CUTOVER)) return 'legacy';
-  // No-proof fields: base mismatch, predecessor gap, lifecycle break — review, not conflict.
-  if (reviewFields.some((f) => fields.includes(f))) return 'review';
-  // Empty or bare 'update' without any proof of overlap — review.
-  if (!fields.length || (fields.length === 1 && fields[0] === 'update')) return 'review';
-  // Everything else: structural markers or ordinary data fields → real conflict.
-  return 'conflict';
+  return !fields.length || fields.some((field) => ['base', 'predecessor', 'lifecycle', RECOVERED_DISK, 'update'].includes(field)) ? 'review' : 'conflict';
 }
 
-/** Validate that `selected` is a subset of writable properties and exclude transport-only keys. */
-export function validateSelectedFields(selected: readonly string[] | undefined): string[] | null {
-  if (selected === undefined) return null;
-  const whitelist = new Set(allWritableFields);
-  const result: string[] = [];
-  for (const key of selected) {
-    if (!whitelist.has(key) || !allWritableFields.includes(key)) continue;
-    if (key === 'id') continue;
-    if (key.startsWith('transport')) continue;
-    result.push(key);
+// Fields with separate projections (attachments, type and folder) still need a full-item decision.
+const reviewable = new Set<string>(['title', 'tags', 'status', 'priority', 'dueDate', 'reminder', 'duration', 'recurrence',
+  'subtasks', 'kanbanColumn', 'isPinned', 'isArchived', 'replyToId', 'linkedItemIds', 'streak', 'history',
+  'lastCompletedDate', 'summary', 'readingTimeMinutes', 'customProps', 'content'] satisfies (keyof SlagItem)[]);
+
+export function selectableNoteFields(head: SlagItem, local: SlagItem): string[] {
+  if (head.type !== local.type) return [];
+  const differences = noteDifferences(head, local);
+  const bodyOwnsSubtasks = head.type === 'task' && (parseSubtasksFromContent(head.content).length || parseSubtasksFromContent(local.content).length);
+  return differences.filter((key) => reviewable.has(key) && (key !== 'subtasks' || !bodyOwnsSubtasks));
+}
+
+export function applyReviewedFields(head: SlagItem, local: SlagItem, selected: readonly string[], content?: string): SlagItem {
+  const allowed = new Set(selectableNoteFields(head, local));
+  if (head.type !== local.type || (!selected.length && content === undefined) || selected.some((key) => !allowed.has(key))) {
+    throw new Error('Неприменимые поля; проверьте выбранные свойства');
   }
-  return result;
+  const fields = new Set(selected);
+  const values = local as unknown as Record<string, unknown>;
+  const item = { ...head, ...Object.fromEntries([...fields].map((key) => [key, values[key]])), updatedAt: Date.now() };
+  if (content !== undefined) { item.content = content; fields.add('content'); }
+  if (fields.has('content') && item.type === 'task') item.subtasks = parseSubtasksFromContent(item.content);
+  for (const [field, value] of Object.entries(item)) {
+    if (value === undefined) Reflect.deleteProperty(item, field);
+  }
+  const retained = new Set(noteDifferences(head, local).filter((key) => !fields.has(key) && key !== 'subtasks'));
+  const violations = noteMergeViolations(item, local, head, fields, retained);
+  if (violations.length) throw new Error('Выбранные свойства нельзя применить отдельно; проверьте связанные изменения');
+  return item;
 }

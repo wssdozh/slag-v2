@@ -5,8 +5,9 @@ import type { SyncStatus } from '../../lib/sync/types';
 import { Icon } from '../UI/icons/Icon';
 import { syncGlyph } from './syncGlyph';
 
-export function SyncStatusButton({ onSettings, mobile = false }: {
+export function SyncStatusButton({ onSettings, onHealth, mobile = false }: {
   onSettings: () => void;
+  onHealth?: () => void;
   mobile?: boolean;
 }) {
   const [status, setStatus] = useState<SyncStatus>(() => syncEngine.getStatus());
@@ -20,6 +21,8 @@ export function SyncStatusButton({ onSettings, mobile = false }: {
     : status.state === 'connected' ? 'Есть связь с релеем' : glyph.title;
 
   const registry = status.registry;
+  const diagnostics = status.diagnostics;
+  const reviews = (diagnostics?.reviews ?? 0) + (diagnostics?.legacyReviews ?? 0);
   const mediaLabel = registry && {
     legacy: 'Legacy', waiting: 'Ожидание', applying: 'Запись…', error: 'Сбой', 'applied-through-cursor': 'Записаны',
   }[registry.media];
@@ -52,6 +55,14 @@ export function SyncStatusButton({ onSettings, mobile = false }: {
           <dd className={`text-right ${registry.media === 'error' ? 'text-warning' : ''}`}>{mediaLabel}</dd>
         </dl>
       )}
+      {reviews > 0 && <div className="text-fg-secondary">Правки на проверку: {reviews}</div>}
+      {Boolean(diagnostics?.conflicts) && <div className="text-warning">Конфликты: {diagnostics?.conflicts}</div>}
+      {diagnostics?.registryOnly && <div className="text-fg-secondary">Старый канал изолирован</div>}
+      {onHealth && <button type="button" onClick={() => { setIsOpen(false); setDismissed(true); onHealth(); }}
+        data-testid={mobile ? 'mobile-sync-open-health' : 'sidebar-sync-open-health'}
+        className={`flex w-full items-center gap-2 rounded-md text-left text-fg-primary hover:bg-tint-6 focus-visible:bg-tint-8 cursor-pointer ${mobile ? 'min-h-12' : 'py-1'}`}>
+        <Icon name="entity.vault" size="sm" /> Состояние хранилища
+      </button>}
       <button type="button" onClick={() => { setIsOpen(false); setDismissed(true); onSettings(); }} data-testid={mobile ? 'mobile-sync-open-settings' : 'sidebar-sync-open-settings'}
         className={`flex w-full items-center gap-2 rounded-md text-left text-fg-primary hover:bg-tint-6 focus-visible:bg-tint-8 cursor-pointer ${mobile ? 'min-h-12' : 'py-1'}`}>
         <Icon name="system.settings" size="sm" /> {registry ? 'Настройки' : 'Настройки синхронизации'}

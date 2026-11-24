@@ -14,6 +14,7 @@ export async function openNoteSession(options: {
   sendLive: (message: string) => boolean; onProgress: () => void; onError: (error: unknown) => void;
   isLiveOpen?: () => boolean;
   onDeliveryChange?: () => void;
+  onRelayResponse?: () => void;
   log?: (event: string, data: Record<string, unknown>, warning?: boolean) => void;
   onStatus?: (status: import('./wire.ts').NoteStatus) => void;
   onApplied: (note: import('../../storage/noteRegistry').AcceptedNote) => void;
@@ -144,9 +145,9 @@ export async function openNoteSession(options: {
   const replica = new NoteReplica({ ...options, keys, generation, atomicGroups, room: options.roomId,
     trackDiskProjection: !!options.port.readRegistryNoteCopies,
     channel: {
-      events: async (...args) => { requireVerified(); return channel.events(...args); },
-      heads: async (...args) => { requireVerified(); return channel.heads(...args); },
-      send: async (...args) => { requireVerified(); return channel.send(...args); },
+      events: async (...args) => { requireVerified(); const result = await channel.events(...args); options.onRelayResponse?.(); return result; },
+      heads: async (...args) => { requireVerified(); const result = await channel.heads(...args); options.onRelayResponse?.(); return result; },
+      send: async (...args) => { requireVerified(); const result = await channel.send(...args); options.onRelayResponse?.(); return result; },
     },
     sendLive: (message) => verified && options.sendLive(message),
     isLiveOpen: () => verified && options.isLiveOpen?.() === true,

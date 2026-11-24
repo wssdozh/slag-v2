@@ -601,7 +601,8 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     return this.currentVaultRead;
   }
 
-  public async getCurrentVaultRecovery(): Promise<{ kind: 'ready' | 'local-only' | 'unavailable'; fresh?: boolean }> {
+  public async getCurrentVaultRecovery(): Promise<{ kind: 'ready'; fresh?: boolean }
+    | { kind: 'local-only'; reason: import('./vaultRecovery').RecoveryReason } | { kind: 'unavailable' }> {
     if (!isTauri()) return { kind: 'ready' };
     const vault = this.currentVault;
     const read = this.currentVaultRead;

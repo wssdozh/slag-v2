@@ -1189,7 +1189,7 @@ test('noteReviewKind classifies per contract: legacy only on marker, others by p
 test('selecting dueDate does not overwrite unrelated tag and priority on retry', async (t) => {
   const server = relay();
   // Local has dueDate changed from head; tags/priority differ too but we select only dueDate
-  const base = note('conflict-due', { content: 'keep this', folder: 'Inbox', tags: ['red'], priority: 'high' });
+  const base = note('conflict-due', { type: 'task', content: 'keep this', folder: 'Inbox', tags: ['red'], priority: 'high' });
   const local = { ...base, dueDate: '2026-06-06', tags: ['green'] };
   const head = { ...base, dueDate: '2025-01-01', tags: ['blue'], priority: 'low' };
   const conflictEntry = { intentId: 'pick-due', noteId: base.id, kind: 'update', revision: 1,
@@ -1263,7 +1263,7 @@ test('invalid linkedItemIds values are not committed via selectedFields', async 
 
 test('saved legacy review does not block independent delivery or repaint health', async (t) => {
   const server = relay();
-  const base = note('health-test', { content: 'initial', tags: ['a'], priority: 'medium' });
+  const base = note('health-test', { type: 'task', content: 'initial', tags: ['a'], priority: 'medium' });
   // Head has different dueDate — making it the differing field for the retry
   const head = { ...base, content: 'head-text', tags: ['b'], priority: 'low' };
   // Conflict entry: local tried to update with a dueDate
@@ -1300,7 +1300,7 @@ test('empty selectedFields without content is rejected', async (t) => {
     state: { cursor: 0, confirmed: {}, pending: [], conflicts: [conflictEntry] },
     save: async () => {},
   });
-  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 0, undefined, []), /Полная замена без содержимого/);
+  await assert.rejects(peer.replica.resolveConflict(conflictEntry.intentId, 'retry', 0, undefined, []), /нельзя выбрать отдельные поля/);
 });
 
 test('selectedFields with explicit content and empty array works', async (t) => {

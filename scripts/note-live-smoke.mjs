@@ -390,6 +390,25 @@ try {
   const replay = cascadeWon ? await authorChannel.send(generation, 'race-replay', cascade, raceHead)
     : await phoneChannel.send(generation, 'race-replay', [create], raceHead);
   assert.deepEqual(replay.results, winner.results);
+  await Promise.all([author.replica.catchUp(), reader.replica.catchUp()]);
+  const alternatives = [{ intentId: 'legacy-review-measured', noteId: id, kind: 'update', revision: 0,
+    item: { ...author.local.get(id), title: 'Legacy snapshot for review' }, fields: ['legacy-cutover'], at: 1 }];
+  await author.replica.preserveLegacyAlternatives(alternatives);
+  assert.equal(author.replica.syncHealth, 'current');
+  const measured = { ...note('roundtrip-with-review', 'delivery probe'), type: 'task', dueDate: '2026-11-24', priority: 'low' };
+  const firstAt = performance.now();
+  await save(author, [measured]);
+  await until(() => reader.saved()?.confirmed[measured.id]?.item?.dueDate === measured.dueDate && author.replica.pendingCount === 0);
+  const outboundMs = Math.round(performance.now() - firstAt);
+  const measuredBase = reader.saved().confirmed[measured.id];
+  const backAt = performance.now();
+  await reader.replica.record([{ id: measured.id, kind: 'update', previous: measuredBase.item, origin: { revision: measuredBase.revision },
+    item: { ...measuredBase.item, priority: 'high' } }]);
+  await until(() => author.saved()?.confirmed[measured.id]?.item?.priority === 'high' && reader.replica.pendingCount === 0);
+  const inboundMs = Math.round(performance.now() - backAt);
+  assert.equal(author.local.get(measured.id).dueDate, measured.dueDate);
+  assert.ok(author.replica.conflicts.some(({ intentId }) => intentId === alternatives[0].intentId));
+  assert.equal(author.replica.syncHealth, 'current');
   const stats = (values) => {
     const sorted = values.toSorted((a, b) => a - b);
     const at = (p) => Math.round(sorted[Math.ceil(sorted.length * p) - 1]);
@@ -397,7 +416,7 @@ try {
   };
   const settled = stats(timings);
   assert.ok(settled.p95Ms <= 1000, `loopback p95 ${settled.p95Ms}ms`);
-  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ samples: timings.length, injectedRttMs: rttMs, ...settled, appliedInMemory: stats(appliedTimings), burstMs: Math.round(burstMs), burstSize: 10, idle, offlineCatchUp: true, httpReplayWithoutDuplicate: true, roundTripWithReview: { outboundMs, inboundMs } })}\n`);
 } finally {
   stop.abort();
   for (const ws of sockets) ws.close();

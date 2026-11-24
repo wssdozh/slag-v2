@@ -20,7 +20,7 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
       const item = { id: 'test-note', type: 'note', title: 'План релиза', content: '1. Проверить сборку\n2. Обновить документацию\n3. Передать на проверку', tags: ['проект'], attachments: [], folder: 'Inbox', createdAt: 1, updatedAt: 1 };
       let latest = 12;
       let closed = false;
-      syncEngine.getNoteConflicts = () => closed ? [] : [{ intentId: 'test-intent', noteId: item.id, kind: 'update', fields: ['content', 'tags'],
+      syncEngine.getNoteConflicts = () => closed ? [] : [{ intentId: 'test-intent', noteId: item.id, kind: 'update', reviewKind: 'conflict', fields: ['content', 'tags'],
         item: { ...item, tags: ['проект', 'на проверке'], content: item.content.replace('2. Обновить документацию', '2. Обновить инструкцию и скриншоты') },
         currentRevision: latest, currentItem: item }];
       syncEngine.resolveNoteConflict = async (_id: string, decision: string, revision: number, content?: string) => {
@@ -65,7 +65,7 @@ for (const [layout, width, height] of [['desktop', 1440, 900], ['mobile', 390, 8
     await page.evaluate(() => window.dispatchEvent(new Event('test-revise')));
     await expect(dialog.getByText('Версия изменилась. Сравнение обновлено.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Проверить новую версию' }).click();
-    await dialog.getByRole('button', { name: layout === 'mobile' ? 'Отправить мою правку' : 'Оставить версию релея' }).click();
+    await dialog.getByRole('button', { name: layout === 'mobile' ? 'Отправить выбранное' : 'Оставить версию релея' }).click();
     await dialog.getByRole('button', { name: 'Подтвердить' }).click();
     await expect(dialog).toBeHidden();
     await expect(compare).toHaveCount(0);
@@ -80,16 +80,49 @@ test('a migrated draft is labelled and compared without an automatic publish', a
   await page.evaluate(async () => {
     const { syncEngine } = await import(/* @vite-ignore */ '/src/lib/sync/syncEngine.ts');
     syncEngine.getNoteConflicts = () => [{ intentId: 'cutover-draft', noteId: 'slag:shared:v1:composer:Inbox', kind: 'update',
-      fields: ['legacy-cutover'], currentRevision: 12, currentItem: { shared: { content: 'Версия с сервера' } },
+      fields: ['legacy-cutover'], reviewKind: 'legacy', currentRevision: 12, currentItem: { shared: { content: 'Версия с сервера' } },
       item: { shared: { content: 'Сохранённая локальная версия' } } }];
     syncEngine.notify();
   });
   await expect(page.getByText('Черновик', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Сравнить', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Конфликт синхронизации' });
+  const dialog = page.getByRole('dialog', { name: 'Старая правка на проверку' });
   await expect(dialog.getByText('Правка из старой очереди — исходная версия неизвестна')).toBeVisible();
   await expect(dialog.getByText(/Сохранённая локальная версия/)).toBeVisible();
   await dialog.screenshot({ path: 'test-results/screenshots/sync-legacy-cutover.png', animations: 'disabled' });
+});
+
+test('a migrated field-only edit is not a transport error and applies only the chosen field', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
+    const item = { id: 'repeat', type: 'task', title: 'Повторяющаяся задача', content: 'Текст одинаковый', tags: [], attachments: [],
+      folder: 'Inbox', createdAt: 1, updatedAt: 1, dueDate: '2026-11-20' };
+    syncEngine.getNoteConflicts = () => [{ intentId: 'old-task', noteId: item.id, kind: 'update', reviewKind: 'legacy', fields: ['legacy-cutover'],
+      item: { ...item, dueDate: '2026-11-23', streak: 0 }, currentRevision: 12, currentItem: item }];
+    syncEngine.resolveNoteConflict = async (...args) => { sessionStorage.setItem('selected-sync-fields', JSON.stringify(args)); };
+    syncEngine.notify();
+  });
+  await page.getByTestId('sidebar-sync-btn').hover();
+  await page.getByTestId('sidebar-sync-open-health').click();
+  await expect(page.getByTestId('vault-health-report')).toBeVisible();
+  await page.screenshot({ path: 'test-results/screenshots/sync-vault-health.png', animations: 'disabled' });
+  await page.getByTestId('settings-tab-sync').click();
+  await expect(page.getByText('Старые правки на проверку', { exact: true })).toBeVisible();
+  await expect(page.getByText('Конфликты синхронизации', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Сравнить', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Старая правка на проверку' });
+  await expect(dialog.getByText('2026-11-20')).toBeVisible();
+  await expect(dialog.getByText('2026-11-23')).toBeVisible();
+  await expect(dialog.getByText('Разницы в отображаемом тексте нет')).toBeHidden();
+  await expect(dialog.getByText('Версия релея', { exact: true })).toBeHidden();
+  await dialog.getByRole('checkbox', { name: 'Срок', exact: true }).check();
+  await dialog.screenshot({ path: 'test-results/screenshots/sync-legacy-properties.png', animations: 'disabled' });
+  await dialog.getByRole('button', { name: 'Отправить выбранное' }).click();
+  await dialog.getByRole('button', { name: 'Подтвердить' }).click();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('selected-sync-fields') ?? 'null')))
+    .toEqual(['old-task', 'retry', 12, null, ['dueDate']]);
 });
 
 test('a folder conflict shows both members and submits one reviewed decision', async ({ page }) => {
@@ -102,9 +135,9 @@ test('a folder conflict shows both members and submits one reviewed decision', a
     const note = { id: 'moved-note', type: 'note', title: 'Запись проекта', folder: 'Проекты', content: '', tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
     const folder = { path: 'Проекты', name: 'Проекты' };
     syncEngine.getNoteConflicts = () => [
-      { intentId: 'note-move', noteId: note.id, folderGroup: { ...group, index: 0 }, currentRevision: 12,
+      { intentId: 'note-move', noteId: note.id, fields: ['folder'], folderGroup: { ...group, index: 0 }, currentRevision: 12,
         currentItem: note, item: { ...note, folder: 'Архив' } },
-      { intentId: 'tree-move', noteId: 'tree-id', folderGroup: { ...group, index: 1 }, currentRevision: 14,
+      { intentId: 'tree-move', noteId: 'tree-id', fields: ['folders'], folderGroup: { ...group, index: 1 }, currentRevision: 14,
         currentItem: [folder], item: [{ path: 'Архив', name: 'Архив' }] },
     ];
     syncEngine.resolveFolderConflict = async (...decision) => {

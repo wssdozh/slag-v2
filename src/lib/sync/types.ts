@@ -1,4 +1,6 @@
 // Shared sync types: device profile, connection state, subscription and status snapshot.
+import type { SyncDiagnostics } from './diagnostics';
+
 export type DeviceSyncMode = 'read-write' | 'receive-only';
 
 export interface DeviceProfile {
@@ -106,6 +108,7 @@ export interface SyncStatus {
   currentRoomId: string | null;
   subscription: SubscriptionInfo;
   manifest?: ManifestStatus;
+  diagnostics?: SyncDiagnostics;
   registry?: {
     relayHead: number | null;
     appliedThrough: number;

@@ -497,4 +497,85 @@ mod tests {
         assert!(!a.exists());
         assert_eq!(fs::read(trash).unwrap(), b"a");
     }
+
+    /// Primary replica gone or NUL: reader falls back to slot 1 and repairs primary.
+    #[test]
+    fn reads_slot_1_when_primary_is_nul_or_missing() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        // Write generation creates two identical replicas under one marker.
+        write_generation(&path, "survived-on-slot-1").unwrap();
+        // Corrupt the primary: zero-byte file.
+        fs::write(payload(&path, 1, 0), b"").unwrap();
+        // Reader must fall back to slot 1 and repair primary back to match.
+        assert_eq!(read_generation(&path).unwrap().as_deref(), Some("survived-on-slot-1"));
+        assert_eq!(fs::read(payload(&path, 1, 0)).unwrap(), b"survived-on-slot-1");
+    }
+
+    /// Both replicas damaged: hash mismatch on every slot → error, no reset.
+    #[test]
+    fn both_replicas_corrupted_fails_without_reset() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        write_generation(&path, "will-die-together").unwrap();
+        // Overwrite both slots with unrelated content.
+        fs::write(payload(&path, 1, 0), b"\xde\xad").unwrap();
+        fs::write(payload(&path, 1, 1), b"\xbe\xef").unwrap();
+        // Marker still references number 1, hashes won't match anything → error.
+        let result = read_generation(&path);
+        assert!(result.is_err());
+        // Subsequent writes must fail because marker still points to broken generation.
+        assert!(write_generation(&path, "must-fail-because-marker-stale").is_err());
+    }
+
+    /// Commit-marker missing while payloads exist: not recoverable, treated as damage.
+    #[test]
+    fn marker_absent_with_payloads_treated_as_damage() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        // Ensure parent directory exists (payload paths are inside vaults/main).
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        // Create replicas directly without marker (simulates crash before marker write).
+        fs::write(payload(&path, 5, 0), b"orphaned-data").unwrap();
+        fs::write(payload(&path, 5, 1), b"orphaned-data").unwrap();
+        // No marker exists — read_marker scans slots and finds them → Err(damaged).
+        assert!(read_generation(&path).is_err());
+        // Must not silently reset: trying to write resets number only after valid marker.
+        assert!(write_generation(&path, "cannot-start-from-orphan").is_err());
+    }
+
+    /// File interrupted mid-write: hash mismatch even if file present but truncated.
+    #[test]
+    fn interrupted_write_caught_by_hash_check() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        write_generation(&path, "full-content").unwrap();
+        // Truncate primary: partial write survives but hash won't match marker.
+        fs::write(payload(&path, 1, 0), b"part").unwrap();
+        // Reader tries primary first (hash miss), falls to slot 1 (ok), repairs primary.
+        assert_eq!(read_generation(&path).unwrap().as_deref(), Some("full-content"));
+        // Now corrupt BOTH replicas — nothing recoverable.
+        fs::write(payload(&path, 1, 0), b"\0\0").unwrap();
+        fs::write(payload(&path, 1, 1), b"\xff\xff").unwrap();
+        assert!(read_generation(&path).is_err());
+    }
+
+    /// Successful write after prior corruption does not zero any data.
+    #[test]
+    fn successful_write_after_corruption_keeps_old_data_alive() {
+        let fixture = Fixture::new();
+        let path = fixture.journal();
+        // Write gen 1, corrupt primary.
+        write_generation(&path, "gen-one").unwrap();
+        fs::write(payload(&path, 1, 0), b"\0\0").unwrap();
+        // Gen 1 still readable via slot 1.
+        assert_eq!(read_generation(&path).unwrap().as_deref(), Some("gen-one"));
+        // Write gen 2 — marker advances, old gen 1 stays on disk but unreadable via marker.
+        write_generation(&path, "gen-two").unwrap();
+        // New generation is accessible.
+        assert_eq!(read_generation(&path).unwrap().as_deref(), Some("gen-two"));
+        // Old markers/slots still physically present (not scrubbed).
+        assert!(payload(&path, 1, 0).exists());
+        assert!(payload(&path, 1, 1).exists());
+    }
 }

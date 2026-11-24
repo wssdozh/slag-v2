@@ -9,10 +9,19 @@ const log = logger.scope('FS');
 const options = { baseDir: BaseDirectory.AppData };
 export const RECOVERY_LOCAL_ONLY = 'recovery-local-only.json';
 
+export type RecoveryReason = 'state' | 'registry' | 'note-move' | 'archive';
 export type VaultRecovery =
   | { kind: 'ready'; state: Record<string, unknown>; fresh: boolean; fence: Record<string, unknown> }
-  | { kind: 'local-only'; state: Record<string, unknown>; fence?: Record<string, unknown> }
+  | { kind: 'local-only'; state: Record<string, unknown>; reason: RecoveryReason; fence?: Record<string, unknown> }
   | { kind: 'unavailable'; state: Record<string, unknown> };
+
+function savedReason(marker: Uint8Array): RecoveryReason {
+  try {
+    const { reason } = parseVaultObject(new TextDecoder('utf-8', { fatal: true }).decode(marker));
+    if (reason === 'state' || reason === 'registry' || reason === 'note-move') return reason;
+  } catch { /* The presence of an unreadable marker still fences the vault. */ }
+  return 'archive';
+}
 
 export function isMissingVaultFile(error: unknown): boolean {
   // ENOENT is 2 on Unix/Windows; Windows also uses 3 for a missing parent.
@@ -45,7 +54,7 @@ function validateRegistry(text: string): void {
 export async function recoverVault(dir: string, vaultId: string, wasPresent: boolean): Promise<VaultRecovery> {
   const statePath = `${dir}/state.json`;
   let state: Record<string, unknown> = {};
-  let reason: 'state' | 'registry' | 'previous' | undefined;
+  let reason: RecoveryReason | undefined;
   let fence: Record<string, unknown> = {};
   try {
     const [marker, bytes, protectedState, registry] = await Promise.all([
@@ -68,7 +77,7 @@ export async function recoverVault(dir: string, vaultId: string, wasPresent: boo
       }
     }
     // One durable marker is enough to keep the relay closed. Its contents are informational.
-    if (marker) reason = 'previous';
+    if (marker) reason = savedReason(marker);
     else if ('failed' in registry || 'failed' in protectedState || !!ledger !== !!config ||
       (state.protectedSync === true && !ledger) ||
       (ledger?.registryRequired === true && (!('protected' in registry) || !registry.protected))) reason = 'registry';
@@ -103,7 +112,7 @@ export async function recoverVault(dir: string, vaultId: string, wasPresent: boo
     }
     if (reason) {
       if (!marker) log.warn('Vault opened for local work; sync continuity is unknown', { reason });
-      return { kind: 'local-only', state, fence };
+      return { kind: 'local-only', state, reason, fence };
     }
     return { kind: 'ready', state, fence, fresh: !wasPresent && !bytes && registry.text === null && !config && !ledger };
   } catch (error) {
