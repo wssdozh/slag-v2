@@ -3,6 +3,7 @@ import test from 'node:test';
 import { mergeMarkdown } from '../src/lib/text/mergeMarkdown.ts';
 import { mergeNote, sameNote } from '../src/lib/sync/notes/merge.ts';
 import { candidate } from '../src/lib/sync/notes/reconcile.ts';
+import { applyReviewedFields } from '../src/lib/sync/notes/review.ts';
 
 const base = { id: 'one', type: 'note', folder: 'Inbox', title: 'old', content: 'First\nSeparator\nLast',
   tags: [], attachments: [], createdAt: 1, updatedAt: 1 };
@@ -91,6 +92,56 @@ test('incompatible type and attachment edits are reported rather than synthesize
   assert.ok(mergeNote(task, { ...task, dueDate: '2026-11-22' }, { ...task, type: 'note' }).conflicts.includes('type'));
   const attached = { ...base, attachments: [{ id: 'image', type: 'image', name: 'image.png' }] };
   assert.ok(mergeNote(attached, { ...attached, content: '![[image.png]]' }, base).conflicts.includes('attachments'));
+});
+
+test('a first Markdown checkbox does not silently replace an independent legacy checklist edit', () => {
+  const task = { ...base, type: 'task' };
+  const legacy = { ...task, subtasks: [{ id: 'legacy', title: 'Legacy step', completed: true }] };
+  const markdown = { ...task, content: `${task.content}\n\n- [ ] Markdown step` };
+  for (const [local, head] of [[legacy, markdown], [markdown, legacy]]) {
+    assert.deepEqual(mergeNote(task, local, head).conflicts, ['subtasks']);
+  }
+  const sameStep = { ...markdown, content: `${task.content}\n\n- [x] Legacy step` };
+  assert.deepEqual(mergeNote(task, legacy, sameStep).conflicts, []);
+  const removed = { ...legacy, subtasks: [] };
+  assert.deepEqual(mergeNote(legacy, removed, { ...legacy, title: 'New title' }).item.subtasks, []);
+  assert.deepEqual(mergeNote(legacy, removed, sameStep).conflicts, ['subtasks']);
+  assert.deepEqual(mergeNote(task, { ...task, title: 'New title' }, markdown).conflicts, []);
+});
+
+test('concurrent edits cannot attach a changed caption to a different same-name file', () => {
+  const attachment = (id) => ({ id, type: 'file', name: 'sheet.pdf', relativePath: `.attachments/${id}` });
+  const attached = { ...base, content: 'Top\n\n![[sheet.pdf|Old caption]]\n\nBottom', attachments: [attachment('A'), attachment('B')] };
+  const caption = { ...attached, content: attached.content.replace('Old caption', 'Edited caption') };
+  const reordered = { ...attached, attachments: [...attached.attachments].reverse() };
+  for (const [local, head] of [[caption, reordered], [reordered, caption]]) {
+    assert.deepEqual(mergeNote(attached, local, head).conflicts, ['attachments']);
+  }
+  assert.throws(() => applyReviewedFields(reordered, caption, ['content']), /связанные изменения/);
+  const explicit = caption.content.replace('sheet.pdf', 'A');
+  assert.equal(applyReviewedFields(reordered, caption, ['content'], explicit).content, explicit);
+  assert.deepEqual(mergeNote(attached, { ...attached, content: attached.content.replace('Top', 'Introduction') }, reordered).conflicts, []);
+  const stable = { ...attached, content: attached.content.replace('sheet.pdf', 'A') };
+  assert.deepEqual(mergeNote(stable, { ...stable, content: stable.content.replace('Old caption', 'Edited caption') },
+    { ...stable, attachments: reordered.attachments }).conflicts, []);
+});
+
+test('two explicit ISO representations of one one-off reminder do not generate a conflict or revision', () => {
+  const task = { ...base, type: 'task' };
+  const local = { ...task, reminder: '2026-11-24T10:00:00+03:00' };
+  const head = { ...task, reminder: '2026-11-24T07:00:00Z' };
+  assert.ok(sameNote(local, head));
+  assert.deepEqual(mergeNote(task, local, head).conflicts, []);
+  assert.equal(mergeNote(task, local, head).item.reminder, head.reminder);
+  assert.ok(!sameNote(local, { ...head, reminder: '2026-11-24T10:00:00+05:00' }));
+  assert.ok(!sameNote(local, { ...head, reminder: '2026-11-24T07:00:00' }));
+  assert.ok(!sameNote({ ...local, reminder: '2026-11-31T10:00:00+03:00' }, { ...head, reminder: '2026-12-01T07:00:00Z' }));
+  const later = mergeNote(local, head, { ...local, dueDate: '2026-11-25' });
+  assert.deepEqual(later.conflicts, []);
+  assert.equal(later.item.dueDate, '2026-11-25');
+  const recurrence = { freq: 'daily' };
+  assert.equal(sameNote({ ...local, recurrence }, { ...head, recurrence }), false);
+  assert.deepEqual(mergeNote({ ...task, recurrence }, { ...local, recurrence }, { ...head, recurrence }).conflicts, ['reminder']);
 });
 
 test('normalization ignores a running enrichment, not actual metadata or custom null', () => {

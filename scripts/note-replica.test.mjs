@@ -663,6 +663,44 @@ test('folder tree shares the journal, survives restart, and never overwrites a c
   assert.equal(a.local.size + b.local.size + resumed.local.size, 0);
 });
 
+test('identical offline folder and profile updates settle without a review or a second revision', async (t) => {
+  const { sharedRegistryId } = await import('../src/lib/sync/notes/sharedBody.ts');
+  const server = relay();
+  const profile = sharedRegistryId('workspace', 'profile');
+  const previous = { name: 'Before' }, next = { name: 'After' };
+  const inbox = [{ path: 'Inbox', name: 'Inbox', description: '' }];
+  const tree = [...inbox, { path: 'Trip', name: 'Trip', description: '' }];
+  const projection = () => {
+    const values = {};
+    return { values, applyShared: async ({ shared }) => { values.profile = shared; },
+      applyFolderTree: async (folders) => { values.folders = folders; } };
+  };
+  const a = device(t, server, projection());
+  const c = device(t, server, projection());
+  await Promise.all([a.replica.catchUp(), c.replica.catchUp()]);
+  await a.replica.recordFolderTree(inbox, []);
+  await a.replica.recordShared(profile, previous, null);
+  await until(() => c.saved()?.cursor === 2 && !a.replica.pendingCount);
+  const b = device(t, server, { ...projection(), state: c.saved() });
+  await b.replica.recordFolderTree(tree, inbox);
+  await b.replica.recordShared(profile, next, previous);
+  const envelope = JSON.parse(JSON.stringify({ version: 1, room, generation, journal: b.saved() }));
+  b.stop();
+  await a.replica.recordFolderTree(tree, inbox);
+  await a.replica.recordShared(profile, next, previous);
+  await until(() => c.saved()?.cursor === 4 && !a.replica.pendingCount);
+  const sends = server.sends();
+  const disk = projection();
+  const back = device(t, server, { ...disk, state: loadNoteJournal(envelope, room, generation) });
+  await back.replica.catchUp();
+  await until(() => !back.replica.pendingCount);
+  assert.deepEqual(back.conflicts, []);
+  assert.deepEqual(back.saved().pending, []);
+  assert.deepEqual(disk.values, { folders: tree, profile: next });
+  assert.equal(server.sends(), sends);
+  assert.equal(server.events.length, 4);
+});
+
 test('batches immediate edits and catches up without further requests when idle', async (t) => {
   const server = relay();
   const a = device(t, server);

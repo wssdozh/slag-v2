@@ -15,7 +15,7 @@ function validDay(day: unknown): boolean {
 }
 
 export function noteMergeViolations(item: SlagItem, local: SlagItem, head: SlagItem,
-  mine: ReadonlySet<string>, theirs: ReadonlySet<string>): string[] {
+  mine: ReadonlySet<string>, theirs: ReadonlySet<string>, base?: SlagItem): string[] {
   const fields: string[] = [];
   if (item.id !== head.id || item.id !== local.id || !isSafeVaultRelativePath(item.id)) fields.push('id');
   if (!isSafeVaultRelativePath(item.folder)) fields.push('folder');
@@ -34,17 +34,46 @@ export function noteMergeViolations(item: SlagItem, local: SlagItem, head: SlagI
   }
   if ((mine.has('attachments') || theirs.has('attachments')) && (mine.has('content') || theirs.has('content'))) {
     const resolved = (note: SlagItem) => resolveAttachmentEmbeds(note.content, note.attachments);
-    const matches = [...resolved(local), ...resolved(head)];
+    const localEmbeds = resolved(local), headEmbeds = resolved(head);
+    const matches = [...localEmbeds, ...headEmbeds];
     const destinations = new Map<string, Set<string | undefined>>();
     for (const { embed, attachment } of matches) {
       const options = destinations.get(embed.name) ?? new Set();
       options.add(attachment?.id);
       destinations.set(embed.name, options);
     }
-    if (resolved(item).some(({ embed, attachment }) => {
+    const merged = resolved(item);
+    const rejectsBinding = merged.some(({ embed, attachment }) => {
       const options = destinations.get(embed.name);
       return options ? !options.has(attachment?.id) || (options.size > 1 && !attachment) : false;
-    })) fields.push('attachments');
+    });
+    // Keep a changed token's binding from the side that edited it, not just any ID
+    // another occurrence of that file name happened to resolve to.
+    const byToken = (list: ReturnType<typeof resolved>) => {
+      const tokens = new Map<string, (string | undefined)[]>();
+      for (const { embed: { name, label }, attachment } of list) {
+        const key = JSON.stringify([name, label]);
+        const ids = tokens.get(key);
+        if (ids) ids.push(attachment?.id);
+        else tokens.set(key, [attachment?.id]);
+      }
+      return tokens;
+    };
+    const reference = base && byToken(resolved(base)), result = byToken(merged);
+    const rebindsEditedEmbed = (edited: ReturnType<typeof resolved>, other: ReturnType<typeof resolved>) => {
+      const previous = reference ?? byToken(other);
+      for (const [token, ids] of byToken(edited)) {
+        const count = previous.get(token)?.length ?? 0;
+        if (ids.length <= count) continue;
+        const after = result.get(token) ?? [];
+        // A reviewed draft can explicitly drop or replace a token, e.g. by spelling its ID.
+        if (!base && !after.length) continue;
+        if (after.length !== ids.length || ids.some((id, i) => id !== after[i])) return true;
+      }
+      return false;
+    };
+    if (rejectsBinding || (mine.has('content') && theirs.has('attachments') && rebindsEditedEmbed(localEmbeds, headEmbeds))
+      || (theirs.has('content') && mine.has('attachments') && rebindsEditedEmbed(headEmbeds, localEmbeds))) fields.push('attachments');
   }
   return fields;
 }

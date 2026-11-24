@@ -302,7 +302,56 @@ async function run() {
     assert.deepEqual(c.replica.conflicts, journal.conflicts);
     assert.deepEqual(c.attempts, []);
     sameProjection();
-    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, final: 150, savedAlternatives: c.replica.conflicts.length })}\n`);
+
+    // The disconnected device and an online peer independently reach the same snapshots.
+    const afterTree = [...c.folders(), { path: 'Same folder', name: 'Same folder', description: '' }];
+    const sameProfile = { name: 'Same name' };
+    const sameReminder = '2026-12-10T07:00:00Z';
+    const reopenEqual = await disconnect(async (off, snapshot) => {
+      await off.replica.recordFolderTree(afterTree, c.folders());
+      await off.replica.recordShared(profile, sameProfile, c.workspace.profile);
+      await edit(off, task, { reminder: '2026-12-10T10:00:00+03:00' }, snapshot);
+    });
+    await a.replica.recordFolderTree(afterTree, a.folders());
+    await b.replica.recordShared(profile, sameProfile, b.workspace.profile);
+    await edit(a, task, { reminder: sameReminder });
+    await online(153);
+    c = await reopenEqual();
+    await converge(153);
+    sameProjection();
+    assert.deepEqual(c.folders(), afterTree);
+    assert.deepEqual(c.workspace.profile, sameProfile);
+    assert.equal(c.local.get(task.id).reminder, sameReminder);
+    assert.deepEqual(c.replica.conflicts, journal.conflicts);
+    assert.deepEqual(c.attempts, []);
+
+    const checklist = { ...note('checklist-sources', 'First\n\nLast'), type: 'task' };
+    const step = { id: 'legacy-step', title: 'Keep this step', completed: true };
+    const file = (id) => ({ id, type: 'file', name: 'sheet.pdf', mimeType: 'application/pdf', size: 4, relativePath: `.attachments/${id}` });
+    const caption = { ...note('embed-binding', '![[sheet.pdf|Original caption]]'), attachments: [file('first'), file('second')] };
+    const newCaption = '![[sheet.pdf|Offline caption]]';
+    await save(a, [checklist, caption]);
+    await converge(155);
+    const reopenConflicts = await disconnect(async (off, snapshot) => {
+      await edit(off, checklist, { subtasks: [step] }, snapshot);
+      await edit(off, caption, { content: newCaption }, snapshot);
+    });
+    await edit(a, checklist, { content: `${checklist.content}\n\n- [ ] Markdown step` });
+    await edit(b, caption, { attachments: caption.attachments.toReversed() });
+    await online(157);
+    c = await reopenConflicts();
+    await converge(157);
+    sameProjection();
+    assert.deepEqual(c.attempts, []);
+    assert.equal(c.local.get(caption.id).content, caption.content);
+    const alternatives = restartJournal(c.saved()).conflicts;
+    assert.deepEqual(alternatives.slice(0, 2), journal.conflicts);
+    assert.deepEqual(alternatives.slice(2).map(({ noteId, item, fields }) => [noteId, item, fields]), [
+      [checklist.id, { ...checklist, subtasks: [step] }, ['subtasks']],
+      [caption.id, { ...caption, content: newCaption }, ['attachments']],
+    ]);
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 157,
+      equivalentEdits: 3, savedAlternatives: alternatives.length })}\n`);
   }
 
   if (offlineOnly) return offlineScenarios();

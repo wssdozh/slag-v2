@@ -24,9 +24,21 @@ const sameProperty = (a: unknown, b: unknown) => equal(a, b, true);
 const own = (object: Record<string, unknown>, key: string) => Object.hasOwn(object, key) ? object[key] : undefined;
 const keys = (...objects: Record<string, unknown>[]) => new Set(objects.flatMap(Object.keys));
 
+function explicitReminderInstant(value: unknown): number {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return NaN;
+  const day = value.slice(0, 10);
+  return new Date(`${day}T00:00:00Z`).toJSON()?.slice(0, 10) === day ? Date.parse(value) : NaN;
+}
+
+const sameReminder = (a: unknown, b: unknown) => sameProperty(a, b) || explicitReminderInstant(a) === explicitReminderInstant(b);
+const oneOffTasks = (...notes: SlagItem[]) => notes.every(({ type, recurrence }) => type === 'task' && !recurrence);
+
 export function noteDifferences(a: SlagItem, b: SlagItem): string[] {
   const left = noteProperties(a), right = noteProperties(b);
-  return [...keys(left, right)].filter((key) => !sameProperty(own(left, key), own(right, key)));
+  return [...keys(left, right)].filter((key) => {
+    const same = key === 'reminder' && oneOffTasks(a, b) ? sameReminder : sameProperty;
+    return !same(own(left, key), own(right, key));
+  });
 }
 
 export function sameNote(a: SlagItem | null, b: SlagItem | null): boolean {
@@ -56,9 +68,11 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
   const a = noteProperties(base), b = noteProperties(local), c = noteProperties(head);
   const localChanges = new Set<string>(), remoteChanges = new Set<string>();
   const conflicts = new Set<string>();
-  const choose = (key: string, original: unknown, mine: unknown, theirs: unknown): unknown => {
-    if (sameProperty(mine, original)) return theirs;
-    if (sameProperty(theirs, original) || sameProperty(mine, theirs)) return mine;
+  const oneOff = oneOffTasks(base, local, head);
+  const compare = (key: string) => key === 'reminder' && oneOff ? sameReminder : sameProperty;
+  const choose = (key: string, original: unknown, mine: unknown, theirs: unknown, same = sameProperty): unknown => {
+    if (same(mine, original) || (same === sameReminder && same(mine, theirs))) return theirs;
+    if (same(theirs, original) || same(mine, theirs)) return mine;
     if (key === 'content' && typeof original === 'string' && typeof mine === 'string' && typeof theirs === 'string') {
       const text = mergeMarkdown(original, mine, theirs);
       if (text !== undefined) return text;
@@ -69,8 +83,9 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
   const entries: [string, unknown][] = [];
   for (const key of keys(a, b, c)) {
     const original = own(a, key), mine = own(b, key), theirs = own(c, key);
-    if (!sameProperty(mine, original)) localChanges.add(key);
-    if (!sameProperty(theirs, original)) remoteChanges.add(key);
+    const same = compare(key);
+    if (!same(mine, original)) localChanges.add(key);
+    if (!same(theirs, original)) remoteChanges.add(key);
     // Subtasks derived from body are not a second simultaneous edit to the same list.
     if (key === 'subtasks' && a.type === 'task' && b.type === 'task' && c.type === 'task') {
       const legacy = (note: SlagItem, fields: ReturnType<typeof noteProperties>) =>
@@ -85,11 +100,25 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
       const props = [...keys(x, y, z)].map((name) => [name, choose(key, own(x, name), own(y, name), own(z, name))] as const);
       const kept = props.filter(([, value]) => value !== undefined);
       if (kept.length) entries.push([key, Object.fromEntries(kept)]);
-    } else entries.push([key, choose(key, original, mine, theirs)]);
+    } else entries.push([key, choose(key, original, mine, theirs, same)]);
   }
   const combined = { ...Object.fromEntries(entries.filter(([, value]) => value !== undefined)),
     createdAt: head.createdAt, updatedAt: Math.max(head.updatedAt, local.updatedAt) } as SlagItem;
   const item = { ...combined, subtasks: noteProperties(combined).subtasks };
-  for (const field of noteMergeViolations(item, local, head, localChanges, remoteChanges)) conflicts.add(field);
+  if (a.type === 'task' && b.type === 'task' && c.type === 'task' && item.subtasks.length && item.subtasks !== combined.subtasks) {
+    // Markdown owns the serialized checklist. An independent frontmatter edit must not vanish,
+    // including an explicit removal; the same title/completion in Markdown already satisfies it.
+    const steps = (list: SlagItem['subtasks']) => Array.isArray(list)
+      ? list.map((step) => step && typeof step.title === 'string' && typeof step.completed === 'boolean' ? [step.title, step.completed] : step)
+      : list;
+    const baseSteps = steps(a.subtasks), resultSteps = steps(item.subtasks);
+    const losesLegacyEdit = (note: SlagItem, fields: ReturnType<typeof noteProperties>) => {
+      if (fields.subtasks.length && fields.subtasks !== note.subtasks) return false;
+      const side = steps(fields.subtasks);
+      return !sameProperty(side, baseSteps) && !sameProperty(side, resultSteps);
+    };
+    if (losesLegacyEdit(local, b) || losesLegacyEdit(head, c)) conflicts.add('subtasks');
+  }
+  for (const field of noteMergeViolations(item, local, head, localChanges, remoteChanges, base)) conflicts.add(field);
   return { item, conflicts: [...conflicts] };
 }

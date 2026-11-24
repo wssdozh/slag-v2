@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **703**, строк: **120460**, зон: **48**.
+Модулей: **703**, строк: **120522**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -659,7 +659,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 57 файлов, 12347 строк
+## src/lib/sync — 57 файлов, 12409 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -692,11 +692,11 @@
 | `notes/journal.ts` | 172 | 12 | JournalKind, RegistryValue, NoteBase, sameRegistryValue, JournalAttempt, +12 | Pure transitions for an ordered queue of local intentions; disk and network s… |
 | `notes/legacyCutover.ts` | 75 | 4 | LEGACY_CUTOVER, sameLegacyValue, LegacyCutoverBlocked, prepareLegacyCutover |  |
 | `notes/mediaWire.ts` | 49 | 1 | REGISTRY_MEDIA_MAX_BYTES, sealRegistryMedia, openRegistryMedia |  |
-| `notes/merge.ts` | 96 | 13 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
-| `notes/mergeValidation.ts` | 51 | 2 | noteMergeViolations | Reject combinations whose individual property edits do not compose safely. |
+| `notes/merge.ts` | 125 | 13 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
+| `notes/mergeValidation.ts` | 80 | 2 | noteMergeViolations | Reject combinations whose individual property edits do not compose safely. |
 | `notes/migrationExport.ts` | 84 | 1 | exportMigrationSnapshot, canExportMigrationSnapshot | Local-only evidence: preserve physical copies, including duplicate IDs and tr… |
 | `notes/persistence.ts` | 156 | 5 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
-| `notes/reconcile.ts` | 46 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
+| `notes/reconcile.ts` | 50 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
 | `notes/recoveryJournal.ts` | 53 | 2 | readRecoveryRegistry, planRecoveredJournal | Rehydrate an empty disk from the relay; import local intentions, not the old … |
 | `notes/replica.ts` | 1086 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/review.ts` | 45 | 5 | RECOVERED_DISK, needsReviewedHead, noteReviewKind, selectableNoteFields, applyReviewedFields |  |

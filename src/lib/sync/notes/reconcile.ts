@@ -22,6 +22,10 @@ export function candidate(intent: NoteIntent, head: NoteBase | undefined): Candi
   if (intent.unverifiedBase) return skip(['base']);
   if (!base && !intent.attempt) return skip(['base']);
   if (!head && kind !== 'create') throw new Error('Эталон заметки не найден; правка осталась в очереди');
+  // Matching non-note snapshots need no new write. This must not settle a cascade,
+  // a lifecycle transition, or a note whose continuity is still unproven.
+  if (kind === 'update' && base && !intent.folderGroup && item && (Array.isArray(item) || 'shared' in item)
+      && sameRegistryValue(item, current)) return skip([]);
   if (base?.revision === (head?.revision ?? 0) && sameRegistryValue(base.item, current)) {
     if (kind === 'update' && sameRegistryValue(item, current)) return skip([]);
     if ((kind === 'create' && !head) || (kind === 'restore' && head && current === null)
