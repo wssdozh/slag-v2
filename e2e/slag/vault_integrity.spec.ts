@@ -58,7 +58,7 @@ test('the vault tab opens the storage state block and it refuses a web sweep', a
 
   await page.evaluate(async () => {
     const { syncEngine } = await import('/src/lib/sync/syncEngine.ts');
-    syncEngine.noteSession = { generation: 1, replica: { catchUp: async (force: boolean) => {
+    syncEngine.noteSession = { generation: 1, replica: { pendingCount: 0, catchUp: async (force: boolean) => {
       document.documentElement.dataset.testRegistryRefresh = String(force);
     } } };
     syncEngine.notify();
