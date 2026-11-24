@@ -81,9 +81,34 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
     conflicts.add(key);
     return theirs;
   };
+  const mergeAttachmentDetails = () => {
+    // Do not combine structure, ordering or metadata from different versions of the file.
+    const file = ({ id, name, type, mimeType, size, relativePath, registryBlobId }: SlagItem['attachments'][number]) =>
+      [id, name, type, mimeType, size, relativePath, registryBlobId];
+    const original = a.attachments.map(file);
+    if (!sameProperty(original, b.attachments.map(file)) || !sameProperty(original, c.attachments.map(file)) ||
+        a.attachments.some(({ registryBlobId }) => !registryBlobId) ||
+        new Set(a.attachments.map(({ id }) => id)).size !== a.attachments.length) return;
+    const enrichmentKeys = ['extractedText', 'summary', 'enrichmentStatus', 'enrichmentError'];
+    const enrichment = (value: Record<string, unknown>) => enrichmentKeys.map((key) => own(value, key));
+    return a.attachments.map((attachment, i) => {
+      const before = attachment as unknown as Record<string, unknown>;
+      const mine = b.attachments[i] as unknown as Record<string, unknown>;
+      const theirs = c.attachments[i] as unknown as Record<string, unknown>;
+      const details = choose('attachments', enrichment(before), enrichment(mine), enrichment(theirs)) as unknown[];
+      return Object.fromEntries([...keys(before, mine, theirs)].flatMap((key) => {
+        const index = enrichmentKeys.indexOf(key);
+        const value = index >= 0 ? details[index] : choose('attachments', own(before, key), own(mine, key), own(theirs, key));
+        return value === undefined ? [] : [[key, value]];
+      }));
+    });
+  };
   const entries: [string, unknown][] = [];
   for (const key of keys(a, b, c)) {
-    const original = own(a, key), mine = own(b, key), theirs = own(c, key);
+    // An omitted reading time is an estimate of the resulting text, not a separate edit.
+    const [original, mine, theirs] = key === 'readingTimeMinutes'
+      ? [base.readingTimeMinutes, local.readingTimeMinutes, head.readingTimeMinutes]
+      : [own(a, key), own(b, key), own(c, key)];
     const same = compare(key);
     // Shared task changes cannot conflict with themselves. Leave type transitions
     // and dependencies between text and attachment bindings under the original checks.
@@ -96,6 +121,8 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
       const legacy = (note: SlagItem, fields: ReturnType<typeof noteProperties>) =>
         fields.subtasks === note.subtasks ? note.subtasks : [];
       entries.push([key, choose(key, legacy(base, a), legacy(local, b), legacy(head, c))]);
+    } else if (key === 'attachments' && !same(mine, original) && !same(theirs, original) && !same(mine, theirs)) {
+      entries.push([key, mergeAttachmentDetails() ?? choose(key, original, mine, theirs)]);
     } else if (key === 'tags' && !sameProperty(local.tags, base.tags) && !sameProperty(head.tags, base.tags) && !sameProperty(local.tags, head.tags)) {
       const tags = mergeTags(base.tags, local.tags, head.tags);
       if (!tags) conflicts.add(key);

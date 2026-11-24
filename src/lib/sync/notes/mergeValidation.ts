@@ -2,9 +2,7 @@
 import type { SlagItem } from '../../../types/index.ts';
 import { resolveAttachmentEmbeds } from '../../text/attachmentEmbed.ts';
 import { isSafeVaultRelativePath } from '../../vault/safePath.ts';
-
-const taskFields = ['status', 'priority', 'dueDate', 'reminder', 'duration', 'recurrence', 'streak', 'history', 'lastCompletedDate', 'subtasks', 'kanbanColumn'];
-const articleFields = ['summary', 'readingTimeMinutes'];
+import { articleOnlyFields, taskOnlyFields } from '../../vault/noteSemantics.ts';
 const completion = ['status', 'history', 'streak', 'lastCompletedDate', 'subtasks'];
 const schedule = ['dueDate', 'reminder', 'duration', 'recurrence'];
 
@@ -22,9 +20,9 @@ export function noteMergeViolations(item: SlagItem, local: SlagItem, head: SlagI
   const crosses = (left: readonly string[], right: readonly string[]) =>
     (left.some((key) => mine.has(key)) && right.some((key) => theirs.has(key)))
     || (left.some((key) => theirs.has(key)) && right.some((key) => mine.has(key)));
-  if (local.type !== head.type && crosses(['type'], [...taskFields, ...articleFields])) fields.push('type');
-  if (item.type !== 'task' && taskFields.some((key) => key !== 'subtasks' && Object.hasOwn(item, key))) fields.push('type');
-  if (item.type !== 'article' && articleFields.some((key) => Object.hasOwn(item, key))) fields.push('type');
+  if (local.type !== head.type && crosses(['type'], [...taskOnlyFields, ...articleOnlyFields])) fields.push('type');
+  if (item.type !== 'task' && taskOnlyFields.some((key) => key !== 'subtasks' && Object.hasOwn(item, key))) fields.push('type');
+  if (item.type !== 'article' && articleOnlyFields.some((key) => Object.hasOwn(item, key))) fields.push('type');
   if (item.type === 'task') {
     if (crosses(completion, schedule) && (item.recurrence || mine.has('recurrence') || theirs.has('recurrence'))) fields.push('recurrence');
     if (crosses(['status'], ['subtasks', 'kanbanColumn'])) fields.push('status');

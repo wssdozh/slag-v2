@@ -97,6 +97,7 @@ import { draftSharedMutation, memorySharedMutations, workspaceSharedMutations } 
 import { isSharedWorkspaceField, selectSharedWorkspace, sharedWorkspacePatch } from '../sync/notes/sharedWorkspace';
 import { equal, sameNote } from '../sync/notes/merge';
 import { editFromDisk, noteDiskProjection } from './noteDiskProjection';
+import { projectItemKind } from '../vault/noteSemantics';
 import { reconcileSyncedVault } from './syncReconcile';
 import {
   DEFAULT_INBOX_FOLDER,
@@ -904,6 +905,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     const existingIndex = items.findIndex(i => i.id === item.id);
     const oldItem = existingIndex >= 0 ? items[existingIndex] : undefined;
     const previous = editedFrom === undefined ? oldItem : editedFrom ?? undefined;
+    if (origin === 'local' && !restoring && previous && previous.type !== item.type) item = projectItemKind(item);
     if (this.noteIntentListeners.size && origin === 'local' && !restoring && oldItem && previous && sameNote(previous, item)) {
       return { item: oldItem };
     }

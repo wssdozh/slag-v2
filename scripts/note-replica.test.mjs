@@ -6,6 +6,7 @@ import { deriveNoteKeys, FOLDER_TREE_ID, opaqueNoteId, sealFolderTree, sealNote 
 import { loadNoteJournal } from '../src/lib/sync/notes/persistence.ts';
 import { noteReviewKind } from '../src/lib/sync/notes/review.ts';
 import { LEGACY_CUTOVER } from '../src/lib/sync/notes/legacyCutover.ts';
+import { noteDiskProjection } from '../src/lib/storage/noteDiskProjection.ts';
 
 const room = 'test-room';
 const generation = 1;
@@ -149,6 +150,39 @@ test('cold capture distinguishes an uncheckpointed projection from a changed or 
   const restored = device(t, server, { state: after });
   await restored.replica.captureColdNoteEdits(async () => [{ item, marker }]);
   assert.equal(restored.saved().pending[0].item.content, 'intermediate');
+});
+
+test('cold capture preserves edited YAML fields without publishing metadata from an uncheckpointed newer file', async (t) => {
+  const server = relay();
+  const source = device(t, server);
+  const projections = new Map();
+  const receiver = device(t, server, { trackDiskProjection: true, apply: async (value) => { projections.set(value.id, value); } });
+  const task = note('cold-task-properties', { type: 'task', status: 'todo', priority: 'low', dueDate: '2026-11-20', recurrence: { freq: 'daily' } });
+  const article = note('cold-article-properties', { type: 'article', summary: 'Original summary', readingTimeMinutes: 2 });
+  await Promise.all([source.replica.catchUp(), receiver.replica.catchUp()]);
+  await source.replica.record([change('create', task), change('create', article)]);
+  await until(() => receiver.saved()?.cursor === 2);
+  const before = receiver.saved();
+  const taskProjection = projections.get(task.id);
+  const taskEdit = { ...noteDiskProjection(taskProjection.item), dueDate: '2026-11-23', priority: 'high', title: 'Edited on disk' };
+  const articleHead = { ...article, summary: 'Accepted remote summary', isPinned: true };
+  await source.replica.record([change('update', articleHead)]);
+  await until(() => receiver.saved()?.cursor === 3);
+  const articleProjection = projections.get(article.id);
+  const reader = device(t, server, { state: before });
+  await reader.replica.captureColdNoteEdits(async () => [
+    { item: taskEdit, marker: taskProjection.registryBodyMarker },
+    { item: noteDiskProjection(articleProjection.item), marker: articleProjection.registryBodyMarker },
+  ]);
+  assert.deepEqual(reader.saved()?.pending.map(({ item }) => [item.id, item.title, item.priority, item.dueDate]),
+    [[task.id, taskEdit.title, 'high', '2026-11-23']]);
+  assert.deepEqual(reader.saved().pending[0].item.recurrence, task.recurrence);
+  await reader.replica.catchUp();
+  await until(() => reader.saved()?.cursor === 4 && !reader.replica.pendingCount);
+  assert.equal(reader.conflicts.length, 0);
+  assert.equal(reader.local.get(article.id).summary, articleHead.summary);
+  assert.equal(reader.local.get(task.id).dueDate, '2026-11-23');
+  assert.equal(server.events.length, 4);
 });
 
 test('an external attachment-only edit creates one revision on both replicas', async (t) => {

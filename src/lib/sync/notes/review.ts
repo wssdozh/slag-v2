@@ -1,6 +1,6 @@
 import type { SlagItem } from '../../../types/index.ts';
 import { LEGACY_CUTOVER } from './legacyCutover.ts';
-import { noteDifferences } from './merge.ts';
+import { equal, noteDifferences } from './merge.ts';
 import { noteMergeViolations } from './mergeValidation.ts';
 import { parseSubtasksFromContent } from '../../tasks/taskUtils.ts';
 
@@ -33,7 +33,16 @@ export function applyReviewedFields(head: SlagItem, local: SlagItem, selected: r
   const values = local as unknown as Record<string, unknown>;
   const item = { ...head, ...Object.fromEntries([...fields].map((key) => [key, values[key]])), updatedAt: Date.now() };
   if (content !== undefined) { item.content = content; fields.add('content'); }
-  if (fields.has('content') && item.type === 'task') item.subtasks = parseSubtasksFromContent(item.content);
+  if (fields.has('content') && item.type === 'task') {
+    const steps = parseSubtasksFromContent(item.content);
+    const headOwnsSteps = parseSubtasksFromContent(head.content).length > 0;
+    const legacy = headOwnsSteps ? undefined : head.subtasks;
+    if (steps.length && legacy?.length) {
+      const checks = (list: typeof steps) => list.map(({ title, completed }) => [title, completed]);
+      if (!equal(checks(steps), checks(legacy))) throw new Error('Выбранные свойства нельзя применить отдельно: текст заменит отдельный список подзадач');
+    }
+    item.subtasks = steps.length || headOwnsSteps ? steps : item.subtasks;
+  }
   for (const [field, value] of Object.entries(item)) {
     if (value === undefined) Reflect.deleteProperty(item, field);
   }

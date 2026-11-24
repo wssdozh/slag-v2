@@ -419,8 +419,45 @@ async function run() {
     assert.equal(c.local.get(daily.id).dueDate, newDay);
     assert.equal(c.local.get(daily.id).title, 'independent offline title');
     assert.deepEqual(c.local.get(daily.id).tags, ['independent online tag']);
-    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 165,
-      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length, skippedRollover: true })}\n`);
+    const examples = [
+      { ...note('property-note', 'note body'), isPinned: true, isArchived: true, tags: ['свойство'], replyToId: baseNote.id,
+        linkedItemIds: [task.id], customProps: { flag: false, nested: { value: null } } },
+      { ...note('property-task', 'task body'), type: 'task', status: 'done', priority: 'high', dueDate: '2026-12-10',
+        reminder: '2026-12-10T08:30:00+03:00', duration: 45, recurrence: { freq: 'weekly', interval: 2, weekdays: [1, 3], resetSubtasks: false },
+        streak: 2, history: ['2026-12-09', '2026-12-10'], lastCompletedDate: '2026-12-10', kanbanColumn: 'custom',
+        subtasks: [{ id: 'legacy', title: 'step', completed: true }] },
+      { ...note('property-article', 'article body'), type: 'article', readingTimeMinutes: 6, summary: 'Article summary' },
+    ];
+    await save(a, examples);
+    await converge(168);
+    for (const peer of peers()) for (const sample of examples) assert.ok(sameNote(peer.local.get(sample.id), sample));
+    const reopenProperties = await disconnect(async (off, snapshot) => {
+      await edit(off, examples[0], { isPinned: false, isArchived: false, replyToId: undefined, linkedItemIds: [], customProps: { flag: true } }, snapshot);
+      await edit(off, examples[1], { status: 'todo', priority: 'none', dueDate: undefined, reminder: undefined, duration: undefined,
+        recurrence: undefined, streak: undefined, history: [], lastCompletedDate: undefined, subtasks: [], kanbanColumn: undefined }, snapshot);
+      await edit(off, examples[2], { summary: undefined, readingTimeMinutes: 1 }, snapshot);
+    });
+    await Promise.all(examples.map((sample) => edit(b, sample, { title: `Updated ${sample.id}` })));
+    await online(171);
+    c = await reopenProperties();
+    await converge(174);
+    sameProjection();
+    for (const peer of peers()) {
+      const [n, t, art] = examples.map(({ id }) => peer.local.get(id));
+      assert.ok(sameNote(n, { ...examples[0], title: 'Updated property-note', isPinned: false, isArchived: false, replyToId: undefined,
+        linkedItemIds: [], customProps: { flag: true } }));
+      assert.ok(sameNote(t, { ...note('property-task', 'task body'), type: 'task', title: 'Updated property-task', status: 'todo', priority: 'none' }));
+      assert.ok(sameNote(art, { ...note('property-article', 'article body'), type: 'article', title: 'Updated property-article', readingTimeMinutes: 1 }));
+    }
+    assert.deepEqual(c.replica.conflicts, alternatives);
+    c.close();
+    c = await device(2, restartJournal(c.saved()), c.local, undefined, c.workspace);
+    await converge(174);
+    sameProjection();
+    assert.deepEqual(c.attempts, []);
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 174,
+      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length, skippedRollover: true,
+      propertyKinds: examples.map(({ type }) => type) })}\n`);
   }
 
   if (offlineOnly) return offlineScenarios();

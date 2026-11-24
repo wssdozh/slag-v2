@@ -1,6 +1,7 @@
 // Serializes local intents and canonical application, not the network. I/O is owned by the host.
 import type { FolderMeta, SlagAttachment, SlagItem } from '../../../types/index.ts';
 import type { AcceptedNote, NoteMutation, NoteOrigin } from '../../storage/noteRegistry';
+import { editFromDisk } from '../../storage/noteDiskProjection.ts';
 import { sha256Hex } from '../../vault/integrity/fingerprint.ts';
 import { DEFAULT_INBOX_FOLDER } from '../../../config/storage.ts';
 import { NoteChannel } from './channel.ts';
@@ -408,23 +409,24 @@ export class NoteReplica {
       let next = state;
       for (const { item: copy, marker } of copies) {
         const previous = live.get(copy.id);
-        if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder
-            || previous.title !== copy.title || previous.type !== copy.type) continue;
+        if (!previous || counts.get(copy.id) !== 1 || previous.folder !== copy.folder) continue;
         const revision = state.confirmed[copy.id].revision;
-        if (normalizeDiskBody(previous.content) === normalizeDiskBody(copy.content)) {
-          if (remember && marker && marker === await this.registryBodyMarker(copy.id, revision, previous.content)) {
-            remember({ id: copy.id, revision, item: previous, registryBodyMarker: marker }, copy);
-          }
-          continue;
-        }
-        // The Markdown and its provenance were replaced together. A replayable projection
-        // ahead of this journal is not a local edit, even if the relay has since advanced again.
+        // A known projection of a newer revision can carry new YAML as well as new text.
+        // Never capture those differences as local. The body-only marker proves nothing
+        // about metadata from a different revision or an unmarked backup.
         const projected = marker ? Number(marker.split(':', 1)[0]) : 0;
-        if (Number.isSafeInteger(projected) && projected > state.confirmed[copy.id].revision
+        if (Number.isSafeInteger(projected) && projected > revision
             && marker === await this.registryBodyMarker(copy.id, projected, copy.content)) continue;
+        let item: SlagItem | undefined;
+        if (marker && marker === await this.registryBodyMarker(copy.id, revision, previous.content)) {
+          item = editFromDisk(previous, copy);
+          if (!item) remember?.({ id: copy.id, revision, item: previous, registryBodyMarker: marker }, copy);
+        } else if (previous.title === copy.title && previous.type === copy.type
+            && normalizeDiskBody(previous.content) !== normalizeDiskBody(copy.content)) {
+          item = { ...previous, content: copy.content };
+        }
         // Keep the confirmed base. A newer remote revision must conflict, not rebase this edit.
-        next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous, source: 'cold-recovery',
-          item: { ...previous, content: copy.content } });
+        if (item) next = recordNote(next, { id: copy.id, kind: 'update', intentId: crypto.randomUUID(), previous, source: 'cold-recovery', item });
       }
       await this.persist(next);
       for (const intent of next.pending) if (!state.pending.includes(intent)) this.logIntent('Note intent recorded', intent);

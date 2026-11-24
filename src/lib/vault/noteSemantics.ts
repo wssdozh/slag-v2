@@ -1,6 +1,17 @@
 // Domain defaults shared by Markdown projection and registry comparison.
-import type { SlagAttachment, SlagItem } from '../../types/index.ts';
+import type { RecurrenceRule, SlagAttachment, SlagItem } from '../../types/index.ts';
 import { parseSubtasksFromContent } from '../tasks/taskUtils.ts';
+
+export const taskOnlyFields = ['status', 'priority', 'dueDate', 'reminder', 'duration', 'recurrence', 'streak', 'history', 'lastCompletedDate', 'subtasks', 'kanbanColumn'] as const;
+export const articleOnlyFields = ['readingTimeMinutes', 'summary'] as const;
+
+/** Keep the locally saved and synced record consistent with what its new kind can store. */
+export function projectItemKind(item: SlagItem): SlagItem {
+  const next = { ...item };
+  if (next.type !== 'task') for (const key of taskOnlyFields) delete next[key];
+  if (next.type !== 'article') for (const key of articleOnlyFields) delete next[key];
+  return next;
+}
 
 export function stripNoteTransportFields(item: SlagItem): SlagItem {
   const { filename: _filename, ...rest } = item;
@@ -16,6 +27,12 @@ export function frontmatterTags(raw: unknown): string[] {
 
 export const normalizeNoteBody = (content: string) => content.replace(/\r\n/g, '\n');
 
+export const estimateReadingMinutes = (content: string) => Math.max(1, Math.round(content.trim().split(/\s+/).length / 200));
+
+export function recurrenceProperties(rule: RecurrenceRule | undefined) {
+  return rule && { ...rule, interval: rule.interval ?? 1, resetSubtasks: rule.resetSubtasks ?? true };
+}
+
 export function noteProperties(item: SlagItem) {
   const { updatedAt: _updatedAt, createdAt: _createdAt, ...value } = stripNoteTransportFields(item);
   const content = normalizeNoteBody(value.content);
@@ -26,5 +43,8 @@ export function noteProperties(item: SlagItem) {
     replyToId: value.replyToId || undefined, history: value.history?.length ? value.history : undefined,
     linkedItemIds: value.linkedItemIds?.length ? value.linkedItemIds : undefined,
     isPinned: value.isPinned ?? false, isArchived: value.isArchived ?? false,
-    ...(value.type === 'task' && { status: value.status ?? 'todo', priority: value.priority ?? 'none' }) };
+    customProps: value.customProps && Object.keys(value.customProps).length ? value.customProps : undefined,
+    ...(value.type === 'article' && { readingTimeMinutes: value.readingTimeMinutes || estimateReadingMinutes(content) }),
+    ...(value.type === 'task' && { status: value.status ?? 'todo', priority: value.priority ?? 'none',
+      recurrence: recurrenceProperties(value.recurrence) }) };
 }
