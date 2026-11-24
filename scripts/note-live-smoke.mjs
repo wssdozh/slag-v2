@@ -395,8 +395,32 @@ async function run() {
     assert.ok(sameNote(c.local.get(localOnly.id), localOnly));
     assert.equal(c.attempts.length, 1);
     assert.deepEqual(restartJournal(c.saved()).conflicts, alternatives);
-    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 162,
-      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length })}\n`);
+    const daily = { ...note('offline-daily-rollover'), type: 'task', status: 'todo', dueDate: '2026-11-20',
+      recurrence: { freq: 'daily', interval: 1, resetSubtasks: true }, streak: 0 };
+    const oldDay = '2026-11-23', newDay = '2026-11-24';
+    const late = { ...daily, dueDate: oldDay };
+    await save(a, [daily]);
+    await converge(163);
+    const reopenRollover = await disconnect(async (off, snapshot) => {
+      const { revision, item: previous } = snapshot.confirmed[daily.id];
+      await off.replica.record([
+        { id: daily.id, kind: 'update', item: late, previous, origin: { revision }, intentId: 'offline-rollover', rollover: true },
+        { id: daily.id, kind: 'update', item: { ...late, title: 'independent offline title' }, previous: late, origin: { intentId: 'offline-rollover' } },
+      ]);
+    });
+    await edit(b, daily, { dueDate: newDay, tags: ['independent online tag'] });
+    await online(164);
+    assert.equal((await expireHistory()).floor, 164);
+    c = await reopenRollover();
+    await converge(165);
+    sameProjection();
+    assert.deepEqual(c.replica.conflicts, alternatives);
+    assert.equal(c.attempts.length, 1, 'only the independent edit is sent');
+    assert.equal(c.local.get(daily.id).dueDate, newDay);
+    assert.equal(c.local.get(daily.id).title, 'independent offline title');
+    assert.deepEqual(c.local.get(daily.id).tags, ['independent online tag']);
+    process.stdout.write(`${JSON.stringify({ devices: 3, retained: 118, expiredFloor: expired.floor, recoveredAt: 150, final: 165,
+      equivalentEdits: 3, savedAlternatives: alternatives.length, floorDuringScan: 161, scanCalls: scanCalls.length, skippedRollover: true })}\n`);
   }
 
   if (offlineOnly) return offlineScenarios();

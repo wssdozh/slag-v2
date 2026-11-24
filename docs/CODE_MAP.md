@@ -4,7 +4,7 @@
 Читай эту карту до того, как грепать: колонка «импортят» показывает,
 что модуль реально используется, «что это» — зачем он нужен.
 
-Модулей: **703**, строк: **120620**, зон: **48**.
+Модулей: **704**, строк: **120678**, зон: **48**.
 
 ## Самые длинные файлы
 
@@ -15,7 +15,7 @@
 | `e2e/slag/editor.spec.ts` | 1737 | 0 |
 | `src/lib/storage/index.ts` | 1578 | 52 |
 | `e2e/slag/views.spec.ts` | 1098 | 0 |
-| `src/lib/sync/notes/replica.ts` | 1086 | 1 |
+| `src/lib/sync/notes/replica.ts` | 1090 | 1 |
 | `src/lib/storage/vaultFiles.ts` | 1046 | 2 |
 | `src/lib/storage/settingsStore.ts` | 966 | 5 |
 | `e2e/slag/feed.spec.ts` | 945 | 0 |
@@ -620,7 +620,7 @@
 | `windowControls.ts` | 379 | 19 | isMobilePlatform, isDesktopApp, isPrimaryWindow, minimizeWindow, toggleMaximizeWindow, +15 | Window chrome and platform checks: main window, minimize, maximize, desktop o… |
 | `writeJsonAtomic.ts` | 31 | 2 | writeJsonAtomic | Installation prefs and encrypted secret snapshots use write-then-rename. Vaul… |
 
-## src/lib/storage — 34 файлов, 8056 строк
+## src/lib/storage — 34 файлов, 8058 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -636,7 +636,7 @@
 | `legacyJson.ts` | 18 | 3 | parseLegacyJson | The JSON an older build left in the webview profile. Every module that moves … |
 | `legacyProfile.ts` | 439 | 1 | LegacyVaultSection, LegacyVaultKey, LegacyKeySplit, splitLegacyKeys, importLegacyProfile | The one-off move off the webview profile. |
 | `noteDiskProjection.ts` | 17 | 2 | noteDiskProjection, editFromDisk | Compare a watcher snapshot with what the last successful write could actually… |
-| `noteRegistry.ts` | 40 | 7 | NoteOrigin, NoteMutation, AcceptedNote, FolderTreeListener, FolderGroupListener, +1 |  |
+| `noteRegistry.ts` | 42 | 7 | NoteOrigin, NoteMutation, AcceptedNote, FolderTreeListener, FolderGroupListener, +1 |  |
 | `noteRemoval.ts` | 25 | 1 | notesRemovedByImport | Which files a synced import takes off the disk. |
 | `port.ts` | 87 | 10 | ChangeOrigin, SyncedVaultData, VaultPort, setVaultPort, vault | The slice of the vault that sync may touch. The app backs it with StorageServ… |
 | `prefs.ts` | 226 | 25 | PrefsBackend, PrefsProfileBackend, initPrefs, getPref, setPref, +4 | Preferences: the one place settings live, wherever they came from. |
@@ -659,7 +659,7 @@
 | `vaultWatchDiff.ts` | 41 | 1 | NoteFileStamp, VaultFileChange, diffNoteFiles | The pure half of the vault sweep: two stamps in, the paths that need re-readi… |
 | `writeGuard.ts` | 15 | 1 | NoteIdentity, hasNewerVersionOnDisk | The one comparison a write makes before it replaces a file: has this note mov… |
 
-## src/lib/sync — 57 файлов, 12419 строк
+## src/lib/sync — 58 файлов, 12475 строк
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
@@ -689,17 +689,18 @@
 | `manifest/sync.ts` | 119 | 3 | getManifest, syncManifest | Compare peer snapshots for diagnostics. A snapshot cannot authorize vault wri… |
 | `notes/bootstrap.ts` | 127 | 0 | BootstrapCopy, BootstrapDecision, planBootstrap, sealBootstrap, sealFolderRegistrySeed | Runs on a trusted client (or local migration tool), never at the relay with d… |
 | `notes/channel.ts` | 105 | 3 | NoteHttpError, NoteChannel | HTTP catch-up and fallback share the room's existing account authorization. |
-| `notes/journal.ts` | 172 | 12 | JournalKind, RegistryValue, NoteBase, sameRegistryValue, JournalAttempt, +12 | Pure transitions for an ordered queue of local intentions; disk and network s… |
+| `notes/journal.ts` | 178 | 12 | JournalKind, RegistryValue, NoteBase, sameRegistryValue, JournalAttempt, +12 | Pure transitions for an ordered queue of local intentions; disk and network s… |
 | `notes/legacyCutover.ts` | 75 | 4 | LEGACY_CUTOVER, sameLegacyValue, LegacyCutoverBlocked, prepareLegacyCutover |  |
 | `notes/mediaWire.ts` | 49 | 1 | REGISTRY_MEDIA_MAX_BYTES, sealRegistryMedia, openRegistryMedia |  |
-| `notes/merge.ts` | 125 | 13 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
+| `notes/merge.ts` | 130 | 14 | relayNote, equal, noteDifferences, sameNote, mergeNote | Three-way merge of note properties, after domain normalization and before sea… |
 | `notes/mergeValidation.ts` | 80 | 2 | noteMergeViolations | Reject combinations whose individual property edits do not compose safely. |
 | `notes/migrationExport.ts` | 84 | 1 | exportMigrationSnapshot, canExportMigrationSnapshot | Local-only evidence: preserve physical copies, including duplicate IDs and tr… |
-| `notes/persistence.ts` | 156 | 5 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
-| `notes/reconcile.ts` | 50 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
+| `notes/persistence.ts` | 157 | 5 | hasSharedRegistryEnrollment, enrolledNoteGeneration, enrolledFolderTree, loadNoteJournal | Registry state is scoped to a room generation; an old queue is never silently… |
+| `notes/reconcile.ts` | 57 | 2 | Candidate, confirmedBase, candidate | Decide what to send from the durable intent and the currently confirmed head. |
 | `notes/recoveryJournal.ts` | 53 | 2 | readRecoveryRegistry, planRecoveredJournal | Rehydrate an empty disk from the relay; import local intentions, not the old … |
-| `notes/replica.ts` | 1086 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
+| `notes/replica.ts` | 1090 | 1 | NoteReplica | Serializes local intents and canonical application, not the network. I/O is o… |
 | `notes/review.ts` | 45 | 5 | RECOVERED_DISK, needsReviewedHead, noteReviewKind, selectableNoteFields, applyReviewedFields |  |
+| `notes/rollover.ts` | 33 | 2 | isOverdueRollover, supersededRollover, expiredLegacyDeadline | Prove that the saved change does no more than running the app's overdue rollo… |
 | `notes/session.ts` | 235 | 1 | openNoteSession | Negotiate once per connection generation, then bind the replica to that vault… |
 | `notes/sharedBody.ts` | 60 | 20 | SharedKind, SharedValue, isLegacySharedKind, SharedBody, SharedMutation, +4 |  |
 | `notes/sharedWorkspace.ts` | 109 | 5 | SharedWorkspaceField, SharedWorkspace, SharedWorkspaceValue, isSharedWorkspaceField, selectSharedWorkspace, +3 |  |
@@ -747,8 +748,8 @@
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
 | `calendarLayout.ts` | 139 | 6 | LayoutPositionedTask, TimedBlockBox, timedBlockBox, computeAntiOverlapLayout | Day-calendar geometry: which column a timed task takes and how tall its block… |
-| `dateUtils.ts` | 186 | 35 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, parseISODateString, getTodayIso, +14 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
-| `recurrenceHelper.ts` | 279 | 3 | RECURRENCE_PRESETS, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, computeNextOccurrence, +2 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
+| `dateUtils.ts` | 186 | 36 | RUSSIAN_MONTHS, RUSSIAN_WEEKDAYS, getISODateString, parseISODateString, getTodayIso, +14 | dateUtils.ts — единый модуль работы с датами и расписанием в SLAG v2. |
+| `recurrenceHelper.ts` | 279 | 4 | RECURRENCE_PRESETS, getIsoWeekday, formatRecurrenceLabel, computeNextStrictOccurrenceDate, computeNextOccurrence, +2 | Recurrence rules: parse, describe and advance a repeating task to its next oc… |
 | `reminder.ts` | 171 | 8 | reminderClock, reminderClockLabel, reminderDay, reminderToIso, shiftReminderToDay, +1 | reminder.ts — что означает строка `reminder` и как её записать. |
 | `todoistTaskParser.ts` | 577 | 12 | ParsedTodoistTask, parseTodoistInput, TaskTimeSlot, getTaskTimeSlot, extractAndStripTags, +2 | Parses Todoist-style quick input into title, due date, tags, priority, durati… |
 
@@ -817,5 +818,5 @@
 
 | файл | строк | импортят | экспортирует | что это |
 |---|---:|---:|---|---|
-| `index.ts` | 692 | 249 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
+| `index.ts` | 692 | 250 | SlagItemType, TaskStatus, SlagItemStatus, SlagItemPriority, SlagAttachment, +79 | The domain, in one place: notes, folders, vaults, attachments, sync and AI se… |
 | `slashCommands.ts` | 167 | 3 | SlashCommand, SLASH_COMMANDS, CATEGORY_LABELS | The slash-command palette: trigger, aliases, icon and what each command inser… |

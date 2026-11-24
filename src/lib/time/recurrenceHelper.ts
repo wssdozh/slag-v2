@@ -1,8 +1,8 @@
 // Recurrence rules: parse, describe and advance a repeating task to its next occurrence.
 import type { RecurrenceRule, SlagItem } from '../../types';
-import { getISODateString, parseISODateString } from './dateUtils';
-import { shiftReminderToDay } from './reminder';
-import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../tasks/taskUtils';
+import { getISODateString, parseISODateString } from './dateUtils.ts';
+import { shiftReminderToDay } from './reminder.ts';
+import { setAllCheckboxesInContent, parseSubtasksFromContent } from '../tasks/taskUtils.ts';
 
 export const RECURRENCE_PRESETS: Array<{ label: string; rule: RecurrenceRule }> = [
   { label: 'Каждый день', rule: { freq: 'daily', interval: 1, resetSubtasks: true } },

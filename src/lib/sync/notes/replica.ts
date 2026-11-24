@@ -10,6 +10,7 @@ import { noteDifferences, relayNote } from './merge.ts';
 import { LEGACY_CUTOVER, sameLegacyValue } from './legacyCutover.ts';
 import { applyReviewedFields, needsReviewedHead, RECOVERED_DISK } from './review.ts';
 import { candidate, confirmedBase } from './reconcile.ts';
+import { expiredLegacyDeadline } from './rollover.ts';
 import type { Candidate } from './reconcile.ts';
 import { isSharedRegistryId } from './sharedBody.ts';
 import type { SharedBody, SharedMutation } from './sharedBody.ts';
@@ -140,11 +141,14 @@ export class NoteReplica {
     });
   }
 
-  private async clearEquivalentLegacyAlternatives() {
+  private async clearSatisfiedLegacyAlternatives() {
     const conflicts = this.conflicts.filter((entry) => {
       if (!needsReviewedHead(entry.fields)) return true;
       const current = confirmedNote(this.state, entry.noteId);
-      return !current || !sameLegacyValue(current.item, entry.item);
+      if (!current || current.revision > this.durableCursor) return true;
+      if (sameLegacyValue(current.item, entry.item)) return false;
+      return !(current.since !== undefined && entry.kind === 'update' && !entry.folderGroup && entry.fields.length === 1 && entry.fields[0] === LEGACY_CUTOVER
+        && isNoteItem(entry.item) && isNoteItem(current.item) && expiredLegacyDeadline(entry.item, current.item, entry.at));
     });
     if (conflicts.length !== this.conflicts.length) await this.persist({ ...this.state, conflicts });
   }
@@ -624,7 +628,7 @@ export class NoteReplica {
         }
       }
       // A complete live frame can satisfy a saved review without any HTTP catch-up.
-      if (this.ready && !gap && !this.needsFeed) await this.clearEquivalentLegacyAlternatives();
+      if (this.ready && !gap && !this.needsFeed) await this.clearSatisfiedLegacyAlternatives();
     });
     return gap;
   }
@@ -692,7 +696,7 @@ export class NoteReplica {
       if (epoch !== this.connectionEpoch) continue;
       if (this.state.cursor >= Math.max(page.head, this.observedRevision)) {
         if (this.conflicts.some(({ fields }) => needsReviewedHead(fields))) {
-          await this.enqueue(() => this.clearEquivalentLegacyAlternatives());
+          await this.enqueue(() => this.clearSatisfiedLegacyAlternatives());
           if (epoch !== this.connectionEpoch || this.needsFeed) continue;
         }
         this.ready = true;

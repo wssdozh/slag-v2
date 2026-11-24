@@ -2,6 +2,7 @@
 import { sameRegistryValue } from './journal.ts';
 import type { NoteBase, NoteIntent, RegistryValue } from './journal.ts';
 import { mergeNote, sameNote } from './merge.ts';
+import { isOverdueRollover, supersededRollover } from './rollover.ts';
 import { FOLDER_TREE_ID, isNoteItem } from './wire.ts';
 import type { NoteHead, NoteKind } from './wire.ts';
 
@@ -31,11 +32,17 @@ export function candidate(intent: NoteIntent, head: NoteBase | undefined): Candi
     if ((kind === 'create' && !head) || (kind === 'restore' && head && current === null)
         || ((kind === 'update' || kind === 'delete') && current !== null)) return { item, kind, conflicts: [] };
   }
+  // An external edit recovered from disk is not eligible for a three-way merge.
+  // If the exact result is already present in the same proven lifecycle, no merge is needed.
+  if (intent.source === 'cold-recovery' && kind === 'update' && !intent.folderGroup && head && base
+      && base.revision < head.revision && base.revision >= (head.since ?? head.revision)
+      && isNoteItem(base.item) && isNoteItem(item) && isNoteItem(current) && sameNote(item, current)) return skip([]);
   if (head && base && intent.provenBase && kind === 'update' && !intent.folderGroup && intent.source !== 'retry' && intent.source !== 'cold-recovery'
       && isNoteItem(base.item) && isNoteItem(item) && isNoteItem(current)
       && ((base.revision < head.revision && base.revision >= (head.since ?? head.revision))
         || (base.revision === head.revision && intent.optimisticBase))) {
     if (sameNote(item, current) || sameNote(item, base.item)) return skip([]);
+    if (intent.rollover && isOverdueRollover(base.item, item) && supersededRollover(item, current)) return skip([]);
     const reapplied = intent.optimisticBase ? mergeNote(base.item, item, intent.optimisticBase) : undefined;
     if (reapplied?.conflicts.length) return skip(reapplied.conflicts);
     const merged = reapplied && base.revision === head.revision ? reapplied

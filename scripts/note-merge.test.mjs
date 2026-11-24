@@ -94,6 +94,27 @@ test('incompatible type and attachment edits are reported rather than synthesize
   assert.ok(mergeNote(attached, { ...attached, content: '![[image.png]]' }, base).conflicts.includes('attachments'));
 });
 
+test('a shared task outcome does not conflict with an independent field already valid on either device', () => {
+  const task = { ...base, type: 'task', status: 'todo', dueDate: '2026-11-20', recurrence: { freq: 'daily' }, content: '- [ ] step' };
+  const closed = { ...task, status: 'done', streak: 1, history: ['2026-11-20'], lastCompletedDate: '2026-11-20', content: '- [x] step' };
+  const withTags = { ...closed, tags: ['mine'] };
+  const withReminder = { ...closed, reminder: '2026-11-20T12:00:00Z' };
+  const moved = { ...task, dueDate: '2026-11-22' };
+  for (const [before, left, right, expected] of [
+    [task, withTags, withReminder, { ...withReminder, tags: ['mine'] }],
+    [task, { ...moved, tags: ['mine'] }, { ...moved, reminder: '2026-11-22T12:00:00Z' },
+      { ...moved, tags: ['mine'], reminder: '2026-11-22T12:00:00Z' }],
+  ]) {
+    for (const [local, head] of [[left, right], [right, left]]) {
+      const merged = mergeNote(before, local, head);
+      assert.deepEqual(merged.conflicts, []);
+      assert.ok(sameNote(merged.item, expected));
+    }
+  }
+  assert.ok(mergeNote(task, closed, { ...task, reminder: withReminder.reminder }).conflicts.includes('recurrence'));
+  assert.ok(mergeNote(task, moved, { ...task, reminder: withReminder.reminder }).conflicts.includes('reminder'));
+});
+
 test('a first Markdown checkbox does not silently replace an independent legacy checklist edit', () => {
   const task = { ...base, type: 'task' };
   const legacy = { ...task, subtasks: [{ id: 'legacy', title: 'Legacy step', completed: true }] };

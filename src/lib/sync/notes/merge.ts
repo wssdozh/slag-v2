@@ -69,6 +69,7 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
   const localChanges = new Set<string>(), remoteChanges = new Set<string>();
   const conflicts = new Set<string>();
   const oneOff = oneOffTasks(base, local, head);
+  const sameTaskType = [a, b, c].every(({ type }) => type === 'task');
   const compare = (key: string) => key === 'reminder' && oneOff ? sameReminder : sameProperty;
   const choose = (key: string, original: unknown, mine: unknown, theirs: unknown, same = sameProperty): unknown => {
     if (same(mine, original) || (same === sameReminder && same(mine, theirs))) return theirs;
@@ -84,8 +85,12 @@ export function mergeNote(base: SlagItem, local: SlagItem, head: SlagItem): { it
   for (const key of keys(a, b, c)) {
     const original = own(a, key), mine = own(b, key), theirs = own(c, key);
     const same = compare(key);
-    if (!same(mine, original)) localChanges.add(key);
-    if (!same(theirs, original)) remoteChanges.add(key);
+    // Shared task changes cannot conflict with themselves. Leave type transitions
+    // and dependencies between text and attachment bindings under the original checks.
+    if (!sameTaskType || key === 'content' || key === 'attachments' || !same(mine, theirs)) {
+      if (!same(mine, original)) localChanges.add(key);
+      if (!same(theirs, original)) remoteChanges.add(key);
+    }
     // Subtasks derived from body are not a second simultaneous edit to the same list.
     if (key === 'subtasks' && a.type === 'task' && b.type === 'task' && c.type === 'task') {
       const legacy = (note: SlagItem, fields: ReturnType<typeof noteProperties>) =>

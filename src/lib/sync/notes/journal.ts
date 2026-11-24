@@ -37,6 +37,8 @@ export type NoteIntentSource = 'app' | 'disk-watch' | 'cold-recovery' | 'retry';
 export interface NoteIntent {
   intentId: string;
   source?: NoteIntentSource;
+  /** Local provenance only; keep automatic updates separate from user edits. */
+  rollover?: true;
   id: string;
   kind: JournalKind;
   item: RegistryValue;
@@ -83,7 +85,7 @@ export function confirmedNote(state: NoteJournal, id: string): NoteBase | undefi
   return Object.hasOwn(state.confirmed, id) ? state.confirmed[id] : undefined;
 }
 
-type JournalChange = Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item' | 'folderGroup' | 'source'> & {
+type JournalChange = Pick<NoteIntent, 'intentId' | 'id' | 'kind' | 'item' | 'folderGroup' | 'source' | 'rollover'> & {
   previous?: Exclude<RegistryValue, null>;
   origin?: NoteOrigin | null;
 };
@@ -111,17 +113,21 @@ export function recordNote(state: NoteJournal, change: JournalChange): NoteJourn
     || (optimistic !== undefined && !matchesPrevious && !acceptedOptimistic)
     || (!!previous && !matchesPrevious && revision === undefined));
   if (!change.folderGroup && !previous && change.kind === 'update' && base && sameRegistryValue(base.item, item)) return state;
-  // An unsent create/restore can absorb typing only over the actual preceding local value.
-  if (matchesPrevious && previous && !previous.attempt && !previous.folderGroup && !change.folderGroup && change.kind === 'update' && previous.item !== null) {
-    return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, intentId: change.intentId, item, source: change.source ?? entry.source } : entry) };
+  // An unsent local intent can absorb an update only over its exact snapshot. Keep
+  // a rollover separate from user edits so it cannot make their whole patch conflict.
+  if (matchesPrevious && previous && !previous.attempt && !previous.folderGroup && !change.folderGroup && change.kind === 'update'
+      && previous.item !== null && previous.rollover === change.rollover) {
+    return { ...state, pending: state.pending.map((entry, i) => i === index ? { ...entry, intentId: change.intentId, item,
+      source: change.source ?? entry.source } : entry) };
   }
   return { ...state, pending: [...state.pending, { id: change.id, intentId: change.intentId, kind: change.kind,
     item, base, predecessor: previous?.intentId,
     ...(optimistic && matchesPrevious ? { provenPredecessor: true as const } : {}),
     ...(unverified ? { unverifiedBase: true as const } : {}), ...(acceptedOptimistic ? { optimisticBase: acceptedOptimistic } : {}),
-    ...((revision !== undefined || acceptedOptimistic || (origin === undefined && snapshot === undefined && !!base && !!confirmed && sameRegistryValue(base.item, confirmed.item)))
-      ? { provenBase: true as const } : {}),
+    ...((revision !== undefined || acceptedOptimistic || (origin === undefined && (snapshot === undefined || change.rollover)
+      && !!base && !!confirmed && sameRegistryValue(base.item, confirmed.item))) ? { provenBase: true as const } : {}),
     ...(change.source ? { source: change.source } : {}),
+    ...(change.rollover && change.kind === 'update' && change.source === 'app' && !change.folderGroup ? { rollover: true as const } : {}),
     ...(change.folderGroup ? { folderGroup: change.folderGroup } : {}) }] };
 }
 

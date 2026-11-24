@@ -997,7 +997,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
     await this.files.flushItemToDisk(item, previous.folder, previousFilename, vault, true);
   }
 
-  public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local'): void {
+  public saveItems(itemsToSave: SlagItem[], origin: 'local' | 'remote' = 'local', options?: { rollover: true }): void {
     if (itemsToSave.length === 0) return;
     const items = this.getItems();
     const oldItemsMap = new Map(items.map(i => [i.id, i]));
@@ -1016,7 +1016,7 @@ public getVaultDir(vault: VaultMeta = this.currentVault): string {
       const base = previous && this.noteOrigins.get(previous);
       const intentId = this.noteIntentListeners.size ? crypto.randomUUID() : undefined;
       if (intentId) this.noteOrigins.set(item, previous && base && sameNote(previous, item) ? base : { intentId });
-      return { id: item.id, kind: previous ? 'update' : 'create', item, previous, intentId, origin: base };
+      return { id: item.id, kind: previous ? 'update' : 'create', item, previous, intentId, origin: base, rollover: options?.rollover };
     })) : undefined;
     const vault = this.currentVault;
     this.attachments.persistNew([...saveMap.values()]);

@@ -1381,6 +1381,139 @@ test('an accepted folder deletion clears the matching recovered review on live d
   }
 });
 
+test('a legacy snapshot of a superseded daily deadline closes after catch-up without a send', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(2026, 10, 24, 12) });
+  const server = relay();
+  const author = device(t, server);
+  const base = note('legacy-daily', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily', interval: 1, resetSubtasks: true } });
+  const old = { ...base, dueDate: '2026-11-23', updatedAt: Date.parse('2026-11-23T09:00:00Z') };
+  const current = { ...base, dueDate: '2026-11-24', updatedAt: Date.parse('2026-11-24T09:00:00Z') };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const saved = author.saved();
+  const review = { intentId: 'old-rollover', noteId: base.id, kind: 'update', revision: 0, item: old, fields: [LEGACY_CUTOVER], at: old.updatedAt };
+  const controls = [
+    { ...review, intentId: 'different-body', item: { ...old, content: 'independent edit' } },
+    { ...review, intentId: 'different-reminder', item: { ...old, reminder: '09:00' } },
+    { ...review, intentId: 'pre-edit-timestamp', at: old.updatedAt - 1 },
+    { ...review, intentId: 'newer-manual', at: current.updatedAt + 1 },
+    { ...review, intentId: 'different-rule', item: { ...old, recurrence: { ...old.recurrence, interval: 2 } } },
+    { ...review, intentId: 'future-deadline', item: { ...old, dueDate: '2026-11-25' } },
+    { ...review, intentId: 'recovered-from-disk', fields: ['recovered-disk'] },
+  ];
+  const peer = device(t, server, { state: saved });
+  await peer.replica.preserveLegacyAlternatives([review, ...controls]);
+  assert.equal(peer.conflicts.length, 1 + controls.length, 'do not discard on an unverified cached head');
+  await author.replica.record([change('update', current)]);
+  await until(() => author.saved().cursor === 2);
+  await peer.replica.catchUp();
+  assert.deepEqual(peer.conflicts.map(({ intentId }) => intentId), controls.map(({ intentId }) => intentId));
+  const journal = loadNoteJournal({ version: 1, room, generation, journal: peer.saved() }, room, generation);
+  assert.equal(journal.confirmed[base.id].item.dueDate, current.dueDate);
+  assert.equal(journal.pending.length, 0);
+  assert.equal(server.sends(), 2);
+});
+
+test('recorded overdue rollovers are not conflicting manual deadline edits after restart', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('daily-rollover', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily' } });
+  const manual = { ...base, id: 'manual-deadline' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base), change('create', manual)]);
+  await until(() => author.saved()?.cursor === 2);
+  const offline = device(t, server, { state: author.saved() });
+  const yesterday = '2026-11-23', today = '2026-11-24';
+  await offline.replica.record([
+    { ...change('update', { ...base, dueDate: yesterday }), previous: base, rollover: true },
+    { ...change('update', { ...manual, dueDate: yesterday }), previous: manual, origin: { revision: 2 } },
+  ]);
+  const journal = loadNoteJournal(JSON.parse(JSON.stringify({ version: 1, room, generation, journal: offline.saved() })), room, generation);
+  assert.deepEqual(journal.pending.map(({ rollover }) => rollover), [true, undefined]);
+  assert.equal(journal.pending[0].provenBase, true, 'a cold snapshot exactly matching the journal is a valid rollover base');
+  offline.stop();
+  await author.replica.record([
+    change('update', { ...base, dueDate: today, content: 'independent online edit' }),
+    change('update', { ...manual, dueDate: today }),
+  ]);
+  await until(() => author.saved()?.cursor === 4);
+  server.prune();
+  const peer = device(t, server, { state: journal });
+  await peer.replica.catchUp();
+  await until(() => !peer.replica.pendingCount);
+  assert.deepEqual(peer.conflicts.map(({ noteId, fields }) => [noteId, fields]), [[manual.id, ['dueDate']]]);
+  assert.equal(peer.local.get(base.id).dueDate, today);
+  assert.equal(peer.local.get(base.id).content, 'independent online edit');
+  assert.equal(server.events.length, 4);
+});
+
+test('a user edit queued behind a rollover still merges after the relay advances the deadline', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('rollover-with-edit', { type: 'task', status: 'todo', dueDate: '2026-11-20', streak: 0, recurrence: { freq: 'daily' } });
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const offline = device(t, server, { state: author.saved() });
+  const rolled = { ...base, dueDate: '2026-11-23' };
+  await offline.replica.record([
+    { ...change('update', rolled), intentId: 'rollover', previous: base, rollover: true },
+    { ...change('update', { ...rolled, title: 'my independent edit' }), previous: rolled, origin: { intentId: 'rollover' } },
+  ]);
+  const journal = offline.saved();
+  offline.stop();
+  await author.replica.record([change('update', { ...base, dueDate: '2026-11-24', tags: ['other device'] })]);
+  await until(() => author.saved().cursor === 2);
+  const receiver = device(t, server, { state: journal });
+  await receiver.replica.catchUp();
+  await until(() => !receiver.replica.pendingCount && receiver.saved()?.cursor === 3);
+  assert.deepEqual(receiver.conflicts, []);
+  assert.equal(receiver.local.get(base.id).dueDate, '2026-11-24');
+  assert.equal(receiver.local.get(base.id).title, 'my independent edit');
+  assert.deepEqual(receiver.local.get(base.id).tags, ['other device']);
+});
+
+test('a cold disk edit already present at a continuous relay head does not archive a duplicate', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('cold-same');
+  const edited = { ...base, content: 'already present on both devices' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const reader = device(t, server, { state: author.saved() });
+  await reader.replica.captureColdNoteEdits(async () => [{ item: edited }]);
+  assert.equal(reader.saved().pending[0].source, 'cold-recovery');
+  await author.replica.record([change('update', edited)]);
+  await until(() => author.saved().cursor === 2);
+  await reader.replica.catchUp();
+  await until(() => !reader.replica.pendingCount);
+  assert.deepEqual(reader.conflicts, []);
+  assert.equal(reader.local.get(base.id).content, edited.content);
+  assert.equal(server.sends(), 2);
+});
+
+test('a restored identical note does not clear an older cold disk intent', async (t) => {
+  const server = relay();
+  const author = device(t, server);
+  const base = note('cold-restored');
+  const edited = { ...base, content: 'same text in a different lifecycle' };
+  await author.replica.catchUp();
+  await author.replica.record([change('create', base)]);
+  await until(() => author.saved()?.cursor === 1);
+  const reader = device(t, server, { state: author.saved() });
+  await reader.replica.captureColdNoteEdits(async () => [{ item: edited }]);
+  await author.replica.record([{ id: base.id, kind: 'delete', item: null }]);
+  await until(() => author.saved().cursor === 2);
+  await author.replica.record([change('restore', edited)]);
+  await until(() => author.saved().cursor === 3);
+  await reader.replica.catchUp();
+  await until(() => !reader.replica.pendingCount);
+  assert.deepEqual(reader.conflicts.map(({ item, fields }) => [item.content, fields]), [[edited.content, ['update']]]);
+  assert.equal(server.sends(), 3);
+});
+
 test('empty selectedFields without content is rejected', async (t) => {
   const server = relay();
   const base = note('empty-fields-test');
