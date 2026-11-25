@@ -232,6 +232,18 @@ async function sealRegistryBody(keys: NoteKeys, room: string, generation: number
 }
 
 export function isNoteItem(value: unknown): value is SlagItem {
+  return noteItemShape(value, isAttachmentMetadata);
+}
+
+export function isLegacyNoteItem(value: unknown): value is SlagItem {
+  return noteItemShape(value, (entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const { dataUrl, ...metadata } = entry as Record<string, unknown>;
+    return (dataUrl === undefined || typeof dataUrl === 'string') && isAttachmentMetadata(metadata);
+  });
+}
+
+function noteItemShape(value: unknown, acceptsAttachment: (entry: unknown) => boolean): value is SlagItem {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
   return typeof item.id === 'string' && item.id.length > 0
@@ -240,7 +252,7 @@ export function isNoteItem(value: unknown): value is SlagItem {
     && typeof item.createdAt === 'number' && Number.isFinite(item.createdAt)
     && typeof item.updatedAt === 'number' && Number.isFinite(item.updatedAt)
     && Array.isArray(item.tags) && item.tags.every((tag: unknown) => typeof tag === 'string')
-    && Array.isArray(item.attachments) && item.attachments.every(isAttachmentMetadata);
+    && Array.isArray(item.attachments) && item.attachments.every(acceptsAttachment);
 }
 
 function isAttachmentMetadata(attachment: unknown): boolean {

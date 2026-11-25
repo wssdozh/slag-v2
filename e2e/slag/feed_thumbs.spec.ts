@@ -1,9 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * A picture keeps its own proportions in the feed: the height is clamped, the width follows
- * the source ratio, and a note that is nothing but a picture hugs it instead of sitting in a
- * column-wide slab. The four stand-in images below cover the ratios people actually attach.
+ * Feed attachments share compact square tiles; opening a tile shows the original
+ * in the viewer without losing the clicked position. The fixtures cover distinct source ratios.
  */
 const svg = (width: number, height: number, label: string) =>
   'data:image/svg+xml;utf8,' +
@@ -49,7 +48,7 @@ const NOTES = [
     ],
   })),
   {
-    // Five pictures: one hero and a rail. The fourth slot counts what did not fit.
+    // Eight attachments exercise tile wrapping and opening a later image.
     id: 'thumb_album',
     type: 'note',
     title: 'album',
@@ -168,9 +167,10 @@ async function seedFeed(page: Page) {
   }, NOTES);
   await page.reload({ waitUntil: 'domcontentloaded' });
 
-  const inbox = page.locator('button', { hasText: 'Входящие' }).first();
-  await expect(inbox).toBeVisible({ timeout: 20000 });
-  await inbox.click();
+  const inbox = page.getByRole('button', { name: 'Входящие', exact: true });
+  const poster = page.locator('#item-thumb_poster');
+  await expect(inbox.or(poster).first()).toBeVisible({ timeout: 20000 });
+  if (await inbox.isVisible() && !(await poster.isVisible())) await inbox.click({ timeout: 5000 });
   await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
   // Lazy images have to be decoded before their box means anything.
   await expect
@@ -187,110 +187,63 @@ const boxOf = async (page: Page, selector: string) => {
 };
 
 test.describe('feed thumbnails', () => {
-  test('a phone keeps tall pictures tall and wide pictures narrow', async ({ page }) => {
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await seedFeed(page);
+  for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    test(`square tiles stay compact and open the original at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await seedFeed(page);
 
-    // 22rem is the ceiling; a 400×600 poster reaches it and is 2/3 as wide.
-    const poster = await boxOf(page, '#item-thumb_poster img');
-    expect(poster.height).toBeLessThanOrEqual(352);
-    expect(poster.height).toBeGreaterThan(300);
-    expect(poster.width / poster.height).toBeCloseTo(2 / 3, 1);
+      for (const shape of SHAPES) {
+        const card = page.locator(`#item-${shape.id}`);
+        const image = card.getByRole('img', { name: `${shape.name}.svg`, exact: true });
+        await expect(image).toBeVisible();
+        await expect(image).toHaveJSProperty('naturalWidth', shape.width);
+        await expect(image).toHaveJSProperty('naturalHeight', shape.height);
+        await expect(image).toHaveClass(/object-cover/);
+        const box = await image.boundingBox();
+        expect(box?.width).toBe(80);
+        expect(box?.height).toBe(80);
+      }
+      const column = await boxOf(page, '.feed-card-contain');
+      expect((await boxOf(page, '#item-thumb_poster')).width).toBeLessThan(column.width - 60);
+      expect((await boxOf(page, '#item-thumb_clip')).width).toBeLessThan(column.width * 0.8);
 
-    // A panorama can not swallow the whole column either.
-    const wide = await boxOf(page, '#item-thumb_panorama img');
-    expect(wide.width).toBeLessThanOrEqual(356);
+      const album = page.locator('#item-thumb_album').getByTestId('item-attachment-grid');
+      await expect(album.getByRole('button', { name: /^album-/ })).toHaveCount(8);
+      expect((await album.boundingBox())?.width).toBeLessThanOrEqual(column.width);
+      const lightbox = page.getByTestId('image-lightbox');
+      for (const index of [6, 4, 4]) {
+        const name = `album-${index}.svg`;
+        await album.getByRole('button', { name, exact: true }).click({ timeout: 5000 });
+        await expect(lightbox).toBeVisible();
+        const active = lightbox.locator('[aria-hidden="false"] img');
+        await expect(active).toHaveAttribute('alt', name);
+        await expect(active).toBeInViewport();
+        await page.keyboard.press('Escape');
+        await expect(lightbox).not.toBeVisible();
+      }
 
-    // The bubble hugs the picture: no empty slab to the right of it.
-    const bubble = await boxOf(page, '#item-thumb_poster');
-    const column = await boxOf(page, '.feed-card-contain');
-    expect(bubble.width).toBeLessThan(column.width - 60);
+      const missing = page.locator('#item-thumb_missing');
+      await expect(missing.getByTestId('media-missing')).toBeVisible();
+      await expect(missing.locator('img')).toHaveCount(0);
+      const textCard = page.locator('#item-thumb_with_text');
+      await expect(textCard).toContainText('Картинка к заметке с текстом');
+      await expect(textCard.getByRole('img', { name: 'wide.svg' })).toBeVisible();
 
-    // A clip is media on the same terms.
-    const clip = await boxOf(page, '#item-thumb_clip');
-    expect(clip.width).toBeLessThan(column.width * 0.8);
-
-    // Eight pictures fill one canvas: five frames and a counter, not eight crops across the column.
-    const album = page.locator('#item-thumb_album [data-testid="media-album"]');
-    await expect(album).toBeVisible();
-    await expect(album.locator('button')).toHaveCount(6);
-    await expect(album).toContainText('+3');
-    const albumBox = await album.boundingBox();
-    expect(albumBox?.width).toBeLessThanOrEqual(321);
-    // The counter is a door, not a decoration: it opens the deck on the first hidden frame.
-    await album.getByTitle('Ещё 3').click();
-    const lightbox = page.getByTestId('image-lightbox');
-    await expect(lightbox).toBeVisible();
-    await expect(lightbox.getByText(/album-6\.svg/).first()).toBeVisible();
-    // The deck opens on the frame that was clicked, not on the first one of the pile — and the
-    // frame is really on screen, not merely marked active.
-    await expect(lightbox.locator('[aria-hidden="false"] img')).toHaveAttribute('alt', 'album-6.svg');
-    await expect(lightbox.locator('[aria-hidden="false"] img')).toBeInViewport();
-    await page.keyboard.press('Escape');
-    await expect(lightbox).not.toBeVisible();
-
-    // The same frame twice in a row: a fresh viewer still lands on it, it does not fall back
-    // to the first slide because the pager remembers where it was.
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await album.getByTitle('album-4.svg').click();
-      await expect(lightbox.locator('[aria-hidden="false"] img')).toHaveAttribute('alt', 'album-4.svg');
-      await expect(lightbox.locator('[aria-hidden="false"] img')).toBeInViewport();
-      await page.keyboard.press('Escape');
-      await expect(lightbox).not.toBeVisible();
-    }
-
-    // A note with text keeps the full column.
-    const withText = await boxOf(page, '#item-thumb_with_text');
-    expect(withText.width).toBeGreaterThan(column.width - 12);
-
-    // Bytes that never arrived are a fact the card states, not a broken icon.
-    await expect(page.locator('#item-thumb_missing [data-testid="media-missing"]')).toBeVisible();
-    await expect(page.locator('#item-thumb_missing img')).toHaveCount(0);
-
-    // A recognised text panel is collapsed by default and must not stretch the card behind it:
-    // the picture keeps hugging its own width until the panel is opened on purpose.
-    const ocrCard = page.locator('#item-thumb_ocr');
-    const collapsed = await boxOf(page, '#item-thumb_ocr');
-    expect(collapsed.width).toBeLessThan(column.width - 100);
-    expect((await boxOf(page, '#item-thumb_ocr img')).width).toBeGreaterThan(200);
-
-    await ocrCard.getByTitle('Показать текст с фото').click();
-    await expect(ocrCard).toContainText('Lipsticks. Nails. Blades.');
-    const opened = await boxOf(page, '#item-thumb_ocr');
-    expect(opened.width).toBeGreaterThan(column.width - 40);
-
-    await ocrCard.getByTitle('Скрыть текст').click();
-    const closedAgain = await boxOf(page, '#item-thumb_ocr');
-    expect(closedAgain.width).toBeLessThan(column.width - 100);
-
-    await page.locator('#item-thumb_album').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-album-phone.png', fullPage: false });
-
-    await page.locator('#item-thumb_poster').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-phone.png', fullPage: false });
-  });
-
-  test('a desktop caps the same way and still reads as a card', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await seedFeed(page);
-
-    const poster = await boxOf(page, '#item-thumb_poster img');
-    expect(poster.height).toBeLessThanOrEqual(320);
-    expect(poster.width / poster.height).toBeCloseTo(2 / 3, 1);
-
-    const wide = await boxOf(page, '#item-thumb_wide img');
-    expect(wide.width).toBeLessThanOrEqual(417);
-    expect(wide.width / wide.height).toBeCloseTo(16 / 9, 1);
-
-    const bubble = await boxOf(page, '#item-thumb_wide');
-    const column = await boxOf(page, '.feed-card-contain');
-    expect(bubble.width).toBeLessThan(column.width - 100);
-
-    await page.locator('#item-thumb_poster').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: 'test-results/screenshots/feed-thumbs-desktop.png', fullPage: false });
-  });
+      const ocr = page.locator('#item-thumb_ocr');
+      const collapsedWidth = (await boxOf(page, '#item-thumb_ocr')).width;
+      expect(collapsedWidth).toBeLessThan(column.width - 60);
+      await ocr.hover();
+      const openOcr = ocr.getByRole('button', { name: 'Текст: poster-ocr.svg' });
+      await expect(openOcr).toHaveAttribute('aria-expanded', 'false');
+      await openOcr.click({ timeout: 5000 });
+      await expect(ocr).toContainText('Lipsticks. Nails. Blades.');
+      await ocr.getByRole('button', { name: 'Скрыть распознанный текст' }).click({ timeout: 5000 });
+      await expect(ocr.getByText(/Lipsticks/)).toHaveCount(0);
+      expect((await boxOf(page, '#item-thumb_ocr')).width).toBeCloseTo(collapsedWidth, 0);
+      await album.screenshot({ path: `test-results/screenshots/feed-thumbs-${viewport.width}.png` });
+    });
+  }
 
   test('a job that was running when the app closed is not a job any more', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });

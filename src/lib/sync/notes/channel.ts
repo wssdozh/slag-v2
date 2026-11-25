@@ -4,6 +4,9 @@ import type { NoteKeys, NoteOp, NoteStatus } from './wire.ts';
 import { base64ToBytes, bytesToBase64 } from '../../media/byteCodec.ts';
 import { openRegistryMedia, REGISTRY_MEDIA_MAX_BYTES, sealRegistryMedia } from './mediaWire.ts';
 
+// Control flow, not a relay or journal error: the unchanged attempt will be retried.
+export class RelayPaused extends Error {}
+
 export class NoteHttpError extends Error {
   readonly status: number;
   readonly code: string;
@@ -18,6 +21,7 @@ interface NoteChannelOptions {
   serverUrl: string; roomId: string; vaultId: string;
   headers: (includeJson: boolean) => Record<string, string>;
   signal: AbortSignal;
+  isRelayPaused?: () => boolean;
   atomicGroups?: boolean;
   sharedRecords?: boolean;
   registryMedia?: boolean;
@@ -31,6 +35,8 @@ export class NoteChannel {
   private async request(action: string, params: Record<string, string | number> = {}, body?: unknown,
     method = body === undefined ? 'GET' : 'POST'): Promise<unknown> {
     this.options.signal.throwIfAborted();
+    // An accepted revision already being projected still needs its bytes before committing.
+    if (!(action === 'note-media' && method === 'GET') && this.options.isRelayPaused?.()) throw new RelayPaused();
     const query = new URLSearchParams({ vault: this.options.vaultId, folderTree: '1' });
     if (this.options.atomicGroups) query.set('atomicGroups', '1');
     if (this.options.sharedRecords) query.set('sharedRecords', '1');

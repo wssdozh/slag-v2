@@ -3,16 +3,25 @@ import { BaseDirectory, readFile } from '@tauri-apps/plugin-fs';
 import { durableVaultReplace, readVaultGeneration } from '../platform/durableVaultFile';
 import { logger } from '../logger/logger';
 import { enrolledNoteGeneration, loadNoteJournal } from '../sync/notes/persistence';
-import { folderFence, readProtectedSyncState, validateSyncLedger } from '../sync/vaultSyncFiles';
+import { folderFence, inspectProtectedSyncState, validateSyncLedger } from '../sync/vaultSyncFiles';
 
 const log = logger.scope('FS');
 const options = { baseDir: BaseDirectory.AppData };
 export const RECOVERY_LOCAL_ONLY = 'recovery-local-only.json';
 
+export type RecoveryReason = 'state' | 'registry' | 'note-move' | 'archive';
 export type VaultRecovery =
   | { kind: 'ready'; state: Record<string, unknown>; fresh: boolean; fence: Record<string, unknown> }
-  | { kind: 'local-only'; state: Record<string, unknown>; fence?: Record<string, unknown> }
+  | { kind: 'local-only'; state: Record<string, unknown>; reason: RecoveryReason; fence?: Record<string, unknown> }
   | { kind: 'unavailable'; state: Record<string, unknown> };
+
+function savedReason(marker: Uint8Array): RecoveryReason {
+  try {
+    const { reason } = parseVaultObject(new TextDecoder('utf-8', { fatal: true }).decode(marker));
+    if (reason === 'state' || reason === 'registry' || reason === 'note-move') return reason;
+  } catch { /* The presence of an unreadable marker still fences the vault. */ }
+  return 'archive';
+}
 
 export function isMissingVaultFile(error: unknown): boolean {
   // ENOENT is 2 on Unix/Windows; Windows also uses 3 for a missing parent.
@@ -45,19 +54,20 @@ function validateRegistry(text: string): void {
 export async function recoverVault(dir: string, vaultId: string, wasPresent: boolean): Promise<VaultRecovery> {
   const statePath = `${dir}/state.json`;
   let state: Record<string, unknown> = {};
-  let reason: 'state' | 'registry' | 'previous' | undefined;
+  let reason: RecoveryReason | undefined;
   let fence: Record<string, unknown> = {};
   try {
-    const [marker, bytes, protectedState, registry] = await Promise.all([
+    const [marker, bytes, [ledgerRead, configRead], registry] = await Promise.all([
       readVaultBytes(`${dir}/${RECOVERY_LOCAL_ONLY}`),
       readVaultBytes(statePath),
-      readProtectedSyncState(dir, vaultId).then((files) => ({ files }), () => ({ files: {}, failed: true } as const)),
+      inspectProtectedSyncState(dir, vaultId),
       readVaultGeneration(`${dir}/note-registry.json`).then(async (text) => {
         const legacy = text === null ? await readVaultBytes(`${dir}/note-registry.json`) : undefined;
         return { text: text ?? (legacy ? new TextDecoder('utf-8', { fatal: true }).decode(legacy) : null), protected: text !== null };
       }).catch(() => ({ text: null, failed: true } as const)),
     ]);
-    const { ledger, config } = protectedState.files as Awaited<ReturnType<typeof readProtectedSyncState>>;
+    const ledger = ledgerRead.status === 'fulfilled' ? ledgerRead.value : undefined;
+    const config = configRead.status === 'fulfilled' ? configRead.value : undefined;
     let brokenState = false;
     if (bytes) {
       try {
@@ -68,8 +78,8 @@ export async function recoverVault(dir: string, vaultId: string, wasPresent: boo
       }
     }
     // One durable marker is enough to keep the relay closed. Its contents are informational.
-    if (marker) reason = 'previous';
-    else if ('failed' in registry || 'failed' in protectedState || !!ledger !== !!config ||
+    if (marker) reason = savedReason(marker);
+    else if ('failed' in registry || ledgerRead.status === 'rejected' || configRead.status === 'rejected' || !!ledger !== !!config ||
       (state.protectedSync === true && !ledger) ||
       (ledger?.registryRequired === true && (!('protected' in registry) || !registry.protected))) reason = 'registry';
     else if ((brokenState || (!bytes && wasPresent)) && !(ledger && config)) reason = 'state';
@@ -103,7 +113,7 @@ export async function recoverVault(dir: string, vaultId: string, wasPresent: boo
     }
     if (reason) {
       if (!marker) log.warn('Vault opened for local work; sync continuity is unknown', { reason });
-      return { kind: 'local-only', state, fence };
+      return { kind: 'local-only', state, reason, fence };
     }
     return { kind: 'ready', state, fence, fresh: !wasPresent && !bytes && registry.text === null && !config && !ledger };
   } catch (error) {

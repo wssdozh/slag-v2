@@ -6,6 +6,8 @@
 // when the client said nothing), but the merge below is what keeps a patch a patch.
 
 import type { SlagItem, SlagItemPriority, SlagItemStatus, SlagItemType, SlagSubtask } from '../types';
+import { projectItemKind } from '../lib/vault/noteSemantics.ts';
+import { parseSubtasksFromContent } from '../lib/tasks/taskUtils.ts';
 
 export interface NotePatch {
   title?: string;
@@ -43,7 +45,7 @@ export function applyNotePatch(
   resolved: NotePatchResolved,
   now: number,
 ): SlagItem {
-  return {
+  const item = {
     ...existing,
     title: patch.title?.trim() || existing.title,
     content: resolved.content,
@@ -56,7 +58,9 @@ export function applyNotePatch(
     reminder: patch.reminder !== undefined ? patch.reminder ?? undefined : existing.reminder,
     duration: patch.duration !== undefined ? patch.duration ?? undefined : existing.duration,
     recurrence: patch.recurrence !== undefined ? patch.recurrence ?? undefined : existing.recurrence,
-    subtasks: resolved.subtasks.length > 0 ? resolved.subtasks : existing.subtasks,
+    subtasks: resolved.subtasks.length > 0 || (patch.content !== undefined && parseSubtasksFromContent(existing.content).length > 0)
+      ? resolved.subtasks : existing.subtasks,
     updatedAt: now,
   };
+  return item.type === existing.type ? item : projectItemKind(item);
 }

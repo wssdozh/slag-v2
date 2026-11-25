@@ -98,8 +98,8 @@ test('a photo from IndexedDB is a skeleton, then a fade — never «нет фа�
   await expect(card).toBeVisible({ timeout: 15000 });
 
   const image = card.locator('img[alt="reveal.png"]');
-  await expect(image).toHaveAttribute('data-loaded', 'true', { timeout: 15000 });
-  await expect(image).toHaveJSProperty('naturalWidth', 1);
+  await expect(image).toHaveJSProperty('naturalWidth', 1, { timeout: 15000 });
+  await expect(image).toBeVisible();
 
   const probe = await page.evaluate(
     () => (window as unknown as { __mediaProbe?: { skeleton: number; missing: number } }).__mediaProbe,

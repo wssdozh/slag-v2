@@ -44,13 +44,14 @@ const openPicker = async (page: Page) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  const inbox = page.locator('button', { hasText: 'Входящие' }).first();
-  await expect(inbox).toBeVisible({ timeout: 20000 });
-  await inbox.click();
+  const inbox = page.getByRole('button', { name: 'Входящие', exact: true });
+  const attach = page.getByRole('button', { name: 'Прикрепить файл', exact: true });
+  await expect(inbox.or(attach).first()).toBeVisible({ timeout: 20000 });
+  if (await inbox.isVisible() && !(await attach.isVisible())) await inbox.click({ timeout: 5000 });
   await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
 
   await page.evaluate(stubDeviceGallery);
-  await page.locator('button[aria-label="Прикрепить файл"]').first().click();
+  await attach.click({ timeout: 5000 });
   await expect(page.locator('[data-testid="media-grid-image"]')).toBeVisible({ timeout: 10000 });
   // The sheet arrives on a spring; a tile measured mid-flight is not where it will be.
   await page.waitForTimeout(500);

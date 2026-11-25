@@ -523,12 +523,9 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     });
 
     // 2. Capture composer island
-    const composer = page.locator('main').locator('div.sticky, div.relative').last();
-    if (await composer.isVisible()) {
-      await composer.screenshot({
-        path: 'test-results/screenshots/composer-island.png',
-      });
-    }
+    const composer = page.getByTestId('composer-dock');
+    await expect(composer).toBeVisible();
+    await composer.screenshot({ path: 'test-results/screenshots/composer-island.png', timeout: 5000 });
 
     // 3. Capture sidebar
     const sidebar = page.locator('aside').first();
@@ -558,9 +555,10 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
       await expect(page.locator('#fullscreen-editor-root')).toBeVisible();
 
       // Open the custom folder dropdown to verify dark styling
-      const folderSelect = page.locator('header button[aria-haspopup="listbox"]').first();
+      const editor = page.getByTestId('fullscreen-editor-modal');
+      const folderSelect = editor.locator('header button[aria-haspopup="listbox"]');
       await expect(folderSelect).toBeVisible();
-      await folderSelect.click();
+      await folderSelect.click({ timeout: 5000 });
       await expect(page.locator('button[role="option"]').first()).toBeVisible();
 
       await page.screenshot({
@@ -572,7 +570,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
       await folderSelect.click();
 
       // Click "Назад" to return
-      await page.locator('header button', { hasText: 'Назад' }).click();
+      await editor.getByRole('button', { name: 'Назад к ленте' }).click({ timeout: 5000 });
       await expect(page.locator('#fullscreen-editor-root')).not.toBeVisible();
     }
   });
@@ -755,7 +753,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     // 2. Send a message via quick prompt (Agenda / Today Plan)
     await page.locator('button', { hasText: 'План на сегодня' }).first().click();
     // Wait for assistant response to appear
-    await expect(page.locator('text=SLAG').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('SLAG', { exact: true })).toBeVisible({ timeout: 5000 });
 
     // Capture chat screenshot
     await page.screenshot({
@@ -873,7 +871,7 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     // 2. Verify Week view by default
     await expect(page.locator('text=Неделя')).toBeVisible();
     await expect(page.locator('text=Месяц')).toBeVisible();
-    await expect(page.locator('text=Сегодня')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Сегодня', exact: true, description: 'Перейти к сегодняшнему дню' })).toBeVisible();
 
     // 3. Verify Today date indicator in week header and All-Day row
     const todayBadge = page.locator('.bg-white.text-canvas, .bg-white.text-\\[\\#09090b\\]');
@@ -918,9 +916,9 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
         path: 'test-results/screenshots/calendar-month-expanded-day.png',
         fullPage: false,
       });
-      // Close modal via Escape
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(200);
+      const composerDialog = page.getByRole('dialog').filter({ hasText: 'Новая задача' });
+      await composerDialog.getByRole('button', { name: 'Закрыть', exact: true }).click({ timeout: 5000 });
+      await expect(composerDialog).not.toBeVisible();
     }
 
     // Capture Month View screenshot
@@ -930,10 +928,11 @@ test.describe('SLAG v2 Specification E2E Verification - Feed', () => {
     });
 
     // 8. Open Overdue & Unscheduled Drawer
-    const drawerBtn = page.locator('button[title*="просроченных"]').first();
-    await drawerBtn.click();
-    await expect(page.locator('text=Просроченные')).toBeVisible();
-    await expect(page.locator('text=Без срока')).toBeVisible();
+    const drawerBtn = page.getByRole('button', { name: 'Сроки', exact: true });
+    if ((await drawerBtn.getAttribute('aria-expanded')) === 'false') await drawerBtn.click({ timeout: 5000 });
+    await expect(drawerBtn).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByText('Просроченные', { exact: true })).toBeVisible();
+    await expect(page.getByText('Без срока', { exact: true })).toBeVisible();
 
     // Capture Drawer screenshot
     await page.screenshot({

@@ -16,11 +16,7 @@ test('mobile cloud opens a compact sync summary and its settings', async ({ page
     ];
     Object.assign(syncEngine.status, {
       state: 'connected', authRequired: false, lastSyncTime: '16:12',
-      manifest: {
-        at: new Date().toISOString(), root: 'same', remoteRoot: 'same', inSync: true,
-        action: 'none', trigger: 'push', folders: [], extra: [], missing: [],
-        peers: [{ deviceId: 'laptop', anonymous: false, root: 'same', inSync: true, at: Date.now(), extra: [], missing: [] }],
-      },
+      initialSync: { state: 'ready' },
     });
     syncEngine.notify();
   });
@@ -28,8 +24,8 @@ test('mobile cloud opens a compact sync summary and its settings', async ({ page
   await page.screenshot({ path: 'test-results/screenshots/mobile-sync-header.png', animations: 'disabled' });
   await cloud.tap();
   const sheet = page.getByRole('dialog', { name: 'Синхронизация', exact: true });
-  await expect(sheet.getByText('Совпало', { exact: true })).toBeVisible();
-  await expect(sheet.getByText('Нет сверки', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('Есть связь с релеем', { exact: true })).toBeVisible();
+  await expect(sheet.getByText('Обмен: 16:12', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/screenshots/mobile-sync-sheet.png', animations: 'disabled' });
   await sheet.getByTestId('mobile-sync-open-settings').tap();
   await expect(page.getByTestId('settings-tab-sync')).toHaveAttribute('aria-current', 'true');

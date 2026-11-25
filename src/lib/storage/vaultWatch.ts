@@ -9,6 +9,7 @@ import { isAndroidApp } from '../platform/deviceAccess';
 import { logger } from '../logger/logger';
 import { diffFolderPaths } from './folderSource';
 import { diffNoteFiles, type NoteFileStamp, type VaultFileChange } from './vaultWatchDiff';
+import { isMissingVaultFile } from './vaultRecovery';
 
 const watchLog = logger.scope('FS');
 
@@ -43,18 +44,25 @@ interface VaultSnapshot {
  * Every note and folder under `notesPath`. Folders ride along on the directory walk itself, so
  * watching them costs no extra pass and no extra stat — the sweep just now remembers them too.
  */
-async function snapshotVault(notesPath: string): Promise<VaultSnapshot> {
+async function snapshotVault(notesPath: string, previous?: VaultSnapshot): Promise<VaultSnapshot> {
   const snapshot: VaultSnapshot = { files: new Map(), folders: [] };
-  await walkDirectory(notesPath, '', snapshot);
+  await walkDirectory(notesPath, '', snapshot, previous);
   return snapshot;
 }
 
-async function walkDirectory(directory: string, relative: string, snapshot: VaultSnapshot): Promise<void> {
+async function walkDirectory(directory: string, relative: string, snapshot: VaultSnapshot, previous?: VaultSnapshot): Promise<void> {
   let entries;
   try {
     entries = await readDir(directory, { baseDir: BaseDirectory.AppData });
   } catch (error) {
+    if (isMissingVaultFile(error)) return;
     watchLog.warn('vault sweep could not read a directory', { directory, error: String(error) });
+    // An unreadable subtree proves nothing about removals. Keep its baseline, but scan siblings.
+    if (previous) {
+      const prefix = relative ? `${relative}/` : '';
+      for (const [path, stamp] of previous.files) if (path.startsWith(prefix)) snapshot.files.set(path, stamp);
+      for (const folder of previous.folders) if (folder.startsWith(prefix)) snapshot.folders.push(folder);
+    }
     return;
   }
 
@@ -64,7 +72,7 @@ async function walkDirectory(directory: string, relative: string, snapshot: Vaul
       if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
       const folder = relative ? `${relative}/${entry.name}` : entry.name;
       snapshot.folders.push(folder);
-      await walkDirectory(`${directory}/${entry.name}`, folder, snapshot);
+      await walkDirectory(`${directory}/${entry.name}`, folder, snapshot, previous);
     } else if (entry.isFile && entry.name.endsWith('.md')) {
       notes.push({ path: `${directory}/${entry.name}`, name: relative ? `${relative}/${entry.name}` : entry.name });
     }
@@ -79,8 +87,10 @@ async function walkDirectory(directory: string, relative: string, snapshot: Vaul
       try {
         const info = await stat(note.path, { baseDir: BaseDirectory.AppData });
         snapshot.files.set(note.name, { mtime: info.mtime?.getTime() ?? 0, size: info.size });
-      } catch {
-        // Removed between the directory listing and the stat: the next sweep reports it as gone.
+      } catch (error) {
+        // Only ENOENT confirms absence. A lock or denied stat must not look like a delete/create.
+        const stamp = previous?.files.get(note.name);
+        if (stamp && !isMissingVaultFile(error)) snapshot.files.set(note.name, stamp);
       }
     }));
   }
@@ -129,7 +139,7 @@ export async function startVaultWatch(options: VaultWatchOptions): Promise<Vault
     if (stopped || paused || running) return;
     running = true;
     try {
-      const next = await snapshotVault(notesPath);
+      const next = await snapshotVault(notesPath, previous);
       if (stopped) return;
       const files = diffNoteFiles(previous.files, next.files);
       const folders = diffFolderPaths(previous.folders, next.folders);

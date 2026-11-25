@@ -11,6 +11,8 @@ export interface NoteMutation {
   item: SlagItem | null;
   /** Snapshot visible at the mutation, even when a remote write is finishing on disk. */
   previous?: SlagItem;
+  /** An automatic rollover, never set by the editor or the disk watcher. */
+  rollover?: true;
 }
 
 export interface AcceptedNote {
@@ -35,5 +37,5 @@ export interface NoteRegistryStorage {
   readNoteRegistry(): Promise<unknown>;
   writeNoteRegistry(value: unknown): Promise<void>;
   applyAcceptedNote(note: AcceptedNote): Promise<void>;
-  subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>): () => void;
+  subscribeNoteIntents(listener: (changes: NoteMutation[]) => Promise<void>, canWrite?: () => boolean): () => void;
 }

@@ -25,7 +25,7 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
     isSearchOpen,
     setIsSearchOpen,
     items,
-    setCurrentFolder,
+    navigateToFolder,
     setSelectedItem,
     setIsFullscreenEditorOpen,
     toggleAssistant,
@@ -129,7 +129,9 @@ const SearchDialog: React.FC<{ presence: ReturnType<typeof usePresence> }> = ({ 
   }, [matchingCommands, noteResults, isExplicitCommandMode]);
 
   const handleSelectItem = (item: SlagItem) => {
-    setCurrentFolder(item.folder);
+    // navigateToFolder also grows the feed window around a target outside the render window
+    // and centres it, which the plain folder switch never did — the chosen note stayed absent.
+    navigateToFolder(item.folder, item.id);
     setSelectedItem(item);
     if (item.type === 'article') {
       setIsFullscreenEditorOpen(true);

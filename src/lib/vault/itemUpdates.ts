@@ -1,5 +1,6 @@
 import type { ItemUpdates, SlagItem } from '../../types';
-import { parseSubtasksFromContent } from '../tasks/taskUtils';
+import { parseSubtasksFromContent } from '../tasks/taskUtils.ts';
+import { projectItemKind } from './noteSemantics.ts';
 
 /**
  * Applies a partial update to an item without touching storage.
@@ -23,8 +24,10 @@ export function applyItemUpdates(target: SlagItem, updates: ItemUpdates): SlagIt
           st => `- [${st.completed ? 'x' : ' '}] ${st.title}`
         );
     content = content ? `${content}\n\n${newChecklines.join('\n')}` : newChecklines.join('\n');
+  }
+  if (content !== target.content) {
     const parsed = parseSubtasksFromContent(content);
-    subtasks = parsed.length > 0 ? parsed : subtasks;
+    if (parsed.length || parseSubtasksFromContent(target.content).length) subtasks = parsed;
   }
 
   let tags = target.tags || [];
@@ -65,5 +68,5 @@ export function applyItemUpdates(target: SlagItem, updates: ItemUpdates): SlagIt
     }
   }
 
-  return result;
+  return result.type === target.type ? result : projectItemKind(result);
 }

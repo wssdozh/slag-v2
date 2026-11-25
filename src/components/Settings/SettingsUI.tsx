@@ -143,6 +143,7 @@ interface SettingsSwitchProps {
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   label: string;
+  className?: string;
   testId?: string;
 }
 
@@ -155,6 +156,7 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
   onChange,
   disabled = false,
   label,
+  className = '',
   testId,
 }) => (
   <button
@@ -167,7 +169,7 @@ export const SettingsSwitch: React.FC<SettingsSwitchProps> = ({
     onClick={() => onChange(!checked)}
     className={`relative w-9 h-5 rounded-full shrink-0 cursor-pointer transition-colors ${
       checked ? 'bg-accent' : 'bg-switch-off'
-    } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+    } ${disabled ? 'opacity-40 cursor-not-allowed' : ''} ${className}`}
   >
     <span
       className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-fg-primary shadow-sm transition-transform"

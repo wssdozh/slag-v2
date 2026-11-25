@@ -85,9 +85,13 @@ export function ItemAttachmentGrid({ attachments, srcs, missing, onOpen, onEnric
           );
         })}
       </div>
-      {expanded?.type === 'audio' && <AudioPlayer src={attachmentSrc(srcs, expanded) ?? ''} name={expanded.name}
-        duration={expanded.duration} waveform={expanded.waveform} transcript={expanded.extractedText}
-        summary={expanded.summary} enrichmentStatus={expanded.enrichmentStatus} onEnrich={() => onEnrich(expanded)} />}
+      {expanded?.type === 'audio' && (
+        <div className="w-64 max-w-full">
+          <AudioPlayer src={attachmentSrc(srcs, expanded) ?? ''} name={expanded.name}
+            duration={expanded.duration} waveform={expanded.waveform} transcript={expanded.extractedText}
+            summary={expanded.summary} enrichmentStatus={expanded.enrichmentStatus} onEnrich={() => onEnrich(expanded)} />
+        </div>
+      )}
       {expanded?.type === 'image' && expanded.extractedText && (
         <div className="max-w-xs border-x border-tint-12 px-2">
           <button type="button" onClick={() => toggle(expanded.id)} aria-expanded="true"

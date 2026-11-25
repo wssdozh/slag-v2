@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { SlagAttachment, SlagItem, FolderMeta } from '../types';
+import type { SlagAttachment, SlagItem, FolderMeta, SlagItemStatus } from '../types';
 import type { McpVaultConfig, VaultStateData, NoteMatch } from './types';
 import { parseMarkdownToItem, serializeItemToMarkdown } from '../lib/vault/markdownSerializer';
 import { toggleCheckboxInContent, parseSubtasksFromContent } from '../lib/tasks/taskUtils';
@@ -22,12 +22,15 @@ import {
   isTextAttachment,
   resolveAttachmentPath,
 } from './attachments';
+import { randomUUID } from 'node:crypto';
 
 import { getSafeNoteFilename } from '../lib/vault/noteFilename';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from '../lib/vault/safePath';
 import { DEFAULT_INBOX_FOLDER } from '../config';
-import { enrolledMarker } from '../node/vaultGuard';
+import { enrolledMarker, guardRoots } from '../node/vaultGuard';
 import { writeFileDurable } from '../node/durableWrite';
+import { buildPendingDir, buildPendingPath, buildReceiptDir, buildReceiptPath, MAILBOX_DIR_NAME, MAX_MAILBOX_BYTES, REQUEST_TTL_MS } from '../lib/storage/taskMailbox';
+import type { TaskMailboxRequest } from '../lib/storage/taskMailbox';
 
 /** What came out of one attachment: text, raw bytes, or a reason there is nothing to give. */
 export type AttachmentPayload =
@@ -60,6 +63,7 @@ export function resolveVaultConfig(customPath?: string): McpVaultConfig {
   }
 
   const resolved = path.resolve(targetPath);
+  // Compute notesDir: prefer explicit 'notes/' subfolder if it exists, else treat target as notes
   const candidateNotesDir = path.join(resolved, 'notes');
   const notesDir = existsSync(candidateNotesDir) ? candidateNotesDir : resolved;
   const trashDir = path.join(resolved, '.trash');
@@ -108,6 +112,19 @@ export class McpVault {
   private async assertLegacyWritable(): Promise<void> {
     if (await this.hasEnrolledMarker()) throw new Error('Это хранилище использует реестр синхронизации. Изменяйте записи в приложении SLAG.');
   }
+
+  private async registryRoot(): Promise<string | undefined> {
+    for (const root of guardRoots(this.config.vaultPath)) {
+      for (const name of ['note-registry.json', 'note-registry.json.commit.json']) {
+        try {
+          await fs.lstat(path.join(root, name));
+          return root;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+        }
+      }
+    }
+    }
 
   public async writeState(data: VaultStateData): Promise<void> {
     await this.assertLegacyWritable();
@@ -453,6 +470,52 @@ export class McpVault {
     return resolveAttachmentByName(item.attachments, basename);
   }
 
+  private async changeRegistryTaskStatus(root: string, match: NoteMatch | undefined | null, targetStatus: SlagItemStatus): Promise<NoteMatch> {
+    if (match?.item.type !== 'task' || !match.item.id.trim() || match.item.id.length > 128) {
+      throw new Error('Задача не найдена. Запрос не отправлен.');
+    }
+    const noteId = match.item.id;
+    const request: TaskMailboxRequest = { requestId: randomUUID(), noteId, targetStatus, createdAt: Date.now() };
+    const body = JSON.stringify(request);
+    if (Buffer.byteLength(body) > MAX_MAILBOX_BYTES) throw new Error('Слишком большой запрос смены статуса.');
+    const pending = buildPendingPath(root, request.requestId);
+    const receipt = buildReceiptPath(root, request.requestId);
+    const temp = `${pending}.tmp`;
+    for (const dir of [path.join(root, MAILBOX_DIR_NAME), buildPendingDir(root), buildReceiptDir(root)]) {
+      await fs.mkdir(dir).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== 'EEXIST') throw error;
+      });
+      if (!(await fs.lstat(dir)).isDirectory()) throw new Error('Неверная папка очереди MCP.');
+    }
+    try {
+      await fs.writeFile(temp, body, { encoding: 'utf-8', flag: 'wx' });
+      await fs.rename(temp, pending);
+      while (Date.now() - request.createdAt < REQUEST_TTL_MS) {
+        const stat = await fs.lstat(receipt).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ENOENT') throw error;
+        });
+        if (stat?.isFile() && stat.size <= MAX_MAILBOX_BYTES) {
+          const value: unknown = JSON.parse(await fs.readFile(receipt, 'utf-8'));
+          if (value && typeof value === 'object' && 'requestId' in value && value.requestId === request.requestId
+              && 'noteId' in value && value.noteId === noteId && 'state' in value) {
+            if (value.state === 'rejected_expired' || value.state === 'rejected_unknown') {
+              throw new Error('error' in value && typeof value.error === 'string' ? value.error : 'SLAG отклонил запрос смены статуса.');
+            }
+            if (value.state === 'projected' && 'newStatus' in value && value.newStatus === targetStatus) {
+              const actual = (await this.scanAllNotes()).find(({ item }) => item.id === noteId);
+              if (actual?.item.type === 'task' && actual.item.status === targetStatus) return actual;
+              break;
+            }
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      throw new Error('Исход неизвестен: откройте нужное хранилище в SLAG и проверьте статус задачи.');
+    } finally {
+      await Promise.all([temp, pending, receipt].map((file) => fs.rm(file, { force: true }).catch(() => undefined)));
+    }
+  }
+
   public async saveNote(params: {
     id?: string;
     title?: string;
@@ -469,6 +532,15 @@ export class McpVault {
     recurrence?: SlagItem['recurrence'] | null;
     subtasks?: string[];
   }): Promise<{ item: SlagItem; created: boolean; path: string }> {
+    const { id, status, ...otherFields } = params;
+    if (id && status !== undefined && Object.values(otherFields).every((value) => value === undefined)) {
+      const root = await this.registryRoot();
+      if (root) {
+        const match = (await this.scanAllNotes()).find(({ item }) => item.id === id.trim());
+        const result = await this.changeRegistryTaskStatus(root, match, status);
+        return { item: result.item, created: false, path: result.relativePath.replace(/\\/g, '/') };
+      }
+    }
     await this.assertLegacyWritable();
     let existingMatch: NoteMatch | null = null;
 
@@ -606,6 +678,10 @@ export class McpVault {
   }
 
   public async toggleTask(idOrTitle: string, subtaskId?: string, explicitStatus?: 'todo' | 'done'): Promise<SlagItem> {
+    if (explicitStatus && subtaskId === undefined) {
+      const root = await this.registryRoot();
+      if (root) return (await this.changeRegistryTaskStatus(root, await this.findNote(idOrTitle), explicitStatus)).item;
+    }
     await this.assertLegacyWritable();
     const match = await this.findNote(idOrTitle);
     if (!match) {

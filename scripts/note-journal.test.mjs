@@ -57,6 +57,23 @@ test('immutable sent attempt is not compacted, and successor retains the optimis
   assert.notDeepEqual(journal.pending[0].base.item, attempt.item);
 });
 
+test('an overdue rollover and a user edit stay separate regardless of order', () => {
+  const base = { ...note, type: 'task', recurrence: { freq: 'daily' }, dueDate: '2026-11-20' };
+  const state = setConfirmed(emptyJournal(), note.id, { revision: 1, item: base });
+  for (const manualFirst of [true, false]) {
+    const first = manualFirst ? { ...base, content: 'manual edit' } : { ...base, dueDate: '2026-11-23' };
+    const second = { ...first, content: 'manual edit', dueDate: '2026-11-23' };
+    const one = recordNote(state, { id: note.id, intentId: 'first', kind: 'update', item: first, previous: base,
+      origin: { revision: 1 }, source: 'app', rollover: manualFirst ? undefined : true });
+    const two = recordNote(one, { id: note.id, intentId: 'second', kind: 'update', item: second, previous: first,
+      origin: { intentId: 'first' }, source: 'app', rollover: manualFirst ? true : undefined });
+    assert.equal(two.pending.length, 2);
+    assert.deepEqual(two.pending.map(({ rollover }) => rollover), manualFirst ? [undefined, true] : [true, undefined]);
+    assert.equal(two.pending[1].predecessor, 'first');
+    assert.equal(two.pending[1].item.content, 'manual edit');
+  }
+});
+
 test('delete and restore retain distinct intents and no-op updates do not enter the queue', () => {
   let journal = setConfirmed(emptyJournal(), note.id, { revision: 1, item: note });
   assert.equal(recordNote(journal, { id: note.id, intentId: 'noop', kind: 'update', item: { ...note, updatedAt: 9 } }), journal);

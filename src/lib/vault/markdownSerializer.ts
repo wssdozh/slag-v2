@@ -5,7 +5,7 @@ import { DEFAULT_INBOX_FOLDER } from '../../config/storage.ts';
 import { isSafeVaultRelativePath, safeVaultRelativePath } from './safePath.ts';
 import { normalizeReminder } from '../time/reminder.ts';
 import { withoutSpoilers } from '../text/noteDisclosure.ts';
-import { frontmatterTags } from './noteSemantics.ts';
+import { estimateReadingMinutes, frontmatterTags } from './noteSemantics.ts';
 
 /**
  * Serializes a SlagItem into Markdown with YAML Frontmatter (Obsidian-compatible).
@@ -208,7 +208,7 @@ export function parseMarkdownToItem(rawContent: string, fallbackId: string, fall
   }
 
   if (type === 'article') {
-    item.readingTimeMinutes = frontmatter.readingTime || Math.max(1, Math.round(body.split(/\s+/).length / 200));
+    item.readingTimeMinutes = frontmatter.readingTime || estimateReadingMinutes(body);
     item.summary = frontmatter.summary;
   }
 

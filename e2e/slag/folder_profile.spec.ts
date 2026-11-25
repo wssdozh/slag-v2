@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupSlag } from '../support/slagSetup';
-import { chooseMobileFolder, openMobileFolderProfile } from '../support/mobileFolders';
+import { mobileFolderTrigger, openMobileFolderProfile } from '../support/mobileFolders';
 
 const STAT_KEYS = ['notes', 'tasks', 'articles', 'media', 'audio', 'links'] as const;
 
@@ -266,7 +266,8 @@ test.describe('Folder profile', () => {
 
   test('mobile profile shows six counters and renames in place', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await chooseMobileFolder(page, 'Проекты');
+    await page.getByRole('button', { name: 'Проекты', exact: true }).click({ timeout: 5000 });
+    await expect(mobileFolderTrigger(page)).toHaveAccessibleName('Переключить папку: Проекты');
     const profile = await openMobileFolderProfile(page);
     for (const key of STAT_KEYS) {
       await expect(profile.getByTestId(`folder-stat-${key}`)).toBeVisible();

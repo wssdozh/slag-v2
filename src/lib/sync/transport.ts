@@ -28,7 +28,7 @@ export interface TransportCallbacks {
   onAssistantClear?: () => void;
   /** A button under an answer was tapped: apply this action, or the tap dies with the frame. */
   onAssistantAction?: (requestId: string, action: unknown) => Promise<void> | void;
-  onCatchUpPull?: () => void;
+  onCatchUpPull?: (reason: 'welcome' | 'close') => void;
   onAuthRejected?: () => void;
 }
 
@@ -65,6 +65,7 @@ export class SyncTransport {
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private currentOptions: TransportOptions | null = null;
+  private paused = false;
   private callbacks: TransportCallbacks;
   /**
    * Set by the app: can this device actually answer with a model? The relay asks before it asks
@@ -89,6 +90,10 @@ export class SyncTransport {
   }
 
   public send(data: string | Uint8Array): boolean {
+    return !this.paused && this.sendOnSocket(data);
+  }
+
+  private sendOnSocket(data: string | Uint8Array): boolean {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
     this.ws.send(data instanceof Uint8Array ? data.slice().buffer : data);
     return true;
@@ -125,18 +130,19 @@ export class SyncTransport {
       && this.currentOptions !== null && this.currentOptions.roomId === roomId;
   }
 
+  public setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (paused) {
+      this.clearReconnectTimeout();
+      if (this.ws?.readyState === WebSocket.CONNECTING) this.closeSocket();
+    }
+  }
+
   public connect(options: TransportOptions): void {
+    if (this.paused) return;
     this.currentOptions = options;
     this.clearReconnectTimeout();
-
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.onmessage = null;
-      this.ws.onopen = null;
-      this.ws.onerror = null;
-      this.ws.close();
-      this.ws = null;
-    }
+    this.closeSocket();
 
     if (!options.enabled || !options.roomId) return;
 
@@ -185,13 +191,17 @@ export class SyncTransport {
           this.callbacks.onAuthRejected?.();
           return;
         }
+        if (this.paused) {
+          this.callbacks.onStatus('offline', null);
+          return;
+        }
         const retryMs = Math.min(
           SYNC_INTERVALS.RECONNECT_BASE_MS * 2 ** Math.min(this.reconnectAttempts++, SYNC_INTERVALS.RECONNECT_MAX_EXPONENT),
           SYNC_INTERVALS.RECONNECT_MAX_MS
         );
         syncLog.info(`Sync WebSocket closed (code ${event.code}${event.reason ? `, reason: ${event.reason.slice(0, 120)}` : ''}), retrying in ${retryMs}ms`);
         this.callbacks.onStatus('offline', null);
-        this.callbacks.onCatchUpPull?.();
+        this.callbacks.onCatchUpPull?.('close');
         this.reconnectTimeout = setTimeout(() => {
           this.reconnectTimeout = null;
           if (this.currentOptions && this.currentOptions.enabled && this.currentOptions.roomId) {
@@ -208,6 +218,9 @@ export class SyncTransport {
   public async handleIncomingMessage(data: string): Promise<void> {
     try {
       const msg = JSON.parse(data);
+      // New vault frames replay from the durable cursor. Receipts still settle in-flight
+      // operations; the Telegram assistant is independent of vault delivery.
+      if (this.paused && (msg.type === 'bundle' || msg.type === 'note_events')) return;
       if (msg.type === 'welcome') {
         if (typeof msg.connectedDevices === 'number') {
           this.callbacks.onConnectedDevicesCount?.(msg.connectedDevices);
@@ -218,7 +231,7 @@ export class SyncTransport {
         this.callbacks.onBinarySupport?.(msg.binary === true);
         // Catch up on anything missed while the socket was down: connect is the only
         // moment a full pull is mandatory now that push no longer pulls first.
-        this.callbacks.onCatchUpPull?.();
+        this.callbacks.onCatchUpPull?.('welcome');
       } else if (msg.type === 'server_ack' && typeof msg.bundleId === 'string') {
         this.callbacks.onServerAck?.(msg.bundleId);
       } else if (msg.type === 'pong') {
@@ -234,7 +247,7 @@ export class SyncTransport {
       } else if (msg.type === 'assistant_probe' && typeof msg.id === 'string') {
         // The relay is electing one device to answer. Two facts decide it: how fast this socket
         // replies, and whether this device could run a model at all.
-        this.send(JSON.stringify({
+        this.sendOnSocket(JSON.stringify({
           type: 'assistant_probe_ack',
           id: msg.id,
           aiReady: this.assistantReadyProvider(),
@@ -246,7 +259,7 @@ export class SyncTransport {
           // The relay stores the mode a human picked; an unknown string degrades to the narrowest.
           msg.mode === 'risky' ? 'risky' : msg.mode === 'read' ? 'read' : 'minimal',
           // One bubble for the whole exchange: the relay only changes its text.
-          (stage) => this.send(JSON.stringify({ type: 'assistant_stage', id: msg.id, stage })),
+          (stage) => this.sendOnSocket(JSON.stringify({ type: 'assistant_stage', id: msg.id, stage })),
         );
       } else if (msg.type === 'assistant_clear') {
         // Not a question: the relay has nothing to answer, it just tells every live device
@@ -270,6 +283,11 @@ export class SyncTransport {
 
   public disconnect(): void {
     this.clearReconnectTimeout();
+    this.closeSocket();
+    this.reconnectAttempts = 0;
+  }
+
+  private closeSocket(): void {
     if (this.ws) {
       this.ws.onclose = null;
       this.ws.onmessage = null;
@@ -278,7 +296,6 @@ export class SyncTransport {
       this.ws.close();
       this.ws = null;
     }
-    this.reconnectAttempts = 0;
   }
 
   private clearReconnectTimeout(): void {

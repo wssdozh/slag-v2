@@ -4,6 +4,7 @@ import type { SlagItem, SlagItemType } from '../../types';
 import { DEFAULT_INBOX_FOLDER } from '../../config';
 import { storage } from '../../lib/storage';
 import { applyTaskCompletion } from '../../lib/tasks/taskCompletion';
+import { estimateReadingMinutes } from '../../lib/vault/noteSemantics';
 import { parseSubtasksFromContent, setAllCheckboxesInContent, toggleCheckboxInContent } from '../../lib/tasks/taskUtils';
 import { logger } from '../../lib/logger/logger';
 import type { ToastMessage } from '../appContext.types';
@@ -54,10 +55,11 @@ export function useItemWrites(deps: ItemWritesDeps) {
       duration: itemData.duration,
       recurrence: itemData.recurrence,
       subtasks: itemData.subtasks || [],
-      readingTimeMinutes: itemData.readingTimeMinutes || (itemData.type === 'article' ? Math.max(1, Math.round(itemData.content.split(/\s+/).length / 200)) : undefined),
+      readingTimeMinutes: itemData.readingTimeMinutes || (itemData.type === 'article' ? estimateReadingMinutes(itemData.content) : undefined),
       summary: itemData.summary,
       replyToId: itemData.replyToId,
       linkedItemIds: itemData.linkedItemIds,
+      customProps: itemData.customProps,
     };
 
     const saved = storage.saveItem(newItem);

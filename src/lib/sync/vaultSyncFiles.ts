@@ -55,22 +55,46 @@ export function validateSyncLedger(section: RecordValue): void {
 }
 
 function normalizedConfig(value: unknown): RecordValue {
-  const config = configFromState(object(value));
+  const record = object(value);
+  const config = configFromState(record);
   if (!config.deviceId || !config.serverUrl || config.enabled === undefined) throw new Error('Missing vault synchronization binding');
-  const syncId = object(value).syncId;
+  const syncId = record.syncId;
   if (syncId !== undefined && (typeof syncId !== 'string' || !syncId)) throw new Error('Invalid vault synchronization ID');
-  return { ...configToState(config), ...(syncId ? { syncId } : {}) };
+  const registryOnly = record.registryOnly;
+  if (registryOnly !== undefined && (registryOnly !== true || !syncId)) throw new Error('Invalid registry-only binding');
+  return { ...configToState(config), ...(syncId ? { syncId } : {}), ...(registryOnly === true && { registryOnly }) };
+}
+
+/** A new recovered scope can use the verified note journal, never the old bundle transport. */
+export function provisionRegistryOnly(dir: string, id: string, binding: RecordValue, registry: unknown): Promise<void> {
+  return serial(dir, async () => {
+    const config = normalizedConfig({ ...binding, registryOnly: true });
+    if (await read(dir, LEDGER, id) || await read(dir, CONFIG, id)) throw new Error('Recovery target is not empty');
+    await write(dir, CONFIG, id, config);
+    await writeVaultGeneration(`${dir}/note-registry.json`, JSON.stringify(registry));
+    await write(dir, LEDGER, id, { registryRequired: true, initialSync: true });
+  });
+}
+
+/** Startup may still use a verified projection fence when the separate room binding is lost. */
+export function inspectProtectedSyncState(dir: string, id: string) {
+  return serial(dir, () => Promise.allSettled([
+    read(dir, LEDGER, id).then((ledger) => {
+      if (ledger) {
+        folderFence(ledger.pendingFolderProjection);
+        validateSyncLedger(ledger);
+      }
+      return ledger;
+    }),
+    read(dir, CONFIG, id).then((config) => config && normalizedConfig(config)),
+  ] as const));
 }
 
 export async function readProtectedSyncState(dir: string, id: string): Promise<{ ledger?: RecordValue; config?: RecordValue }> {
-  return serial(dir, async () => {
-    const [ledger, config] = await Promise.all([read(dir, LEDGER, id), read(dir, CONFIG, id)]);
-    if (ledger) {
-      folderFence(ledger.pendingFolderProjection);
-      validateSyncLedger(ledger);
-    }
-    return { ledger, config: config && normalizedConfig(config) };
-  });
+  const [ledger, config] = await inspectProtectedSyncState(dir, id);
+  if (ledger.status === 'rejected') throw ledger.reason;
+  if (config.status === 'rejected') throw config.reason;
+  return { ledger: ledger.value, config: config.value };
 }
 
 /** Only called after existing legacy hydration and config verification, before opening transport. */
