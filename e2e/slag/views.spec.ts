@@ -884,7 +884,8 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     // 3. Verify AudioPlayer and VideoCirclePlayer in Feed
     // Switch to "Все" to ensure demo items are visible
     const viewModal = await openViewModal(page);
-    await viewModal.locator('button', { hasText: 'Все' }).last().click();
+    await viewModal.getByRole('button', { name: 'Фильтры', exact: true }).click();
+    await viewModal.getByRole('button', { name: 'Все', exact: true }).click({ timeout: 5000 });
     await page.keyboard.press('Escape');
 
     // Create a note with voice attachment to test feed player
@@ -925,8 +926,8 @@ test.describe('SLAG v2 Specification E2E Verification - Views', () => {
     await expect(page.locator('text=Заметка с голосовым сообщением').first()).toBeVisible({ timeout: 10000 });
 
     // Verify Linear Monochrome AudioPlayer components (no redundant 1x speed button)
-    const audioCard = page.locator('.group', { hasText: 'Заметка с голосовым сообщением' });
-    await audioCard.scrollIntoViewIfNeeded();
+    const audioCard = page.locator('[data-flip-id]').filter({ hasText: 'Заметка с голосовым сообщением' });
+    await audioCard.getByRole('button', { name: 'voice_note.webm', exact: true }).click({ timeout: 5000 });
     await expect(audioCard.locator('button[title*="Воспроизвести"]').first()).toBeVisible();
     // The row names the recording and shows its duration; the byte-size pill is gone.
     await expect(audioCard.locator('text=voice_note').first()).toBeVisible();

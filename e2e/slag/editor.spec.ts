@@ -135,8 +135,9 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.waitForTimeout(500);
 
     // 1. Verify pure voice card has no fake "Голосовая заметка" h3 header
-    const voiceCard = page.locator('.group').filter({ has: page.locator('audio') }).first();
-    await voiceCard.scrollIntoViewIfNeeded();
+    const voiceTile = page.getByRole('button', { name: 'pure_voice.webm', exact: true });
+    const voiceCard = page.locator('.feed-card-contain').filter({ has: voiceTile });
+    await voiceTile.click({ timeout: 5000 });
     await expect(voiceCard).toBeVisible();
     await expect(voiceCard.locator('h3')).toHaveCount(0);
 
@@ -155,7 +156,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
       fullPage: false,
     });
 
-    // 2. Verify pure single image card has no fake "Изображение" h3 header and uses natural object-contain
+    // 2. A pure image note has no synthetic title; its tile crops the preview.
     const singleImageCard = page.locator('.group').filter({ has: page.locator('img[alt="ui-preview.png"]') }).first();
     await singleImageCard.scrollIntoViewIfNeeded();
     await expect(singleImageCard).toBeVisible();
@@ -163,7 +164,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
 
     const singleImg = singleImageCard.locator('img[alt="ui-preview.png"]').first();
     await expect(singleImg).toBeVisible();
-    await expect(singleImg).toHaveClass(/object-contain/);
+    await expect(singleImg).toHaveClass(/object-cover/);
 
     // Screenshot natural single image card
     await page.screenshot({
