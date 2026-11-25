@@ -22,17 +22,20 @@ if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(version)) {
 
 const confPath = 'src-tauri/tauri.conf.json';
 const conf = JSON.parse(readFileSync(confPath, 'utf8'));
-conf.version = version;
-writeFileSync(confPath, `${JSON.stringify(conf, null, 2)}\n`);
 
 // `--update-check` and the log line it prints read CARGO_PKG_VERSION, so Cargo has to agree too.
 const cargoPath = 'src-tauri/Cargo.toml';
 const cargo = readFileSync(cargoPath, 'utf8');
-const stamped = cargo.replace(/^version = "[^"]+"/m, `version = "${version}"`);
-if (stamped === cargo) {
+const packageVersion = /^(\[package\]\r?\n[^[]*?^version = )"[^"]+"/m;
+if (!packageVersion.test(cargo)) {
   console.error(`stamp-version: no [package] version line in ${cargoPath}`);
   process.exit(1);
 }
-writeFileSync(cargoPath, stamped);
+const stamped = cargo.replace(packageVersion, (_, prefix) => `${prefix}"${version}"`);
+if (stamped !== cargo) writeFileSync(cargoPath, stamped);
+if (conf.version !== version) {
+  conf.version = version;
+  writeFileSync(confPath, `${JSON.stringify(conf, null, 2)}\n`);
+}
 
 process.stdout.write(`stamped ${version} into ${confPath} and ${cargoPath}\n`);
