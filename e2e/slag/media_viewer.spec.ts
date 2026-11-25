@@ -31,10 +31,11 @@ async function seedAndOpenFeed(page: Parameters<Parameters<typeof test>[1]>[0]['
   }, NOTE);
   await page.reload({ waitUntil: 'domcontentloaded' });
 
-  // A phone opens on the folder list; the feed (and the note) live behind it.
-  const inbox = page.locator('button', { hasText: 'Входящие' }).first();
-  await expect(inbox).toBeVisible({ timeout: 20000 });
-  await inbox.click();
+  // Enter the Inbox from the folder list if the mobile shell opened there.
+  const inbox = page.getByRole('button', { name: 'Входящие', exact: true });
+  const card = page.locator('#item-media_viewer_item');
+  await expect(inbox.or(card).first()).toBeVisible({ timeout: 20000 });
+  if (await inbox.isVisible() && !(await card.isVisible())) await inbox.click({ timeout: 5000 });
   await expect(page.locator('.feed-card-contain').first()).toBeVisible({ timeout: 15000 });
 }
 
@@ -44,8 +45,8 @@ test.describe('media viewer', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await seedAndOpenFeed(page);
 
-    // A clip plays in its card; the viewer is the way out of it.
-    await page.getByRole('button', { name: 'Открыть видео' }).first().click();
+    // The clip's attachment tile opens the mixed media deck.
+    await page.locator('#item-media_viewer_item').getByRole('button', { name: 'clip.mp4', exact: true }).click({ timeout: 5000 });
 
     const lightbox = page.getByTestId('image-lightbox');
     await expect(lightbox).toBeVisible();
