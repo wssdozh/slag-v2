@@ -53,7 +53,7 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
         id,
         type: 'note',
         title,
-        content: '',
+        content: title,
         folder: 'Входящие',
         tags: [],
         attachments,
@@ -89,13 +89,17 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
 
-  const card = page.locator('.group').filter({ hasText: 'первый_трек' }).first();
-  await expect(card).toBeVisible({ timeout: 10000 });
-  await expect(card.locator('text=первый_трек')).toBeVisible();
-  await expect(card.locator('text=второй_трек')).toBeVisible();
-  // Title and author sit above the line, not under it.
-  await expect(card.locator('text=babypills').first()).toBeVisible();
-  await expect(card.locator('text=.wav')).toHaveCount(0);
+  const card = page.locator('#item-probe_two_tracks');
+  const firstTile = card.getByRole('button', { name: 'babypills - первый_трек.wav', exact: true });
+  const secondTile = card.getByRole('button', { name: 'babypills - второй_трек.wav', exact: true });
+  await expect(firstTile).toBeVisible();
+  await expect(secondTile).toBeVisible();
+  await firstTile.click({ timeout: 5000 });
+  await expect(firstTile).toHaveAttribute('aria-expanded', 'true');
+  const firstMeta = card.getByTestId('audio-row-meta');
+  await expect(firstMeta.getByText('первый_трек', { exact: true })).toBeVisible();
+  await expect(firstMeta.getByText('babypills', { exact: true })).toBeVisible();
+  await expect(firstMeta.getByText('.wav')).toHaveCount(0);
 
   const strip = card.locator('[title="Перемотка"]').first();
   // A ready transcript stays folded until asked for.
@@ -106,7 +110,7 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await expect(accordion).toHaveAttribute('data-expanded', 'true');
   await card.locator('button[aria-label="Расшифровка"]').first().click();
   await expect(accordion).toHaveAttribute('data-expanded', 'false');
-  const headerBox = await card.locator('text=первый_трек').first().boundingBox();
+  const headerBox = await firstMeta.getByText('первый_трек', { exact: true }).boundingBox();
   const stripBox = await strip.boundingBox();
   expect(headerBox).not.toBeNull();
   expect(stripBox).not.toBeNull();
@@ -128,49 +132,47 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
     })
     .toBeGreaterThan(2.4);
 
-  // One player at a time: starting the second pauses the first, and the first says so.
-  const players = card.locator('audio');
-  const firstButton = card.locator('button[title*="Воспроизвести"], button[title*="Пауза"]').nth(0);
-  const secondButton = card.locator('button[title*="Воспроизвести"], button[title*="Пауза"]').nth(1);
+  // This card expands one track at a time. Open another card to test playback exclusivity.
+  await secondTile.click({ timeout: 5000 });
+  await expect(firstTile).toHaveAttribute('aria-expanded', 'false');
+  await expect(card.getByTestId('audio-row-meta').getByText('второй_трек', { exact: true })).toBeVisible();
+  await expect(card.locator('audio')).toHaveCount(1);
+  await firstTile.click({ timeout: 5000 });
+  const single = page.locator('#item-probe_single_song');
+  await single.getByRole('button', { name: 'beatles - Hey Jude.wav', exact: true }).click({ timeout: 5000 });
+  const firstAudio = card.locator('audio');
+  const secondAudio = single.locator('audio');
+  const playerButton = 'button[title="Воспроизвести"], button[title="Пауза"]';
+  const firstButton = card.locator(playerButton);
+  const secondButton = single.locator(playerButton);
   await firstButton.click();
   // `paused` on the element is the state the row is armed in; the title only follows it
   // after the `play` event. The collision guard pauses the first row synchronously inside
   // the second row's `play` event, so the invariant is polled instead of slept on.
   await expect
-    .poll(() => players.nth(0).evaluate((el: HTMLAudioElement) => el.paused), {
+    .poll(() => firstAudio.evaluate((el: HTMLAudioElement) => el.paused), {
       message: 'the first row actually starts playing',
       timeout: 5000,
     })
     .toBe(false);
   await secondButton.click();
   await expect
-    .poll(() => players.evaluateAll((els: HTMLAudioElement[]) => els.map(el => el.paused)), {
+    .poll(() => Promise.all([firstAudio, secondAudio].map(audio => audio.evaluate((el: HTMLAudioElement) => el.paused))), {
       message: 'starting the second row leaves exactly one playhead',
       timeout: 5000,
     })
     .toEqual([true, false]);
-  const pausedStates = await players.evaluateAll((els: HTMLAudioElement[]) => els.map(el => el.paused));
-  console.log('PAUSED', JSON.stringify(pausedStates));
-  expect(pausedStates[0]).toBe(true);
-  expect(pausedStates[1]).toBe(false);
   // The paused row says so on its own button, not just in the media element.
-  await expect
-    .poll(
-      () =>
-        card
-          .locator('button[title*="Воспроизвести"], button[title*="Пауза"]')
-          .evaluateAll((els: HTMLButtonElement[]) => els.map(el => el.title)),
-      { message: 'buttons follow the playhead', timeout: 5000 },
-    )
-    .toEqual(['Воспроизвести', 'Пауза']);
+  await expect(firstButton).toHaveAttribute('title', 'Воспроизвести');
+  await expect(secondButton).toHaveAttribute('title', 'Пауза');
 
   await card.screenshot({ path: 'test-results/screenshots/voice-card-names.png' });
 
   // A single named track gets the same header + line as a multi-track card.
-  const single = page.locator('.group').filter({ hasText: 'Hey Jude' }).first();
-  await expect(single).toBeVisible({ timeout: 10000 });
-  await expect(single.locator('text=beatles')).toBeVisible();
-  await expect(single.locator('text=.wav')).toHaveCount(0);
+  const singleMeta = single.getByTestId('audio-row-meta');
+  await expect(singleMeta.getByText('beatles', { exact: true })).toBeVisible();
+  await expect(singleMeta.getByText('.wav')).toHaveCount(0);
+  await secondButton.click({ timeout: 5000 });
   await expect(single.getByTestId('voice-progress')).toHaveCount(0);
   await expect(single.getByTestId('audio-row-meta')).toBeVisible();
 
@@ -191,10 +193,10 @@ test('a card with several tracks: names on rows, real seeking, one playhead at a
   await single.screenshot({ path: 'test-results/screenshots/voice-single-song.png' });
 
   // A recorded memo has a machine name: no header, but it still owns a real line.
-  const audioCount = await page.locator('audio').count();
-  await expect(page.locator('[title="Перемотка"]')).toHaveCount(audioCount);
-  await expect(page.locator('[data-testid="audio-row-meta"]')).toHaveCount(audioCount - 1);
-  await expect(page.locator('text=voice_11-22-33')).toHaveCount(0);
+  const memo = page.locator('#item-probe_single_memo');
+  await memo.getByRole('button', { name: 'voice_11-22-33.webm', exact: true }).click({ timeout: 5000 });
+  await expect(memo.locator('[title="Перемотка"]')).toBeVisible();
+  await expect(memo.getByTestId('audio-row-meta')).toHaveCount(0);
 });
 
 test('a track whose bytes never arrived says so instead of arming a dead play button', async ({ page }) => {
@@ -235,11 +237,11 @@ test('a track whose bytes never arrived says so instead of arming a dead play bu
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('main').first()).toBeVisible({ timeout: 90000 });
 
-  const card = page.locator('.group').filter({ hasText: 'пропавший трек' }).first();
+  const card = page.locator('#item-probe_missing_audio');
   await expect(card).toBeVisible({ timeout: 10000 });
-  const play = card.locator('button[title="Файла нет на устройстве"]').first();
-  await expect(play).toBeVisible();
-  await expect(play).toBeDisabled();
-  await expect(card.getByText('файла нет', { exact: true }).first()).toBeVisible();
+  const tile = card.getByRole('button', { name: 'nostalgia - пропавший трек.wav', exact: true });
+  await expect(tile).toBeVisible();
+  await expect(tile).toBeDisabled();
+  await expect(tile.getByTestId('media-missing')).toHaveText('нет файла');
   await card.screenshot({ path: 'test-results/screenshots/audio-missing-file.png' });
 });
