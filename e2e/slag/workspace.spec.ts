@@ -295,14 +295,18 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
 
     // 3. Open FolderViewModal to set Type Filter to "Таски"
     const modal = await openViewModal(page);
-    const taskOption = modal.locator('button', { hasText: 'Таски' });
+    await modal.getByRole('button', { name: 'Фильтры', exact: true }).click();
+    const taskOption = modal.getByRole('button', { name: 'Таски', exact: true });
     await expect(taskOption).toBeVisible();
     await taskOption.click();
+    await expect(taskOption).toHaveAttribute('aria-pressed', 'true');
+    await modal.getByRole('button', { name: 'Назад', exact: true }).click({ timeout: 5000 });
     await page.keyboard.press('Escape');
+    await expect(modal).not.toBeVisible();
 
-    // 4. Verify the active type filter badge appears in the header
-    const taskBadge = page.locator('header span', { hasText: 'Таски' }).first();
-    await expect(taskBadge).toBeVisible();
+    // The compact header signals active filters on the menu trigger.
+    const filterTrigger = header.getByRole('button', { name: 'Вид и фильтры папки' });
+    await expect(filterTrigger).toHaveAttribute('data-filtered', 'true');
 
     // 6. Verify Composer new layout: top-right expand button, icon-only type selectors, TG-style mic/circle
     const expandBtn = page.locator('button[title*="Раскрыть в полноэкранный редактор"]').first();
@@ -310,10 +314,11 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
 
     const typeBtnComposer = page.locator('button[aria-label="Сменить тип записи"]').first();
     await expect(typeBtnComposer).toBeVisible();
-    await typeBtnComposer.click();
-    const taskOptionComposer = page.locator('body > div button', { hasText: 'Таска' }).first();
+    await typeBtnComposer.click({ timeout: 5000 });
+    const taskOptionComposer = page.getByRole('button', { name: 'Таска', exact: true });
     await expect(taskOptionComposer).toBeVisible();
-    await taskOptionComposer.click();
+    await taskOptionComposer.click({ timeout: 5000 });
+    await expect(typeBtnComposer).toContainText('Таска');
 
     // Verify empty state has media button (Mic or Video)
     const mediaBtn = page.locator('button[aria-label*="Записать"]').first();
@@ -495,7 +500,7 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
       fullPage: false,
     });
 
-    await page.keyboard.press('Escape');
+    await composerDialog.getByRole('button', { name: 'Закрыть', exact: true }).click({ timeout: 5000 });
     await expect(composerDialog).not.toBeVisible();
   });
 
@@ -524,9 +529,16 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     const demoCheckTrigger = page.locator('aside button', { hasText: 'demo_check' });
     await expect(demoCheckTrigger).toBeVisible();
 
-    // 4. Fresh vaults start clean (f239d6b) and offer the demo seeder in the empty state
-    await expect(page.locator('text=Хранилище пустое')).toBeVisible();
-    await page.locator('button', { hasText: 'Сгенерировать демо-заметки и папки' }).click();
+    // Fresh vaults start clean. The demo generator is a storage fixture, not an empty-state action.
+    const seedDemo = async () => {
+      await page.evaluate(async () => {
+        const { storage } = await import('/src/lib/storage/index.ts');
+        storage.seedDemoData();
+      });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+    };
+    await expect(page.getByText('Хранилище пустое', { exact: true })).toBeVisible();
+    await seedDemo();
 
     // 5. Verify demo note exists in Входящие
     await expect(page.locator('text=Добро пожаловать в SLAG').first()).toBeVisible();
@@ -555,17 +567,15 @@ test.describe('SLAG v2 Specification E2E Verification - Workspace', () => {
     const emptyHeading = page.locator('text=Хранилище пустое');
     await expect(emptyHeading).toBeVisible();
 
-    const seedButton = page.locator('button', { hasText: 'Сгенерировать демо-заметки и папки' });
-    await expect(seedButton).toBeVisible();
-
     // Capture visual screenshot of the empty vault mini-component
     await page.screenshot({
       path: 'test-results/screenshots/empty-vault-demo-seeder.png',
       fullPage: false,
     });
 
-    // 9. Click seed button
-    await seedButton.click();
+    // 9. Populate the empty vault again and verify it leaves the empty state.
+    await seedDemo();
+    await page.locator('aside span', { hasText: 'База знаний' }).first().click({ timeout: 5000 });
     await expect(page.locator('text=Горячие клавиши и разметка').first()).toBeVisible();
 
     const inboxBtn = page.locator('aside button', { hasText: 'Входящие' }).first();

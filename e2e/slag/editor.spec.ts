@@ -562,8 +562,9 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
       path: 'test-results/screenshots/calendar-slot-composer-modal.png',
       fullPage: false,
     });
-    await page.keyboard.press('Escape');
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible();
+    const weekComposer = page.getByRole('dialog').filter({ hasText: 'Новая задача' });
+    await weekComposer.getByRole('button', { name: 'Закрыть', exact: true }).click({ timeout: 5000 });
+    await expect(weekComposer).not.toBeVisible();
 
     // 8. Verify Month View day card directly spawns ComposerModal on click
     await page.locator('button', { hasText: 'Месяц' }).click();
@@ -650,7 +651,7 @@ test.describe('SLAG v2 Specification E2E Verification - Editor', () => {
     await page.waitForTimeout(400);
 
     // Verify task is now in Unscheduled list
-    const unscheduledCard = page.locator(`text=${uniqueUntimedTitle}`).first();
+    const unscheduledCard = page.getByTestId('calendar-drawer-task').filter({ hasText: uniqueUntimedTitle });
     await expect(unscheduledCard).toBeVisible();
 
     // 7. Drag unscheduled task from Drawer into "Весь день" row (untimed task)
